@@ -1,8 +1,8 @@
 {
   "name": "hyodo",
   "displayName": "HyoDo - AFO Kingdom Plugin",
-  "description": "Philosophy-driven agent orchestration plugin based on 眞善美孝永 (Truth, Goodness, Beauty, Serenity, Eternity). Features Trinity Score evaluation, 세종대왕의 정신 (장영실/이순신/신사임당) strategists, and 4-Gate CI quality gates.",
-  "version": "2.0.0-sejong",
+  "description": "Philosophy-driven agent orchestration plugin based on 眞善美孝永 (Truth, Goodness, Beauty, Serenity, Eternity). Features Trinity Score evaluation, 세종대왕의 정신 (장영실/이순신/신사임당) strategists, 오호대장군 (Ollama FREE debugging), and 4-Gate CI quality gates.",
+  "version": "3.0.0-ultrawork",
   "author": {
     "name": "AFO Kingdom",
     "url": "https://github.com/lofibrainwav"
@@ -18,7 +18,10 @@
     "strategists",
     "hyodo",
     "sejong",
-    "korean-history"
+    "korean-history",
+    "ollama",
+    "ultrawork",
+    "five-generals"
   ],
   "compatibility": {
     "claudeCode": ">=1.0.0"
@@ -28,7 +31,7 @@
     "agents": true,
     "skills": true,
     "mcp": false,
-    "hooks": false
+    "hooks": true
   },
   "philosophy": {
     "name": "세종대왕의 정신",
@@ -87,6 +90,48 @@
         "icon": "🌉",
         "specialty": "초충도, 묵죽도의 예술혼 - UX, 가독성, 커뮤니케이션",
         "question": "사용자가 이해할 수 있는가?"
+      }
+    ],
+    "generals": [
+      {
+        "name": "Guan Yu",
+        "korean": "관우",
+        "hanja": "關羽",
+        "model": "qwen2.5-coder:7b",
+        "role": "Code Review",
+        "weapon": "청룡언월도"
+      },
+      {
+        "name": "Zhang Fei",
+        "korean": "장비",
+        "hanja": "張飛",
+        "model": "deepseek-r1:7b",
+        "role": "Bug Tracking",
+        "weapon": "장팔사모"
+      },
+      {
+        "name": "Zhao Yun",
+        "korean": "조운",
+        "hanja": "趙雲",
+        "model": "qwen3:8b",
+        "role": "Test Generation",
+        "weapon": "용담창"
+      },
+      {
+        "name": "Ma Chao",
+        "korean": "마초",
+        "hanja": "馬超",
+        "model": "codestral:latest",
+        "role": "Fast Code Gen",
+        "weapon": "서량철기"
+      },
+      {
+        "name": "Huang Zhong",
+        "korean": "황충",
+        "hanja": "黃忠",
+        "model": "qwen3-vl:latest",
+        "role": "UI Analysis",
+        "weapon": "백보천양"
       }
     ]
   }

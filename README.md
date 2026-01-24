@@ -1,10 +1,17 @@
-# HyoDo (孝道) - AFO Kingdom Plugin v2.0.0-sejong
+# HyoDo (孝道) - AFO Kingdom Plugin v3.0.0-ultrawork
 
-> **세종대왕의 정신: 백성을 위한 실용적 혁신**
+> **세종대왕의 정신 + 오호대장군: 전략가가 지휘하고, 무장이 실행한다**
 
 Philosophy-driven agent orchestration plugin for Claude Code, based on the wisdom of **眞善美孝永** (Truth, Goodness, Beauty, Serenity, Eternity).
 
-## What's New in v2.0.0-sejong
+## What's New in v3.0.0-ultrawork
+
+- **오호대장군 (五虎大將軍)** - Ollama 기반 FREE 티어 디버깅 군단
+- **훅 시스템** - pre_tool, on_error 훅으로 자동화
+- **ultrawork** - 병렬 작업 실행 (비용 $0.00)
+- **토큰 버닝 최적화** - 50-70% 비용 절감
+
+### v2.0.0-sejong (이전)
 
 - **세종대왕의 정신** - 삼국지 전략가에서 조선 위인으로 마이그레이션
 - **Chancellor V3** - CostAwareRouter + KeyTriggerRouter 연동
@@ -44,6 +51,7 @@ Trinity Score = (眞 × 0.35) + (善 × 0.35) + (美 × 0.20) + (孝 × 0.08) + 
 |---------|-------------|
 | `/trinity [task]` | Calculate Trinity Score |
 | `/strategist [topic]` | 세종대왕의 정신 - 3 전략가 분석 |
+| `/ultrawork [tasks]` | **NEW** 병렬 작업 실행 - 오호대장군 |
 | `/chancellor-v3` | Chancellor V3 라우팅 시스템 제어 |
 | `/organs` | 十一臟腑 건강 상태 체크 |
 | `/cost-estimate` | 작업 비용 사전 예측 |
@@ -78,6 +86,29 @@ Before (삼국지)              After (세종대왕)
 |-------|---------|
 | **trinity-guardian** | Monitors Trinity Score on code changes |
 | **quality-gate** | Runs 4-Gate CI (Pyright → Ruff → pytest → SBOM) |
+| **ollama-debugger** | **NEW** 오호대장군 - FREE 티어 디버깅 |
+
+## 오호대장군 (五虎大將軍) - Ollama 디버깅 군단
+
+> "전략가가 지휘하고, 무장이 실행한다"
+
+| 장군 | 한자 | 모델 | 역할 |
+|------|------|------|------|
+| **관우** | 關羽 | qwen2.5-coder:7b | 코드 리뷰/리팩터링 |
+| **장비** | 張飛 | deepseek-r1:7b | 버그 추적/디버깅 |
+| **조운** | 趙雲 | qwen3:8b | 테스트 생성/검증 |
+| **마초** | 馬超 | codestral:latest | 빠른 코드 생성 |
+| **황충** | 黃忠 | qwen3-vl:latest | UI/스크린샷 분석 |
+
+**비용**: $0.00 (모든 작업 FREE 티어)
+
+## Hooks
+
+| Hook | Type | Description |
+|------|------|-------------|
+| **cost_check** | pre_tool | 비용 티어 체크 - FREE 우선 라우팅 |
+| **safety_gate** | pre_tool | 이순신 안전 게이트 - 위험 작업 차단 |
+| **ollama_debug** | on_error | 에러 시 오호대장군 자동 호출 |
 
 ## Skills
 
@@ -101,22 +132,30 @@ Before (삼국지)              After (세종대왕)
 ```
 HyoDo/
 ├── .claude-plugin/
-│   └── plugin.json        # Plugin metadata (v2.0.0-sejong)
-├── commands/              # 11 slash commands
+│   └── plugin.json        # Plugin metadata (v3.0.0-ultrawork)
+├── commands/              # 12 slash commands
 │   ├── trinity.md
 │   ├── strategist.md      # 세종대왕의 정신
-│   ├── chancellor-v3.md   # NEW: V3 라우팅
-│   ├── organs.md          # NEW: 十一臟腑
-│   ├── cost-estimate.md   # NEW: 비용 예측
-│   ├── routing.md         # NEW: 트리거 분석
+│   ├── ultrawork.md       # NEW: 병렬 실행
+│   ├── chancellor-v3.md   # V3 라우팅
+│   ├── organs.md          # 十一臟腑
+│   ├── cost-estimate.md   # 비용 예측
+│   ├── routing.md         # 트리거 분석
 │   ├── check.md
 │   ├── preflight.md
 │   ├── evidence.md
 │   ├── rollback.md
 │   └── ssot.md
-├── agents/                # 2 autonomous agents
+├── agents/                # 3 autonomous agents
 │   ├── trinity-guardian.md
-│   └── quality-gate.md
+│   ├── quality-gate.md
+│   └── ollama-debugger.md # NEW: 오호대장군
+├── hooks/                 # NEW: Hook system
+│   ├── pre_tool/
+│   │   ├── cost_check.md
+│   │   └── safety_gate.md
+│   └── on_error/
+│       └── ollama_debug.md
 ├── skills/                # 4 skill modules
 │   ├── trinity-score-calculator/
 │   ├── strategy-engine/
