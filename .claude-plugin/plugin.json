@@ -1,8 +1,8 @@
 {
   "name": "hyodo",
   "displayName": "HyoDo - AFO Kingdom Plugin",
-  "description": "Philosophy-driven agent orchestration plugin based on 眞善美孝永 (Truth, Goodness, Beauty, Serenity, Eternity). Trinity = Serenity + Eternity. Features Trinity Score evaluation, 3 Strategists consensus, and 4-Gate CI quality gates.",
-  "version": "1.0.0",
+  "description": "Philosophy-driven agent orchestration plugin based on 眞善美孝永 (Truth, Goodness, Beauty, Serenity, Eternity). Features Trinity Score evaluation, 세종대왕의 정신 (장영실/이순신/신사임당) strategists, and 4-Gate CI quality gates.",
+  "version": "2.0.0-sejong",
   "author": {
     "name": "AFO Kingdom",
     "url": "https://github.com/lofibrainwav"
@@ -17,8 +17,8 @@
     "mcp",
     "strategists",
     "hyodo",
-    "serenity",
-    "eternity"
+    "sejong",
+    "korean-history"
   ],
   "compatibility": {
     "claudeCode": ">=1.0.0"
@@ -31,8 +31,8 @@
     "hooks": false
   },
   "philosophy": {
-    "name": "HyoDo (孝道)",
-    "meaning": "The Way of Serenity - Trinity = Serenity + Eternity",
+    "name": "세종대왕의 정신",
+    "meaning": "백성을 위한 실용적 혁신과 문화적 융성",
     "pillars": {
       "truth": {
         "korean": "眞",
@@ -62,19 +62,31 @@
     },
     "strategists": [
       {
-        "name": "Zhuge Liang",
-        "korean": "諸葛亮",
-        "role": "眞 Sword"
+        "name": "Jang Yeong-sil",
+        "korean": "장영실",
+        "hanja": "蔣英實",
+        "role": "眞 Sword",
+        "icon": "⚔️",
+        "specialty": "측우기, 자격루의 정밀함 - 기술적 정확성, 검증, 아키텍처",
+        "question": "이 설계가 3년 후에도 유효한가?"
       },
       {
-        "name": "Sima Yi",
-        "korean": "司馬懿",
-        "role": "善 Shield"
+        "name": "Yi Sun-sin",
+        "korean": "이순신",
+        "hanja": "李舜臣",
+        "role": "善 Shield",
+        "icon": "🛡️",
+        "specialty": "거북선, 학익진의 수호 - 안전성, 리스크 평가, 게이트키핑",
+        "question": "최악의 경우 무슨 일이 발생하는가?"
       },
       {
-        "name": "Zhou Yu",
-        "korean": "周瑜",
-        "role": "美 Bridge"
+        "name": "Shin Saimdang",
+        "korean": "신사임당",
+        "hanja": "申師任堂",
+        "role": "美 Bridge",
+        "icon": "🌉",
+        "specialty": "초충도, 묵죽도의 예술혼 - UX, 가독성, 커뮤니케이션",
+        "question": "사용자가 이해할 수 있는가?"
       }
     ]
   }

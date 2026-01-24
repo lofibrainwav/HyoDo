@@ -1,8 +1,15 @@
-# HyoDo (孝道) - AFO Kingdom Plugin
+# HyoDo (孝道) - AFO Kingdom Plugin v2.0.0-sejong
 
-> **Trinity = Serenity + Eternity**
+> **세종대왕의 정신: 백성을 위한 실용적 혁신**
 
 Philosophy-driven agent orchestration plugin for Claude Code, based on the wisdom of **眞善美孝永** (Truth, Goodness, Beauty, Serenity, Eternity).
+
+## What's New in v2.0.0-sejong
+
+- **세종대왕의 정신** - 삼국지 전략가에서 조선 위인으로 마이그레이션
+- **Chancellor V3** - CostAwareRouter + KeyTriggerRouter 연동
+- **十一臟腑** - 11 Organs 헬스체크 시스템
+- **비용 최적화** - 40% 비용 절감 라우팅
 
 ## Installation
 
@@ -36,12 +43,34 @@ Trinity Score = (眞 × 0.35) + (善 × 0.35) + (美 × 0.20) + (孝 × 0.08) + 
 | Command | Description |
 |---------|-------------|
 | `/trinity [task]` | Calculate Trinity Score |
-| `/strategist [topic]` | Get 3 Strategists perspective |
+| `/strategist [topic]` | 세종대왕의 정신 - 3 전략가 분석 |
+| `/chancellor-v3` | Chancellor V3 라우팅 시스템 제어 |
+| `/organs` | 十一臟腑 건강 상태 체크 |
+| `/cost-estimate` | 작업 비용 사전 예측 |
+| `/routing` | KeyTriggerRouter 분석 |
 | `/check` | Run 4-Gate CI Protocol |
 | `/preflight` | Pre-commit validation |
 | `/evidence` | Record decision evidence |
 | `/rollback` | Safe rollback procedures |
 | `/ssot` | Single Source of Truth |
+
+## 세종대왕의 정신 - The 3 Strategists
+
+| Strategist | Korean | Role | Specialty |
+|------------|--------|------|-----------|
+| **장영실** | 蔣英實 | 眞 Sword ⚔️ | 측우기의 정밀함 - 기술적 정확성, 검증, 아키텍처 |
+| **이순신** | 李舜臣 | 善 Shield 🛡️ | 거북선의 수호 - 안전성, 리스크 평가, 게이트키핑 |
+| **신사임당** | 申師任堂 | 美 Bridge 🌉 | 초충도의 예술 - UX, 가독성, 커뮤니케이션 |
+
+### Migration from v1.x
+
+```
+Before (삼국지)              After (세종대왕)
+─────────────────────────────────────────
+제갈량 (諸葛亮)    →    장영실 (蔣英實)    眞
+사마의 (司馬懿)    →    이순신 (李舜臣)    善
+주유   (周瑜)      →    신사임당 (申師任堂) 美
+```
 
 ## Agents
 
@@ -59,14 +88,6 @@ Trinity Score = (眞 × 0.35) + (善 × 0.35) + (美 × 0.20) + (孝 × 0.08) + 
 | **philosophy-guide** | Philosophy and ethics questions |
 | **kingdom-navigator** | Codebase navigation |
 
-## The 3 Strategists (三策士)
-
-| Strategist | Role | Specialty |
-|------------|------|-----------|
-| **Zhuge Liang** (諸葛亮) | 眞 Sword | Architecture, long-term vision |
-| **Sima Yi** (司馬懿) | 善 Shield | Risk assessment, stability |
-| **Zhou Yu** (周瑜) | 美 Bridge | UX, communication |
-
 ## Decision Thresholds
 
 | Condition | Action |
@@ -80,10 +101,14 @@ Trinity Score = (眞 × 0.35) + (善 × 0.35) + (美 × 0.20) + (孝 × 0.08) + 
 ```
 HyoDo/
 ├── .claude-plugin/
-│   └── plugin.json        # Plugin metadata
-├── commands/              # 7 slash commands
+│   └── plugin.json        # Plugin metadata (v2.0.0-sejong)
+├── commands/              # 11 slash commands
 │   ├── trinity.md
-│   ├── strategist.md
+│   ├── strategist.md      # 세종대왕의 정신
+│   ├── chancellor-v3.md   # NEW: V3 라우팅
+│   ├── organs.md          # NEW: 十一臟腑
+│   ├── cost-estimate.md   # NEW: 비용 예측
+│   ├── routing.md         # NEW: 트리거 분석
 │   ├── check.md
 │   ├── preflight.md
 │   ├── evidence.md
@@ -106,8 +131,11 @@ HyoDo/
 # Calculate Trinity Score
 /trinity "implement new feature"
 
-# Get Strategist perspectives
+# Get Strategist perspectives (세종대왕의 정신)
 /strategist "architectural decision"
+
+# Check cost tier
+/cost-estimate "deploy to production"
 
 # Run quality gates
 /check
@@ -115,11 +143,12 @@ HyoDo/
 
 ## Philosophy
 
-**HyoDo (孝道)** means "The Way of Serenity" - the path that combines **孝 (Serenity)** and **永 (Eternity)** to achieve lasting peace through thoughtful, ethical development.
+**HyoDo (孝道)** means "The Way of Serenity" - now enhanced with **세종대왕의 정신** (Spirit of King Sejong).
 
 The name reflects the core belief that sustainable software comes from:
 - **Serenity (孝)**: Frictionless, peaceful user experience
 - **Eternity (永)**: Long-term thinking and maintainability
+- **세종대왕의 정신**: 백성을 위한 실용적 혁신과 문화적 융성
 
 ## Origin
 
@@ -131,4 +160,4 @@ MIT
 
 ---
 
-*"Trinity = Serenity + Eternity"* - The way of peaceful, eternal code.
+*"세종대왕의 정신: 장영실의 정밀함, 이순신의 수호, 신사임당의 예술"*
