@@ -1,0 +1,81 @@
+{
+  "name": "hyodo",
+  "displayName": "HyoDo - AFO Kingdom Plugin",
+  "description": "Philosophy-driven agent orchestration plugin based on 眞善美孝永 (Truth, Goodness, Beauty, Serenity, Eternity). Trinity = Serenity + Eternity. Features Trinity Score evaluation, 3 Strategists consensus, and 4-Gate CI quality gates.",
+  "version": "1.0.0",
+  "author": {
+    "name": "AFO Kingdom",
+    "url": "https://github.com/lofibrainwav"
+  },
+  "repository": "https://github.com/lofibrainwav/HyoDo",
+  "license": "MIT",
+  "keywords": [
+    "agent-orchestration",
+    "trinity-score",
+    "philosophy",
+    "langgraph",
+    "mcp",
+    "strategists",
+    "hyodo",
+    "serenity",
+    "eternity"
+  ],
+  "compatibility": {
+    "claudeCode": ">=1.0.0"
+  },
+  "features": {
+    "commands": true,
+    "agents": true,
+    "skills": true,
+    "mcp": false,
+    "hooks": false
+  },
+  "philosophy": {
+    "name": "HyoDo (孝道)",
+    "meaning": "The Way of Serenity - Trinity = Serenity + Eternity",
+    "pillars": {
+      "truth": {
+        "korean": "眞",
+        "weight": 0.35,
+        "description": "Technical accuracy, verifiability"
+      },
+      "goodness": {
+        "korean": "善",
+        "weight": 0.35,
+        "description": "Ethical soundness, stability"
+      },
+      "beauty": {
+        "korean": "美",
+        "weight": 0.20,
+        "description": "Elegant design, UX clarity"
+      },
+      "serenity": {
+        "korean": "孝",
+        "weight": 0.08,
+        "description": "Frictionless operation, peace"
+      },
+      "eternity": {
+        "korean": "永",
+        "weight": 0.02,
+        "description": "Long-term sustainability"
+      }
+    },
+    "strategists": [
+      {
+        "name": "Zhuge Liang",
+        "korean": "諸葛亮",
+        "role": "眞 Sword"
+      },
+      {
+        "name": "Sima Yi",
+        "korean": "司馬懿",
+        "role": "善 Shield"
+      },
+      {
+        "name": "Zhou Yu",
+        "korean": "周瑜",
+        "role": "美 Bridge"
+      }
+    ]
+  }
+}
