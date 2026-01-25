@@ -161,7 +161,12 @@ HyoDo/
 │   ├── strategy-engine/
 │   ├── philosophy-guide/
 │   └── kingdom-navigator/
-└── README.md
+├── README.md
+├── QUICK_START.md         # NEW: 5분 시작 가이드
+├── CONTRIBUTING.md        # NEW: 기여 가이드
+├── CHANGELOG.md           # NEW: 변경 이력
+├── SECURITY.md            # NEW: 보안 정책
+└── LICENSE                # MIT License
 ```
 
 ## Quick Start
@@ -193,9 +198,18 @@ The name reflects the core belief that sustainable software comes from:
 
 This plugin is derived from the [AFO Kingdom](https://github.com/anthropics/AFO_Kingdom) project, an agent orchestration system built on East Asian philosophy principles.
 
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [QUICK_START.md](QUICK_START.md) | 5분 시작 가이드 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 기여 가이드 (眞善美 원칙) |
+| [CHANGELOG.md](CHANGELOG.md) | 버전별 변경 이력 |
+| [SECURITY.md](SECURITY.md) | 이순신 보안 정책 |
+
 ## License
 
-MIT
+MIT - See [LICENSE](LICENSE) for details
 
 ---
 
