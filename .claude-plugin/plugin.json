@@ -40,27 +40,27 @@
       "truth": {
         "korean": "眞",
         "weight": 0.35,
-        "description": "Technical accuracy, verifiability"
+        "description": "Technical accuracy, verifiability, factual correctness"
       },
       "goodness": {
         "korean": "善",
         "weight": 0.35,
-        "description": "Ethical soundness, stability"
+        "description": "Ethical soundness, stability, no harm to systems"
       },
       "beauty": {
         "korean": "美",
-        "weight": 0.20,
-        "description": "Elegant design, UX clarity"
+        "weight": 0.2,
+        "description": "Clear structure, elegant design, UX clarity"
       },
       "serenity": {
         "korean": "孝",
         "weight": 0.08,
-        "description": "Frictionless operation, peace"
+        "description": "Frictionless operation, low cognitive load"
       },
       "eternity": {
         "korean": "永",
         "weight": 0.02,
-        "description": "Long-term sustainability"
+        "description": "Long-term sustainability, reproducibility"
       }
     },
     "strategists": [
@@ -71,7 +71,7 @@
         "role": "眞 Sword",
         "icon": "⚔️",
         "specialty": "측우기, 자격루의 정밀함 - 기술적 정확성, 검증, 아키텍처",
-        "question": "이 설계가 3년 후에도 유효한가?"
+        "question": "이 설계가 3년 후에도 유효한가? 기술 부채가 발생하는가?"
       },
       {
         "name": "Yi Sun-sin",
@@ -80,7 +80,7 @@
         "role": "善 Shield",
         "icon": "🛡️",
         "specialty": "거북선, 학익진의 수호 - 안전성, 리스크 평가, 게이트키핑",
-        "question": "최악의 경우 무슨 일이 발생하는가?"
+        "question": "최악의 경우 무슨 일이 발생하는가? 테스트가 충분한가?"
       },
       {
         "name": "Shin Saimdang",
@@ -89,7 +89,7 @@
         "role": "美 Bridge",
         "icon": "🌉",
         "specialty": "초충도, 묵죽도의 예술혼 - UX, 가독성, 커뮤니케이션",
-        "question": "사용자가 이해할 수 있는가?"
+        "question": "사용자가 이해할 수 있는가? 복잡성을 숨길 수 있는가?"
       }
     ],
     "generals": [
