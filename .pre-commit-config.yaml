@@ -1,0 +1,68 @@
+# HyoDo Pre-commit Configuration
+# 이순신 안전 게이트: 커밋 전 품질 검증
+
+repos:
+  # ─────────────────────────────────────────
+  # 眞 (Truth) - 기술적 정확성
+  # ─────────────────────────────────────────
+
+  # Markdown 린트
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.39.0
+    hooks:
+      - id: markdownlint
+        args: ["--fix"]
+        files: \.(md|markdown)$
+
+  # JSON 유효성
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-json
+      - id: check-yaml
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+
+  # ─────────────────────────────────────────
+  # 善 (Goodness) - 안전성
+  # ─────────────────────────────────────────
+
+  # 비밀 키 감지
+  - repo: https://github.com/Yelp/detect-secrets
+    rev: v1.4.0
+    hooks:
+      - id: detect-secrets
+        args: ["--baseline", ".secrets.baseline"]
+        exclude: package-lock.json
+
+  # 대용량 파일 방지
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: check-added-large-files
+        args: ["--maxkb=1000"]
+
+  # ─────────────────────────────────────────
+  # 美 (Beauty) - 가독성
+  # ─────────────────────────────────────────
+
+  # Prettier (JSON, YAML, MD)
+  - repo: https://github.com/pre-commit/mirrors-prettier
+    rev: v3.1.0
+    hooks:
+      - id: prettier
+        types_or: [json, yaml, markdown]
+
+# ─────────────────────────────────────────
+# 세종대왕의 정신: 장영실의 정밀함으로 품질 보장
+# ─────────────────────────────────────────
+
+default_language_version:
+  python: python3.11
+
+ci:
+  autofix_commit_msg: |
+    [pre-commit.ci] 자동 수정
+
+    Co-Authored-By: 장영실 (眞 Sword) <jang@afo.kingdom>
+  autoupdate_commit_msg: "[pre-commit.ci] pre-commit 자동 업데이트"
