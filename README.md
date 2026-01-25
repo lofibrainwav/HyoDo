@@ -33,6 +33,8 @@
 
 ## 🏛️ Architecture (지능형 오장육부)
 
+![AFO Kingdom Intelligence Architecture](file:///Users/brnestrm/.gemini/antigravity/brain/8f2e465b-82c1-4ba9-a1cf-b8591bfe2384/afo_kingdom_architecture_visual_1769360156661.png)
+
 ```mermaid
 graph TD
     subgraph "👑 Command & Control"
