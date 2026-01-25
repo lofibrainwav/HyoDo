@@ -58,11 +58,12 @@ total = (眞 * 0.35) + (善 * 0.35) + (美 * 0.20) + (孝 * 0.08) + (永 * 0.02)
 
 ## 행동 결정
 
-| 조건                           | 행동            |
-| ---------------------------- | ------------- |
-| Trinity >= 90 AND Risk <= 10 | AUTO_RUN      |
-| 그 외                          | ASK_COMMANDER |
-| Secrets/Auth/Prod 영향         | BLOCK         |
+| 조건 | 행동 |
+| :--- | :--- |
+| **Trinity >= 90 AND Risk <= 10** | **AUTO_RUN** (즉시 승인) |
+| **Trinity >= 75 AND Risk <= 25** | **ASK_COMMANDER** (사령관 확인 필요) |
+| **Trinity < 70 OR Risk > 30** | **BLOCK** (기술적/철학적 차단) |
+| **Secrets/Auth 영향 감지** | **CRITICAL_BLOCK** (이순신 방패) |
 
 ## 출력 형식
 

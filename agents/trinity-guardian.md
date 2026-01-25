@@ -57,9 +57,9 @@ allowed-tools:
 1. **변경 감지**: git diff를 분석하여 변경 범위 파악
 2. **점수 계산**: MCP 도구로 Trinity Score 계산
 3. **평가 결과**:
-   - Score >= 90 AND Risk <= 10: "AUTO_RUN 승인" 메시지
-   - Score 70-89 OR Risk 11-30: 개선 필요 항목 제시
-   - Score < 70 OR Risk > 30: "BLOCK" 경고 및 상세 사유
+   - **Score >= 90 AND Risk <= 10**: "AUTO_RUN 승인" 메시지
+   - **Score >= 75 AND Risk <= 25**: "NEEDS_REVIEW (사령관 확인)"
+   - **Score < 70 OR Risk > 30**: "BLOCK (중단 보호)"
 
 ## 출력 형식
 
