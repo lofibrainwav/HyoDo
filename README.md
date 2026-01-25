@@ -26,14 +26,13 @@
 
 ---
 
-## 더 알고 싶다면? (Advanced Mode)
-
-<details>
-<summary>📚 고급 기능 보기</summary>
+---
 
 ## 🏛️ Architecture (지능형 오장육부)
 
-![AFO Kingdom Intelligence Architecture](file:///Users/brnestrm/.gemini/antigravity/brain/8f2e465b-82c1-4ba9-a1cf-b8591bfe2384/afo_kingdom_architecture_visual_1769360156661.png)
+![AFO Kingdom Intelligence Architecture](docs/images/architecture.png)
+
+왕국의 지능은 **승상**을 중심으로 4인의 학자와 3인의 책사가 조율하는 '지능형 오장육부' 체계로 작동합니다.
 
 ```mermaid
 graph TD
@@ -58,17 +57,26 @@ graph TD
     Heo & Jeong & Ryu & Kim --> Jang & Yi & Shin
 ```
 
-### 眞善美孝永 (The Five Pillars)
+---
+
+## 📜 眞善美孝永 (The Five Pillars)
 
 HyoDo는 **Trinity Score**를 통해 코드의 완성도를 측정합니다.
 
 | 기둥 | 의미 | 비중 | 담당 |
-|------|------|------|------|
-| **眞** (Truth) | 정확성 | 35% | 정약용/장영실 |
-| **善** (Goodness) | 안전성 | 35% | 류성룡/이순신 |
-| **美** (Beauty) | 가독성 | 20% | 허준/신사임당 |
-| **孝** (Serenity) | 편의성 | 8% | 승상 |
-| **永** (Eternity) | 지속성 | 2% | 승상/김유신 |
+| :--- | :--- | :---: | :--- |
+| **眞** (Truth) | 기술적 정확성 | 35% | 정약용 / 장영실 |
+| **善** (Goodness) | 윤리 및 안정성 | 35% | 류성룡 / 이순신 |
+| **美** (Beauty) | 서사 및 UX | 20% | 허준 / 신사임당 |
+| **孝** (Serenity) | 평온 수호 | 8% | 승상 |
+| **永** (Eternity) | 지속성 유지 | 2% | 승상 / 김유신 |
+
+---
+
+## 📚 고급 기능 (Advanced Mode)
+
+<details>
+<summary>상세 내용 보기 (고급 명령어 및 전략가 질문)</summary>
 
 ### 고급 명령어
 
