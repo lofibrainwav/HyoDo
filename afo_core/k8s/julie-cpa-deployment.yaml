@@ -1,0 +1,62 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: julie-cpa
+  namespace: afo-kingdom
+  labels:
+    app: julie-cpa
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: julie-cpa
+  template:
+    metadata:
+      labels:
+        app: julie-cpa
+    spec:
+      containers:
+      - name: julie-cpa
+        image: afo/julie-cpa:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8010
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8010
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8010
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: afo-secrets
+              key: database-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: julie-cpa-service
+  namespace: afo-kingdom
+spec:
+  selector:
+    app: julie-cpa
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8010
+  type: LoadBalancer

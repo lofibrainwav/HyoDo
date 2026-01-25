@@ -1,0 +1,44 @@
+# Prometheus Configuration for AFO Kingdom
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'afo-kingdom'
+    env: 'development'
+
+# Rule files for alerting
+rule_files:
+  - "/etc/prometheus/alerting_rules.yml"
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - alertmanager:9093
+
+# Scrape configuration
+scrape_configs:
+  # Soul Engine API (main backend)
+  # Note: API Server runs on port 8010 (see config/settings.py)
+  # If using Docker port mapping, adjust target port accordingly
+  - job_name: 'afo-soul-engine'
+    static_configs:
+      - targets: ['host.docker.internal:8010']
+    metrics_path: '/metrics'
+    scrape_interval: 10s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Optional: Node exporter for system metrics
+  # - job_name: 'node'
+  #   static_configs:
+  #     - targets: ['node-exporter:9100']
+
+  # Optional: Docker metrics
+  # - job_name: 'docker'
+  #   static_configs:
+  #     - targets: ['cadvisor:8080']

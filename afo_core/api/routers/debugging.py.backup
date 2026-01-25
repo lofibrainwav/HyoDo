@@ -1,0 +1,75 @@
+# Trinity Score: 90.0 (Established by Chancellor)
+import asyncio
+import datetime
+import json
+from collections.abc import AsyncGenerator
+from typing import Any
+
+from fastapi import APIRouter, Request
+from sse_starlette.sse import EventSourceResponse
+
+router = APIRouter(tags=["Debugging Agent"])
+
+
+@router.get("/debugging/stream")
+@router.get("/api/debugging/stream")
+async def debugging_stream(request: Request) -> EventSourceResponse:
+    """Stream real-time self-healing logs and agent status."""
+
+    async def event_generator() -> AsyncGenerator[dict[str, Any], None]:
+        # Initial handshake
+        yield {
+            "event": "connected",
+            "data": json.dumps(
+                {
+                    "message": "🛡️ Healing Agent Stream Connected",
+                    "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                    "agent": "Yeongdeok (Guardian)",
+                }
+            ),
+        }
+
+        # Connect to Real System Pulse (Heart)
+        try:
+            import redis.asyncio as redis
+
+            from AFO.utils.redis_connection import get_redis_url
+
+            redis_url = get_redis_url()
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            pubsub = redis_client.pubsub()
+            await pubsub.subscribe("kingdom:logs:stream")
+
+            # Yield real logs from the Kingdom's nervous system
+            async for message in pubsub.listen():
+                if await request.is_disconnected():
+                    break
+
+                if message["type"] == "message":
+                    # Real log event from system
+                    yield {"event": "update", "data": message["data"]}
+
+        except Exception as e:
+            # Fallback only if Heart connection fails
+            yield {
+                "event": "error",
+                "data": json.dumps({"message": f"Heart connection failed: {e!s}"}),
+            }
+
+            # Temporary heartbeat while reconnecting
+            while True:
+                if await request.is_disconnected():
+                    break
+                await asyncio.sleep(5)
+                yield {
+                    "event": "update",
+                    "data": json.dumps(
+                        {
+                            "type": "heartbeat",
+                            "status": "reconnecting",
+                            "timestamp": datetime.datetime.now(datetime.UTC).isoformat(),
+                        }
+                    ),
+                }
+
+    return EventSourceResponse(event_generator())

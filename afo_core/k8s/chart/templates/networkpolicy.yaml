@@ -1,0 +1,51 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "afo-kingdom.fullname" . }}-default-deny
+  labels:
+    {{- include "afo-kingdom.labels" . | nindent 4 }}
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "afo-kingdom.fullname" . }}-allow-core
+  labels:
+    {{- include "afo-kingdom.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "afo-kingdom.selectorLabels" . | nindent 6 }}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          {{- include "afo-kingdom.selectorLabels" . | nindent 10 }}
+    # Allow Ingress from Ingress Controller (optional, depends on setup)
+    # - namespaceSelector: {} 
+    ports:
+    - protocol: TCP
+      port: {{ .Values.service.port }}
+  egress:
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 10.0.0.0/8
+        - 192.168.0.0/16
+        - 172.16.0.0/12
+    # Allow egress to internal DNS
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53
+    # Allow egress to DB/Redis (assuming they are external or explicitly allowed IPs)
+    # If in-cluster, need podSelector rules.

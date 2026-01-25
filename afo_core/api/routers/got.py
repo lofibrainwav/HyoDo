@@ -1,0 +1,182 @@
+# Trinity Score: 90.0 (Established by Chancellor)
+"""Graph of Thought (GoT) Router for AFO Kingdom
+생각의 그물 - Graph-based reasoning and thought traversal API.
+
+Enables structured thinking through graph nodes, allowing complex reasoning
+chains to be visualized and traversed.
+"""
+
+import logging
+from datetime import UTC, datetime
+from typing import Any
+from uuid import uuid4
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from AFO.utils.standard_shield import shield
+
+logger = logging.getLogger("AFO.GoT")
+router = APIRouter(tags=["Graph of Thought"])
+
+
+# --- Pydantic Models ---
+
+
+class ThoughtNode(BaseModel):
+    """A single node in the graph of thought."""
+
+    id: str = Field(default_factory=lambda: str(uuid4())[:8])
+    content: str
+    node_type: str = Field(
+        default="reasoning", description="reasoning, decision, observation, conclusion"
+    )
+    confidence: float = Field(default=0.8, ge=0.0, le=1.0)
+    parent_id: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class ThoughtGraph(BaseModel):
+    """A complete graph of thoughts."""
+
+    id: str = Field(default_factory=lambda: str(uuid4()))
+    title: str
+    nodes: list[ThoughtNode] = Field(default_factory=list)
+    edges: list[tuple[str, str]] = Field(default_factory=list)
+    created_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
+    trinity_score: float = 0.0
+
+
+class CreateGraphRequest(BaseModel):
+    """Request to create a new thought graph."""
+
+    title: str
+    initial_thought: str
+
+
+class AddNodeRequest(BaseModel):
+    """Request to add a node to existing graph."""
+
+    graph_id: str
+    content: str
+    node_type: str = "reasoning"
+    parent_id: str | None = None
+
+
+class TraverseRequest(BaseModel):
+    """Request to traverse graph for insights."""
+
+    graph_id: str
+    strategy: str = Field(
+        default="depth_first", description="depth_first, breadth_first, best_first"
+    )
+
+
+# --- In-Memory Storage (MVP) ---
+_thought_graphs: dict[str, ThoughtGraph] = {}
+
+
+# --- Endpoints ---
+
+
+@shield(pillar="善")
+@router.post("/graph", response_model=ThoughtGraph)
+async def create_thought_graph(request: CreateGraphRequest) -> ThoughtGraph:
+    """Create a new Graph of Thought with an initial node."""
+    logger.info(f"🕸️ Creating new thought graph: {request.title}")
+
+    initial_node = ThoughtNode(
+        content=request.initial_thought,
+        node_type="observation",
+        confidence=1.0,
+    )
+
+    graph = ThoughtGraph(
+        title=request.title,
+        nodes=[initial_node],
+        trinity_score=85.0,
+    )
+
+    _thought_graphs[graph.id] = graph
+    return graph
+
+
+@shield(pillar="善")
+@router.get("/graph/{graph_id}", response_model=ThoughtGraph)
+async def get_thought_graph(graph_id: str) -> ThoughtGraph:
+    """Retrieve a thought graph by ID."""
+    if graph_id not in _thought_graphs:
+        raise HTTPException(status_code=404, detail=f"Graph {graph_id} not found")
+    return _thought_graphs[graph_id]
+
+
+@shield(pillar="善")
+@router.post("/graph/node", response_model=ThoughtNode)
+async def add_thought_node(request: AddNodeRequest) -> ThoughtNode:
+    """Add a new node to an existing thought graph."""
+    if request.graph_id not in _thought_graphs:
+        raise HTTPException(status_code=404, detail=f"Graph {request.graph_id} not found")
+
+    graph = _thought_graphs[request.graph_id]
+
+    # Validate parent exists if specified
+    if request.parent_id:
+        parent_exists = any(n.id == request.parent_id for n in graph.nodes)
+        if not parent_exists:
+            raise HTTPException(
+                status_code=400, detail=f"Parent node {request.parent_id} not found"
+            )
+
+    new_node = ThoughtNode(
+        content=request.content,
+        node_type=request.node_type,
+        parent_id=request.parent_id,
+    )
+
+    graph.nodes.append(new_node)
+
+    # Add edge if parent specified
+    if request.parent_id:
+        graph.edges.append((request.parent_id, new_node.id))
+
+    logger.info(f"➕ Added node {new_node.id} to graph {request.graph_id}")
+    return new_node
+
+
+@shield(pillar="善")
+@router.post("/graph/traverse")
+async def traverse_graph(request: TraverseRequest) -> dict[str, Any]:
+    """Traverse a thought graph and extract insights."""
+    if request.graph_id not in _thought_graphs:
+        raise HTTPException(status_code=404, detail=f"Graph {request.graph_id} not found")
+
+    graph = _thought_graphs[request.graph_id]
+
+    # Simple traversal - collect all conclusions
+    conclusions = [n for n in graph.nodes if n.node_type == "conclusion"]
+    reasoning_chain = [n.content for n in graph.nodes if n.node_type == "reasoning"]
+
+    avg_confidence = sum(n.confidence for n in graph.nodes) / len(graph.nodes) if graph.nodes else 0
+
+    return {
+        "graph_id": request.graph_id,
+        "strategy": request.strategy,
+        "total_nodes": len(graph.nodes),
+        "total_edges": len(graph.edges),
+        "conclusions": [c.content for c in conclusions],
+        "reasoning_chain": reasoning_chain,
+        "average_confidence": round(avg_confidence, 3),
+        "insight": f"Graph contains {len(graph.nodes)} thoughts with {len(conclusions)} conclusions.",
+    }
+
+
+@shield(pillar="善")
+@router.get("/health")
+async def got_health() -> dict[str, Any]:
+    """Check Graph of Thought service health."""
+    return {
+        "status": "healthy",
+        "service": "Graph of Thought",
+        "graphs_in_memory": len(_thought_graphs),
+        "supported_strategies": ["depth_first", "breadth_first", "best_first"],
+    }

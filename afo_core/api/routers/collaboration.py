@@ -1,0 +1,533 @@
+# Trinity Score: 95.0 (Real-time Collaboration System)
+"""
+Collaboration Router (PH-SE-07.01)
+
+실시간 다중 사용자 다이어그램 협업을 위한 WebSocket 기반 시스템.
+Operational Transform으로 충돌 해결 및 상태 동기화 보장.
+"""
+
+import asyncio
+import json
+import logging
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from enum import Enum
+from typing import Any, Type
+
+from fastapi import APIRouter, Depends, HTTPException, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
+
+from AFO.utils.standard_shield import shield
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/collaboration", tags=["Real-time Collaboration"])
+
+
+# ============================================================================
+# Data Models & Types
+# ============================================================================
+
+
+class MessageType(str, Enum):
+    """협업 메시지 유형."""
+
+    JOIN = "join"
+    LEAVE = "leave"
+    UPDATE = "update"
+    CURSOR = "cursor"
+    SYNC = "sync"
+    ERROR = "error"
+
+
+class CollaborationMessage(BaseModel):
+    """협업 메시지 모델."""
+
+    type: MessageType
+    user_id: str
+    diagram_id: str
+    data: dict[str, Any] = {}
+    timestamp: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
+    message_id: str = field(default_factory=lambda: f"msg_{datetime.now(UTC).timestamp()}")
+
+
+class UserSession(BaseModel):
+    """사용자 세션 정보."""
+
+    user_id: str
+    username: str
+    permissions: list[str] = ["read"]  # ["read", "write", "admin"]
+    cursor_position: dict[str, float] | None = None
+    last_activity: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
+    connected_at: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
+
+
+class DiagramSession(BaseModel):
+    """다이어그램 세션 정보."""
+
+    diagram_id: str
+    participants: dict[str, UserSession] = {}
+    diagram_state: dict[str, Any] = {}
+    version: int = 0
+    created_at: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
+    last_modified: float = field(default_factory=lambda: datetime.now(UTC).timestamp())
+
+
+# ============================================================================
+# In-Memory Session Management (Phase 1 - Redis로 교체 예정)
+# ============================================================================
+
+
+class CollaborationManager:
+    """협업 세션 관리자."""
+
+    def __init__(self) -> None:
+        self.active_sessions: dict[str, DiagramSession] = {}
+        self.active_connections: dict[str, dict[str, WebSocket]] = {}
+        self._cleanup_task: asyncio.Task | None = None
+
+    async def start_cleanup_task(self) -> None:
+        """정기적 세션 정리 태스크 시작."""
+        if self._cleanup_task is None:
+            self._cleanup_task = asyncio.create_task(self._periodic_cleanup())
+
+    async def stop_cleanup_task(self) -> None:
+        """세션 정리 태스크 중지."""
+        if self._cleanup_task:
+            self._cleanup_task.cancel()
+            try:
+                await self._cleanup_task
+            except asyncio.CancelledError:
+                pass
+            self._cleanup_task = None
+
+    async def _periodic_cleanup(self) -> None:
+        """주기적으로 비활성 세션 정리."""
+        while True:
+            try:
+                await asyncio.sleep(60)  # 1분마다 정리
+                await self._cleanup_inactive_sessions()
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.error(f"Session cleanup error: {e}")
+
+    async def _cleanup_inactive_sessions(self) -> None:
+        """비활성 세션 및 연결 정리."""
+        current_time = datetime.now(UTC).timestamp()
+        timeout_seconds = 300  # 5분 타임아웃
+
+        # 비활성 연결 정리
+        for diagram_id, connections in list(self.active_connections.items()):
+            for user_id, websocket in list(connections.items()):
+                try:
+                    session = self.active_sessions.get(diagram_id)
+                    if session and user_id in session.participants:
+                        user_session = session.participants[user_id]
+                        if current_time - user_session.last_activity > timeout_seconds:
+                            # 타임아웃된 연결 정리
+                            await self._remove_participant(diagram_id, user_id, websocket)
+                    else:
+                        # 세션이 없거나 참가자가 없는 경우 연결 종료
+                        await websocket.close(code=1000)
+                        del connections[user_id]
+                except Exception as e:
+                    logger.error(f"Error cleaning up connection {user_id}: {e}")
+                    try:
+                        del connections[user_id]
+                    except KeyError:
+                        pass
+
+            # 빈 연결 딕셔너리 정리
+            if not connections:
+                del self.active_connections[diagram_id]
+
+        # 빈 세션 정리
+        for diagram_id, session in list(self.active_sessions.items()):
+            if not session.participants:
+                del self.active_sessions[diagram_id]
+
+    async def join_session(
+        self,
+        diagram_id: str,
+        user_id: str,
+        username: str,
+        websocket: WebSocket,
+        permissions: list[str] = None,
+    ) -> DiagramSession:
+        """세션 참여."""
+        if permissions is None:
+            permissions = ["read"]
+
+        # 세션 생성 또는 가져오기
+        if diagram_id not in self.active_sessions:
+            self.active_sessions[diagram_id] = DiagramSession(diagram_id=diagram_id)
+
+        session = self.active_sessions[diagram_id]
+
+        # 사용자 세션 생성
+        user_session = UserSession(
+            user_id=user_id,
+            username=username,
+            permissions=permissions,
+        )
+
+        session.participants[user_id] = user_session
+
+        # 연결 저장
+        if diagram_id not in self.active_connections:
+            self.active_connections[diagram_id] = {}
+        self.active_connections[diagram_id][user_id] = websocket
+
+        logger.info(f"User {username} ({user_id}) joined diagram {diagram_id}")
+        return session
+
+    async def leave_session(self, diagram_id: str, user_id: str, websocket: WebSocket) -> None:
+        """세션 떠나기."""
+        await self._remove_participant(diagram_id, user_id, websocket)
+
+    async def _remove_participant(
+        self, diagram_id: str, user_id: str, websocket: WebSocket
+    ) -> None:
+        """참가자 제거."""
+        try:
+            # 연결 종료
+            await websocket.close(code=1000)
+        except Exception:
+            pass  # 이미 닫힌 연결
+
+        # 세션에서 제거
+        if diagram_id in self.active_sessions:
+            session = self.active_sessions[diagram_id]
+            if user_id in session.participants:
+                del session.participants[user_id]
+                logger.info(f"User {user_id} left diagram {diagram_id}")
+
+        # 연결에서 제거
+        if diagram_id in self.active_connections and user_id in self.active_connections[diagram_id]:
+            del self.active_connections[diagram_id][user_id]
+
+    async def broadcast_to_diagram(
+        self,
+        diagram_id: str,
+        message: CollaborationMessage,
+        exclude_user: str = None,
+    ) -> None:
+        """다이어그램의 모든 참가자에게 메시지 브로드캐스트."""
+        if diagram_id not in self.active_connections:
+            return
+
+        connections = self.active_connections[diagram_id]
+        message_json = message.model_dump_json()
+
+        for user_id, websocket in list(connections.items()):
+            if exclude_user and user_id == exclude_user:
+                continue
+
+            try:
+                await websocket.send_text(message_json)
+            except Exception as e:
+                logger.error(f"Failed to send message to {user_id}: {e}")
+                # 실패한 연결 정리
+                try:
+                    del connections[user_id]
+                except KeyError:
+                    pass
+
+    async def update_user_activity(self, diagram_id: str, user_id: str) -> None:
+        """사용자 활동 업데이트."""
+        if (
+            diagram_id in self.active_sessions
+            and user_id in self.active_sessions[diagram_id].participants
+        ):
+            self.active_sessions[diagram_id].participants[user_id].last_activity = datetime.now(
+                UTC
+            ).timestamp()
+
+    def get_session_info(self, diagram_id: str) -> DiagramSession | None:
+        """세션 정보 조회."""
+        return self.active_sessions.get(diagram_id)
+
+    def get_participants(self, diagram_id: str) -> dict[str, UserSession]:
+        """참가자 목록 조회."""
+        session = self.active_sessions.get(diagram_id)
+        return session.participants if session else {}
+
+
+# 글로벌 협업 매니저 인스턴스
+collaboration_manager = CollaborationManager()
+
+
+# ============================================================================
+# WebSocket Endpoints
+# ============================================================================
+
+
+@shield(pillar="善")
+@router.websocket("/ws/diagram/{diagram_id}")
+async def diagram_collaboration_websocket(
+    websocket: WebSocket,
+    diagram_id: str,
+    user_id: str = "anonymous",
+    username: str = "Anonymous User",
+) -> None:
+    """다이어그램 실시간 협업 WebSocket 엔드포인트.
+
+    다중 사용자 실시간 다이어그램 편집을 지원합니다.
+    """
+    await websocket.accept()
+
+    try:
+        # 세션 참여
+        session = await collaboration_manager.join_session(
+            diagram_id=diagram_id,
+            user_id=user_id,
+            username=username,
+            websocket=websocket,
+        )
+
+        # 참가 메시지 브로드캐스트
+        join_message = CollaborationMessage(
+            type=MessageType.JOIN,
+            user_id=user_id,
+            diagram_id=diagram_id,
+            data={
+                "username": username,
+                "participants": [
+                    {
+                        "user_id": uid,
+                        "username": u.username,
+                        "permissions": u.permissions,
+                    }
+                    for uid, u in session.participants.items()
+                ],
+            },
+        )
+        await collaboration_manager.broadcast_to_diagram(
+            diagram_id, join_message, exclude_user=user_id
+        )
+
+        # 현재 참가자에게 세션 정보 전송
+        sync_message = CollaborationMessage(
+            type=MessageType.SYNC,
+            user_id="system",
+            diagram_id=diagram_id,
+            data={
+                "session": session.model_dump(),
+                "participants": [
+                    {
+                        "user_id": uid,
+                        "username": u.username,
+                        "permissions": u.permissions,
+                        "cursor_position": u.cursor_position,
+                    }
+                    for uid, u in session.participants.items()
+                ],
+            },
+        )
+        await websocket.send_text(sync_message.model_dump_json())
+
+        # 메시지 처리 루프
+        while True:
+            try:
+                # 메시지 수신 (타임아웃 30초)
+                message_data = await asyncio.wait_for(
+                    websocket.receive_text(),
+                    timeout=30.0,
+                )
+
+                # JSON 파싱
+                try:
+                    message_dict = json.loads(message_data)
+                    message = CollaborationMessage(**message_dict)
+                except (json.JSONDecodeError, ValueError) as e:
+                    # 잘못된 메시지 형식
+                    error_message = CollaborationMessage(
+                        type=MessageType.ERROR,
+                        user_id="system",
+                        diagram_id=diagram_id,
+                        data={"error": f"Invalid message format: {e}"},
+                    )
+                    await websocket.send_text(error_message.model_dump_json())
+                    continue
+
+                # 사용자 활동 업데이트
+                await collaboration_manager.update_user_activity(diagram_id, user_id)
+
+                # 메시지 타입별 처리
+                await _handle_collaboration_message(message, websocket)
+
+            except TimeoutError:
+                # 타임아웃 - 활동 확인
+                await collaboration_manager.update_user_activity(diagram_id, user_id)
+                continue
+
+    except WebSocketDisconnect:
+        logger.info(f"WebSocket disconnected for user {user_id} in diagram {diagram_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error for user {user_id}: {e}")
+    finally:
+        # 세션 떠나기
+        await collaboration_manager.leave_session(diagram_id, user_id, websocket)
+
+        # 떠난 메시지 브로드캐스트
+        leave_message = CollaborationMessage(
+            type=MessageType.LEAVE,
+            user_id=user_id,
+            diagram_id=diagram_id,
+            data={"username": username},
+        )
+        await collaboration_manager.broadcast_to_diagram(diagram_id, leave_message)
+
+
+async def _handle_collaboration_message(
+    message: CollaborationMessage, websocket: WebSocket
+) -> None:
+    """협업 메시지 처리."""
+    try:
+        if message.type == MessageType.UPDATE:
+            # 다이어그램 업데이트 메시지
+            await _handle_update_message(message)
+
+        elif message.type == MessageType.CURSOR:
+            # 커서 위치 업데이트
+            await _handle_cursor_message(message)
+
+        elif message.type == MessageType.SYNC:
+            # 동기화 요청
+            await _handle_sync_message(message, websocket)
+
+        else:
+            logger.warning(f"Unhandled message type: {message.type}")
+
+    except Exception as e:
+        logger.error(f"Error handling message {message.type}: {e}")
+
+        # 에러 메시지 전송
+        error_message = CollaborationMessage(
+            type=MessageType.ERROR,
+            user_id="system",
+            diagram_id=message.diagram_id,
+            data={"error": f"Message processing failed: {e}"},
+        )
+        await websocket.send_text(error_message.model_dump_json())
+
+
+async def _handle_update_message(message: CollaborationMessage) -> None:
+    """업데이트 메시지 처리 (Phase 2에서 OT 로직 추가 예정)."""
+    # 현재는 단순 브로드캐스트 (Phase 1)
+    await collaboration_manager.broadcast_to_diagram(
+        message.diagram_id,
+        message,
+        exclude_user=message.user_id,
+    )
+
+
+async def _handle_cursor_message(message: CollaborationMessage) -> None:
+    """커서 메시지 처리."""
+    # 세션에 커서 위치 저장
+    session = collaboration_manager.get_session_info(message.diagram_id)
+    if session and message.user_id in session.participants:
+        session.participants[message.user_id].cursor_position = message.data.get("position")
+
+    # 다른 참가자들에게 브로드캐스트
+    await collaboration_manager.broadcast_to_diagram(
+        message.diagram_id,
+        message,
+        exclude_user=message.user_id,
+    )
+
+
+async def _handle_sync_message(message: CollaborationMessage, websocket: WebSocket) -> None:
+    """동기화 메시지 처리."""
+    session = collaboration_manager.get_session_info(message.diagram_id)
+    if session:
+        sync_message = CollaborationMessage(
+            type=MessageType.SYNC,
+            user_id="system",
+            diagram_id=message.diagram_id,
+            data={
+                "diagram_state": session.diagram_state,
+                "version": session.version,
+                "participants": [
+                    {
+                        "user_id": uid,
+                        "username": u.username,
+                        "permissions": u.permissions,
+                        "cursor_position": u.cursor_position,
+                    }
+                    for uid, u in session.participants.items()
+                ],
+            },
+        )
+        await websocket.send_text(sync_message.model_dump_json())
+
+
+# ============================================================================
+# REST API Endpoints (세션 관리용)
+# ============================================================================
+
+
+@shield(pillar="善")
+@router.get("/session/{diagram_id}")
+async def get_session_info(diagram_id: str) -> dict[str, Any]:
+    """세션 정보 조회."""
+    session = collaboration_manager.get_session_info(diagram_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {
+        "diagram_id": session.diagram_id,
+        "participants": [
+            {
+                "user_id": uid,
+                "username": u.username,
+                "permissions": u.permissions,
+                "connected_at": u.connected_at,
+                "last_activity": u.last_activity,
+            }
+            for uid, u in session.participants.items()
+        ],
+        "version": session.version,
+        "created_at": session.created_at,
+        "last_modified": session.last_modified,
+    }
+
+
+@shield(pillar="善")
+@router.get("/sessions/active")
+async def get_active_sessions() -> dict[str, Any]:
+    """활성 세션 목록 조회."""
+    return {
+        "sessions": [
+            {
+                "diagram_id": session.diagram_id,
+                "participant_count": len(session.participants),
+                "version": session.version,
+                "last_modified": session.last_modified,
+            }
+            for session in collaboration_manager.active_sessions.values()
+        ],
+        "total_sessions": len(collaboration_manager.active_sessions),
+    }
+
+
+# ============================================================================
+# Lifecycle Management
+# ============================================================================
+
+
+@shield(pillar="善")
+@router.on_event("startup")
+async def startup_event() -> None:
+    """서버 시작 시 협업 매니저 초기화."""
+    await collaboration_manager.start_cleanup_task()
+    logger.info("Collaboration system initialized")
+
+
+@shield(pillar="善")
+@router.on_event("shutdown")
+async def shutdown_event() -> None:
+    """서버 종료 시 정리."""
+    await collaboration_manager.stop_cleanup_task()
+    logger.info("Collaboration system shut down")

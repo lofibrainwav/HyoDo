@@ -1,0 +1,9 @@
+apiVersion: v2
+name: afo-kingdom
+description: A Helm chart for the AFO Kingdom (Phase 17 Cloud Ascension)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+maintainers:
+  - name: Antigravity
+    email: chancellor@afo.kingdom

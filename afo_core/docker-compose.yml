@@ -1,0 +1,502 @@
+# AFO Kingdom Docker Compose
+# Docker Compose V2+ (version 속성 불필요)
+
+services:
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Infrastructure Services (Databases, Caches, Monitoring)
+  # [DISABLED 2026-01-20] Using local brew installations instead
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # postgres:
+  #   image: postgres:15-alpine
+  #   container_name: afo-postgres
+  #   environment:
+  #     POSTGRES_DB: afo_memory
+  #     POSTGRES_USER: afo
+  #     POSTGRES_PASSWORD: afo_secret_change_me
+  #   ports:
+  #     - "15432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U afo -d afo_memory"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # redis:
+  #   image: redis:7.2-alpine
+  #   container_name: afo-redis
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Vector DB: LanceDB (파일 기반, Docker 불필요)
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Phase 30: Qdrant → LanceDB 마이그레이션 완료
+  # LanceDB는 파일 기반으로 Docker 컨테이너 불필요
+  # 데이터 경로: ./data/lancedb (LANCEDB_PATH 환경변수)
+  # 임베딩: Ollama embeddinggemma 사용
+  #
+  # [DEPRECATED] qdrant:
+  #   image: qdrant/qdrant:v1.7.4
+  #   container_name: afo-qdrant
+  #   ports:
+  #     - "6333:6333"
+  #     - "6334:6334"
+  #   volumes:
+  #     - qdrant_data:/qdrant/storage
+  #
+  # [DEPRECATED] chromadb: Phase 8.2.2에서 Qdrant로 마이그레이션
+  # [DEPRECATED] Qdrant: Phase 30에서 LanceDB로 마이그레이션
+  # chromadb:
+  #   image: chromadb/chroma:latest
+  #   container_name: afo-chromadb
+  #   ports:
+  #     - "8009:8000"
+  #   volumes:
+  #     - chromadb_data:/chroma/chroma
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Monitoring Stack
+  # ═══════════════════════════════════════════════════════════════════════════════
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: afo-prometheus
+    profiles: ["monitoring", "production"]  # 프로파일 기반 활성화
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver' # Added for Tempo Service Graph
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: afo-grafana
+    profiles: ["monitoring", "production"]  # 프로파일 기반 활성화
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./config/observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    depends_on:
+      - prometheus  # prometheus도 같은 프로파일이므로 문제없음
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: afo-alertmanager
+    profiles: ["monitoring", "production"]  # 프로파일 기반 활성화
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./monitoring/alertmanager.yml:/etc/alertmanager/config.yml:ro
+    command:
+      - '--config.file=/etc/alertmanager/config.yml'
+      - '--storage.path=/alertmanager'
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: afo-cadvisor
+    profiles: ["monitoring", "production"]  # 프로파일 기반 활성화
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+
+  tempo:
+    image: grafana/tempo:latest
+    container_name: afo-tempo
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ./config/observability/tempo.yaml:/etc/tempo.yaml
+      - tempo_data:/tmp/tempo
+    ports:
+      - "3200:3200"   # HTTP
+      # - "4317"      # OTLP gRPC (internal mostly)
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3200/ready"]
+      interval: 10s
+      retries: 5
+
+  loki:
+    image: grafana/loki:latest
+    container_name: afo-loki
+    command: -config.file=/etc/loki/config.yaml
+    volumes:
+      - ./config/observability/loki.yaml:/etc/loki/config.yaml
+      - loki_data:/tmp/loki
+    ports:
+      - "3100"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3100/ready"]
+      interval: 10s
+      retries: 5
+
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: afo-otel-collector
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./config/observability/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+      - "8889:8889" # Prometheus exporter
+    depends_on:
+      - tempo
+      - loki
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Core AFO Microservices
+  # [DISABLED 2026-01-20] Running locally instead of Docker
+  # api-gateway:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: afo-api-gateway
+  #   ports:
+  #     - "8000:8000"
+  #   environment:
+  #     - SERVICE_NAME=api-gateway
+  #   depends_on:
+  #     - input-service
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # rag-service: DEPRECATED (2026-01-15)
+  # RAG 기능이 soul-engine (port 8010)에 통합됨 - api/routers/rag_query.py
+  # 별도 컨테이너 불필요. 재활성화 필요시 아래 주석 해제
+  # rag-service:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: afo-rag-service
+  #   ports:
+  #     - "8001:8001"
+  #   environment:
+  #     - SERVICE_NAME=rag-service
+  #     - OLLAMA_BASE_URL=http://host.docker.internal:11434
+  #     - PYTHONPATH=/app
+  #     - REDIS_URL=redis://afo-redis:6379
+  #     - DATABASE_URL=postgresql://afo:${POSTGRES_PASSWORD}@afo-postgres:5432/afo
+  #   command: ["python", "-m", "uvicorn", "AFO.api_server:app", "--host", "0.0.0.0", "--port", "8001"]
+  #   depends_on:
+  #     - redis
+  #   working_dir: /app
+  #   volumes:
+  #     - .:/app
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # [DISABLED 2026-01-20] Running locally instead of Docker
+  # input-service:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: afo-input-service
+  #   ports:
+  #     - "8005:8005"
+  #   environment:
+  #     - SERVICE_NAME=input-service
+  #     - PYTHONPATH=/app
+  #   command: ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8005"]
+  #   depends_on:
+  #     - postgres
+  #   volumes:
+  #     - ./afo_soul_engine:/app/afo_soul_engine
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # service-registry: 제거됨 (Docker DNS로 대체)
+  # Docker Compose의 내장 DNS와 API Gateway의 ServiceDiscovery 클래스로 충분
+  # 별도 서비스 레지스트리 컨테이너는 불필요한 중복이므로 제거
+  # service-registry:
+  #   build:
+  #     context: .
+  #     dockerfile: afo_soul_engine/Dockerfile
+  #   container_name: afo-service-registry
+  #   ports:
+  #     - "8008:8008"
+  #   environment:
+  #     - SERVICE_NAME=service-registry
+  #     - PYTHONPATH=/app
+  #   command: ["python", "-m", "uvicorn", "api_server:app", "--host", "0.0.0.0", "--port", "8008"]
+  #   volumes:
+  #     - ./afo_soul_engine:/app/afo_soul_engine
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8008/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # [DISABLED 2026-01-20] Running locally instead of Docker
+  # soul-engine:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   args:
+  #     BUILD_VERSION: ${BUILD_VERSION:-unknown}
+  #     GIT_SHA: ${GIT_SHA:-unknown}
+  #   container_name: afo-soul-engine
+  #   ports:
+  #     - "8010:8010"
+  #   environment:
+  #     - SERVICE_NAME=soul-engine
+  #     - API_SERVER_HOST=0.0.0.0
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317
+  #     - OLLAMA_BASE_URL=http://host.docker.internal:11434
+  #     - OLLAMA_MODEL=llama3.2:3b
+  #     - REDIS_URL=redis://afo-redis:6379
+  #     - REDIS_HOST=afo-redis
+  #     - REDIS_PORT=6379
+  #     - DATABASE_URL=postgresql://afo:afo_secret_change_me@afo-postgres:5432/afo_memory
+  #     - POSTGRES_HOST=afo-postgres
+  #     - POSTGRES_PORT=5432
+  #     # Qdrant 제거됨 - LanceDB 사용 (Phase 30)
+  #     - VECTOR_DB=lancedb
+  #     - LANCEDB_PATH=/app/data/lancedb
+  #     - OLLAMA_HOST=http://host.docker.internal:11434
+  #     - WALLET_SERVICE_URL=http://afo-wallet-service:8011
+  #     - VAULT_ADDR=http://afo-vault:8200
+  #     - OLLAMA_PORT=11434
+  #     - POSTGRES_USER=afo
+  #     - POSTGRES_PASSWORD=afo_secret_change_me
+  #     - POSTGRES_DB=afo_memory
+  #     - PYTHONPATH=/app
+  #     - BUILD_VERSION=${BUILD_VERSION:-unknown}
+  #     - GIT_SHA=${GIT_SHA:-unknown}
+  #   working_dir: /app
+  #   volumes:
+  #     - .:/app
+  #     - ./artifacts:/AFO/packages/afo-core/artifacts:ro
+  #     - ../trinity-os:/app/trinity-os:ro  # Context7 integration
+  #   depends_on:
+  #     - ollama
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+
+  # [DISABLED 2026-01-20] Running locally instead of Docker
+  # dashboard:
+  #   build:
+  #     context: ../dashboard
+  #     dockerfile: Dockerfile
+  #   container_name: afo-dashboard
+  #   ports:
+  #     - "3100:3000"  # External 3100 to avoid conflict with local dev (3000)
+  #   environment:
+  #     - SERVICE_NAME=dashboard
+  #     - NEXT_TELEMETRY_DISABLED=1
+  #     - SOUL_ENGINE_URL=http://afo-soul-engine:8010
+  #     - NEXT_PUBLIC_SOUL_ENGINE_URL=http://afo-soul-engine:8010
+  #   depends_on:
+  #     - soul-engine
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # API Services Integration (Phase 20: Wallet & Vault)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  # [DISABLED 2026-01-20] Running locally instead of Docker
+  # wallet-service:
+  #   build:
+  #     context: .
+  #     dockerfile: Dockerfile
+  #   container_name: afo-wallet-service
+  #   ports:
+  #     - "8011:8011"
+  #   environment:
+  #     - SERVICE_NAME=wallet-service
+  #     - API_SERVER_HOST=0.0.0.0
+  #     - API_WALLET_ENCRYPTION_KEY=${API_WALLET_ENCRYPTION_KEY:-default_key_change_me}
+  #     - API_WALLET_KMS=${API_WALLET_KMS:-local}  # TICKET W1: KMS 선택 스위치
+  #     - DATABASE_URL=postgresql://afo:afo_secret_change_me@afo-postgres:5432/afo_memory
+  #     - REDIS_URL=redis://afo-redis:6379
+  #     - VAULT_ADDR=http://afo-vault:8200  # 보안 프로파일 시 사용
+  #     - VAULT_AUTH_METHOD=approle  # TICKET W3: AppRole authentication
+  #     - VAULT_ROLE_ID=${VAULT_ROLE_ID}  # Runtime 역할만 (Seeder는 별도 경로)
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+  #   command: ["python", "wallet_server.py"]
+
+  # ═══════════════════════════════════════════════════════════════════════════════
+  # Security Services (Optional - Security Profile)
+  # ═══════════════════════════════════════════════════════════════════════════════
+
+  vault:
+    image: hashicorp/vault:latest
+    container_name: afo-vault
+    profiles: ["security"]  # 보안 프로파일에서만 활성화
+    ports:
+      - "8200:8200"
+    environment:
+      - VAULT_ADDR=http://0.0.0.0:8200
+      - VAULT_DEV_ROOT_TOKEN_ID=root
+      - VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200
+    volumes:
+      - vault_data:/vault/file
+    cap_add:
+      - IPC_LOCK
+    healthcheck:
+      test: ["CMD", "vault", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ═══════════════════════════════════════════════════════════════════════════════════════════════
+  # External Tools Integration
+  # ═══════════════════════════════════════════════════════════════════════════════════════════════
+  langflow:
+    image: langflowai/langflow:latest
+    container_name: afo-langflow
+    ports:
+      - "7860:7860"
+    environment:
+      - LANGFLOW_DATABASE_URL=sqlite:///./langflow.db
+      # 메모리 최적화 설정
+      - LANGFLOW_WORKERS=1              # 워커 수 제한
+      - LANGFLOW_AUTO_LOGIN=false       # 자동 로그인 비활성화
+      - LANGFLOW_CACHE_TYPE=memory      # 경량 캐시
+      - LANGFLOW_DEV=false              # 프로덕션 모드
+    volumes:
+      - langflow_data:/app/langflow
+    deploy:
+      resources:
+        limits:
+          memory: 1536M                  # 최대 메모리 1.5GB 제한
+        reservations:
+          memory: 512M                   # 최소 메모리 512MB 보장
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:7860/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  n8n:
+    image: n8nio/n8n:latest
+    container_name: afo-n8n
+    ports:
+      - "5678:5678"
+    environment:
+      - N8N_BASIC_AUTH_ACTIVE=true
+      - N8N_BASIC_AUTH_USER=user
+      - N8N_BASIC_AUTH_PASSWORD=password
+    volumes:
+      - n8n_data:/home/node/.n8n
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:5678/healthz || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: afo-open-webui
+    ports:
+      - "3001:8080"
+    environment:
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      # 메모리 최적화 설정
+      - ENABLE_SIGNUP=false             # 회원가입 비활성화
+      - DEFAULT_MODELS=llama3.2:3b      # 기본 모델 제한
+      - WEBUI_AUTH=false                # 인증 비활성화 (로컬용)
+    volumes:
+      - openwebui_data:/app/backend/data
+    depends_on:
+      - ollama
+    deploy:
+      resources:
+        limits:
+          memory: 768M                   # 최대 메모리 768MB 제한
+        reservations:
+          memory: 256M                   # 최소 메모리 256MB 보장
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: afo-ollama
+    ports:
+      - "11435:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0
+      # 메모리 최적화 설정
+      - OLLAMA_NUM_PARALLEL=1          # 동시 요청 수 제한
+      - OLLAMA_MAX_LOADED_MODELS=1     # 동시 로드 모델 수 제한
+      - OLLAMA_KEEP_ALIVE=5m           # 모델 메모리 유지 시간 (기본 5분)
+      - OLLAMA_NUM_CTX=2048            # 컨텍스트 길이 제한 (메모리 절감)
+    deploy:
+      resources:
+        limits:
+          memory: 4G                    # 최대 메모리 4GB 제한
+        reservations:
+          memory: 2G                    # 최소 메모리 2GB 보장
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  redis_data:
+  tempo_data:
+  loki_data:
+  # qdrant_data: 제거됨 (LanceDB로 마이그레이션 완료 - Phase 30)
+  # LanceDB는 로컬 파일 기반 - ./data/lancedb
+  # chromadb_data: 제거됨 (Qdrant로 마이그레이션 완료 - Phase 8)
+  # chromadb_data:
+  grafana_data:
+  langflow_data:
+  n8n_data:
+  openwebui_data:
+  ollama_data:
+  redisinsight:
+  vault_data:

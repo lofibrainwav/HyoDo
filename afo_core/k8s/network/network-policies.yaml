@@ -1,0 +1,127 @@
+# AFO Kingdom Network Policies
+# 眞善美孝永 - Zero Trust Network Segmentation
+
+---
+# Default Deny All Ingress/Egress
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+  namespace: afo-kingdom
+spec:
+  podSelector: {}  # 모든 Pod에 적용
+  policyTypes:
+  - Ingress
+  - Egress
+
+---
+# Allow Soul Engine → PostgreSQL (Port 5432)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-soul-engine-to-postgres
+  namespace: afo-kingdom
+spec:
+  podSelector:
+    matchLabels:
+      app: postgres
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: soul-engine
+    ports:
+    - protocol: TCP
+      port: 5432
+
+---
+# Allow Soul Engine → Redis (Port 6379)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-soul-engine-to-redis
+  namespace: afo-kingdom
+spec:
+  podSelector:
+    matchLabels:
+      app: redis
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: soul-engine
+    - podSelector:
+        matchLabels:
+          app: rag-service
+    ports:
+    - protocol: TCP
+      port: 6379
+
+---
+# Allow Soul Engine → Qdrant (Port 6333/6334)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-rag-to-qdrant
+  namespace: afo-kingdom
+spec:
+  podSelector:
+    matchLabels:
+      app: qdrant
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: rag-service
+    ports:
+    - protocol: TCP
+      port: 6333
+    - protocol: TCP
+      port: 6334
+
+---
+# Allow External Access to Soul Engine API (Port 8010)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-external-to-soul-engine
+  namespace: afo-kingdom
+spec:
+  podSelector:
+    matchLabels:
+      app: soul-engine
+  policyTypes:
+  - Ingress
+  ingress:
+  - from: []  # 외부 접근 허용 (Ingress Controller 뒤)
+    ports:
+    - protocol: TCP
+      port: 8010
+
+---
+# Allow DNS Egress (Required for Service Discovery)
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-dns-egress
+  namespace: afo-kingdom
+spec:
+  podSelector: {}
+  policyTypes:
+  - Egress
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: kube-system
+    ports:
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 53

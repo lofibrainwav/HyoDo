@@ -1,0 +1,54 @@
+import logging
+
+from fastapi import APIRouter, HTTPException, Request
+
+from AFO.services.kakao_bridge_service import kakao_bridge_service
+from AFO.services.unified_messaging_service import ChannelType, unified_messaging_service
+from AFO.utils.standard_shield import shield
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/kakao", tags=["KakaoBot Bridge"])
+
+
+@shield(pillar="善")
+@router.post("/webhook")
+async def kakao_webhook(request: Request):
+    """
+    카카오톡 브릿지 앱으로부터 메시지를 수신하여 통합 서비스로 전달.
+    """
+    try:
+        payload = await request.json()
+
+        msg = payload.get("msg", "")
+        sender = payload.get("sender", "알 수 없음")
+        channel_raw = payload.get("channel", ChannelType.KAKAO.value)
+        channel_value = str(channel_raw).lower()
+        try:
+            channel = ChannelType(channel_value)
+        except ValueError:
+            logger.warning("Unknown channel '%s', defaulting to kakao", channel_raw)
+            channel = ChannelType.KAKAO
+
+        result = await unified_messaging_service.handle_incoming_message(
+            content=msg, sender=sender, channel=channel
+        )
+        return result
+
+    except Exception as e:
+        logger.error(f"Kakao Webhook Error: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@shield(pillar="善")
+@router.get("/notifications")
+async def get_kakao_notifications():
+    """
+    브릿지 앱이 폴링할 알림 메시지 목록 반환.
+    """
+    notifications = await kakao_bridge_service.get_notifications()
+    # 알림을 가져간 후 큐를 비울지 여부는 정책에 따라 결정
+    # 여기서는 가져가면 즉시 비움 (카톡 봇이 중복 메시지 보내지 않도록)
+    if notifications:
+        await kakao_bridge_service.clear_notifications()
+    return {"notifications": notifications}

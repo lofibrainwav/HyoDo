@@ -1,0 +1,73 @@
+# Trinity Score: 98.0 (Established by Chancellor)
+"""GenUI Router
+Phase 31: Operation Gwanggaeto (Expansion)
+
+API Endpoints for generating and previewing UI components.
+Exposes the creative power of Samahwi (Royal Architect) to the frontend.
+"""
+
+from typing import Any
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+
+from AFO.schemas.gen_ui import GenUIRequest, GenUIResponse
+from AFO.services.gen_ui import gen_ui_service
+from AFO.services.vision_verifier import vision_verifier
+from AFO.utils.standard_shield import shield
+
+router = APIRouter(prefix="/api/gen-ui", tags=["GenUI"])
+
+
+@shield(pillar="美")
+@router.post("/create", response_model=GenUIResponse)
+async def create_component(request: GenUIRequest) -> GenUIResponse:
+    """Generate a new UI component.
+    Calls Samahwi (Royal Architect) to write code based on the prompt.
+    """
+    try:
+        response = await gen_ui_service.generate_component(request)
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@shield(pillar="美")
+@router.post("/preview", response_model=GenUIResponse)
+async def preview_component(
+    request: GenUIRequest, background_tasks: BackgroundTasks
+) -> GenUIResponse:
+    """Generate and deploy a component to the Sandbox.
+    Target: packages/dashboard/src/components/genui/
+    """
+    try:
+        # 1. Generate
+        response = await gen_ui_service.generate_component(request)
+
+        # 2. Deploy if approved
+        if response.status == "approved":
+            try:
+                path = gen_ui_service.deploy_component(response)
+                # Append deployment info to description
+                response.description += f" [Deployed to Sandbox: {path}]"
+
+                # 3. Schedule Autonomous Verification (The Eyes)
+                background_tasks.add_task(vision_verifier.verify_component, request.component_name)
+            except Exception as deploy_error:
+                # We don't fail the request, but mark the error
+                response.error = f"Generation success, but deployment failed: {deploy_error}"
+
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e)) from e
+
+
+@shield(pillar="美")
+@router.get("/health")
+async def gen_ui_health() -> dict[str, Any]:
+    """Check status of the GenUI engine."""
+    return {
+        "status": "online",
+        "service": "GenUI (Operation Gwanggaeto)",
+        "scholar": "Samahwi (Royal Architect)",
+        "mode": "Phase 31",
+    }

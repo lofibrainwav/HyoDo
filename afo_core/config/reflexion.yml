@@ -1,0 +1,14 @@
+version: 1
+max_iters: 5
+time_budget_sec: 30
+dry_run_default: true
+risk_threshold: 10
+stop_conditions:
+  - type: max_iters
+  - type: time_budget
+judge:
+  rubric:
+    - factuality
+    - safety
+    - clarity
+  pass_score: 0.9

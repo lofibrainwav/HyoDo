@@ -1,0 +1,14 @@
+# AFO Kingdom Gitleaks Configuration
+# 善 (Goodness): Precise security perimeter definition
+
+[allowlist]
+description = "Ignore test data and artifacts"
+paths = [
+    '''packages/afo-core/tests/''',
+    '''docs/''',
+    '''artifacts/''',
+    '''AFO_Stealth_Profile/''',
+    '''research_dump.txt''',
+    '''purge_dns.sh''',
+    '''packages/afo-core/k8s/monitoring/alertmanager-config.yaml'''
+]

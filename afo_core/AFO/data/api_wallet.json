@@ -1,0 +1,17 @@
+{
+  "keys": [
+    {
+      "id": 1,
+      "name": "HTTP_KEY",
+      "encrypted_key": "gAAAAABpZpin50tppAgEkKv5bh1YFOLomxbe86J07XYJ_poWopjg6NvvXcRFpnbJMxPTihHycr3rSQKtTggJM9i5zevMiASlTA==",
+      "key_type": "api",
+      "read_only": true,
+      "service": "other",
+      "description": "Bulk import: HTTP_KEY",
+      "key_hash": "95338c85fae8054f",
+      "created_at": "2026-01-13T11:10:31.857903",
+      "last_accessed": "2026-01-24T19:46:10.022027",
+      "access_count": 4
+    }
+  ]
+}

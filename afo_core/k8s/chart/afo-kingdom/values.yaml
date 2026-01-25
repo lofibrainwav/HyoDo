@@ -1,0 +1,84 @@
+# AFO Kingdom Default Values
+# 眞 (Truth): Default Configuration
+
+global:
+  env: production
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Backend (Julie CPA / Soul Engine)
+# ═══════════════════════════════════════════════════════════════════════════════
+backend:
+  replicaCount: 2
+  image:
+    repository: afo/soul-engine
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 8010
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 2Gi
+    requests:
+      cpu: 500m
+      memory: 1Gi
+  env:
+    SERVICE_NAME: "soul-engine"
+  # 善의 보안 강화: Probes 추가
+  probes:
+    livenessProbe:
+      httpGet:
+        path: /health
+        port: 8010
+      initialDelaySeconds: 30
+      periodSeconds: 10
+    readinessProbe:
+      httpGet:
+        path: /health
+        port: 8010
+      initialDelaySeconds: 5
+      periodSeconds: 5
+  # 孝의 자동화: HPA 추가
+  autoscaling:
+    enabled: true
+    minReplicas: 2
+    maxReplicas: 10
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: 80
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Frontend (Trinity Dashboard)
+# ═══════════════════════════════════════════════════════════════════════════════
+dashboard:
+  replicaCount: 2
+  image:
+    repository: afo/dashboard
+    pullPolicy: IfNotPresent
+    tag: "latest"
+  service:
+    type: ClusterIP
+    port: 3000
+    targetPort: 3000
+  resources:
+    limits:
+      cpu: 1000m
+      memory: 1Gi
+    requests:
+      cpu: 250m
+      memory: 256Mi
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Infrastructure
+# ═══════════════════════════════════════════════════════════════════════════════
+postgresql:
+  enabled: true
+  auth:
+    username: afo
+    database: afo
+    # password: set via secret
+
+redis:
+  enabled: true
+  auth:
+    enabled: false

@@ -1,0 +1,65 @@
+name: Code Quality Checks
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest pytest-asyncio mypy types-redis types-requests
+          pip install -r requirements.txt
+      
+      - name: Ruff Lint
+        run: ruff check .
+      
+      - name: Ruff Format Check
+        run: ruff format --check .
+      
+      - name: MyPy Type Check
+        run: mypy AFO --ignore-missing-imports
+        continue-on-error: true
+      
+      - name: Pytest
+        run: pytest tests -v
+        continue-on-error: true
+
+  parallel-quality:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff pytest pytest-asyncio mypy types-redis types-requests
+          pip install -r requirements.txt
+      
+      - name: Run parallel quality checks
+        run: |
+          chmod +x scripts/run_quality_checks.sh
+          ./scripts/run_quality_checks.sh || true
+

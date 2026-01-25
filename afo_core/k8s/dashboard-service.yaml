@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: afo-dashboard-service
+  namespace: afo-kingdom
+  labels:
+    app: afo-dashboard
+    tier: frontend
+spec:
+  type: ClusterIP
+  selector:
+    app: afo-dashboard
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 3000

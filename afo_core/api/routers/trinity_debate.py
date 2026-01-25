@@ -1,0 +1,70 @@
+import json
+
+from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel
+from sse_starlette.sse import EventSourceResponse
+
+from AFO.utils.standard_shield import shield
+from application.trinity.debate_service import trinity_service
+from domain.trinity.models import DebateResolution
+
+router = APIRouter(prefix="/api/trinity", tags=["Trinity Resonance (L6)"])
+
+
+class DebateRequest(BaseModel):
+    query: str
+
+
+@shield(pillar="善")
+@router.post("/debate", response_model=DebateResolution)
+async def conduct_trinity_debate(request: DebateRequest):
+    """One-shot debate (legacy compatibility)"""
+    # Note: conduct_debate is currently a placeholder after refactor
+    raise HTTPException(
+        status_code=501, detail="Please use /debate/stream for the live experience."
+    )
+
+
+from application.trinity.metacognitive_service import metacognitive_service
+
+
+@shield(pillar="善")
+@router.get("/debate/stream")
+async def conduct_trinity_debate_stream(request: Request, query: str):
+    """
+    Trigger a Streaming Trinity Debate.
+    Returns an SSE stream of thought chunks.
+    """
+
+    async def event_generator():
+        try:
+            async for chunk in trinity_service.conduct_debate_stream(query):
+                # Check for client disconnect
+                if await request.is_disconnected():
+                    break
+
+                yield {"event": "strategist_thought", "data": json.dumps(chunk)}
+        except Exception as e:
+            yield {"event": "error", "data": json.dumps({"detail": str(e)})}
+
+    return EventSourceResponse(event_generator())
+
+
+@shield(pillar="善")
+@router.get("/metacognition/audit/stream")
+async def conduct_metacognitive_audit_stream(request: Request, target: str = "Phase 5.5"):
+    """
+    Trigger a Streaming Metacognitive Audit.
+    Returns an SSE stream of reflection chunks.
+    """
+
+    async def event_generator():
+        try:
+            async for chunk in metacognitive_service.audit_system_stream(target):
+                if await request.is_disconnected():
+                    break
+                yield {"event": "metacognitive_reflection", "data": json.dumps(chunk)}
+        except Exception as e:
+            yield {"event": "error", "data": json.dumps({"detail": str(e)})}
+
+    return EventSourceResponse(event_generator())

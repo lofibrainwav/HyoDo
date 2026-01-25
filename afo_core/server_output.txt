@@ -1,0 +1,87 @@
+✅ Context7 trinity-os 경로 추가: /Users/brnestrm/AFO_Kingdom/packages/afo-core/trinity-os
+✅ AFO 설정 로드 완료: dev 환경 (AFOSettings)
+⚠️ Ollama 서버 확인 실패: http://localhost:11434
+/Users/brnestrm/AFO_Kingdom/packages/afo-core/AFO/llms/ollama_api.py:48: RuntimeWarning: coroutine 'OllamaAPIWrapper._check_availability.<locals>.check' was never awaited
+  return False
+RuntimeWarning: Enable tracemalloc to get the object allocation traceback
+Evolution module not available: No module named 'AFO.governance.narrative_sanitizer'
+2026-01-12 21:57:31,460 - AFO.api_server - INFO - ℹ️ Sentry SDK not available, skipping initialization
+2026-01-12 21:57:31,460 - AFO.api_server - INFO - ℹ️ OpenTelemetry not available, skipping initialization
+2026-01-12 21:57:31,460 - AFO.api.config - INFO - FastAPI application created successfully
+2026-01-12 21:57:31,460 - AFO.api_server - INFO - FastAPI application created
+2026-01-12 21:57:31,461 - AFO.api_server - INFO - Chancellor Router registered successfully
+2026-01-12 21:57:31,464 - AFO.api_server - INFO - Multimodal Router registered successfully
+2026-01-12 21:57:31,464 - AFO.api_server - INFO - RAG Router registered successfully
+2026-01-12 21:57:31,464 - AFO.api_server - WARNING - Auth Router registration failed: 'NoneType' object has no attribute 'routes'
+2026-01-12 21:57:31,464 - AFO.api_server - INFO - Rate limiter configured
+2026-01-12 21:57:31,464 - AFO.api_server - WARNING - ⚠️ APIKeyAuthMiddleware not available
+2026-01-12 21:57:31,464 - AFO.api_server - WARNING - ⚠️ API Key ACL not available
+2026-01-12 21:57:31,465 - AFO.api_server - INFO - Application configured with security measures
+2026-01-12 21:57:31,465 - AFO.setup - INFO - CORS middleware configured
+2026-01-12 21:57:31,465 - AFO.setup - INFO - Middleware setup complete
+2026-01-12 21:57:31,465 - AFO.api_server - INFO - Middleware setup completed
+2026-01-12 21:57:31,465 - AFO.api.router_manager - INFO - AFO Router Manager initialized with beautiful code principles
+2026-01-12 21:57:31,465 - AFO.api.router_manager - INFO - Starting router registration process...
+2026-01-12 21:57:31,488 - AFO.api.router_manager - WARNING - Time Travel Router not available
+2026-01-12 21:57:31,493 - AFO.api.router_manager - INFO - Skills API registered successfully (6 routes)
+2026-01-12 21:57:31,506 - AFO.api.router_manager - INFO - Router registration completed. Total: 198 routers
+2026-01-12 21:57:31,507 - AFO.api_server - INFO - Router setup completed
+2026-01-12 21:57:31,507 - AFO.api_server - INFO - AFO Kingdom API Server initialized with beautiful code principles
+INFO:     Started server process [71203]
+INFO:     Waiting for application startup.
+2026-01-12 21:57:31,574 - services.vision_service - INFO - Connected to Ollama at http://localhost:11434, models: 6
+2026-01-12 21:57:31,574 - services.vision_service - INFO - VisionService initialized with model: qwen3-vl:8b (host: http://localhost:11434)
+2026-01-12 21:57:31,575 - services.audio_service - WARNING - Whisper not installed. Run: pip install openai-whisper
+2026-01-12 21:57:31,575 - services.audio_service - INFO - AudioService initialized with model: base
+2026-01-12 21:57:31,575 - multimodal_rag_engine - INFO - MultimodalRAGEngine initialized with Vision & Audio services
+2026-01-12 21:57:31,575 - multimodal_rag_engine - INFO - MultimodalRAGEngine initialized with Vision & Audio services
+2026-01-12 21:57:31,576 - multimodal_rag_cache - INFO - ✅ Multimodal RAG Cache Redis client 자동 설정됨
+2026-01-12 21:57:31,576 - multimodal_rag_cache - INFO - ✅ Multimodal RAG Cache Redis client 설정됨
+2026-01-12 21:57:31,578 - AFO.api.config - INFO - Application lifespan: initialization completed
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://127.0.0.1:8040 (Press CTRL+C to quit)
+✅ Context7 trinity-os 경로 이미 추가됨: /Users/brnestrm/AFO_Kingdom/packages/trinity-os
+✅ AFO 설정 로드 완료: dev 환경 (AFOSettings)
+✅ 5기둥 API Router loaded successfully
+   - GET /api/5pillars/current (현재 5기둥 점수 조회)
+   - POST /api/5pillars/live (LangFlow 실시간 평가 - Phase 23-D)
+   - GET /api/5pillars/family/hub (가족 허브 전체 상태 - Phase 23-E)
+   - POST /api/5pillars/family/hub/member/update (가족 구성원 데이터 업데이트)
+   - GET /api/5pillars/family/hub/data (실시간 가족 허브 데이터)
+[TRINITY-OS] 페르소나 전환 → 불굴의 사령관 (활성화)
+✅ Skills Registry SSOT 복구 성공
+[지휘소 v6 - 최종】 API 서버 가동 준비 (완전 비동기)...
+[Query Expander] WordNet + ChromaDB 하이브리드 확장 준비 완료
+🚀 [AntiGravity] 활성화: dev 환경 자동 배포 준비 완료 (孝)
+🛡️ [AntiGravity] DRY_RUN 모드 활성화 - 모든 위험 동작 시뮬레이션 (善)
+✅ PostgreSQL 연결 성공 (localhost:15432/afo_memory)
+✅ Redis 연결 성공 (localhost:6379)
+[RAG 엔진] 멀티-LLM 지원 준비 완료.
+[RAG 엔진] 지원 LLM: claude, gemini, codex, ollama, lmstudio
+[Multimodal RAG] 멀티모달 RAG 엔진 준비 완료 (텍스트+이미지 통합 검색)
+🔍 Multimodal RAG Cache 초기화 시도... REDIS_CLIENT: True
+✅ Multimodal RAG Cache 모듈 import 성공
+✅ [Multimodal RAG Cache] 캐시 시스템 초기화 완료 (Redis 통합)
+ℹ️ [INFO] 31 Skills loaded in simulation mode
+[영덕] 영덕 완전체 준비 완료 - 뇌/눈/귀/팔 모두 연결됨
+[지휘소 v6】 LangGraph 설계도를 컴파일하여 '두뇌'를 완성합니다...
+[지휘소 v6】 Chancellor V2 Runner 가동 준비 완료. (MCP Contract Enforced)
+ℹ️ Anthropic library unavailable
+[지휘소 v6】 '진정한 두뇌' (Chancellor Graph) 가동 준비 완료. (True Intelligence)
+INFO:     127.0.0.1:64423 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64434 - "GET /api/5pillars/current HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64436 - "GET /api/skills/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64437 - "GET /api/got/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64438 - "GET /api/modal/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64439 - "GET /api/multi-agent/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64440 - "GET /api/n8n/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64441 - "GET /api/trinity/policy/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64442 - "GET /api/trinity/sbt/health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64443 - "GET /api/evolution/history HTTP/1.1" 200 OK
+INFO:     127.0.0.1:64444 - "GET /api/evolution/history HTTP/1.1" 200 OK
+INFO:     Shutting down
+INFO:     Waiting for application shutdown.
+2026-01-12 21:57:34,610 - AFO.memory_system.yeongdeok_complete - INFO - ✅ Yeongdeok memory system closed gracefully
+2026-01-12 21:57:34,610 - AFO.api.config - INFO - Application lifespan: cleanup completed
+INFO:     Application shutdown complete.
+INFO:     Finished server process [71203]

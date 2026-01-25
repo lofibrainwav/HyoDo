@@ -1,0 +1,144 @@
+# AFO Kingdom Kyverno Policies
+# 眞善美孝永 - Pod Security Enforcement
+
+---
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: afo-enforce-restricted-pss
+  annotations:
+    policies.kyverno.io/title: AFO Kingdom Restricted PSS Enforcement
+    policies.kyverno.io/category: Security
+    policies.kyverno.io/severity: high
+    policies.kyverno.io/subject: Pod
+    policies.kyverno.io/description: >-
+      왕국 표준 restricted Pod Security Standards 강제.
+      root 실행, privileged, capability 추가, hostPath 등 금지.
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+  # 善: Privileged 컨테이너 금지
+  - name: restrict-privileged
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - afo-kingdom
+    validate:
+      message: "Privileged containers are forbidden in AFO Kingdom (善)."
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              privileged: "false"
+          initContainers:
+          - securityContext:
+              privileged: "false"
+
+  # 善: Root 실행 금지
+  - name: run-as-non-root
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - afo-kingdom
+    validate:
+      message: "Containers must run as non-root in AFO Kingdom (善)."
+      pattern:
+        spec:
+          securityContext:
+            runAsNonRoot: true
+          containers:
+          - securityContext:
+              runAsNonRoot: true
+
+  # 善: Capability Drop ALL
+  - name: drop-all-capabilities
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - afo-kingdom
+    validate:
+      message: "All capabilities must be dropped (善)."
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              capabilities:
+                drop:
+                - ALL
+          initContainers:
+          - securityContext:
+              capabilities:
+                drop:
+                - ALL
+
+  # 善: Read-only Root Filesystem
+  - name: read-only-root-filesystem
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - afo-kingdom
+    validate:
+      message: "Root filesystem must be read-only (善)."
+      pattern:
+        spec:
+          containers:
+          - securityContext:
+              readOnlyRootFilesystem: true
+
+---
+# Kyverno Mutate Policy: Auto-Harden Pods
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: afo-mutate-security-defaults
+  annotations:
+    policies.kyverno.io/title: AFO Kingdom Auto-Harden
+    policies.kyverno.io/description: >-
+      자동으로 보안 기본값 주입 (善/孝)
+spec:
+  rules:
+  # 孝: 자동으로 seccomp RuntimeDefault 추가
+  - name: add-seccomp-profile
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - afo-kingdom
+    mutate:
+      patchStrategicMerge:
+        spec:
+          securityContext:
+            seccompProfile:
+              type: RuntimeDefault
+
+  # 孝: 자동으로 non-root UID 설정
+  - name: set-run-as-user
+    match:
+      any:
+      - resources:
+          kinds:
+          - Pod
+          namespaces:
+          - afo-kingdom
+    mutate:
+      patchStrategicMerge:
+        spec:
+          securityContext:
+            runAsUser: 1000
+            runAsGroup: 1000
+            fsGroup: 1000

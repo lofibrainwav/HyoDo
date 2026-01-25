@@ -1,0 +1,57 @@
+replicaCount: 3
+
+image:
+  repository: afo-soul-engine
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 8010
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: chart-example.local
+      paths:
+        - path: /
+          pathType: ImplementationSpecific
+
+resources: 
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+probes:
+  enabled: true
+  liveness:
+    path: /health
+    initialDelaySeconds: 15
+    periodSeconds: 20
+  readiness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+
+env:
+  ENVIRONMENT: "production"
+  TRINITY_MODE: "enabled"
+
+secrets:
+  geminiApiKey: "your-gemini-key"
+  grokApiKey: "your-grok-key"
+  sentryDsn: "your-sentry-dsn"
+  databaseUrl: "postgresql://user:pass@db:5432/dbname"
+  redisUrl: "redis://redis:6379/0"

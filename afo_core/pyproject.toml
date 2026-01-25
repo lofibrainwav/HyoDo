@@ -1,0 +1,574 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.poetry]
+package-mode = false
+
+[project]
+name = "afo_core"
+version = "1.0.0"
+description = "AFO Ultimate General Command Post"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "fastapi>=0.115.0",
+    "pydantic-settings>=2.0.0",
+    "pydantic>=2.12.5",
+    "python-multipart>=0.0.6",
+    "psutil>=7.2.1,<8.0.0",
+    "slowapi>=0.1.9",
+    "opentelemetry-api>=1.22.0",
+    "opentelemetry-sdk>=1.22.0",
+    "opentelemetry-exporter-otlp>=1.22.0",
+    "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "structlog>=24.1.0",
+    "pytest-asyncio>=1.3.0",
+    "llama-index>=0.14.12,<0.15.0",
+    "llama-index-llms-ollama>=0.9.1,<0.10.0",
+    "llama-index-embeddings-ollama>=0.8.5,<0.9.0",
+    "llama-index-vector-stores-chroma>=0.5.5,<0.6.0",
+    "chromadb>=1.4.0,<2.0.0",
+    "torch>=2.1.0,<2.10.0",
+    "bitsandbytes>=0.49.0,<0.50.0 ; sys_platform == 'linux'",
+    "peft>=0.18.0,<0.19.0",
+    "transformers>=4.57.3,<6.0.0",
+    "httpx>=0.28.1",
+    "redis>=7.1.0",
+    "numpy>=1.24.0",
+    "scipy>=1.10.0",
+    "dspy-ai>=3.0.4",
+    "psycopg2-binary>=2.9.11",
+    "langgraph>=1.0.5,<2.0.0",
+    "langgraph-checkpoint-redis>=0.3.1,<0.4.0",
+    "psycopg[binary,pool]>=3.3.2,<4.0.0",
+    "langgraph-checkpoint-postgres>=3.0.2,<4.0.0",
+    "prometheus-client>=0.23.1,<0.24.0",
+    "moviepy>=2.2.1,<3.0.0",
+    "cryptography>=46.0.3",
+    "aiohttp>=3.13.3",
+    "sse-starlette>=3.1.2,<5.0.0",
+    "certifi>=2026.1.4,<2027.0.0",
+    "pillow>=11.3.0,<12.0",
+    "werkzeug>=3.1.5",
+    "urllib3>=2.6.3",
+    "pdfminer-six>=20251230",
+    "pypdf>=6.6.0",
+    "mcp>=1.23.0",
+    "marshmallow>=3.18.0,<4.0.0",
+    "fonttools>=4.60.2",
+    "filelock>=3.20.1",
+    "langchain-core>=1.2.5",
+    "langchain-community>=0.3.0,<0.4.0",
+    "pyright>=1.1.408",
+    "playwright>=1.57.0",
+    "python-docx>=1.2.0",
+    "autogen-agentchat>=0.7.5",
+    "autogen>=0.10.4",
+    "crewai>=0.102.0",
+    "mem0ai>=1.0.2,<2.0.0",
+    "loguru>=0.7.3,<0.8.0",
+    "sqlmodel>=0.0.31,<0.0.32",
+    "neo4j>=6.1.0,<7.0.0",
+    "pgvector>=0.4.2,<0.5.0",
+    "asyncpg>=0.31.0,<0.32.0",
+    "ujson>=5.10.0",
+    "astropy>=6.0.0",
+    "sympy>=1.13.0",
+    "upstash-redis>=1.5.0,<2.0.0",
+    "openai>=2.15.0,<3.0.0",
+]
+
+[tool.setuptools.packages.find]
+include = ["AFO*"]
+exclude = ["tests*", "scripts*", "legacy*", "artifacts*", "node_modules*"]
+
+# ============================================================================
+# Ruff Configuration (Linter & Formatter)
+# ============================================================================
+[tool.ruff]
+# Python 버전
+target-version = "py312"
+line-length = 100
+exclude = [
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "venv_rag",
+    "node_modules",
+    "*.egg-info",
+    "dist",
+    "build",
+    "tests",
+    "scripts",
+    "legacy",
+    "legacy/**",
+    "tools",
+    "artifacts",
+    "docs",
+]
+
+[tool.ruff.lint]
+# 활성화할 규칙
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "UP",  # pyupgrade
+    "ARG", # flake8-unused-arguments
+    "SIM", # flake8-simplify
+    "TCH", # flake8-type-checking
+    "PTH", # flake8-use-pathlib
+    "RUF", # Ruff-specific rules
+    "S",     # flake8-bandit (Security)
+    "ANN",   # flake8-annotations
+    "DTZ",   # flake8-datetimez
+    "ASYNC", # flake8-async
+    "PL",    # Pylint
+    "TRY",   # tryceratops
+]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "B008",   # do not perform function calls in argument defaults
+    "ARG001",  # unused function argument
+    "ARG002",  # unused method argument
+    "T201",   # print statements (allowed in scripts)
+    "RUF001",  # ambiguous unicode (allow 眞善美孝)
+    "RUF002",  # ambiguous unicode
+    "RUF003",  # ambiguous unicode
+    "S101",    # assert (vetted)
+    "ANN401",  # any-type (allowed for now)
+    "PLR2004", # magic-value-comparison
+    "PLC0415", # import-outside-top-level (allow for now)
+    "ANN201",  # missing-return-type (allow for now)
+    "DTZ005",  # datetime-now-without-tz (allow for now in legacy)
+    "ANN002",  # missing-type-args
+    "ANN003",  # missing-type-kwargs
+    "ANN202",  # missing-return-type-private
+    "ANN204",  # missing-return-type-special
+    "TRY003",  # long-exception-message
+    "TRY201",  # raise-without-exception-name
+    "TRY300",  # move-to-else-block
+    "TRY301",  # abstract-raise
+    "PLR0911", # too-many-return-statements
+    "S110",    # try-except-pass (allow for now)
+    "ANN001",  # missing-type-args (allow for now)
+    "BLE001",  # blind-except (allow for now)
+    "PLW0603", # global-statement (allow for now)
+    "PLR0913", # too-many-arguments
+    "PLR0912", # too-many-branches
+    "PLR0915", # too-many-statements
+    "TRY400",  # logging-error-instead-of-exception
+    "DTZ003",  # unittest-utcnow
+    "S102",    # exec-used
+    "S311",    # random-used
+    "S608",    # sql-injection-warning
+    "PLR2004", # magic-value-comparison
+    "PLW0602", # global-variable-not-assigned
+    "SIM115",  # open-file-without-context-handler
+    "SIM105",  # try-except-pass
+    "RUF012",  # mutable-class-default
+    "UP046",   # non-pep695-generic-class (Pydantic Generic 호환성)
+    "TC001",   # typing-only-first-party-import (Runtime 필요 시 허용)
+    "TC004",   # typing-only-standard-library-import
+    "RUF006",  # asyncio-dangling-task (older)
+       # non-pep604-isinstance
+    "B008",    # function-call-in-default-argument
+    "B904",    # raise-without-from
+    "S607",    # partial-executable-path
+    "PLR1730", # if-stmt-min-max
+    "SIM117",  # multiple-with-statements
+    "ISC001",  # implicit-str-concat
+    "UP032",   # f-string
+    "PERF401", # list-comprehension-transform
+    "PTH",     # allow-os-path-for-legacy
+    "S603",    # subprocess-without-shell-equals-true
+    "PLW1510", # subprocess-run-without-check
+    "S108",    # temp-file-usage
+    "DTZ001",  # datetime-without-tzinfo
+    "DTZ006",  # datetime-fromtimestamp-without-tz
+    "TRY002",  # raise-vanilla-exception
+    "PLC0414", # useless-import-alias
+    "PLR1714", # repeated-equality-comparison
+    "PLR5501", # else-if-used-instead-of-elif
+    "PLW2901", # loop-variable-overwritten
+    "S303",    # insecure-hash-sha1
+    "S310",    # url-open-permitted-schemes
+    "S324",    # insecure-hash-md5
+    "S112",    # try-except-continue
+    "ASYNC109", # async-function-with-timeout
+    "ASYNC230", # blocking-open-call-in-async
+    "TRY401",  # redundant-exception-in-logging
+    "ANN205",  # missing-return-type-staticmethod
+    "ASYNC221", # async-process-run-blocking
+    "PLC0206", # dict-index-iteration
+    "UP035",   # deprecated-typing-generics (Dict, List, etc. - allow for legacy)
+    "RUF013",  # implicit-optional (allow for legacy)
+    "E722",    # bare-except (allow for legacy error handling)
+    "B007",    # loop-control-variable-not-used (allow for legacy)
+    "TRY004",  # prefer-type-error (allow for legacy)
+    "B905",    # zip-without-strict (allow for legacy)
+    "RUF022",  # unsorted-all (allow for legacy)
+    "SIM118",  # key-in-dict-keys (allow for legacy)
+    "SIM401",  # dict-get-with-default (allow for legacy)
+    "SIM105",  # use-contextlib-suppress (allow for legacy - already ignored but for redundancy)
+    "ARG005",  # unused-lambda-argument (allow for legacy)
+    "ANN206",  # missing-return-type-classmethod (allow for legacy)
+    "UP028",   # yield-in-for-loop (allow for legacy)
+    "B023",    # function-uses-loop-variable (allow for legacy)
+    "SIM210",  # use-conditional-true-false (allow for legacy)
+]
+
+[tool.bandit]
+exclude_dirs = ["tests", "artifacts", ".venv", "venv", "legacy", "node_modules", ".ruff_cache", ".mypy_cache", "scripts/admin", "scripts/grok_*.py"]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]
+"scripts/**" = ["T201", "E402", "F401", "F811"]
+"tests/**" = ["ARG", "F401", "E402", "SIM117", "SIM105", "B017",  "F811", "PLR2004", "S101", "BLE001", "DOC201", "CPY001", "F841"]
+"legacy/**" = ["E402", "F401", "SIM117", "F811", "F841", "B025", "E722", "B007", "SIM102", "BLE001", "DOC201", "B024"]
+
+"services/log_analysis.py" = ["E402"]
+"services/plugin_manager.py" = ["E402"]
+"afo_soul_engine/**/*.py" = ["F401", "E402"]
+"api/routers/*.py" = ["E402", "F401", "SIM105", "SIM108", "B904", "E722", "F841",  "PLC0415", "F811"]
+"api/routes/*.py" = ["E402", "F401", "F841",  "PLC0415", "F811"]
+"config/*.py" = ["RUF012", "B024", "B025"]
+"cache/*.py" = ["RUF006"]
+"browser_auth/*.py" = ["B025"]
+"domain/**/*.py" = ["RUF012"]
+"factories/*.py" = ["RUF012"]
+"mediators/*.py" = ["B024"]
+"api_wallet.py" = ["F401"]
+"chancellor_graph.py" = ["F811"]
+"llm_router.py" = ["F842"]
+"api/chancellor_v2/**/*.py" = ["F401", "F841", "F811", "ARG"]
+# AFO core modules - sys.path manipulation requires E402 exemption
+"AFO/**/*.py" = ["E402"]
+"infrastructure/**/*.py" = ["E402", "F401"]
+"utils/exponential_backoff.py" = ["UP047"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+line-ending = "auto"
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "AFO",
+    "afo_soul_engine",
+    "api",
+    "application",
+    "brain",
+    "browser_auth",
+    "builders",
+    "commands",
+    "config",
+    "domain",
+    "event_bus",
+    "factories",
+    "infrastructure",
+    "julie_cpa",
+    "llm_router",
+    "llms",
+    "models",
+    "monitoring",
+    "scholars",
+    "services",
+    "strategists",
+    "tigers",
+    "tigers_orchestrator",
+    "utils",
+    "validation",
+]
+
+# ============================================================================
+# Pytest Configuration
+# ============================================================================
+# ============================================================================
+# Pytest Configuration
+# ============================================================================
+[tool.pytest.ini_options]
+minversion = "7.4"
+testpaths = ["tests", "tests/health", "tests/llm", "tests/api"]
+python_files = ["test_*.py", "*_test.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--disable-warnings",
+    "-p", "no:warnings",
+    "-p", "no:web3",
+    "--ignore=tests/test_coverage_sweep.py",
+]
+markers = [
+    "smoke: quick tests run on every commit",
+    "slow: slow tests run only before deployment",
+    "integration: integration tests requiring Redis, DB, API",
+    "api: API server tests",
+    "unit: unit tests",
+    "bdd: BDD (Behavior-Driven Development) tests",
+    "browser_auth: browser auth module tests",
+    "skip_external: skip tests depending on external services",
+    "external: external API call tests",
+    "asyncio: Tests that use asyncio",
+    "module_reload: Tests that reload modules (run in isolation)",
+]
+
+asyncio_mode = "auto"
+norecursedirs = ["legacy", "scripts", ".venv", "venv", "env", "node_modules"]
+pythonpath = "."
+
+# ============================================================================
+# Coverage Configuration (pytest-cov)
+# ============================================================================
+[tool.coverage.run]
+source = ["AFO", "api", "config", "llms", "utils"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/legacy/*",
+    "*/node_modules/*",
+]
+
+[tool.coverage.report]
+# Phase 25: 현실적인 커버리지 임계값 설정 (점진적 개선)
+fail_under = 45
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+]
+
+# ============================================================================
+# MyPy Configuration
+# ============================================================================
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+check_untyped_defs = false
+disallow_untyped_decorators = false
+no_implicit_optional = true
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_unreachable = true
+strict_equality = true
+show_error_codes = true
+show_error_context = true
+
+# 파일/디렉토리 제외
+exclude = [
+    "venv/",
+    ".venv/",
+    "venv_rag/",
+    "build/",
+    "dist/",
+    ".*egg-info/",
+    "__pycache__/",
+    ".git/",
+    "node_modules/",
+]
+
+# 모듈별 설정
+[[tool.mypy.overrides]]
+# 【老子】道生一一生二 - 외부 의존성은 격리하여 왕국의 진실을 보호함
+module = [
+    "qdrant_client.*",
+    "langchain.*",
+    "langchain_openai.*",
+    "langchain_community.*",
+    "langchain_core.*",
+    "langgraph.*",
+    "fastapi.*",
+    "uvicorn.*",
+    "pydantic.*",
+    "pydantic_settings.*",
+    "sentry_sdk.*",
+    "sse_starlette.*",
+    "google.*",
+    "httpx.*",
+    "hvac.*",
+    "passlib.*",
+    "psutil.*",
+    "asyncpg.*",
+    "pgvector.*",
+    "watchdog.*",
+    "prometheus_fastapi_instrumentator.*",
+    "prometheus_client.*",
+    "anthropic.*",
+    "openai.*",
+    "sentence_transformers.*",
+    "ragas.*",
+    "autogen.*",
+    "autogen_agentchat.*",
+    "opentelemetry.*",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# 【莊子】無用之用 - 내부 phantom 모듈 (미구현 계획 모듈)
+module = [
+    "strategy_engine",
+    "query_expansion_advanced",
+    "multimodal_rag_engine",
+    "multimodal_rag_cache",
+    "memory_system.*",
+    "input_storage",
+    "services.llm_router",
+    "security.vault_manager",
+    "afo_soul_engine.*",
+    "api.middleware.*",
+    "api.routes.*",
+    "api.routers.*",
+    "api.fig_overlay.*",
+    "config.antigravity",
+]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "scripts.*"
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+
+[[tool.mypy.overrides]]
+# 【孔子】中庸 - 과도한 엄격함은 진행을 막으니, 잠시 눈을 감아 조화를 이룸
+module = [
+    # Top Level Legacy
+    "api.*", "config.*", "llms.*", "afo_soul_engine.*", "afo_skills_registry", "llm_router", "chancellor_graph",
+    # AFO Package Legacy/Broken (Strangler Fig)
+    "AFO.afo_skills_registry",
+    "AFO.api.*",
+    "AFO.api_server",
+    "AFO.cache.*",
+    "AFO.chancellor.*",
+    "AFO.chancellor_graph",
+    "AFO.config.*",
+    "AFO.domain.janus.*",
+    "AFO.julie_cpa.*",
+    "AFO.llm_router",
+    "AFO.llms.*",
+    "AFO.models.*",
+    "AFO.serenity.*",
+    "AFO.services.antigravity.*",
+    "AFO.services.antigravity_engine",
+    "AFO.services.checkpoint",
+    "AFO.services.debugging_skill",
+    "AFO.services.hybrid_rag",
+    "AFO.services.langchain_openai_service",
+    "AFO.services.llm_cache_service",
+    "AFO.services.mcp_stdio_client",
+    "AFO.services.redis_cache_service",
+    "AFO.services.scholar_ingestion",
+    "AFO.services.security.*",
+    "AFO.services.system_monitoring_dashboard",
+    "AFO.start.*",
+    "AFO.utils.*"
+]
+# Phase 11: ignore_errors 제거 - 진실 검사 유지
+# 이 모듈들은 이제 정상 MyPy 검사 대상
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["autogen", "autogen.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["services.trinity_score_monitor"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["services.langchain_openai_service"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# Optional/external dependencies (may not be installed)
+module = ["crewai", "crewai.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+# AFO Soul Engine optional routers
+module = ["AFO.afo_soul_engine.*", "afo_soul_engine.*"]
+ignore_missing_imports = true
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# Agent fabric (crewai dependency)
+module = ["AFO.afo_agent_fabric", "AFO.afo_agent_fabric_v2"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+# API compat layer (legacy)
+module = ["AFO.api.compat"]
+ignore_errors = true
+# ============================================================================
+# Pyright Configuration
+# ============================================================================
+[tool.pyright]
+include = ["AFO", "utils"]
+exclude = [
+    "**/__pycache__",
+    "**/node_modules",
+    "**/venv",
+    "**/.venv",
+    "**/build",
+    "**/dist",
+    "**/legacy",
+    "tests",
+    "scripts",
+    "tigers",
+    "verify_*.py",
+    "strategists",
+    "stubs.py",
+    "julie_cpa",
+    "docs"
+]
+venvPath = ".."
+venv = ".venv"
+pythonVersion = "3.12"
+pythonPlatform = "Darwin"
+typeCheckingMode = "basic"
+reportMissingImports = "none"
+reportMissingTypeStubs = "none"
+reportUnknownArgumentType = "none"
+reportUnknownMemberType = "none"
+reportPrivateUsage = false
+reportAttributeAccessIssue = "none"
+reportArgumentType = "none"
+reportGeneralTypeIssues = "none"
+reportCallIssue = "none"
+reportOptionalMemberAccess = "none"
+reportInvalidTypeVarUse = "none"
+reportOptionalCall = "none"
+reportInvalidTypeForm = "none"
+reportTypedDictNotRequiredAccess = "none"
+reportReturnType = "none"
+reportMissingModuleSource = "none"
+reportAssignmentType = "none"
+reportUnusedExpression = "none"
+reportUnboundVariable = "none"
+reportOperatorIssue = "none"
+reportRedeclaration = "none"
+reportOptionalContextManager = "none"
+reportUnsupportedDunderAll = "none"
+stubPath = "typings"
+
+[dependency-groups]
+dev = [
+    "cyclonedx-bom>=7.2.1,<8.0.0",
+    "pytest-xdist>=3.8.0,<4.0.0",
+    "pyright>=1.1.391,<2.0.0"
+]

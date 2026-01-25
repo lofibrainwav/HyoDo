@@ -1,0 +1,24 @@
+approved_skills:
+  - skill_001_brave_search
+  - skill_003_filesystem_read
+  - skill_005_memory_kv
+  - skill_041_royal_library
+  # MockSkillRegistry skills (for V2 integration testing)
+  - truth_evaluate
+  - arch_audit
+  - code_refactor
+  - goodness_review
+  - beauty_optimize
+  - serenity_deploy
+  - eternity_log
+  # Test skill for Chancellor Graph validation
+  - skill_test
+
+blocked_skills:
+  - skill_999_experimental
+
+fallback_rules:
+  - if: skill_unavailable
+    then: log_and_skip
+  - if: rate_limit_exceeded
+    then: exponential_backoff

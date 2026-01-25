@@ -1,0 +1,55 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: afo-dashboard
+  namespace: afo-kingdom
+  labels:
+    app: afo-dashboard
+    tier: frontend
+    pillar: beauty
+    component: trinity-dashboard
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: afo-dashboard
+  template:
+    metadata:
+      labels:
+        app: afo-dashboard
+        tier: frontend
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001 # nextjs
+        runAsGroup: 1001 # nodejs
+      containers:
+      - name: dashboard
+        image: afo/dashboard:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: SOUL_ENGINE_URL
+          value: "http://julie-cpa-service:8010" # Internal K8s DNS
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10

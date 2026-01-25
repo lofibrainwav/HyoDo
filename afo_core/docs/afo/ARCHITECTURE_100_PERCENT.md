@@ -1,0 +1,87 @@
+# ARCHITECTURE_100_PERCENT (Archived)
+
+> 원본 문서는 용량 최적화를 위해 아카이브로 이동했습니다.
+
+- 원본 라인 수: 577
+- 원본 경로: packages/afo-core/docs/afo/ARCHITECTURE_100_PERCENT.md
+- 아카이브 경로: docs/archive/non_docs/packages/afo-core/docs/afo/ARCHITECTURE_100_PERCENT_20260116.md
+- 아카이브 일자: 2026-01-16
+
+## 주요 섹션
+
+- # 🏗️ AFO 왕국 아키텍처 100% 완전 분석
+- ## 📊 시스템 아키텍처 개요
+- ### 계층 구조 (Layered Architecture)
+- ## 🔄 데이터 흐름 (Data Flow)
+- ### 1. API 요청 흐름
+- ### 2. Chancellor Graph 흐름
+- ### 3. RAG 시스템 흐름
+- ## 🧩 핵심 컴포넌트
+- ### 1. API 서버 (`api_server.py`)
+- ### 2. 라우터 구조
+- #### `api/routers/` (기본 라우터)
+- #### `api/routes/` (기능별 라우터)
+- ### 3. 서비스 레이어
+- #### `AFO/services/`
+- ### 4. 유틸리티
+- #### `AFO/utils/`
+- ### 5. 설정 관리
+- #### `config/`
+- ## 🔌 통합 포인트
+- ### 1. 데이터베이스 통합
+- ### 2. 외부 API 통합
+- ### 3. LangGraph 통합
+- ## 📡 API 엔드포인트 전체 목록
+- ### 루트 및 기본
+- ### Health & System (`/api/system`)
+- ### Skills (`/api/skills`)
+- ### 5 Pillars (`/api/5pillars`)
+- ### RAG (`/api/crag`, `/api/ragas`)
+- ### Chancellor (`/chancellor`)
+- ### Wallet (`/api/wallet`)
+- ### 기타 (api_server.py 직접 정의)
+- ## 🧠 11-오장육부 시스템
+- ### 장기 매핑
+- ### 건강 점수 계산
+- # Brain (Memory)
+- # Heart (Redis)
+- # Lungs (Qdrant)
+- # Digestive (Ollama)
+- ## 🔄 LLM Router 동작 원리
+- ### 라우팅 순서
+- ### 비용 최적화
+- ## 🎯 스킬 시스템
+- ### 스킬 레지스트리 구조
+- ### 스킬 실행 흐름
+- ## 🔐 인증 및 보안
+- ### API Wallet
+- ### 환경 변수 관리
+- ## 📊 모니터링 및 로깅
+- ### 메트릭 수집
+- ### 로깅
+- ## 🚀 배포 및 실행
+- ### 개발 환경
+- ### 프로덕션 환경
+- ### 테스트 환경
+- ## 🔗 저장소 간 통합
+- ### AFO ↔ TRINITY-OS
+- ### AFO ↔ SixXon
+- ## 📈 성능 최적화
+- ### 캐싱 전략
+- ### 비동기 처리
+- ### 연결 풀링
+- ## 🎯 핵심 설계 원칙
+- ### 1. 중앙 집중식 설정
+- ### 2. 모듈화
+- ### 3. 타입 안전성
+- ### 4. 에러 처리
+- ### 5. 테스트 가능성
+- ## 🔍 완전한 데이터 흐름 예시
+- ### 예시: 스킬 실행 요청
+- ### 예시: RAG 질의
+- ## 🎯 眞善美孝永 구현
+- ### 眞 (Truth) - 기술적 확실성
+- ### 善 (Goodness) - 윤리·안정성
+- ### 美 (Beauty) - 단순함·우아함
+- ### 孝 (Serenity) - 평온·연속성
+- ### 永 (Eternity) - 영속성

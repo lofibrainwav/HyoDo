@@ -1,0 +1,6 @@
+# Development Requirements for afo-core
+# Use this for local development with editable install
+# CI uses requirements.txt only
+
+-r requirements.txt
+-e .

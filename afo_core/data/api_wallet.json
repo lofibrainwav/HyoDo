@@ -1,0 +1,30 @@
+{
+  "keys": [
+    {
+      "id": 1,
+      "name": "test_key",
+      "encrypted_key": "gAAAAABpdD7EfdUuheuJXc3znA0YzY3cU7jk5VWx7pgJnjpeeDwYJPib8pqxJxCCwolIt2w-p6hHBYKzfcg5xuelzrJSQKfU5w==",
+      "key_type": "api",
+      "read_only": true,
+      "service": "",
+      "description": "",
+      "key_hash": "acb42a4fa3d3621a",
+      "created_at": "2026-01-23T19:38:44.707773",
+      "last_accessed": null,
+      "access_count": 0
+    },
+    {
+      "id": 2,
+      "name": "HTTP_KEY",
+      "encrypted_key": "gAAAAABpdGNJjABW7ane9voWngiwAvNPLWpvU9H3s4_UbstdvVW2_0BwHshtEYMM8dtUBW-kRom2wa1J8S5o6UQvwSrTPRlteQ==",
+      "key_type": "api",
+      "read_only": true,
+      "service": "other",
+      "description": "Bulk import: HTTP_KEY",
+      "key_hash": "95338c85fae8054f",
+      "created_at": "2026-01-23T22:14:33.387313",
+      "last_accessed": "2026-01-25T00:22:04.533618",
+      "access_count": 21
+    }
+  ]
+}

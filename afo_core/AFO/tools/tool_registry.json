@@ -1,0 +1,56 @@
+{
+  "version": "tools/ssot/v1",
+  "anchor": "TICKETS.md",
+  "tools": [
+    {
+      "id": "trivy",
+      "pillar": "goodness",
+      "evidence_paths": ["trivy-results.json", "artifacts/trivy-results.json", "logs/trivy-results.json"]
+    },
+    {
+      "id": "vulture",
+      "pillar": "truth",
+      "evidence_paths": ["artifacts/vulture.json", "artifacts/vulture.txt"]
+    },
+    {
+      "id": "penpot",
+      "pillar": "beauty",
+      "evidence_paths": ["artifacts/penpot-health.json"]
+    },
+    {
+      "id": "coolify",
+      "pillar": "eternity",
+      "evidence_paths": ["artifacts/coolify-health.json"]
+    },
+    {
+      "id": "mattermost",
+      "pillar": "goodness",
+      "evidence_paths": ["artifacts/mattermost-health.json"]
+    },
+    {
+      "id": "langgraph",
+      "pillar": "truth",
+      "evidence_paths": ["artifacts/langgraph-version.json"]
+    },
+    {
+      "id": "optuna",
+      "pillar": "truth",
+      "evidence_paths": ["artifacts/optuna-version.json"]
+    },
+    {
+      "id": "fairlearn",
+      "pillar": "goodness",
+      "evidence_paths": ["artifacts/fairlearn-version.json"]
+    },
+    {
+      "id": "tflite",
+      "pillar": "truth",
+      "evidence_paths": ["artifacts/tflite-version.json"]
+    },
+    {
+      "id": "k8s_ops",
+      "pillar": "eternity",
+      "evidence_paths": ["artifacts/k8s-ops-status.json"]
+    }
+  ]
+}

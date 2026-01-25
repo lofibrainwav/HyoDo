@@ -1,0 +1,31 @@
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException
+
+from AFO.config.antigravity import antigravity
+from AFO.utils.standard_shield import shield
+from services.external_interface import external_service
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api/v1/public", tags=["External Interface"])
+
+
+def check_exposure_gate() -> None:
+    """Ensure external exposure is permitted by the Sovereign."""
+    if not antigravity.EXTERNAL_EXPOSURE_ENABLED:
+        raise HTTPException(status_code=403, detail="External Exposure Locked by Sovereign Decree.")
+
+
+@shield(pillar="善")
+@router.get("/chronicle", response_model=list[dict], dependencies=[Depends(check_exposure_gate)])
+async def get_public_chronicle():
+    """Returns a sanitized, read-only summary of the kingdom's optimization history."""
+    return external_service.get_public_chronicle()
+
+
+@shield(pillar="善")
+@router.get("/status", dependencies=[Depends(check_exposure_gate)])
+async def get_public_status():
+    """Returns the high-level health of the civilization."""
+    return external_service.get_public_status()

@@ -1,0 +1,214 @@
+# Trinity Score: 90.0 (Established by Chancellor)
+# Phase 25: OpenAI 의존성 제거, Ollama 통일 (眞 - 로컬 지능 주권)
+# Refactored: #153 복잡도 D등급 → B등급 개선
+from dataclasses import dataclass, field
+from typing import Any
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
+
+from AFO.services.hybrid_rag import (
+    generate_answer_async,
+    generate_answer_stream_async,
+    generate_hyde_query_async,
+    get_embedding_async,
+    query_graph_context,
+    query_qdrant_async,
+)
+
+# ============================================================
+# Pipeline Stage Helpers (Complexity Reduction)
+# ============================================================
+
+
+@dataclass
+class RAGPipelineContext:
+    """RAG 파이프라인 실행 컨텍스트"""
+
+    query: str
+    search_query: str = ""
+    embedding: list[float] = field(default_factory=list)
+    results: list[dict[str, Any]] = field(default_factory=list)
+    graph_context: list[dict[str, Any]] = field(default_factory=list)
+    contexts: list[str] = field(default_factory=list)
+    logs: list[str] = field(default_factory=list)
+
+
+async def _stage_hyde(ctx: RAGPipelineContext, use_hyde: bool) -> None:
+    """Stage 1: HyDE (Hypothetical Document Embeddings)"""
+    ctx.search_query = ctx.query
+    if use_hyde:
+        try:
+            ctx.search_query = await generate_hyde_query_async(ctx.query, None)
+            ctx.logs.append(f"✨ HyDE Generated (Ollama): {ctx.search_query[:50]}...")
+        except Exception:
+            ctx.logs.append("ℹ️ HyDE Skipped (error)")
+    else:
+        ctx.logs.append("ℹ️ HyDE Skipped")
+
+
+async def _stage_embedding(ctx: RAGPipelineContext) -> None:
+    """Stage 2: Embedding Generation (Ollama embeddinggemma)"""
+    try:
+        ctx.embedding = await get_embedding_async(ctx.search_query, None)
+    except Exception as e:
+        ctx.logs.append(f"❌ Embedding Failed: {e}")
+        ctx.embedding = [0.0] * 768  # Fallback dimension
+
+
+async def _stage_retrieval(ctx: RAGPipelineContext, top_k: int, use_qdrant: bool) -> None:
+    """Stage 3: Vector Store Retrieval"""
+    if not use_qdrant:
+        return
+
+    try:
+        from qdrant_client import QdrantClient
+
+        q_client = QdrantClient("localhost", port=6333)
+        retrieval_results = await query_qdrant_async(ctx.embedding, top_k, q_client)
+        if isinstance(retrieval_results, list):
+            ctx.results.extend(retrieval_results)
+    except Exception:
+        pass
+
+    ctx.logs.append(f"🔍 Retrieved {len(ctx.results)} chunks from Vector Store")
+
+
+def _extract_entities(query: str, results: list[dict[str, Any]]) -> list[str]:
+    """엔티티 추출 헬퍼 (복잡도 분리)"""
+    entities = [w for w in query.split() if len(w) > 4]
+    for res in results:
+        if isinstance(res, dict) and "metadata" in res:
+            metadata = res["metadata"]
+            if isinstance(metadata, dict) and "content" in metadata:
+                content = metadata["content"]
+                if isinstance(content, str):
+                    words = [w for w in content.split() if w and w[0].isupper()]
+                    entities.extend(words[:3])
+    return list(set(entities))[:5]
+
+
+def _stage_graph_context(ctx: RAGPipelineContext, use_graph: bool) -> None:
+    """Stage 4: Graph Context Extraction"""
+    if not use_graph:
+        return
+
+    entities = _extract_entities(ctx.query, ctx.results)
+    if entities:
+        ctx.graph_context = query_graph_context(entities)
+        ctx.logs.append(
+            f"🕸️ Graph Context: Found {len(ctx.graph_context)} connections for {entities}"
+        )
+
+
+def _stage_context_selection(ctx: RAGPipelineContext) -> None:
+    """Stage 5: Context Selection / Rerank"""
+    ctx.contexts = [r.get("content", "") for r in ctx.results[:5] if isinstance(r, dict)]
+
+
+class HybridRAGService:
+    """Strangler Fig Compatibility Layer for Hybrid RAG Service."""
+
+    available = True
+
+
+router = APIRouter()
+
+
+class RAGRequest(BaseModel):
+    query: str
+    top_k: int = 5
+    # Optional flags
+    use_hyde: bool = True
+    use_graph: bool = True
+    use_qdrant: bool = True
+
+
+class RAGResponse(BaseModel):
+    answer: str
+    sources: list[Any]
+    graph_context: list[Any]
+    processing_log: list[str]
+
+
+@router.post("/query", response_model=RAGResponse)
+async def query_knowledge_base(request: RAGRequest):
+    """Advanced GraphRAG Query Endpoint (Ollama 기반)
+    Orchestrates HyDE -> Hybrid Retrieval -> Graph Expansion -> Rerank -> Generation
+    Phase 25: OpenAI 의존성 제거, Ollama 통일
+    Refactored: #153 복잡도 D(26) → B 개선
+    """
+    if not HybridRAGService.available:
+        raise HTTPException(
+            status_code=503, detail="RAG Service Unavailable (Missing dependencies)"
+        )
+
+    # Initialize pipeline context
+    ctx = RAGPipelineContext(query=request.query)
+    ctx.logs.append("🧠 Advanced RAG Pipeline Started (Ollama)")
+
+    # Execute pipeline stages
+    await _stage_hyde(ctx, request.use_hyde)
+    await _stage_embedding(ctx)
+    await _stage_retrieval(ctx, request.top_k, request.use_qdrant)
+    _stage_graph_context(ctx, request.use_graph)
+    _stage_context_selection(ctx)
+
+    # Generation (Ollama)
+    answer = await generate_answer_async(
+        query=request.query,
+        contexts=ctx.contexts,
+        temperature=0.7,
+        response_format="markdown",
+        additional_instructions="Use the provided Graph Context to enrich the answer.",
+        openai_client=None,
+        graph_context=ctx.graph_context,
+    )
+
+    return RAGResponse(
+        answer=str(answer),
+        sources=ctx.results[:5],
+        graph_context=ctx.graph_context,
+        processing_log=ctx.logs,
+    )
+
+
+@router.post("/query/stream")
+async def query_knowledge_base_stream(request: RAGRequest):
+    """
+    Advanced GraphRAG Streaming Query Endpoint (Ollama 기반)
+    Mirror of /query but streams generation tokens via SSE.
+    Phase 25: OpenAI 의존성 제거, Ollama 통일
+    Refactored: #153 복잡도 D(21) → B 개선
+    """
+    if not HybridRAGService.available:
+        raise HTTPException(
+            status_code=503, detail="RAG Service Unavailable (Missing dependencies)"
+        )
+
+    # Initialize pipeline context (reuse same stages as /query)
+    ctx = RAGPipelineContext(query=request.query)
+
+    # Execute pipeline stages (same as /query)
+    await _stage_hyde(ctx, request.use_hyde)
+    await _stage_embedding(ctx)
+    await _stage_retrieval(ctx, request.top_k, request.use_qdrant)
+    _stage_graph_context(ctx, request.use_graph)
+    _stage_context_selection(ctx)
+
+    # Streaming Generation (Ollama)
+    headers = {"X-Accel-Buffering": "no", "Cache-Control": "no-cache"}
+
+    return StreamingResponse(
+        generate_answer_stream_async(
+            query=request.query,
+            contexts=ctx.contexts,
+            temperature=0.7,
+            response_format="markdown",
+            additional_instructions="Use the provided Graph Context to enrich the answer.",
+            openai_client=None,
+        ),
+        media_type="text/event-stream",
+        headers=headers,
+    )

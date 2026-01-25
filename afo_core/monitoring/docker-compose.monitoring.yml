@@ -1,0 +1,79 @@
+# AFO Kingdom Monitoring Stack
+# Docker Compose for Prometheus + Grafana + Alertmanager
+
+version: '3.8'
+
+services:
+  # ============================================================
+  # Prometheus - Metrics Collection
+  # ============================================================
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    container_name: afo-prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./alerting_rules.yml:/etc/prometheus/alerting_rules.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=7d'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    networks:
+      - afo-monitoring
+
+  # ============================================================
+  # Alertmanager - Alert Routing & Notifications
+  # ============================================================
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: afo-alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - ./alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager_data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - afo-monitoring
+
+  # ============================================================
+  # Grafana - Visualization & Dashboards
+  # ============================================================
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: afo-grafana
+    restart: unless-stopped
+    ports:
+      - "3001:3000"  # 3001 to avoid conflict with Next.js dashboard
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=afo-kingdom-guardian
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_SERVER_ROOT_URL=http://localhost:3001
+      - GF_ALERTING_ENABLED=true
+      - GF_UNIFIED_ALERTING_ENABLED=true
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - afo-monitoring
+    depends_on:
+      - prometheus
+
+networks:
+  afo-monitoring:
+    driver: bridge
+
+volumes:
+  prometheus_data:
+  alertmanager_data:
+  grafana_data:

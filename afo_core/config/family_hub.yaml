@@ -1,0 +1,43 @@
+family_hub:
+  name: "AFO Royal Family"
+  description: "The core members of the AFO Kingdom's decision-making body."
+
+  members:
+    Julie:
+      role: "Strategic Auditor (CPA)"
+      persona_id: "julie_cpa"
+      icon: "👩‍💼"
+      color: "green"
+      description: "Responsible for financial auditing, risk assessment, and mission control operations."
+
+    Yeongdeok:
+      role: "Chief Archivist (Memory)"
+      persona_id: "yeongdeok_memory"
+      icon: "🦀"
+      color: "blue"
+      description: "Guardian of the Kingdom's extensive knowledge base and memory systems."
+
+    ZhugeLiang:
+      role: "Prime Strategist (Truth)"
+      persona_id: "zhuge_liang_truth"
+      icon: "⚔️"
+      color: "cyan"
+      description: "Architect of grand strategy, ensuring all actions align with Truth (眞)."
+
+    SimaYi:
+      role: "Grand Guardian (Goodness)"
+      persona_id: "sima_yi_goodness"
+      icon: "🛡️"
+      color: "amber"
+      description: "Defender of stability and ethics, prioritizing Goodness (善)."
+
+    ZhouYu:
+      role: "Grand Architect (Beauty)"
+      persona_id: "zhou_yu_beauty"
+      icon: "🌉"
+      color: "pink"
+      description: "Master of aesthetics and user experience, ensuring Beauty (美)."
+
+  settings:
+    update_interval_sec: 5
+    retention_policy_days: 30

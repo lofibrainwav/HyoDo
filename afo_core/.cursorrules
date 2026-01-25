@@ -1,0 +1,43 @@
+# AFO 왕국 Cursor IDE 설정 규칙
+
+## 프로젝트 컨텍스트
+- Python 3.12+ 프로젝트
+- FastAPI 기반 API 서버
+- PostgreSQL, Redis, Qdrant 사용
+- LangChain, LangGraph 기반 RAG 시스템
+
+## 코딩 스타일
+- 타입 힌트 필수 (Python 3.10+ 문법 사용)
+- Docstring 작성 (Google 스타일)
+- Ruff 린터/포매터 사용
+- MyPy 타입 체크 준수
+
+## 파일 구조
+- `AFO/` - 메인 패키지
+- `api/` - API 라우터
+- `config/` - 설정 파일
+- `services/` - 비즈니스 로직
+- `utils/` - 유틸리티 함수
+- `tests/` - 테스트 파일
+
+## 설정 우선순위
+1. `AFO/config/settings.py` - 중앙 설정
+2. 환경 변수 (`.env` 파일)
+3. 기본값 (settings.py에 정의)
+
+## 코드 품질
+- Ruff 자동 수정 가능한 이슈는 자동 수정
+- 타입 힌트는 `X | None` 형식 사용 (Python 3.12+)
+- Import는 isort 규칙 준수
+- 라인 길이: 100자
+
+## 테스트
+- Pytest 사용
+- 테스트 파일: `tests/` 디렉토리
+- 테스트 명명: `test_*.py` 또는 `*_test.py`
+
+## Git
+- 커밋 메시지: 이모지 + 간단한 설명
+- 브랜치: `main`, `develop`
+- `.gitignore` 준수
+

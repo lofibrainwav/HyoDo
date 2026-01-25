@@ -1,0 +1,102 @@
+# AFO Kingdom Kubernetes RBAC
+# 眞善美孝永 - Least Privilege Principle
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: afo-kingdom
+  labels:
+    name: afo-kingdom
+    # Pod Security Standards - Restricted Level
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+
+---
+# ServiceAccount for Soul Engine
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: soul-engine-sa
+  namespace: afo-kingdom
+
+---
+# ServiceAccount for Trinity Components
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: trinity-sa
+  namespace: afo-kingdom
+
+---
+# Role: DB Secret Reader (Minimal Permission)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: afo-kingdom
+  name: db-secret-reader
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  resourceNames: ["afo-postgres-secret", "afo-redis-secret"]
+  verbs: ["get"]  # 善: 읽기만 허용
+
+---
+# Role: ConfigMap Reader
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: afo-kingdom
+  name: configmap-reader
+rules:
+- apiGroups: [""]
+  resources: ["configmaps"]
+  verbs: ["get", "list"]
+
+---
+# RoleBinding: Soul Engine → DB Secrets
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: soul-engine-db-access
+  namespace: afo-kingdom
+subjects:
+- kind: ServiceAccount
+  name: soul-engine-sa
+  namespace: afo-kingdom
+roleRef:
+  kind: Role
+  name: db-secret-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# RoleBinding: Trinity → ConfigMaps
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: trinity-config-access
+  namespace: afo-kingdom
+subjects:
+- kind: ServiceAccount
+  name: trinity-sa
+  namespace: afo-kingdom
+roleRef:
+  kind: Role
+  name: configmap-reader
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# ClusterRole: Kingdom Monitor (Read-Only Cluster Access)
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: afo-kingdom-monitor
+rules:
+- apiGroups: ["metrics.k8s.io"]
+  resources: ["pods", "nodes"]
+  verbs: ["get", "list"]
+- apiGroups: [""]
+  resources: ["nodes", "namespaces"]
+  verbs: ["get", "list"]

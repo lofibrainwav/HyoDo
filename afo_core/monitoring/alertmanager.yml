@@ -1,0 +1,72 @@
+# Alertmanager Configuration for AFO Kingdom
+# Sends alerts to Slack when triggered
+
+global:
+  resolve_timeout: 5m
+  # Slack webhook URL - replace with your actual webhook
+  slack_api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'slack-kingdom'
+  
+  routes:
+    # Critical alerts go immediately
+    - match:
+        severity: critical
+      receiver: 'slack-kingdom-critical'
+      group_wait: 10s
+      repeat_interval: 1h
+    
+    # Warning alerts
+    - match:
+        severity: warning
+      receiver: 'slack-kingdom'
+      group_wait: 1m
+
+receivers:
+  - name: 'slack-kingdom'
+    slack_configs:
+      - channel: '#afo-kingdom-alerts'
+        send_resolved: true
+        username: '🏛️ AFO Kingdom Guardian'
+        icon_emoji: ':crown:'
+        title: '{{ .Status | toUpper }}: {{ .CommonLabels.alertname }}'
+        text: |-
+          {{ .CommonAnnotations.description }}
+          
+          *서비스:* {{ .CommonLabels.service }}
+          *심각도:* {{ .CommonLabels.severity }}
+          
+          {{ if .CommonAnnotations.runbook_url }}📖 Runbook: {{ .CommonAnnotations.runbook_url }}{{ end }}
+          
+          왕국 지킴이 알림 🏛️
+
+  - name: 'slack-kingdom-critical'
+    slack_configs:
+      - channel: '#afo-kingdom-critical'
+        send_resolved: true
+        username: '🚨 AFO Kingdom CRITICAL'
+        icon_emoji: ':rotating_light:'
+        title: '🚨 CRITICAL: {{ .CommonLabels.alertname }}'
+        text: |-
+          {{ .CommonAnnotations.summary }}
+          
+          {{ .CommonAnnotations.description }}
+          
+          *서비스:* {{ .CommonLabels.service }}
+          *즉시 대응 필요!*
+          
+          {{ if .CommonAnnotations.runbook_url }}📖 Runbook: {{ .CommonAnnotations.runbook_url }}{{ end }}
+        color: '{{ if eq .Status "firing" }}danger{{ else }}good{{ end }}'
+
+# Inhibition rules - suppress less severe alerts when critical is firing
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['service']

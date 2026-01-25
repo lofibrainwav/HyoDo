@@ -1,0 +1,170 @@
+# Trinity Score: 90.0 (Established by Chancellor)
+"""N8N Integration Router for AFO Kingdom
+n8n 워크플로우 자동화 통합 API.
+
+Provides endpoints for managing n8n workflow integrations,
+triggering workflows, and monitoring workflow status.
+"""
+
+import logging
+import os
+from datetime import UTC, datetime
+from typing import Any, Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from AFO.config.settings import settings
+
+logger = logging.getLogger("AFO.N8N")
+router = APIRouter(tags=["N8N Integration"])
+
+
+# --- Configuration (眞 - Centralized) ---
+N8N_URL = settings.N8N_URL
+# settings module does not have N8N_API_TOKEN yet, but let's see if we should add it or use env
+N8N_API_TOKEN = os.getenv("N8N_API_TOKEN", "")
+
+
+# --- Pydantic Models ---
+
+
+class WorkflowInfo(BaseModel):
+    """N8N workflow information."""
+
+    id: str
+    name: str
+    active: bool = True
+    description: str | None = None
+    tags: list[str] = Field(default_factory=list)
+    last_execution: str | None = None
+
+
+class TriggerRequest(BaseModel):
+    """Request to trigger a workflow."""
+
+    workflow_id: str
+    input_data: dict[str, Any] = Field(default_factory=dict)
+    wait_for_completion: bool = False
+
+
+class TriggerResponse(BaseModel):
+    """Response from workflow trigger."""
+
+    execution_id: str
+    workflow_id: str
+    status: str
+    started_at: str
+    output_data: dict[str, Any] | None = None
+
+
+class WorkflowStatus(BaseModel):
+    """Workflow execution status."""
+
+    execution_id: str
+    workflow_id: str
+    status: str  # running, completed, failed, waiting
+    started_at: str
+    finished_at: str | None = None
+    error: str | None = None
+
+
+# --- Mock Data (MVP) ---
+_mock_workflows: dict[str, WorkflowInfo] = {
+    "youtube-to-spec": WorkflowInfo(
+        id="youtube-to-spec",
+        name="YouTube to n8n Spec Generator",
+        description="Converts YouTube tutorials to n8n workflow specifications",
+        tags=["youtube", "automation", "skill"],
+    ),
+    "health-monitor": WorkflowInfo(
+        id="health-monitor",
+        name="Kingdom Health Monitor",
+        description="Monitors AFO Kingdom services and sends alerts",
+        tags=["monitoring", "alerts"],
+    ),
+    "data-sync": WorkflowInfo(
+        id="data-sync",
+        name="Data Synchronization",
+        description="Syncs data between PostgreSQL and LanceDB",
+        tags=["database", "sync"],
+    ),
+}
+
+_mock_executions: dict[str, WorkflowStatus] = {}
+
+
+# --- Endpoints ---
+
+
+@router.get("/workflows")
+async def list_workflows() -> dict[str, Any]:
+    """List all available n8n workflows."""
+    return {
+        "workflows": list(_mock_workflows.values()),
+        "count": len(_mock_workflows),
+        "n8n_url": N8N_URL,
+        "connected": bool(N8N_API_TOKEN),
+    }
+
+
+@router.get("/workflow/{workflow_id}", response_model=WorkflowInfo)
+async def get_workflow(workflow_id: str) -> WorkflowInfo:
+    """Get workflow details by ID."""
+    if workflow_id not in _mock_workflows:
+        raise HTTPException(status_code=404, detail=f"Workflow {workflow_id} not found")
+    return _mock_workflows[workflow_id]
+
+
+@router.post("/trigger", response_model=TriggerResponse)
+async def trigger_workflow(request: TriggerRequest) -> TriggerResponse:
+    """Trigger an n8n workflow execution."""
+    if request.workflow_id not in _mock_workflows:
+        raise HTTPException(status_code=404, detail=f"Workflow {request.workflow_id} not found")
+
+    execution_id = str(uuid4())[:8]
+    started_at = datetime.now(UTC).isoformat()
+
+    # Store execution status
+    _mock_executions[execution_id] = WorkflowStatus(
+        execution_id=execution_id,
+        workflow_id=request.workflow_id,
+        status="completed" if not request.wait_for_completion else "running",
+        started_at=started_at,
+        finished_at=started_at if not request.wait_for_completion else None,
+    )
+
+    logger.info(f"⚡ Triggered workflow {request.workflow_id} (execution: {execution_id})")
+
+    return TriggerResponse(
+        execution_id=execution_id,
+        workflow_id=request.workflow_id,
+        status="completed",
+        started_at=started_at,
+        output_data={
+            "message": "Workflow executed successfully (mock)",
+            "input": request.input_data,
+        },
+    )
+
+
+@router.get("/execution/{execution_id}", response_model=WorkflowStatus)
+async def get_execution_status(execution_id: str) -> WorkflowStatus:
+    """Get workflow execution status."""
+    if execution_id not in _mock_executions:
+        raise HTTPException(status_code=404, detail=f"Execution {execution_id} not found")
+    return _mock_executions[execution_id]
+
+
+@router.get("/health")
+async def n8n_health() -> dict[str, Any]:
+    """Check N8N integration health."""
+    return {
+        "status": "healthy",
+        "service": "N8N Integration",
+        "n8n_url": N8N_URL,
+        "api_token_configured": bool(N8N_API_TOKEN),
+        "workflows_count": len(_mock_workflows),
+        "active_executions": sum(1 for e in _mock_executions.values() if e.status == "running"),
+    }

@@ -1,0 +1,127 @@
+"""
+Log Analysis API Router
+Trinity Score: 眞 (Truth) - Exposing System Diagnostics via API
+"""
+
+import logging
+from pathlib import Path
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
+from pydantic import BaseModel, Field
+
+from AFO.config.log_analysis import log_analysis_settings
+from AFO.services.log_analysis import LogAnalysisService
+from AFO.utils.resilience_decorator import shield
+
+# Initialize Router
+router = APIRouter(prefix="/log-analysis", tags=["Log Analysis"])
+logger = logging.getLogger("AFO.api.log_analysis")
+
+# Service Dependency (Singleton-like for now)
+# Ideally, this should be dependency injected or managed by a container
+_service = LogAnalysisService(output_dir=str(log_analysis_settings.OUTPUT_DIR))
+
+
+# Pydantic Models for API
+class AnalysisRequest(BaseModel):
+    log_path: str = Field(..., description="Absolute path to the log file to analyze")
+    chunk_size: int | None = Field(None, description="Optional chunk size override")
+
+
+class AnalysisResponse(BaseModel):
+    status: str
+    message: str
+    report_file: str | None = None
+    chunks_created: int | None = None
+
+
+class ReportSummary(BaseModel):
+    id: str
+    filename: str
+    created_at: float
+    size: int
+
+
+@shield(pillar="美")
+@router.post("/analyze", response_model=AnalysisResponse)
+@shield(
+    fallback=AnalysisResponse(
+        status="failure", message="Resilience shield activated: Pipeline failed"
+    ),
+    pillar="善",
+)
+async def trigger_analysis(request: AnalysisRequest, background_tasks: BackgroundTasks):
+    """
+    Trigger a log analysis task.
+    Currently synchronous for simplicity, but designed to be async-capable.
+    """
+    path = Path(request.log_path)
+    if not path.exists():
+        raise HTTPException(status_code=404, detail=f"Log file not found: {path}")
+
+    logger.info(f"Received analysis request for {path}")
+
+    # Execute Pipeline
+    # TODO: In future, offload to Celery or proper async worker via background_tasks
+    result = _service.run_pipeline(str(path), chunk_size=request.chunk_size)
+
+    status = "success"
+    message = "Analysis completed successfully."
+    report_file = None
+    chunks = 0
+
+    if result.get("sequential", {}).get("status") == "success":
+        report_file = result["sequential"].get("report_file")
+
+    if result.get("chunking", {}).get("status") == "success":
+        chunks = result["chunking"].get("chunks_created", 0)
+
+    # Partial failure handling
+    if not report_file:
+        status = "partial_failure"
+        message = "Analysis finished but report generation might have failed."
+
+    return AnalysisResponse(
+        status=status,
+        message=message,
+        report_file=report_file,
+        chunks_created=chunks,
+    )
+
+
+@shield(pillar="美")
+@router.get("/reports", response_model=list[ReportSummary])
+async def list_reports():
+    """List all generated analysis reports."""
+    output_dir = log_analysis_settings.OUTPUT_DIR
+    if not output_dir.exists():
+        return []
+
+    reports = []
+    # Find all integrated and sequential reports
+    for f in output_dir.glob("*_report.md"):
+        stat = f.stat()
+        reports.append(
+            ReportSummary(id=f.stem, filename=f.name, created_at=stat.st_ctime, size=stat.st_size)
+        )
+
+    # Sort by creation time desc
+    reports.sort(key=lambda x: x.created_at, reverse=True)
+    return reports
+
+
+@shield(pillar="美")
+@router.get("/reports/{filename}")
+@shield(fallback={"filename": "error", "content": "Failed to read report"}, pillar="善")
+async def get_report_content(filename: str):
+    """Retrieve the content of a specific report."""
+    # Security: Basic prevention of directory traversal
+    if ".." in filename or "/" in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    file_path = log_analysis_settings.OUTPUT_DIR / filename
+    if not file_path.exists():
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    content = file_path.read_text(encoding="utf-8")
+    return {"filename": filename, "content": content}

@@ -1,0 +1,172 @@
+groups:
+  - name: afo-kingdom-alerts
+    rules:
+    # --- Core Infrastructure ---
+    - alert: HighCPUUsage
+      expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "CPU 사용률 80% 초과"
+        description: "인스턴스 {{ $labels.instance }} CPU가 80% 초과 5분 지속 – HPA 자동 확장 중"
+
+    - alert: HighMemoryUsage
+      expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "메모리 사용률 90% 초과"
+        description: "노드 메모리 부족 – OOM 위험"
+
+    - alert: APIHighLatency
+      expr: histogram_quantile(0.95, rate(http_request_latency_seconds_bucket[5m])) > 1
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "API 응답 지연"
+        description: "95th percentile 지연 1초 초과 – 사용자 경험 저하"
+
+    - alert: PodCrashLoop
+      expr: rate(kube_pod_container_status_restarts_total[10m]) > 5
+      for: 2m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Pod 반복 재시작"
+        description: "{{ $labels.pod }} CrashLoopBackOff"
+
+    - alert: RiskScoreHigh
+      expr: risk_score_current > 10
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Risk Score 10 초과"
+        description: "왕국 위험도 상승 – 즉시 확인 필요"
+
+    - alert: DBConnectionExhaust
+      expr: pg_pool_active_connections / pg_pool_max_connections * 100 > 80
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "DB 연결 풀 80% 초과"
+        description: "쿼리 지연 위험 – 연결 풀 확장 추천"
+
+    # --- Advanced Scenarios ---
+    - alert: OllamaGPUOverload
+      expr: nvidia_gpu_utilization > 90
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Ollama GPU 과부하"
+        description: "GPU 사용률 90% 초과 5분 지속 – AI 추론 지연 위험!"
+
+    - alert: RedisMemoryHigh
+      expr: redis_used_memory / redis_maxmemory * 100 > 80
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Redis 메모리 높음"
+        description: "Redis 메모리 80% 초과 – 캐시 효율 저하"
+
+    - alert: GrokAPIRateNearLimit
+      expr: rate(grok_requests_total[5m]) > 90
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Grok API 호출 과다"
+        description: "Grok 호출율 90% 초과 – 비용/제한 임박"
+    
+    - alert: ProphetLatencyHigh
+      expr: histogram_quantile(0.99, rate(prophet_predict_latency_seconds[5m])) > 5
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "Prophet 예측 지연"
+        description: "99th percentile 예측 5초 초과 – 미래 지연"
+
+    - alert: DiskSpaceLow
+      expr: node_filesystem_avail_bytes / node_filesystem_size_bytes * 100 < 15
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "디스크 공간 부족"
+        description: "디스크 15% 미만 – 로그/데이터 유실 위험"
+
+    - alert: CertificateExpirySoon
+      expr: ssl_certificate_expiry_days < 30
+      for: 1h
+      labels:
+        severity: warning
+      annotations:
+        summary: "SSL 인증서 만료 임박"
+        description: "인증서 {{ $labels.cert }} 30일 내 만료"
+
+    - alert: DeploymentStuck
+      expr: kube_deployment_status_replicas_updated != kube_deployment_spec_replicas
+      for: 10m
+      labels:
+        severity: critical
+      annotations:
+        summary: "배포 멈춤"
+        description: "Deployment {{ $labels.deployment }} 롤아웃 실패"
+
+    - alert: High5xxErrorRate
+      expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "5xx 에러율 높음"
+        description: "5xx 에러율 5% 초과 – 서비스 장애 위험"
+
+    # --- Chancellor V2 Alerts (PH22-02) ---
+    - alert: ChancellorVerifyFail
+      expr: rate(chancellor_v2_verify_fail_total[5m]) > 5
+      for: 2m
+      labels:
+        severity: warning
+        service: chancellor_v2
+      annotations:
+        summary: "Chancellor V2 검증 실패 급증"
+        description: "최근 5분간 VERIFY 실패 > 5회 – 그래프 실행 품질 저하"
+
+    - alert: ChancellorExecuteBlocked
+      expr: rate(chancellor_v2_execute_blocked_total[5m]) > 10
+      for: 2m
+      labels:
+        severity: warning
+        service: chancellor_v2
+      annotations:
+        summary: "Chancellor V2 Allowlist 차단 급증"
+        description: "최근 5분간 403 차단 > 10회 – 미승인 스킬 호출 시도"
+
+    - alert: ChancellorTraceGap
+      expr: time() - chancellor_v2_trace_last_created_timestamp > 3600
+      for: 5m
+      labels:
+        severity: critical
+        service: chancellor_v2
+      annotations:
+        summary: "Chancellor V2 실행 중단"
+        description: "60분 이상 새 trace 없음 – 그래프 실행 중단 의심"
+
+    - alert: ChancellorArtifactsDiskHigh
+      expr: chancellor_v2_artifacts_bytes > 1073741824
+      for: 10m
+      labels:
+        severity: warning
+        service: chancellor_v2
+      annotations:
+        summary: "Chancellor V2 아티팩트 디스크 과다"
+        description: "artifacts 용량 1GB 초과 – prune 스크립트 실행 필요"
+

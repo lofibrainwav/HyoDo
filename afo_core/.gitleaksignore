@@ -1,0 +1,26 @@
+# AFO Kingdom Gitleaks Ignore List
+# 善 (Goodness): Exclusion of known non-secrets and test data
+
+# Test dummy keys
+packages/afo-core/tests/.*
+tests/.*
+
+# Documentation examples
+docs/.*
+
+# Artifacts and logs
+artifacts/.*
+research_dump.txt
+logs/.*
+
+# Local profiles and temp data
+AFO_Stealth_Profile/.*
+.cache/.*
+.venv/.*
+venv/.*
+
+# Infrastructure examples
+packages/afo-core/k8s/monitoring/alertmanager-config.yaml
+
+# Public scripts
+purge_dns.sh
