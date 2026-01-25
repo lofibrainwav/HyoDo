@@ -31,22 +31,42 @@
 <details>
 <summary>📚 고급 기능 보기</summary>
 
-### 철학적 배경
+## 🏛️ Architecture (지능형 오장육부)
 
-HyoDo는 **세종대왕의 정신**을 기반으로 합니다:
-- **眞善美孝永** (진선미효영) - 5가지 품질 기준
-- **장영실/이순신/신사임당** - 3 전략가 분석 시스템
-- **오호대장군** - Ollama 기반 무료 AI 디버깅
+```mermaid
+graph TD
+    subgraph "👑 Command & Control"
+        Chancellor["丞 승상 (Chancellor v2.3)"]
+    end
 
-### 5가지 품질 기준 (五柱)
+    subgraph "🧑‍🎓 Jiphyeonjeon Scholars (Intelligence Layer)"
+        Heo["🌿 허준 (Vision/UX)"]
+        Jeong["🛠️ 정약용 (Logic/Coding)"]
+        Ryu["🚩 류성룡 (Strategy/Security)"]
+        Kim["📜 김유신 (Archive/Stability)"]
+    end
 
-| 기둥 | 의미 | 비중 |
-|------|------|------|
-| **眞** (Truth) | 정확성 | 35% |
-| **善** (Goodness) | 안전성 | 35% |
-| **美** (Beauty) | 가독성 | 20% |
-| **孝** (Serenity) | 편의성 | 8% |
-| **永** (Eternity) | 지속성 | 2% |
+    subgraph "🛡️ 3 Strategists (Persona Layer)"
+        Jang["眞 장영실 (Truth/矛)"]
+        Yi["善 이순신 (Goodness/盾)"]
+        Shin["美 신사임당 (Beauty/橋)"]
+    end
+
+    Chancellor --> Heo & Jeong & Ryu & Kim
+    Heo & Jeong & Ryu & Kim --> Jang & Yi & Shin
+```
+
+### 眞善美孝永 (The Five Pillars)
+
+HyoDo는 **Trinity Score**를 통해 코드의 완성도를 측정합니다.
+
+| 기둥 | 의미 | 비중 | 담당 |
+|------|------|------|------|
+| **眞** (Truth) | 정확성 | 35% | 정약용/장영실 |
+| **善** (Goodness) | 안전성 | 35% | 류성룡/이순신 |
+| **美** (Beauty) | 가독성 | 20% | 허준/신사임당 |
+| **孝** (Serenity) | 편의성 | 8% | 승상 |
+| **永** (Eternity) | 지속성 | 2% | 승상/김유신 |
 
 ### 고급 명령어
 
