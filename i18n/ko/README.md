@@ -1,6 +1,6 @@
-# HyoDo (孝道)
+# HyoDo
 
-> **Claude Code를 위한 AI 코드 품질 자동화**
+> **AI 코딩 도우미를 위한 자동 코드 리뷰**
 
 <p align="center">
   <a href="../../README.md">English</a> •
@@ -9,143 +9,152 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Claude_Code-Plugin-blueviolet" alt="Claude Code">
-  <img src="https://img.shields.io/badge/비용_절감-50--70%25-green" alt="Cost Savings">
+  <img src="https://img.shields.io/badge/연동-Claude_Code-blueviolet" alt="Claude Code">
+  <img src="https://img.shields.io/badge/절감-AI_비용_50--70%25-green" alt="Cost Savings">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
 </p>
 
 ---
 
-## HyoDo란?
+## 왜 HyoDo인가?
 
-HyoDo는 Trinity Score 시스템을 사용하여 코드 품질 검사를 자동화하는 **Claude Code 플러그인**입니다:
+Claude 같은 AI 도우미로 코드를 빠르게 작성할 수 있지만, 그 코드가 **좋은 코드**인지 어떻게 알 수 있을까요?
 
-- **문제를 조기에 발견** — 문제가 되기 전에 잡아냄
-- **AI 비용 절감** — 지능형 캐싱으로 50-70% 절감
-- **확신 있는 결정** — 명확한 합격/불합격 점수
+HyoDo가 자동으로 코드 품질을 검사하고 간단한 점수를 알려줍니다:
+
+| 점수 | 의미 | 할 일 |
+|:----:|:-----|:------|
+| **90+** | ✅ 통과 | 배포하세요! |
+| **70-89** | ⚠️ 검토 필요 | 머지 전에 다시 확인 |
+| **< 70** | ❌ 문제 발견 | 먼저 수정하세요 |
+
+더 이상 추측하지 마세요. "내 컴퓨터에서는 되는데"는 이제 그만.
 
 ---
 
-## 30초 시작
+## 빠른 시작
 
-```bash
-/start              # 도움말
-/check              # 코드 품질 체크
-/score              # 점수 확인 (90점 이상 = 안전)
-/safe               # 안전성 검사
-/cost "작업 설명"   # 비용 예측
+[Claude Code](https://claude.ai/code) (Anthropic의 AI 코딩 도우미)를 사용한다면, 그냥 입력하세요:
+
+```
+/check
 ```
 
-**끝!** 이것만 알면 됩니다.
+끝입니다. HyoDo가 코드를 분석하고 준비 여부를 알려줍니다.
+
+### 다른 명령어
+
+| 명령어 | 기능 |
+|:-------|:-----|
+| `/start` | 도움말 보기 |
+| `/check` | 품질 검사 실행 |
+| `/score` | 점수 확인 |
+| `/safe` | 보안 문제 검사 |
+| `/cost` | AI 비용 예측 |
 
 ---
 
-## Trinity Score
+## HyoDo는 무엇을 검사하나요?
 
-HyoDo는 세 가지 차원에서 코드를 평가합니다:
+HyoDo는 세 가지를 봅니다:
 
-| 차원 | 가중치 | 검사 항목 |
-|:-----|:------:|:----------|
-| **眞 진리** | 35% | 타입 안전성, 로직 정확성, 테스트 통과 |
-| **善 선함** | 35% | 보안, 안정성, 에러 처리 |
-| **美 아름다움** | 20% | 코드 스타일, 문서화, 가독성 |
+### 1. 작동하나요? (35%)
+- 타입 에러
+- 로직 버그
+- 실패하는 테스트
 
-추가로 **孝 평온 (8%)** 개발자 경험, **永 영원 (2%)** 유지보수성.
+### 2. 안전한가요? (35%)
+- 보안 취약점
+- 에러 처리
+- 엣지 케이스
 
-### 점수 해석
+### 3. 읽기 쉬운가요? (20%)
+- 코드 스타일
+- 문서화
+- 네이밍 규칙
 
-| 점수 | 상태 | 행동 |
-|:----:|:----:|:-----|
-| 90+ | ✅ 안전 | 바로 진행 |
-| 70-89 | ⚠️ 주의 | 확인 후 진행 |
-| < 70 | ❌ 위험 | 수정 필요 |
+추가로: 개발자 경험 (8%)과 장기 유지보수성 (2%).
 
 ---
 
 ## 설치
 
-### 방법 1: Git Clone
+### Claude Code 사용자용
+
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git ~/.hyodo
 ```
 
-### 방법 2: 원클릭 설치
+또는 원클릭:
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install.sh | bash
 ```
 
----
+### 요구사항
 
-## 명령어
-
-### 심플 모드 (추천)
-
-| 명령어 | 설명 |
-|:-------|:-----|
-| `/start` | 시작 가이드 |
-| `/check` | 품질 검사 실행 |
-| `/score` | Trinity Score 보기 |
-| `/safe` | 보안 검사 |
-| `/cost` | AI 비용 예측 |
-
-### 고급 모드
-
-| 명령어 | 설명 |
-|:-------|:-----|
-| `/trinity` | 상세 점수 분석 |
-| `/preflight` | 커밋 전 검증 |
-| `/ultrawork` | 병렬 작업 실행 |
-| `/evidence` | 감사 로깅 |
-| `/rollback` | 변경 취소 |
+- [Claude Code](https://claude.ai/code) — Anthropic 공식 코딩 도우미
+- [Ollama](https://ollama.ai) (선택) — 로컬 AI 분석용 (코드 비공개 유지)
 
 ---
 
 ## 작동 방식
 
 ```
-코드 → HyoDo 분석 → Trinity Score → 결정
-                          │
-               ┌──────────┼──────────┐
-               │          │          │
-            90+: 진행   70-89: 확인  <70: 중단
+당신의 코드
+    ↓
+HyoDo 분석 (3가지 영역 검사)
+    ↓
+점수 (0-100)
+    ↓
+✅ 배포  /  ⚠️ 검토  /  ❌ 수정
 ```
 
-HyoDo는 로컬 AI (Ollama)를 사용하여 분석하므로 코드가 비공개로 유지되고 비용이 낮습니다.
+모든 분석은 로컬에서 실행됩니다. 코드가 외부로 전송되지 않습니다.
 
 ---
 
-## 문서
+## FAQ
 
-| 문서 | 설명 |
-|:-----|:-----|
-| [QUICK_START.md](../../QUICK_START.md) | 5분 빠른 시작 |
-| [CONTRIBUTING.md](../../CONTRIBUTING.md) | 기여 가이드 |
-| [ROADMAP.md](../../ROADMAP.md) | 향후 계획 |
+**Q: HyoDo는 유료인가요?**
+A: 아니요, HyoDo는 무료 오픈소스입니다 (MIT 라이선스).
 
----
+**Q: 다른 AI 도우미와도 작동하나요?**
+A: 현재 Claude Code에 최적화되어 있습니다. 다른 통합은 곧 지원 예정.
 
-## 철학
+**Q: 어떤 언어를 지원하나요?**
+A: Python, TypeScript, JavaScript 등. Claude Code가 지원하면 HyoDo도 검사할 수 있습니다.
 
-**HyoDo (孝道)**는 "평온의 길" — 개발 워크플로우에서 마찰을 줄입니다.
-
-세종대왕 시대의 지혜에서 영감을 받아, HyoDo는 모든 결정에 세 가지 관점을 적용합니다:
-
-- **장영실** ⚔️ — "3년 후에도 작동할까?"
-- **이순신** 🛡️ — "최악의 경우는?"
-- **신사임당** 🌉 — "사용자가 이해할 수 있나?"
+**Q: 제 코드는 안전한가요?**
+A: 네. HyoDo는 로컬에서 실행됩니다. 명시적으로 설정하지 않는 한 외부 서버로 전송되지 않습니다.
 
 ---
 
 ## 기여하기
 
-가이드라인은 [CONTRIBUTING.md](../../CONTRIBUTING.md)를 참조하세요.
+도움을 주고 싶으신가요? [CONTRIBUTING.md](../../CONTRIBUTING.md)를 참조하세요.
 
 ## 라이선스
 
-MIT - [LICENSE](../../LICENSE)
+MIT — 원하는 대로 사용하세요.
+
+---
+
+<details>
+<summary>이름에 대하여</summary>
+
+**HyoDo (孝道)**는 "조화의 길"이라는 뜻입니다 — 마찰 없이 그냥 작동하는 코드를 작성하는 것.
+
+이 프로젝트는 세종대왕 시대의 혁신에서 영감을 받아, 시대를 초월한 원칙을 현대 소프트웨어에 적용합니다:
+
+- 장기적으로 생각하기
+- 최악에 대비하기
+- 단순하게 유지하기
+
+</details>
 
 ---
 
 <p align="center">
-  <em>처음이신가요? <code>/start</code>로 시작하세요!</em>
+  <strong>처음이신가요?</strong> <code>/check</code>를 입력하고 어떻게 되는지 보세요.
 </p>
