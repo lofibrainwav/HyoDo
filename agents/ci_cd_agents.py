@@ -46,6 +46,19 @@ class InMemoryQueue:
     async def get(self, key: str) -> str | None:
         return self._store.get(key)
 
+    async def delete(self, key: str) -> None:
+        """키 삭제"""
+        self._store.pop(key, None)
+        self._queues.pop(key, None)
+
+    async def llen(self, key: str) -> int:
+        """큐 길이 반환"""
+        return len(self._queues.get(key, []))
+
+    async def exists(self, key: str) -> bool:
+        """키 존재 여부"""
+        return key in self._store or key in self._queues
+
 
 # 글로벌 인메모리 큐
 _memory_queue = InMemoryQueue()
