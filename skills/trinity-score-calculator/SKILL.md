@@ -17,8 +17,12 @@ metadata:
     serenity: 8
     eternity: 2
 allowed-tools:
-  - mcp__afo-ultimate-mcp__calculate_trinity_score
-  - mcp__trinity-score-mcp__calculate
+  - Read
+  - Bash
+  # MCP tools (optional - AFO Kingdom 환경에서만 지원)
+  # - mcp__afo-ultimate-mcp__calculate_trinity_score
+  # - mcp__trinity-score-mcp__calculate
+standalone: true
 ---
 
 # Trinity Score Calculator (眞善美孝永)

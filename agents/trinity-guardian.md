@@ -11,8 +11,10 @@ allowed-tools:
   - Bash(git diff:*)
   - Bash(git status:*)
   - Bash(curl:*)
-  - mcp__trinity-score-mcp__calculate
-  - mcp__afo-ultimate-mcp__calculate_trinity_score
+  # MCP tools (optional - AFO Kingdom 환경에서만 지원)
+  # - mcp__trinity-score-mcp__calculate
+  # - mcp__afo-ultimate-mcp__calculate_trinity_score
+standalone: true
 ---
 
 # Trinity Guardian Agent (眞善美孝永 수호자)

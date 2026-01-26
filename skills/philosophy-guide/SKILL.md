@@ -13,7 +13,10 @@ metadata:
   philosophy_version: "2.0"
 allowed-tools:
   - Read
-  - mcp__trinity-score-mcp__calculate
+  - Bash
+  # MCP tools (optional - AFO Kingdom 환경에서만 지원)
+  # - mcp__trinity-score-mcp__calculate
+standalone: true
 ---
 
 # AFO Kingdom Philosophy Guide (眞善美孝永)

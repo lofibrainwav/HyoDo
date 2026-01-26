@@ -1,8 +1,9 @@
 ---
 description: "十一臟腑 (11 Organs) 시스템 건강 상태 체크"
-allowed-tools: Read, Glob, Grep, Bash(curl:*), mcp__afo-ultimate-mcp__health
+allowed-tools: Read, Glob, Grep, Bash(curl:*)
 impact: LOW
 tags: [health, organs, infrastructure, monitoring]
+note: "MCP 도구 사용은 선택적 (AFO Kingdom 전체 환경에서만 지원)"
 ---
 
 # 十一臟腑 (11 Organs) 건강 체크

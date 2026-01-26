@@ -15,7 +15,10 @@ allowed-tools:
   - Read
   - Glob
   - Grep
-  - mcp__context7__*
+  - Bash
+  # MCP tools (optional - AFO Kingdom 환경에서만 지원)
+  # - mcp__context7__*
+standalone: true
 ---
 
 # AFO Kingdom Navigator

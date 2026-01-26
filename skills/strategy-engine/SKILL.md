@@ -1,6 +1,6 @@
 ---
 name: strategy-engine
-description: 4-stage command triage and orchestration using LangGraph with Redis checkpointing. Routes decisions through 3 strategists.
+description: 4-stage command triage and orchestration using LangGraph. Routes decisions through 3 strategists. (Standalone mode uses InMemoryQueue instead of Redis)
 license: MIT
 compatibility:
   - claude-code
