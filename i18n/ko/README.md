@@ -34,9 +34,7 @@
 
 ## 아키텍처 (지능형 오장육부)
 
-![AFO Kingdom Intelligence Architecture](../../docs/images/architecture.png)
-
-왕국의 지능은 **승상**을 중심으로 4인의 학자와 3인의 책사가 조율하는 '지능형 오장육부' 체계로 작동합니다.
+**승상**을 중심으로 4인의 학자와 3인의 책사가 조율하는 체계입니다.
 
 ```mermaid
 graph TD

@@ -34,9 +34,7 @@
 
 ## Architecture (Intelligent Organs System)
 
-![AFO Kingdom Intelligence Architecture](docs/images/architecture.png)
-
-The kingdom's intelligence operates through the **Chancellor** coordinating 4 Scholars and 3 Strategists in an "Intelligent Organs" system.
+The system operates through the **Chancellor** coordinating 4 Scholars and 3 Strategists.
 
 ```mermaid
 graph TD
