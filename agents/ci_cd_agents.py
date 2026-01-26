@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-AFO 왕국 CI/CD 에이전트 네트워크
+HyoDo CI/CD 에이전트 네트워크 (Standalone)
 코드 품질 검사를 에이전트화하여 병렬 처리하고 승상이 최종 검증하는 시스템
 
 Trinity Score: 95.0 (Established by Chancellor)
@@ -12,18 +12,43 @@ import logging
 import time
 import uuid
 from abc import ABC, abstractmethod
+from collections import defaultdict
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any
 
-from AFO.config.settings import get_settings
-from AFO.services.redis_cache_service import RedisCacheService
-from AFO.utils.logging_config import setup_logging
-
-# 설정 및 로깅 초기화
-setup_logging()
+# Standalone 로깅 설정
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+)
 logger = logging.getLogger(__name__)
-settings = get_settings()
+
+
+class InMemoryQueue:
+    """인메모리 메시지 큐 (Redis 대체)"""
+
+    def __init__(self) -> None:
+        self._queues: dict[str, list[str]] = defaultdict(list)
+        self._store: dict[str, str] = {}
+
+    async def lpush(self, key: str, value: str) -> None:
+        self._queues[key].insert(0, value)
+
+    async def rpop(self, key: str) -> str | None:
+        if self._queues[key]:
+            return self._queues[key].pop()
+        return None
+
+    async def set(self, key: str, value: str, expire: int = 3600) -> None:
+        self._store[key] = value
+
+    async def get(self, key: str) -> str | None:
+        return self._store.get(key)
+
+
+# 글로벌 인메모리 큐
+_memory_queue = InMemoryQueue()
 
 
 class AgentStatus(Enum):
@@ -92,7 +117,7 @@ class BaseAgent(ABC):
         self.priority = priority
         self.status = AgentStatus.IDLE
         self.current_task: str | None = None
-        self.redis = RedisCacheService()
+        self.queue = _memory_queue  # Standalone 인메모리 큐
 
         # 메시지 큐 키들
         self.message_queue = f"agent:messages:{agent_id}"
@@ -117,7 +142,7 @@ class BaseAgent(ABC):
 
             # 수신자 큐에 메시지 추가
             recipient_queue = f"agent:messages:{message.recipient}"
-            await self.redis.lpush(recipient_queue, json.dumps(message_data))
+            await self.queue.lpush(recipient_queue, json.dumps(message_data))
 
             # 상태 업데이트
             await self.update_status()
@@ -134,7 +159,7 @@ class BaseAgent(ABC):
         try:
             messages = []
             while True:
-                message_data = await self.redis.rpop(self.message_queue)
+                message_data = await self.queue.rpop(self.message_queue)
                 if not message_data:
                     break
 
@@ -167,7 +192,7 @@ class BaseAgent(ABC):
             "timestamp": time.time(),
         }
 
-        await self.redis.set(self.status_key, json.dumps(status_data), expire=3600)  # 1시간 유지
+        await self.queue.set(self.status_key, json.dumps(status_data), expire=3600)  # 1시간 유지
 
     async def report_result(self, result: AgentResult) -> None:
         """결과 보고"""
@@ -182,7 +207,7 @@ class BaseAgent(ABC):
                 "timestamp": result.timestamp,
             }
 
-            await self.redis.lpush(self.result_queue, json.dumps(result_data))
+            await self.queue.lpush(self.result_queue, json.dumps(result_data))
 
             # Chancellor에게 결과 보고 메시지 전송
             await self.send_message(
@@ -286,7 +311,7 @@ class CICDPipeline:
     """CI/CD 파이프라인 오케스트레이터"""
 
     def __init__(self) -> None:
-        self.redis = RedisCacheService()
+        self.queue = _memory_queue  # Standalone 인메모리 큐
         self.agents: dict[str, BaseAgent] = {}
         self.pipeline_status = "idle"
         self.current_session_id: str | None = None

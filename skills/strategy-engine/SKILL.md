@@ -72,18 +72,30 @@ All conversation states are persisted to Redis for:
 
 ## Usage
 
-```python
-from AFO.chancellor import ChancellorGraph
+Use the `/strategist` command in Claude CLI:
 
-chancellor = ChancellorGraph()
-result = await chancellor.invoke({
+```bash
+# 3-strategist 분석 요청
+/strategist "Optimize the database queries"
+
+# 전략가별 관점 확인
+/trinity  # Trinity Score 확인
+/routing  # 라우팅 결정 확인
+```
+
+Or invoke the engine programmatically:
+
+```python
+from hyodo.strategy import StrategyEngine
+
+engine = StrategyEngine()
+result = engine.analyze({
     "command": "Optimize the database queries",
     "context": {"current_latency": "500ms"}
 })
 
 print(f"Decision: {result['decision']}")
-print(f"Strategist: {result['lead_strategist']}")
-print(f"Plan: {result['action_plan']}")
+print(f"Lead Strategist: {result['lead_strategist']}")
 ```
 
 ## Decision Criteria
