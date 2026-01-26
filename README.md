@@ -1,56 +1,60 @@
-# HyoDo (孝道) - AI 코드 품질 자동화
+# HyoDo (孝道) - AI Code Quality Automation
 
-> **코드 품질 자동 체크 + 비용 50-70% 절감**
+> **Automated code quality checks + 50-70% cost savings**
 
-## 30초 시작 (Simple Mode)
+<p align="center">
+  <a href="./i18n/ko/README.md">한국어</a> •
+  <a href="./i18n/zh/README.md">中文</a> •
+  <a href="./i18n/ja/README.md">日本語</a>
+</p>
+
+## Quick Start (30 seconds)
 
 ```bash
-/start              # 도움말
-/check              # 코드 품질 체크
-/score              # 점수 확인 (90점 이상 = 안전)
-/safe               # 안전성 검사
-/cost "작업 설명"   # 비용 예측
+/start              # Help
+/check              # Code quality check
+/score              # View score (90+ = safe)
+/safe               # Safety inspection
+/cost "task desc"   # Cost prediction
 ```
 
-**끝!** 이것만 알면 됩니다.
+**That's it!** This is all you need to know.
 
 ---
 
-## 점수 시스템
+## Scoring System
 
-| 점수 | 상태 | 행동 |
-|------|------|------|
-| 90+ | ✅ 안전 | 바로 진행 |
-| 70-89 | ⚠️ 주의 | 확인 후 진행 |
-| 70 미만 | ❌ 위험 | 수정 필요 |
-
----
+| Score | Status | Action |
+|-------|--------|--------|
+| 90+ | ✅ Safe | Proceed immediately |
+| 70-89 | ⚠️ Caution | Review before proceeding |
+| Below 70 | ❌ Risky | Fixes required |
 
 ---
 
-## 🏛️ Architecture (지능형 오장육부)
+## Architecture (Intelligent Organs System)
 
 ![AFO Kingdom Intelligence Architecture](docs/images/architecture.png)
 
-왕국의 지능은 **승상**을 중심으로 4인의 학자와 3인의 책사가 조율하는 '지능형 오장육부' 체계로 작동합니다.
+The kingdom's intelligence operates through the **Chancellor** coordinating 4 Scholars and 3 Strategists in an "Intelligent Organs" system.
 
 ```mermaid
 graph TD
-    subgraph "👑 Command & Control"
-        Chancellor["丞 승상 (Chancellor v2.3)"]
+    subgraph "Command & Control"
+        Chancellor["丞 Chancellor (v2.3)"]
     end
 
-    subgraph "🧑‍🎓 Jiphyeonjeon Scholars (Intelligence Layer)"
-        Heo["🌿 허준 (Vision/UX)"]
-        Jeong["🛠️ 정약용 (Logic/Coding)"]
-        Ryu["🚩 류성룡 (Strategy/Security)"]
-        Kim["📜 김유신 (Archive/Stability)"]
+    subgraph "Jiphyeonjeon Scholars (Intelligence Layer)"
+        Heo["Heo Jun (Vision/UX)"]
+        Jeong["Jeong Yak-yong (Logic/Coding)"]
+        Ryu["Ryu Seong-ryong (Strategy/Security)"]
+        Kim["Kim Yu-sin (Archive/Stability)"]
     end
 
-    subgraph "🛡️ 3 Strategists (Persona Layer)"
-        Jang["眞 장영실 (Truth/矛)"]
-        Yi["善 이순신 (Goodness/盾)"]
-        Shin["美 신사임당 (Beauty/橋)"]
+    subgraph "3 Strategists (Persona Layer)"
+        Jang["眞 Jang Yeong-sil (Truth/Spear)"]
+        Yi["善 Yi Sun-sin (Goodness/Shield)"]
+        Shin["美 Shin Saimdang (Beauty/Bridge)"]
     end
 
     Chancellor --> Heo & Jeong & Ryu & Kim
@@ -59,145 +63,145 @@ graph TD
 
 ---
 
-## 📜 眞善美孝永 (The Five Pillars)
+## The Five Pillars (眞善美孝永)
 
-HyoDo는 **Trinity Score**를 통해 코드의 완성도를 측정합니다.
+HyoDo measures code completeness through the **Trinity Score**.
 
-| 기둥 | 의미 | 비중 | 담당 |
+| Pillar | Meaning | Weight | Responsible |
 | :--- | :--- | :---: | :--- |
-| **眞** (Truth) | 기술적 정확성 | 35% | 정약용 / 장영실 |
-| **善** (Goodness) | 윤리 및 안정성 | 35% | 류성룡 / 이순신 |
-| **美** (Beauty) | 서사 및 UX | 20% | 허준 / 신사임당 |
-| **孝** (Serenity) | 평온 수호 | 8% | 승상 |
-| **永** (Eternity) | 지속성 유지 | 2% | 승상 / 김유신 |
+| **眞** (Truth) | Technical accuracy | 35% | Jeong Yak-yong / Jang Yeong-sil |
+| **善** (Goodness) | Ethics & stability | 35% | Ryu Seong-ryong / Yi Sun-sin |
+| **美** (Beauty) | Narrative & UX | 20% | Heo Jun / Shin Saimdang |
+| **孝** (Serenity) | Peace preservation | 8% | Chancellor |
+| **永** (Eternity) | Sustainability | 2% | Chancellor / Kim Yu-sin |
 
 ---
 
-## 📚 고급 기능 (Advanced Mode)
+## Advanced Features
 
 <details>
-<summary>상세 내용 보기 (고급 명령어 및 전략가 질문)</summary>
+<summary>View Details (Advanced Commands & Strategist Questions)</summary>
 
-### 고급 명령어
+### Advanced Commands
 
-| 명령어 | 설명 |
-|--------|------|
-| `/trinity` | 상세 Trinity Score 계산 |
-| `/strategist` | 3전략가 관점 분석 |
-| `/ultrawork` | 병렬 작업 실행 |
-| `/chancellor-v3` | 라우팅 시스템 제어 |
-| `/organs` | 11장기 헬스체크 |
-| `/cost-estimate` | 상세 비용 분석 |
+| Command | Description |
+|---------|-------------|
+| `/trinity` | Detailed Trinity Score calculation |
+| `/strategist` | 3-Strategist perspective analysis |
+| `/ultrawork` | Parallel task execution |
+| `/chancellor-v3` | Routing system control |
+| `/organs` | 11-organ health check |
+| `/cost-estimate` | Detailed cost analysis |
 
-### 세종대왕의 3 전략가
+### King Sejong's 3 Strategists
 
-| 전략가 | 역할 | 질문 |
-|--------|------|------|
-| **장영실** ⚔️ | 기술 정확성 | "3년 후에도 유효한가?" |
-| **이순신** 🛡️ | 안전성 | "최악의 경우는?" |
-| **신사임당** 🌉 | 사용성 | "사용자가 이해하는가?" |
+| Strategist | Role | Key Question |
+|------------|------|--------------|
+| **Jang Yeong-sil** ⚔️ | Technical Accuracy | "Will this be valid in 3 years?" |
+| **Yi Sun-sin** 🛡️ | Safety | "What's the worst case?" |
+| **Shin Saimdang** 🌉 | Usability | "Can users understand this?" |
 
-### 오호대장군 (무료 AI)
+### Five Tiger Generals (Free AI)
 
-| 장군 | 역할 | 비용 |
-|------|------|------|
-| 관우 | 코드 리뷰 | $0 |
-| 장비 | 버그 추적 | $0 |
-| 조운 | 테스트 생성 | $0 |
-| 마초 | 코드 생성 | $0 |
-| 황충 | UI 분석 | $0 |
+| General | Role | Cost |
+|---------|------|------|
+| Guan Yu | Code Review | $0 |
+| Zhang Fei | Bug Tracking | $0 |
+| Zhao Yun | Test Generation | $0 |
+| Ma Chao | Code Generation | $0 |
+| Huang Zhong | UI Analysis | $0 |
 
 </details>
 
 ---
 
-## 설치
+## Installation
 
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git ~/.hyodo
 ```
 
-또는 원클릭:
+Or one-click install:
 ```bash
 curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install.sh | bash
 ```
 
 ---
 
-## 명령어 전체 목록
+## Complete Command Reference
 
-### Simple Mode (초보자)
+### Simple Mode (Beginners)
 
-| 명령어 | 설명 |
-|--------|------|
-| `/start` | 시작 가이드 |
-| `/check` | 품질 체크 |
-| `/score` | 점수 확인 |
-| `/safe` | 안전 검사 |
-| `/cost` | 비용 예측 |
+| Command | Description |
+|---------|-------------|
+| `/start` | Getting started guide |
+| `/check` | Quality check |
+| `/score` | View score |
+| `/safe` | Safety inspection |
+| `/cost` | Cost prediction |
 
-### Advanced Mode (고급)
+### Advanced Mode
 
-| 명령어 | 설명 |
-|--------|------|
-| `/trinity` | Trinity Score 계산 |
-| `/strategist` | 3전략가 분석 |
-| `/ultrawork` | 병렬 실행 |
-| `/chancellor-v3` | 라우팅 제어 |
-| `/organs` | 헬스체크 |
-| `/cost-estimate` | 상세 비용 |
-| `/routing` | 트리거 분석 |
-| `/preflight` | 커밋 전 검사 |
-| `/evidence` | 증거 기록 |
-| `/rollback` | 롤백 |
-| `/ssot` | SSOT |
-| `/multiplatform` | 멀티플랫폼 |
-
----
-
-## 문서
-
-| 문서 | 설명 |
-|------|------|
-| [QUICK_START.md](QUICK_START.md) | 5분 시작 |
-| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | 아키텍처 |
-| [CONTRIBUTING.md](CONTRIBUTING.md) | 기여 가이드 |
-| [MIGRATION.md](MIGRATION.md) | 마이그레이션 |
+| Command | Description |
+|---------|-------------|
+| `/trinity` | Trinity Score calculation |
+| `/strategist` | 3-Strategist analysis |
+| `/ultrawork` | Parallel execution |
+| `/chancellor-v3` | Routing control |
+| `/organs` | Health check |
+| `/cost-estimate` | Detailed cost |
+| `/routing` | Trigger analysis |
+| `/preflight` | Pre-commit inspection |
+| `/evidence` | Evidence logging |
+| `/rollback` | Rollback |
+| `/ssot` | Single Source of Truth |
+| `/multiplatform` | Multi-platform |
 
 ---
 
-## 라이선스
+## Documentation
+
+| Document | Description |
+|----------|-------------|
+| [QUICK_START.md](QUICK_START.md) | 5-minute quickstart |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Architecture |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guide |
+| [MIGRATION.md](MIGRATION.md) | Migration guide |
+
+---
+
+## License
 
 MIT - [LICENSE](LICENSE)
 
 ---
 
 <details>
-<summary>🏛️ 철학적 배경 상세</summary>
+<summary>Philosophical Background</summary>
 
-### HyoDo (孝道) - "효도"
+### HyoDo (孝道) - "The Way of Filial Piety"
 
-- **孝**: 평온함, 마찰 없는 경험
-- **道**: 길, 방법론
+- **孝**: Serenity, frictionless experience
+- **道**: Path, methodology
 
-### 세종대왕의 정신
+### The Spirit of King Sejong
 
-> "백성을 위한 실용적 혁신과 문화적 융성"
+> "Practical innovation and cultural prosperity for the people"
 
-장영실, 이순신, 신사임당 - 조선의 3대 위인의 지혜를 코드 품질에 적용
+Jang Yeong-sil, Yi Sun-sin, Shin Saimdang - applying the wisdom of three great figures of Joseon Dynasty to code quality.
 
-### 마이그레이션 히스토리
+### Migration History
 
 ```
-v1.x (삼국지)          v2.x+ (세종대왕)
-─────────────────────────────────────
-제갈량 (諸葛亮)    →    장영실 (蔣英實)    眞
-사마의 (司馬懿)    →    이순신 (李舜臣)    善
-주유   (周瑜)      →    신사임당 (申師任堂) 美
+v1.x (Three Kingdoms)      v2.x+ (King Sejong)
+─────────────────────────────────────────────
+Zhuge Liang (諸葛亮)   →   Jang Yeong-sil (蔣英實)   眞
+Sima Yi (司馬懿)       →   Yi Sun-sin (李舜臣)       善
+Zhou Yu (周瑜)         →   Shin Saimdang (申師任堂)  美
 ```
 
 </details>
 
 ---
 
-*처음이라면 `/start` 부터 시작하세요!*
+*New here? Start with `/start`!*

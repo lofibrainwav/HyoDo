@@ -1,26 +1,32 @@
 # Contributing to HyoDo (孝道)
 
-> "세종대왕의 정신: 백성을 위한 실용적 혁신"
+> "The Spirit of King Sejong: Practical innovation for the people"
 
-HyoDo 프로젝트에 기여해 주셔서 감사합니다.
+<p align="center">
+  <a href="./i18n/ko/CONTRIBUTING.md">한국어</a> •
+  <a href="./i18n/zh/CONTRIBUTING.md">中文</a> •
+  <a href="./i18n/ja/CONTRIBUTING.md">日本語</a>
+</p>
 
-## 眞善美孝永 기여 원칙
+Thank you for contributing to the HyoDo project.
 
-모든 기여는 다섯 기둥(五柱)에 따라 평가됩니다:
+## 眞善美孝永 Contribution Principles
 
-| 기둥 | 가중치 | 기여 기준 |
-|------|--------|----------|
-| **眞 (Truth)** | 35% | 기술적으로 정확한가? |
-| **善 (Goodness)** | 35% | 안전하고 안정적인가? |
-| **美 (Beauty)** | 20% | 코드가 읽기 쉬운가? |
-| **孝 (Serenity)** | 8% | 사용자 경험이 좋은가? |
-| **永 (Eternity)** | 2% | 장기적으로 유지 가능한가? |
+All contributions are evaluated according to the Five Pillars (五柱):
 
-## 기여 프로세스
+| Pillar | Weight | Contribution Criteria |
+|--------|--------|----------------------|
+| **眞 (Truth)** | 35% | Is it technically accurate? |
+| **善 (Goodness)** | 35% | Is it safe and stable? |
+| **美 (Beauty)** | 20% | Is the code readable? |
+| **孝 (Serenity)** | 8% | Is the user experience good? |
+| **永 (Eternity)** | 2% | Is it maintainable long-term? |
 
-### 1. Issue 생성
+## Contribution Process
 
-새로운 기능이나 버그 수정 전에 Issue를 먼저 생성해주세요.
+### 1. Create an Issue
+
+Please create an Issue before working on new features or bug fixes.
 
 ### 2. Fork & Branch
 
@@ -29,40 +35,40 @@ git fork https://github.com/lofibrainwav/HyoDo.git
 git checkout -b feature/your-feature-name
 ```
 
-### 3. 개발
+### 3. Development
 
-- 세종대왕의 정신 (장영실/이순신/신사임당) 원칙을 따르세요
-- 오호대장군 (Ollama FREE 티어)을 활용하여 디버깅하세요
+- Follow the Spirit of King Sejong principles (Jang Yeong-sil/Yi Sun-sin/Shin Saimdang)
+- Use the Five Tiger Generals (Ollama FREE tier) for debugging
 
-### 4. 테스트
+### 4. Testing
 
 ```bash
-# Trinity Score 확인
+# Check Trinity Score
 /trinity "your changes"
 
-# 전략가 분석
+# Strategist analysis
 /strategist "your changes"
 
-# 품질 게이트
+# Quality gate
 /check
 ```
 
 ### 5. Pull Request
 
-- PR 제목은 명확하게 작성
-- 변경 사항을 설명
-- Trinity Score >= 70 필수
+- Write a clear PR title
+- Describe your changes
+- Trinity Score >= 70 required
 
-## 코드 스타일
+## Code Style
 
-- 한국어 주석 권장
-- 세종대왕의 정신 철학 반영
-- 眞善美 균형 유지
+- Comments in English recommended for global contributors
+- Reflect the Spirit of King Sejong philosophy
+- Maintain 眞善美 balance
 
-## 질문?
+## Questions?
 
-Issue를 통해 질문해주세요.
+Please ask through Issues.
 
 ---
 
-*"전략가가 지휘하고, 무장이 실행한다"*
+*"Strategists command, warriors execute"*

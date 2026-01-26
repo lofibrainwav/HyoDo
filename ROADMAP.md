@@ -1,96 +1,102 @@
 # HyoDo Roadmap
 
-> "세종대왕의 정신: 백성을 위한 실용적 혁신"
+> "The Spirit of King Sejong: Practical innovation for the people"
 
-## 2026 로드맵
+<p align="center">
+  <a href="./i18n/ko/ROADMAP.md">한국어</a> •
+  <a href="./i18n/zh/ROADMAP.md">中文</a> •
+  <a href="./i18n/ja/ROADMAP.md">日本語</a>
+</p>
 
-### Q1 2026 (현재)
+## 2026 Roadmap
 
-#### v3.0.0-ultrawork (완료)
-- [x] 오호대장군 (五虎大將軍) - Ollama 디버깅 군단
-- [x] 훅 시스템 (pre_tool, post_tool, on_error)
-- [x] ultrawork 병렬 실행
-- [x] 토큰 버닝 50-70% 최적화
+### Q1 2026 (Current)
+
+#### v3.0.0-ultrawork (Complete)
+- [x] Five Tiger Generals (五虎大將軍) - Ollama debugging corps
+- [x] Hook system (pre_tool, post_tool, on_error)
+- [x] ultrawork parallel execution
+- [x] 50-70% token burning optimization
 
 ### Q2 2026
 
-#### v3.1.0-lsp (계획)
-- [ ] LSP/AST 통합
-  - Language Server Protocol 연동
-  - 코드 리팩터링 자동화
-  - Symbol 추적 (rename/move safe)
-- [ ] 자연어 ultrawork 트리거
-  - "테스트랑 린트 동시에" 자동 인식
+#### v3.1.0-lsp (Planned)
+- [ ] LSP/AST Integration
+  - Language Server Protocol integration
+  - Automated code refactoring
+  - Symbol tracking (rename/move safe)
+- [ ] Natural language ultrawork triggers
+  - "Run tests and lint simultaneously" auto-recognition
   - Intent Parsing
-- [ ] 멀티모델 지원
-  - OpenAI GPT-4/GPT-5 지원
-  - Google Gemini 지원
+- [ ] Multi-model support
+  - OpenAI GPT-4/GPT-5 support
+  - Google Gemini support
 
 ### Q3 2026
 
-#### v3.2.0-browser (계획)
-- [ ] Playwright 브라우저 자동화
+#### v3.2.0-browser (Planned)
+- [ ] Playwright browser automation
   - Screenshot → Analyze → Action
-  - Form fill 자동화
+  - Form fill automation
 - [ ] Public API Gateway
-  - REST API 공개
-  - OpenAPI 3.0 문서
-  - JWT/OAuth2 인증
+  - REST API release
+  - OpenAPI 3.0 documentation
+  - JWT/OAuth2 authentication
 
 ### Q4 2026
 
-#### v4.0.0-distributed (계획)
-- [ ] 분산 Chancellor
+#### v4.0.0-distributed (Planned)
+- [ ] Distributed Chancellor
   - Multi-node orchestration
-  - 수평 확장
-- [ ] 실시간 협업 모드
-  - 다중 사용자 동시 작업
+  - Horizontal scaling
+- [ ] Real-time collaboration mode
+  - Multi-user concurrent work
 - [ ] Federated Learning
-  - Strategist 자동 개선
+  - Strategist auto-improvement
 
 ---
 
-## 장기 비전 (2027+)
+## Long-term Vision (2027+)
 
-### 眞 (Truth) 진화
-- AI 기반 코드 리뷰 자동화
-- 기술 부채 자동 감지 및 해결
+### 眞 (Truth) Evolution
+- AI-based automated code review
+- Automatic technical debt detection and resolution
 
-### 善 (Goodness) 진화
-- Zero-Trust 완전 자동화
-- 보안 취약점 실시간 패치
+### 善 (Goodness) Evolution
+- Zero-Trust full automation
+- Real-time security vulnerability patching
 
-### 美 (Beauty) 진화
-- UI/UX 자동 생성
-- 디자인 시스템 통합
+### 美 (Beauty) Evolution
+- Automated UI/UX generation
+- Design system integration
 
-### 孝 (Serenity) 진화
-- 음성 인터페이스
-- 자연어 완전 지원
+### 孝 (Serenity) Evolution
+- Voice interface
+- Full natural language support
 
-### 永 (Eternity) 진화
-- 자가 진화 시스템
-- 자동 버전 관리
+### 永 (Eternity) Evolution
+- Self-evolving system
+- Automatic version management
 
 ---
 
-## 커뮤니티 목표
+## Community Goals
 
-| 지표 | 2026 목표 |
-|------|----------|
+| Metric | 2026 Target |
+|--------|-------------|
 | GitHub Stars | 1,000+ |
 | Contributors | 50+ |
-| 플러그인 설치 | 10,000+ |
-| Discord 멤버 | 500+ |
+| Plugin Installs | 10,000+ |
+| Discord Members | 500+ |
 
 ---
 
-## 기여 환영
+## Contributions Welcome
 
-로드맵에 추가하고 싶은 기능이 있다면:
-1. [Issue 생성](https://github.com/lofibrainwav/HyoDo/issues)
-2. [CONTRIBUTING.md](CONTRIBUTING.md) 참조
+If you'd like to add features to the roadmap:
+1. [Create an Issue](https://github.com/lofibrainwav/HyoDo/issues)
+2. See [CONTRIBUTING.md](CONTRIBUTING.md)
 
 ---
 
-*"전략가가 지휘하고, 무장이 실행한다"*
+*"Strategists command, warriors execute"*

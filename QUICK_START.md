@@ -1,98 +1,104 @@
-# HyoDo 1분 시작 가이드
+# HyoDo 1-Minute Quick Start Guide
 
-> 코드 품질 체크 + 비용 절감 = 끝!
+> Code quality check + cost savings = Done!
 
-## 1. 설치 (30초)
+<p align="center">
+  <a href="./i18n/ko/QUICK_START.md">한국어</a> •
+  <a href="./i18n/zh/QUICK_START.md">中文</a> •
+  <a href="./i18n/ja/QUICK_START.md">日本語</a>
+</p>
+
+## 1. Installation (30 seconds)
 
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git
 cd HyoDo && ./install.sh
 ```
 
-## 2. 바로 사용 (30초)
+## 2. Start Using (30 seconds)
 
 ```bash
-/start    # 도움말
-/check    # 코드 품질 체크
-/score    # 점수 확인
+/start    # Help
+/check    # Code quality check
+/score    # View score
 ```
 
-**끝입니다!** 이 3개면 충분합니다.
+**That's it!** These 3 commands are all you need.
 
 ---
 
-## 점수 이해하기
+## Understanding Scores
 
-| 점수 | 의미 | 행동 |
-|------|------|------|
-| **90점 이상** | 안전 | 바로 진행 |
-| **70-89점** | 주의 | 확인 후 진행 |
-| **70점 미만** | 위험 | 수정 필요 |
-
----
-
-## Simple Mode 명령어 (5개)
-
-| 명령어 | 하는 일 |
-|--------|---------|
-| `/start` | 도움말 보기 |
-| `/check` | 코드 품질 체크 |
-| `/score` | 점수 확인 |
-| `/safe` | 안전성 검사 |
-| `/cost "작업"` | 비용 예측 |
-
-**이것만 알면 됩니다.**
+| Score | Meaning | Action |
+|-------|---------|--------|
+| **90+ points** | Safe | Proceed immediately |
+| **70-89 points** | Caution | Review before proceeding |
+| **Below 70 points** | Risky | Fixes required |
 
 ---
 
-## 비용 절감 효과
+## Simple Mode Commands (5 total)
+
+| Command | What it does |
+|---------|--------------|
+| `/start` | View help |
+| `/check` | Code quality check |
+| `/score` | View score |
+| `/safe` | Safety inspection |
+| `/cost "task"` | Cost prediction |
+
+**This is all you need to know.**
+
+---
+
+## Cost Savings
 
 ```
-일반 AI 사용:     $0.015/1k tokens
-HyoDo 사용:       $0.00 ~ $0.0025/1k tokens
+Standard AI usage:    $0.015/1k tokens
+With HyoDo:           $0.00 ~ $0.0025/1k tokens
 
-절감률: 50-70%
+Savings: 50-70%
 ```
 
 ---
 
 <details>
-<summary><strong>고급 기능 (Advanced Mode)</strong></summary>
+<summary><strong>Advanced Features (Advanced Mode)</strong></summary>
 
-### 상세 분석 명령어
+### Detailed Analysis Commands
 
-| 명령어 | 용도 |
-|--------|------|
-| `/trinity` | 5가지 품질 지표 상세 분석 |
-| `/strategist` | 3명의 전문가 관점 분석 |
-| `/ultrawork` | 병렬 작업 실행 |
-| `/organs` | 시스템 상태 체크 |
+| Command | Purpose |
+|---------|---------|
+| `/trinity` | Detailed analysis of 5 quality metrics |
+| `/strategist` | Analysis from 3 expert perspectives |
+| `/ultrawork` | Parallel task execution |
+| `/organs` | System status check |
 
-### 철학적 프레임워크
+### Philosophical Framework
 
-품질 점수는 5가지 기둥으로 구성됩니다:
+Quality scores consist of 5 pillars:
 
-| 항목 | 비중 | 의미 |
-|------|------|------|
-| 정확성 | 35% | 코드가 올바른가? |
-| 안전성 | 35% | 문제가 없는가? |
-| 가독성 | 20% | 읽기 쉬운가? |
-| 편의성 | 8% | 쓰기 편한가? |
-| 지속성 | 2% | 오래 유지되는가? |
+| Item | Weight | Meaning |
+|------|--------|---------|
+| Accuracy | 35% | Is the code correct? |
+| Safety | 35% | Are there any issues? |
+| Readability | 20% | Is it easy to read? |
+| Usability | 8% | Is it easy to use? |
+| Sustainability | 2% | Will it last? |
 
-### 전문가 분석 (3 Strategists)
+### Expert Analysis (3 Strategists)
 
-| 전문가 | 관점 | 핵심 질문 |
-|--------|------|----------|
-| 장영실 | 기술 | "3년 후에도 유효한가?" |
-| 이순신 | 안전 | "최악의 경우는?" |
-| 신사임당 | UX | "이해하기 쉬운가?" |
+| Expert | Perspective | Key Question |
+|--------|-------------|--------------|
+| Jang Yeong-sil | Technical | "Will this be valid in 3 years?" |
+| Yi Sun-sin | Safety | "What's the worst case?" |
+| Shin Saimdang | UX | "Is it easy to understand?" |
 
 </details>
 
 ---
 
-## 다음 단계
+## Next Steps
 
-- 더 알고 싶다면: [README.md](README.md)
-- 기여하고 싶다면: [CONTRIBUTING.md](CONTRIBUTING.md)
+- Want to learn more: [README.md](README.md)
+- Want to contribute: [CONTRIBUTING.md](CONTRIBUTING.md)
