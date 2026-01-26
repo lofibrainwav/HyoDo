@@ -53,7 +53,7 @@ Calculate a Trinity Score by providing base scores for each pillar:
 ## Decision Thresholds
 
 - **AUTO_RUN**: Trinity Score ≥ 90 AND Risk Score ≤ 10
-- **ASK_COMMANDER**: Trinity Score ≥ 75 AND Risk Score ≤ 25
+- **ASK_COMMANDER**: Trinity Score 70-89 OR Risk Score 11-30
 - **BLOCK**: Trinity Score < 70 OR Risk Score > 30
 
 ## Integration
