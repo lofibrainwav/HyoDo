@@ -27,7 +27,7 @@
 ### 자동 설치 스크립트
 
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 chmod +x install_dependencies.sh
 ./install_dependencies.sh
 ```
@@ -35,7 +35,7 @@ chmod +x install_dependencies.sh
 ### 수동 설치
 
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 python3 -m pip install --user -r requirements.txt
 ```
 

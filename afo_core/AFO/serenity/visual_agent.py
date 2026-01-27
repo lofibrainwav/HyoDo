@@ -89,7 +89,7 @@ class VisualAgent:
             # Parse and Validate (Janus Contract)
             plan = VisualPlan.model_validate_json(content)
 
-            # Safety Checks (Sima Yi's Gates)
+            # Safety Checks (Yi Sun-sin's Gates)
             for action in plan.actions:
                 if action.confidence < 0.7:
                     action.safety = "confirm"

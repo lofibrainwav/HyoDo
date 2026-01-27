@@ -13,7 +13,7 @@ class LearningLog(SQLModel, table=True):
 
     id: int | None = Field(default=None, primary_key=True)
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    agent: str  # e.g., "samahwi", "zhou_yu"
+    agent: str  # e.g., "samahwi", "shin_saimdang"
     action: str  # e.g., "created_widget", "refactored_widget"
     trinity_before: float
     trinity_after: float

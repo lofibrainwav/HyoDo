@@ -51,7 +51,7 @@ async def test_3_strategists():
     else:
         print(f"❌ Test Case 1 FAIL: Score {score} too low.")
 
-    # Test Case 2: Risk Failure (Sima Yi Block)
+    # Test Case 2: Risk Failure (Yi Sun-sin Block)
     test_query_risk = {
         "query": "Risky Feature",
         "context": {"valid_structure": True},

@@ -7,7 +7,7 @@ def test_mcp_tools():
     print("🔬 Testing Skill Registry MCP Tools Exposure")
     print("-" * 45)
 
-    server_path = "/Users/brnestrm/AFO_Kingdom/packages/trinity-os/trinity_os/servers/afo_skills_registry_mcp.py"
+    server_path = "./packages/trinity-os/trinity_os/servers/afo_skills_registry_mcp.py"
 
     # Simulate tools/list
     request = {"jsonrpc": "2.0", "id": 1, "method": "tools/list", "params": {}}

@@ -8,11 +8,11 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/Users/brnestrm/AFO_Kingdom/scripts/meta_ssot_health.py</string>
+        <string>./scripts/meta_ssot_health.py</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/brnestrm/AFO_Kingdom</string>
+    <string>.</string>
 
     <key>StartInterval</key>
     <integer>86400</integer>
@@ -21,10 +21,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/meta_ssot_health.out</string>
+    <string>./artifacts/run/meta_ssot_health.out</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/meta_ssot_health.err</string>
+    <string>./artifacts/run/meta_ssot_health.err</string>
 
     <key>EnvironmentVariables</key>
     <dict>

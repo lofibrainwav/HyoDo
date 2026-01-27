@@ -22,7 +22,7 @@
 - ✅ watchdog
 - ✅ openai
 
-**가상환경 위치**: `/Users/brnestrm/AFO_Kingdom/AFO/venv_rag`
+**가상환경 위치**: `./AFO/venv_rag`
 
 ### ✅ 2단계: 전체 시스템 테스트
 
@@ -77,7 +77,7 @@
 ### 가상환경 활성화
 
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 source venv_rag/bin/activate
 ```
 

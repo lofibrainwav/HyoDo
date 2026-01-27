@@ -3,7 +3,7 @@ import logging
 import sys
 
 # Setup Path
-sys.path.append("/Users/brnestrm/AFO_Kingdom/packages/afo-core")
+sys.path.append("./packages/afo-core")
 
 # Configure Logging to stdout
 logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")

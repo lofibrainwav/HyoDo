@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 
 # Setup Path
-sys.path.append("/Users/brnestrm/AFO_Kingdom/packages/afo-core")
+sys.path.append("./packages/afo-core")
 
 import pathlib
 
@@ -44,7 +44,7 @@ async def verify_genesis():
 
     # 2. Verify Chronicle Creation
     # Look for the daily log or chronicle file
-    bridge_path = "/Users/brnestrm/AFO_Kingdom/docs"
+    bridge_path = "./docs"
     today = datetime.now().strftime("%Y-%m-%d")
     daily_log = f"{bridge_path}/journals/daily/{today}.md"
 

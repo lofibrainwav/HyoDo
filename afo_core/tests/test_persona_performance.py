@@ -23,7 +23,7 @@ async def benchmark_persona_switch(iterations: int = 10) -> dict[str, Any]:
     try:
         from AFO.services.persona_service import persona_service
 
-        persona_types = ["commander", "learner", "jang_yeong_sil", "sima_yi", "zhou_yu"]
+        persona_types = ["commander", "learner", "jang_yeong_sil", "yi_sun_sin", "shin_saimdang"]
         switch_times: list[float] = []
 
         for i in range(iterations):
@@ -140,7 +140,7 @@ async def benchmark_concurrent_switches(concurrent_tasks: int = 5) -> dict[str, 
     try:
         from AFO.services.persona_service import persona_service
 
-        persona_types = ["commander", "learner", "jang_yeong_sil", "sima_yi", "zhou_yu"]
+        persona_types = ["commander", "learner", "jang_yeong_sil", "yi_sun_sin", "shin_saimdang"]
 
         async def switch_task(persona_type: str) -> float:
             start_time = time.perf_counter()

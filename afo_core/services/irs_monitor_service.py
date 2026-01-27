@@ -1,7 +1,7 @@
 """IRS Monitor Service (TICKET-110)
 
 L2 Infrastructure Layer - IRS 및 법령 변경 감지 서비스
-SSOT: TRINITY_OS_PERSONAS.yaml (Sima Yi - Goodness/Safety)
+SSOT: TRINITY_OS_PERSONAS.yaml (Yi Sun-sin - Goodness/Safety)
 
 외부 소스(API/RSS)를 모니터링하여 변경 사항을 감지하고,
 L1 Domain Model로 변환하여 Collaboration Hub로 전파.
@@ -130,7 +130,7 @@ class IRSMonitorService:
                 change.status = ValidationStatus.PENDING
                 logger.info(f"Change {change.change_id} set to PENDING (DRY_RUN active)")
             else:
-                # 리스크가 낮으면 자동 적용 고려 (Sima Yi 정책)
+                # 리스크가 낮으면 자동 적용 고려 (Yi Sun-sin 정책)
                 if analysis.impact_level in [ImpactLevel.LOW, ImpactLevel.NONE]:
                     change.status = ValidationStatus.APPROVED
                 else:

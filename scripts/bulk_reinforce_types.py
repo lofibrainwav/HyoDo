@@ -40,7 +40,7 @@ def reinforce_file(file_path) -> None:
 
 
 def main() -> None:
-    project_root = Path("/Users/brnestrm/AFO_Kingdom")
+    project_root = Path(".")
     exclude_dirs = {".git", "__pycache__", ".venv", "node_modules", "dist", "build"}
     healed_count = 0
     print(f"🚀 Broadly reinforcing {project_root} for Trinity Score...")

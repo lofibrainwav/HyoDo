@@ -57,7 +57,7 @@
 
 ### 옵시디언 vault
 
-- ✅ Vault 경로: `/Users/brnestrm/AFO/docs`
+- ✅ Vault 경로: `${HOME}/AFO/docs`
 - ✅ Markdown 파일: 확인됨
 - ✅ 문서 로드: 성공
 - ✅ 메타데이터 추출: 성공
@@ -90,7 +90,7 @@
 
 2. **초기 인덱싱**
    ```bash
-   cd /Users/brnestrm/AFO/scripts/rag
+   cd ${HOME}/AFO/scripts/rag
    python index_obsidian_to_qdrant.py --clear
    ```
 

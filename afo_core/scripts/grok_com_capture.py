@@ -10,7 +10,7 @@ import os
 from playwright.sync_api import sync_playwright
 
 SESSION_FILE = "secrets/grok_com_session.json"
-USER_DATA_DIR = "/Users/brnestrm/Library/Application Support/Google/Chrome"  # macOS default
+USER_DATA_DIR = "${HOME}/Library/Application Support/Google/Chrome"  # macOS default
 
 
 def capture_grok_com() -> None:

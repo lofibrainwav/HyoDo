@@ -123,7 +123,7 @@ def get_automation_skills() -> list[AFOSkillCard]:
     skill_010 = AFOSkillCard(
         skill_id="skill_010_family_persona",
         name="Family Persona Manager",
-        description="Manages the AFO Family personas (Yeongdeok, Sima Yi, Zhuge Liang) and their interactions",
+        description="Manages the AFO Family personas (Yeongdeok, Yi Sun-sin, Jang Yeong-sil) and their interactions",
         category=SkillCategory.STRATEGIC_COMMAND,
         tags=["family", "persona", "roleplay", "interaction"],
         version="1.0.0",

@@ -9,7 +9,7 @@ import subprocess
 from datetime import datetime
 from pathlib import Path
 
-ROOT = Path("/Users/brnestrm/AFO_Kingdom")
+ROOT = Path(".")
 QUARANTINE = ROOT / "quarantine" / "_cleanup_phase22"
 QUARANTINE.mkdir(parents=True, exist_ok=True)
 

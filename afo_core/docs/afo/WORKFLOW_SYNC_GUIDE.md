@@ -9,7 +9,7 @@
 
 ### 원클릭 동기화
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 ./scripts/sync_workflow.sh
 ```
 
@@ -24,7 +24,7 @@ cd /Users/brnestrm/AFO_Kingdom/AFO
 
 ### Step 1: 키 추출
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 python3 scripts/export_keys.py > /tmp/afo_env_keys.sh
 ```
 
@@ -84,7 +84,7 @@ curl http://localhost:8010/api/wallet/keys | python3 -m json.tool
 
 ### 시나리오 1: 매일 아침 시작
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 ./scripts/sync_workflow.sh
 source /tmp/afo_env_keys_clean.sh
 ```
@@ -96,7 +96,7 @@ source /tmp/afo_env_keys_clean.sh
 
 ### 시나리오 3: RAG 시스템 사용
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 source /tmp/afo_env_keys_clean.sh
 python3 rag_graph.py
 ```
@@ -118,7 +118,7 @@ echo $OPENAI_API_KEY
 ### API 서버 연결 실패
 ```bash
 # 서버 재시작
-cd /Users/brnestrm/AFO_Kingdom
+cd .
 python3 -m AFO.api_server > AFO/api_server.log 2>&1 &
 ```
 

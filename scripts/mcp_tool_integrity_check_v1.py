@@ -3,7 +3,7 @@ import os
 import sys
 
 # Setup paths
-package_root = "/Users/brnestrm/AFO_Kingdom/packages/afo-core"
+package_root = "./packages/afo-core"
 if package_root not in sys.path:
     sys.path.append(package_root)
 
@@ -31,7 +31,7 @@ async def verify_registry():
             print(f"    Tools: {', '.join(skill.mcp_config.tools)}")
 
     # Check Skills Directory
-    skills_dir = "/Users/brnestrm/AFO_Kingdom/skills"
+    skills_dir = "./skills"
     physical_skills = [
         d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d))
     ]

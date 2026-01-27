@@ -41,9 +41,9 @@ class TrinityDebateService:
                     await queue.put(None)  # Sentinel to close the main generator
 
         # Start parallel producers
-        asyncio.create_task(_stream_to_queue(StrategistType.ZHUGE_LIANG))
-        asyncio.create_task(_stream_to_queue(StrategistType.SIMA_YI))
-        asyncio.create_task(_stream_to_queue(StrategistType.ZHOU_YU))
+        asyncio.create_task(_stream_to_queue(StrategistType.JANG_YEONG_SIL))
+        asyncio.create_task(_stream_to_queue(StrategistType.YI_SUN_SIN))
+        asyncio.create_task(_stream_to_queue(StrategistType.SHIN_SAIMDANG))
 
         # Consumer
         while True:

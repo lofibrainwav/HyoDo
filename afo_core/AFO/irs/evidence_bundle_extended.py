@@ -1,7 +1,7 @@
 """
 Evidence Bundle - Evidence Bundle 시스템 확장
 
-美 (Zhou Yu): Evidence Bundle 확장
+美 (Shin Saimdang): Evidence Bundle 확장
 - IRS 변경사항 추적
 - 메타인지 기록
 """

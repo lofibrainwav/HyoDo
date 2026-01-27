@@ -16,7 +16,7 @@ from typing import Any
 import requests
 
 # #region agent log
-LOG_PATH = Path("/Users/brnestrm/AFO_Kingdom/.cursor/debug.log")
+LOG_PATH = Path("./.cursor/debug.log")
 # #endregion agent log
 
 BASE_URL = "http://localhost:8010"

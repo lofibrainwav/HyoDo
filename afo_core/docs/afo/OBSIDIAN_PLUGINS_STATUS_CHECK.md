@@ -67,7 +67,7 @@ docs/.obsidian/plugins/
 ### 1. Obsidian 앱 열기
 
 ```bash
-open -a Obsidian /Users/brnestrm/AFO/docs
+open -a Obsidian ${HOME}/AFO/docs
 ```
 
 ### 2. Community Plugins 활성화
@@ -91,7 +91,7 @@ open -a Obsidian /Users/brnestrm/AFO/docs
 설치 후 다음 명령어로 확인:
 
 ```bash
-cd /Users/brnestrm/AFO
+cd ${HOME}/AFO
 python3 scripts/obsidian/apply_and_verify_complete.py
 ```
 

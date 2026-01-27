@@ -138,4 +138,4 @@ Be conservative. When in doubt, flag as a concern.
 
 
 # Backwards compatibility alias
-SimaYiAgent = YiSunSinAgent
+YiSunSinAgent = YiSunSinAgent

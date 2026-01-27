@@ -137,7 +137,7 @@ def parse_violations(report_path: str) -> Dict[str, List[str]]:
 
 
 def main():
-    report_path = "/Users/brnestrm/.gemini/antigravity/brain/1d922f5c-e481-4697-9a20-c97526f94472/quality_violations_full.txt"
+    report_path = "${HOME}/.gemini/antigravity/brain/1d922f5c-e481-4697-9a20-c97526f94472/quality_violations_full.txt"
     if not os.path.exists(report_path):
         print(f"Error: Report not found at {report_path}")
         return
@@ -147,7 +147,7 @@ def main():
     print(f"🚀 Starting Mass Liquidation v2 for {total_files} files...")
 
     for i, (file_path, violations) in enumerate(violations_map.items()):
-        full_path = os.path.join("/Users/brnestrm/AFO_Kingdom", file_path)
+        full_path = os.path.join(".", file_path)
         if os.path.exists(full_path):
             liquidate_file(full_path, violations)
         else:

@@ -24,7 +24,7 @@ class CodexCLIWrapper:
     """
 
     def __init__(self) -> None:
-        self.cli_path = "/Users/brnestrm/.nvm/versions/node/v24.11.1/bin/codex"
+        self.cli_path = "${HOME}/.nvm/versions/node/v24.11.1/bin/codex"
         self.available = self._check_availability()
 
         if self.available:

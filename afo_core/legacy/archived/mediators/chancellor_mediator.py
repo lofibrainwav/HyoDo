@@ -47,7 +47,7 @@ class Colleague(ABC):
 
 
 class StrategistSquad(Colleague):
-    """Concrete Colleague: Represents the 3 Strategists (Zhuge, Sima, Zhou)."""
+    """Concrete Colleague: Represents the 3 Strategists (Jang, Yi, Shin)."""
 
     def deliberate(self, query: str) -> None:
         print(f"🧠 [Strategists] Deliberating on: {query}")

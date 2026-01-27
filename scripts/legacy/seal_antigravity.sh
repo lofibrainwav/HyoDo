@@ -1,5 +1,5 @@
 #!/bin/bash
-cd /Users/brnestrm/AFO_Kingdom
+cd .
 
 set -euo pipefail
 

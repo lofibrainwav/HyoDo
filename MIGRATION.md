@@ -19,9 +19,9 @@ Before (v2.x):          After (v3.x):
 **마이그레이션 방법:**
 ```bash
 # 코드에서 전략가 이름 변경
-sed -i 's/zhuge_liang/jang_yeong_sil/g' your_code.py
-sed -i 's/sima_yi/yi_sun_sin/g' your_code.py
-sed -i 's/zhou_yu/shin_saimdang/g' your_code.py
+sed -i 's/jang_yeong_sil/jang_yeong_sil/g' your_code.py
+sed -i 's/yi_sun_sin/yi_sun_sin/g' your_code.py
+sed -i 's/shin_saimdang/shin_saimdang/g' your_code.py
 ```
 
 #### 2. 훅 시스템 추가

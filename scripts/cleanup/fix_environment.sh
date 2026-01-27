@@ -4,7 +4,7 @@
 echo "🔧 환경 설정 표준화 시작..."
 
 # WORKSPACE_ROOT 설정
-export WORKSPACE_ROOT="/Users/brnestrm/AFO_Kingdom"
+export WORKSPACE_ROOT="."
 echo "export WORKSPACE_ROOT=\"$WORKSPACE_ROOT\"" >> ~/.zshrc
 
 # PYTHONPATH 정리 및 표준화

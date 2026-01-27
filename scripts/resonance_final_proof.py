@@ -35,7 +35,7 @@ async def verify_resonance():
 
     # 2. Verify AI Gateway (Ollama Streaming + RAG Context)
     print("\n[Step 2] 善: AI Gateway (Ollama) Resonance Verification")
-    ai_req = AIRequest(query=query, context=context_text, persona="zhuge_liang", stream=True)
+    ai_req = AIRequest(query=query, context=context_text, persona="jang_yeong_sil", stream=True)
     print(f"🚀 Model Routing: {ai_gateway._route_model(ai_req.persona)}")
     print("   AI Response: ", end="", flush=True)
 

@@ -15,7 +15,7 @@ def get_scholar_patterns(scholar_name: str) -> str:
     """Load patterns for a specific scholar.
 
     Args:
-        scholar_name: Name of the scholar (zilong, lushun, simayi, etc.)
+        scholar_name: Name of the scholar (jang, shin, yiyi, etc.)
 
     Returns:
         The content of the pattern file or empty string if not found.

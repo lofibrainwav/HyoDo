@@ -107,7 +107,7 @@ python3 scripts/rag/config.py
 RAG 시스템을 실행하면 자동으로 PostgreSQL에서 키를 가져옵니다:
 
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 source venv_rag/bin/activate
 python3 scripts/rag/index_obsidian_to_qdrant.py --clear
 ```

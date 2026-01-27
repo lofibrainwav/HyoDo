@@ -68,7 +68,7 @@
 ### 기본 사용 (자동 감지)
 
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 python config.py  # 설정 확인
 python test_rag_system.py  # 테스트
 ```

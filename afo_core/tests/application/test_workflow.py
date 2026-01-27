@@ -46,8 +46,8 @@ async def test_process_irs_change(workflow, sample_change_log):
     # Check results
     assert analysis is not None
     assert analysis.jang_yeong_sil_opinion is not None
-    assert analysis.sima_yi_opinion is not None
-    assert analysis.zhou_yu_opinion is not None
+    assert analysis.yi_sun_sin_opinion is not None
+    assert analysis.shin_saimdang_opinion is not None
 
     # Check if impact level was correctly set by mock logic (NEW_REGULATION -> HIGH/MEDIUM)
     # Our mock implementation sets it to HIGH for NEW_REGULATION
@@ -63,5 +63,5 @@ async def test_parallel_execution(workflow, sample_change_log):
     analysis = await workflow._analyze_impact_parallel(sample_change_log)
 
     assert "Technical impact" in analysis.jang_yeong_sil_opinion
-    assert "Risk assessment" in analysis.sima_yi_opinion
-    assert "User Dashboard" in analysis.zhou_yu_opinion
+    assert "Risk assessment" in analysis.yi_sun_sin_opinion
+    assert "User Dashboard" in analysis.shin_saimdang_opinion

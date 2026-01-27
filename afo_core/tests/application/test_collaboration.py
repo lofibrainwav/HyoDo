@@ -24,16 +24,16 @@ class TestVotingMachine:
     def test_weighted_voting_consensus(self) -> None:
         vm = VotingMachine()
 
-        # 1. Zhuge Liang (Truth) - High Score
-        vm.cast_vote(AgentType.ZHUGE_LIANG, VoteType.APPROVE, trinity_score=0.9)
+        # 1. Jang Yeong-sil (Truth) - High Score
+        vm.cast_vote(AgentType.JANG_YEONG_SIL, VoteType.APPROVE, trinity_score=0.9)
         # Weight ≈ 1.45
 
-        # 2. Sima Yi (Goodness) - Moderate Score
-        vm.cast_vote(AgentType.SIMA_YI, VoteType.APPROVE, trinity_score=0.7)
+        # 2. Yi Sun-sin (Goodness) - Moderate Score
+        vm.cast_vote(AgentType.YI_SUN_SIN, VoteType.APPROVE, trinity_score=0.7)
         # Weight ≈ 1.35
 
-        # 3. Zhou Yu (Beauty) - Abstain
-        vm.cast_vote(AgentType.ZHOU_YU, VoteType.ABSTAIN, trinity_score=0.5)
+        # 3. Shin Saimdang (Beauty) - Abstain
+        vm.cast_vote(AgentType.SHIN_SAIMDANG, VoteType.ABSTAIN, trinity_score=0.5)
 
         result = vm.tally_votes()
 
@@ -45,8 +45,8 @@ class TestVotingMachine:
 
     def test_voting_rejection(self) -> None:
         vm = VotingMachine()
-        vm.cast_vote(AgentType.ZHUGE_LIANG, VoteType.APPROVE, trinity_score=0.5) # W=1.25
-        vm.cast_vote(AgentType.SIMA_YI, VoteType.REJECT, trinity_score=0.9) # W=1.45
+        vm.cast_vote(AgentType.JANG_YEONG_SIL, VoteType.APPROVE, trinity_score=0.5) # W=1.25
+        vm.cast_vote(AgentType.YI_SUN_SIN, VoteType.REJECT, trinity_score=0.9) # W=1.45
 
         result = vm.tally_votes()
 
@@ -59,9 +59,9 @@ class TestVotingMachine:
 
     def test_veto_blocks_consensus(self) -> None:
         vm = VotingMachine()
-        vm.cast_vote(AgentType.ZHUGE_LIANG, VoteType.APPROVE, trinity_score=0.9)
-        vm.cast_vote(AgentType.SIMA_YI, VoteType.APPROVE, trinity_score=0.9)
-        vm.cast_vote(AgentType.ZHOU_YU, VoteType.VECO, trinity_score=0.5) # VETO!
+        vm.cast_vote(AgentType.JANG_YEONG_SIL, VoteType.APPROVE, trinity_score=0.9)
+        vm.cast_vote(AgentType.YI_SUN_SIN, VoteType.APPROVE, trinity_score=0.9)
+        vm.cast_vote(AgentType.SHIN_SAIMDANG, VoteType.VECO, trinity_score=0.5) # VETO!
 
         result = vm.tally_votes()
 

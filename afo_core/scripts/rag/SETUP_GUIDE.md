@@ -23,14 +23,14 @@
 ### 방법 1: 사용자 설치 (권장)
 
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 pip install --user -r requirements.txt
 ```
 
 ### 방법 2: 가상환경 사용
 
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt

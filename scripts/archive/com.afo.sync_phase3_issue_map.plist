@@ -14,17 +14,17 @@
     <key>ProgramArguments</key>
     <array>
       <string>/usr/bin/python3</string>
-      <string>/Users/brnestrm/AFO_Kingdom/scripts/sync_phase3_issue_map.py</string>
+      <string>./scripts/sync_phase3_issue_map.py</string>
     </array>
     <key>RunAtLoad</key>
     <true/>
     <key>StartInterval</key>
     <integer>3600</integer>
     <key>WorkingDirectory</key>
-    <string>/Users/brnestrm/AFO_Kingdom</string>
+    <string>.</string>
     <key>StandardOutPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/sync_phase3_issue_map.out</string>
+    <string>./artifacts/run/sync_phase3_issue_map.out</string>
     <key>StandardErrorPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/sync_phase3_issue_map.err</string>
+    <string>./artifacts/run/sync_phase3_issue_map.err</string>
   </dict>
 </plist>

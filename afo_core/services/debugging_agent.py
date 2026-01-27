@@ -33,7 +33,7 @@ class HealingAgent:
     Core Philosophy: Active Inference (Minimize Free Energy)
     """
 
-    def __init__(self, name: str = "SimaYi_Healing_Bot") -> None:
+    def __init__(self, name: str = "YiSunSin_Healing_Bot") -> None:
         self.name = name
         self.state = AgentState()
         self.running = False

@@ -14,7 +14,7 @@ class SSOTDriftGuard:
         self.tickets_md = self.root / "TICKETS.md"
         self.evolution_log = self.root / "AFO_EVOLUTION_LOG.md"
         # Adjusted path for actual brain location
-        self.brain_root = Path("/Users/brnestrm/.gemini/antigravity/brain")
+        self.brain_root = Path("${HOME}/.gemini/antigravity/brain")
 
     def check_drift(self) -> None:
         """Perform a holistic check of SSOT artifacts."""

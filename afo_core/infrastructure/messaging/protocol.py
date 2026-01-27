@@ -129,7 +129,7 @@ class AgentMessage(BaseModel):
         if self.to_agent == "ALL":
             return list(AgentType)
         elif self.to_agent == "STRATEGISTS":
-            return [AgentType.ZHUGE_LIANG, AgentType.SIMA_YI, AgentType.ZHOU_YU]
+            return [AgentType.JANG_YEONG_SIL, AgentType.YI_SUN_SIN, AgentType.SHIN_SAIMDANG]
         elif self.to_agent == "SCHOLARS":
             return [AgentType.BANGTONG, AgentType.JARYONG, AgentType.YUKSON, AgentType.YEONGDEOK]
         else:

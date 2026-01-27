@@ -36,7 +36,7 @@
 ### 1. 저장소 정보
 
 - **저장소 타입**: JSON 파일
-- **파일 경로**: `/Users/brnestrm/AFO_Kingdom/AFO/api_wallet_storage.json`
+- **파일 경로**: `./AFO/api_wallet_storage.json`
 - **파일 크기**: 16 bytes
 - **DB 사용**: False
 

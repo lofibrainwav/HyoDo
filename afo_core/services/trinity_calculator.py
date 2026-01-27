@@ -39,9 +39,9 @@ class PersonaType(Enum):
     COMMANDER = "commander"
     FAMILY_HEAD = "family_head"
     CREATOR = "creator"
-    ZHUGE_LIANG = "jang_yeong_sil"  # 제갈량 - 眞 (Truth)
-    SIMA_YI = "sima_yi"  # 사마의 - 善 (Goodness)
-    ZHOU_YU = "zhou_yu"  # 주유 - 美 (Beauty)
+    JANG_YEONG_SIL = "jang_yeong_sil"  # 제갈량 - 眞 (Truth)
+    YI_SUN_SIN = "yi_sun_sin"  # 사마의 - 善 (Goodness)
+    SHIN_SAIMDANG = "shin_saimdang"  # 주유 - 美 (Beauty)
     DEFAULT = "default"
 
 
@@ -61,9 +61,9 @@ PERSONA_SCORE_MAP: dict[PersonaType, PersonaScores] = {
     PersonaType.COMMANDER: PersonaScores(90.0, 85.0, 80.0, 95.0, 90.0),
     PersonaType.FAMILY_HEAD: PersonaScores(75.0, 95.0, 85.0, 90.0, 85.0),
     PersonaType.CREATOR: PersonaScores(80.0, 75.0, 95.0, 80.0, 75.0),
-    PersonaType.ZHUGE_LIANG: PersonaScores(95.0, 80.0, 75.0, 85.0, 90.0),  # 眞 강조
-    PersonaType.SIMA_YI: PersonaScores(80.0, 95.0, 75.0, 90.0, 85.0),  # 善 강조
-    PersonaType.ZHOU_YU: PersonaScores(75.0, 80.0, 95.0, 85.0, 80.0),  # 美 강조
+    PersonaType.JANG_YEONG_SIL: PersonaScores(95.0, 80.0, 75.0, 85.0, 90.0),  # 眞 강조
+    PersonaType.YI_SUN_SIN: PersonaScores(80.0, 95.0, 75.0, 90.0, 85.0),  # 善 강조
+    PersonaType.SHIN_SAIMDANG: PersonaScores(75.0, 80.0, 95.0, 85.0, 80.0),  # 美 강조
     PersonaType.DEFAULT: PersonaScores(80.0, 80.0, 80.0, 85.0, 80.0),
 }
 
@@ -81,11 +81,11 @@ def _resolve_persona_type(persona_data: dict[str, Any]) -> PersonaType:
 
     # 역할 기반 매칭
     if "truth" in role or "strategist" in role:
-        return PersonaType.ZHUGE_LIANG
+        return PersonaType.JANG_YEONG_SIL
     if "goodness" in role or "guardian" in role:
-        return PersonaType.SIMA_YI
+        return PersonaType.YI_SUN_SIN
     if "beauty" in role or "architect" in role:
-        return PersonaType.ZHOU_YU
+        return PersonaType.SHIN_SAIMDANG
 
     return PersonaType.DEFAULT
 

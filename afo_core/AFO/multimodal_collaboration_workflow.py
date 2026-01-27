@@ -92,9 +92,9 @@ class MultimodalCollaborationWorkflow:
             self._consult_shin_saimdang(change_log),
         )
 
-        zhuge_opinion, sima_opinion, zhou_opinion = results
+        jang_opinion, yi_opinion, shin_opinion = results
 
-        # Synthesize logic (Mock logic primarily, relying on Sima Yi for safety)
+        # Synthesize logic (Mock logic primarily, relying on Yi Sun-sin for safety)
         # In a real impl, this would use LLM outputs.
 
         return ChangeImpactAnalysis(
@@ -107,9 +107,9 @@ class MultimodalCollaborationWorkflow:
                 "goodness": 0.0,
                 "beauty": 0.0,
             },
-            jang_yeong_sil_opinion=zhuge_opinion,
-            sima_yi_opinion=sima_opinion,
-            zhou_yu_opinion=zhou_opinion,
+            jang_yeong_sil_opinion=jang_opinion,
+            yi_sun_sin_opinion=yi_opinion,
+            shin_saimdang_opinion=shin_opinion,
             requires_manual_intervention=True,
             estimated_adaptation_effort=5.0,
         )

@@ -10,7 +10,7 @@
 
 ### ✅ 1. 의존성 설치 (10/10 완료)
 
-**가상환경**: `/Users/brnestrm/AFO_Kingdom/AFO/venv_rag`
+**가상환경**: `./AFO/venv_rag`
 
 **설치된 패키지**:
 - ✅ python-frontmatter
@@ -75,7 +75,7 @@ export OPENAI_API_KEY="your-api-key"
 ### 가상환경 활성화
 
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 source venv_rag/bin/activate
 ```
 

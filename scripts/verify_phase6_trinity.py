@@ -43,9 +43,9 @@ async def verify_trinity_debate():
 
     # Validation
     required_personas = [
-        StrategistType.ZHUGE_LIANG.value,
-        StrategistType.SIMA_YI.value,
-        StrategistType.ZHOU_YU.value,
+        StrategistType.JANG_YEONG_SIL.value,
+        StrategistType.YI_SUN_SIN.value,
+        StrategistType.SHIN_SAIMDANG.value,
         "synthesis",
     ]
 

@@ -24,10 +24,10 @@ fi
 echo "=== 1) Find council/strategists definitions (search) ==="
 if command -v rg >/dev/null 2>&1; then
   rg -n --hidden --glob '!**/.git/**' \
-    "Council|Council of Minds|Strategist|제갈량|사마의|주유|Zhuge|Sima|Zhou" \
+    "Council|Council of Minds|Strategist|장영실|이순신|신사임당|Jang|Yi|Shin" \
     packages scripts AFO 2>/dev/null || true
 else
-  grep -RIn "Council\|Council of Minds\|Strategist\|제갈량\|사마의\|주유\|Zhuge\|Sima\|Zhou" \
+  grep -RIn "Council\|Council of Minds\|Strategist\|장영실\|이순신\|신사임당\|Jang\|Yi\|Shin" \
     packages scripts AFO 2>/dev/null || true
 fi
 

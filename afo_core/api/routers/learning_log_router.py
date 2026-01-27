@@ -26,7 +26,7 @@ _new_log_event = asyncio.Event()
 @shield(pillar="善")
 @router.post("/learning-log")
 async def create_learning_log(log: LearningLog) -> dict[str, Any]:
-    """Receives feedback from Agents (Sima Yi/Zhou Yu) and saves it.
+    """Receives feedback from Agents (Yi Sun-sin/Shin Saimdang) and saves it.
 
     Args:
         log: Learning log to create

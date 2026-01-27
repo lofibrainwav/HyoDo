@@ -207,9 +207,9 @@ class TestAgentMessage:
         )
 
         targets = message.get_target_agents()
-        assert AgentType.ZHUGE_LIANG in targets
-        assert AgentType.SIMA_YI in targets
-        assert AgentType.ZHOU_YU in targets
+        assert AgentType.JANG_YEONG_SIL in targets
+        assert AgentType.YI_SUN_SIN in targets
+        assert AgentType.SHIN_SAIMDANG in targets
         assert AgentType.ASSOCIATE not in targets
 
     def test_message_with_pillar_scores(self) -> None:

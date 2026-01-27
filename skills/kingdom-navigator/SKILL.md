@@ -28,7 +28,7 @@ Your guide to navigating the AFO Kingdom codebase. Uses the royal map and compas
 ## Kingdom Structure
 
 ```
-/Users/brnestrm/AFO_Kingdom/
+./
 ├── packages/                 # Core packages (monorepo)
 │   ├── afo-core/            # Backend (FastAPI, Chancellor)
 │   ├── trinity-os/          # Philosophy engine
@@ -153,4 +153,4 @@ Glob: skills/*/SKILL.md
 2. Use `Grep` for content-based search
 3. Check `docs/MAP_OF_KINGDOM.md` for documentation index
 4. Reference `.claude/CONTEXT_COMPASS.yaml` for context guidance
-5. All paths are relative to `/Users/brnestrm/AFO_Kingdom/`
+5. All paths are relative to `./`

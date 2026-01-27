@@ -147,7 +147,7 @@ async def get_system_architecture() -> SystemArchitectureResponse:
     # 3책사 (Strategists)
     strategists = [
         {
-            "name": "제갈량 (Zhuge Liang)",
+            "name": "제갈량 (Jang Yeong-sil)",
             "pillar": "眞",
             "weight": "35%",
             "role": "기술적 확실성/아키텍처",
@@ -155,7 +155,7 @@ async def get_system_architecture() -> SystemArchitectureResponse:
             "trinity_score": 95.0,
         },
         {
-            "name": "사마의 (Sima Yi)",
+            "name": "사마의 (Yi Sun-sin)",
             "pillar": "善",
             "weight": "35%",
             "role": "보안/안정성/리스크",
@@ -163,7 +163,7 @@ async def get_system_architecture() -> SystemArchitectureResponse:
             "trinity_score": 92.0,
         },
         {
-            "name": "주유 (Zhou Yu)",
+            "name": "주유 (Shin Saimdang)",
             "pillar": "美",
             "weight": "20%",
             "role": "단순함/UX/디자인",

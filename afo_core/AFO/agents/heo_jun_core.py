@@ -1,5 +1,5 @@
 # Trinity Score: 90.0 (Established by Chancellor)
-"""Zhou Yu Agent Core (Phase 16-3)
+"""Shin Saimdang Agent Core (Phase 16-3)
 The Esthetic Guardian of AFO Kingdom.
 Philosophy:
 - 美 (Beauty): Ensures standard Glassmorphism and Tailwind tokens.
@@ -32,7 +32,7 @@ class HeoJunAgent:
             else:
                 return "Error: No target .tsx file specified."
 
-        return "Zhou Yu is watching. (No refactoring triggered)"
+        return "Shin Saimdang is watching. (No refactoring triggered)"
 
     async def _tool_refactor_widget(self, relative_path: str) -> str:
         """Phase 16-3: Refactor Tool

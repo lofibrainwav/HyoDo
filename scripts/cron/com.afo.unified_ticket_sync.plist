@@ -8,11 +8,11 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/Users/brnestrm/AFO_Kingdom/scripts/unified_ticket_sync.py</string>
+        <string>./scripts/unified_ticket_sync.py</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/brnestrm/AFO_Kingdom</string>
+    <string>.</string>
 
     <key>StartInterval</key>
     <integer>3600</integer>
@@ -21,10 +21,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/unified_ticket_sync.out</string>
+    <string>./artifacts/run/unified_ticket_sync.out</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/unified_ticket_sync.err</string>
+    <string>./artifacts/run/unified_ticket_sync.err</string>
 
     <key>EnvironmentVariables</key>
     <dict>

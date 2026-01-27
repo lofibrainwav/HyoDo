@@ -1,7 +1,7 @@
-✅ Context7 trinity-os 경로 추가: /Users/brnestrm/AFO_Kingdom/packages/afo-core/trinity-os
+✅ Context7 trinity-os 경로 추가: ./packages/afo-core/trinity-os
 ✅ AFO 설정 로드 완료: dev 환경 (AFOSettings)
 ⚠️ Ollama 서버 확인 실패: http://localhost:11434
-/Users/brnestrm/AFO_Kingdom/packages/afo-core/AFO/llms/ollama_api.py:48: RuntimeWarning: coroutine 'OllamaAPIWrapper._check_availability.<locals>.check' was never awaited
+./packages/afo-core/AFO/llms/ollama_api.py:48: RuntimeWarning: coroutine 'OllamaAPIWrapper._check_availability.<locals>.check' was never awaited
   return False
 RuntimeWarning: Enable tracemalloc to get the object allocation traceback
 Evolution module not available: No module named 'AFO.governance.narrative_sanitizer'
@@ -40,7 +40,7 @@ INFO:     Waiting for application startup.
 2026-01-12 21:57:31,578 - AFO.api.config - INFO - Application lifespan: initialization completed
 INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8040 (Press CTRL+C to quit)
-✅ Context7 trinity-os 경로 이미 추가됨: /Users/brnestrm/AFO_Kingdom/packages/trinity-os
+✅ Context7 trinity-os 경로 이미 추가됨: ./packages/trinity-os
 ✅ AFO 설정 로드 완료: dev 환경 (AFOSettings)
 ✅ 5기둥 API Router loaded successfully
    - GET /api/5pillars/current (현재 5기둥 점수 조회)

@@ -36,20 +36,20 @@ AFO_Kingdom/
 
 ### AFO 리포지토리
 
-- ✅ 위치: `/Users/brnestrm/AFO_Kingdom/AFO`
+- ✅ 위치: `./AFO`
 - ✅ Git 저장소: 존재
 - ✅ 옵시디언 vault: `docs/` 디렉토리
 - ✅ RAG 스크립트: `scripts/rag/` 디렉토리
 
 ### 옵시디언 vault
 
-- ✅ 경로: `/Users/brnestrm/AFO_Kingdom/AFO/docs`
+- ✅ 경로: `./AFO/docs`
 - ✅ 설정 디렉토리: `.obsidian/` 존재
 - ✅ 문서 디렉토리: `afo/` 존재
 
 ### RAG 시스템
 
-- ✅ 스크립트 위치: `/Users/brnestrm/AFO_Kingdom/AFO/scripts/rag/`
+- ✅ 스크립트 위치: `./AFO/scripts/rag/`
 - ✅ config.py: 경로 자동 감지 지원
 - ✅ 모든 스크립트: 존재 확인
 
@@ -65,9 +65,9 @@ RAG 시스템의 `config.py`는 자동으로 리포지토리 루트를 감지합
 
 ### 현재 감지된 경로
 
-- 리포지토리 루트: `/Users/brnestrm/AFO_Kingdom/AFO`
-- 옵시디언 vault: `/Users/brnestrm/AFO_Kingdom/AFO/docs`
-- 동기화 상태 파일: `/Users/brnestrm/AFO_Kingdom/AFO/.obsidian_sync_state.json`
+- 리포지토리 루트: `./AFO`
+- 옵시디언 vault: `./AFO/docs`
+- 동기화 상태 파일: `./AFO/.obsidian_sync_state.json`
 
 ---
 
@@ -94,7 +94,7 @@ RAG 시스템의 `config.py`는 자동으로 리포지토리 루트를 감지합
 
 1. **설정 확인**
    ```bash
-   cd /Users/brnestrm/AFO_Kingdom/AFO
+   cd ./AFO
    python3 scripts/rag/config.py
    ```
 
@@ -111,5 +111,5 @@ RAG 시스템의 `config.py`는 자동으로 리포지토리 루트를 감지합
 ---
 
 **상태**: ✅ 폴더 구조 확인 및 검증 완료  
-**위치**: `/Users/brnestrm/AFO_Kingdom/AFO`
+**위치**: `./AFO`
 

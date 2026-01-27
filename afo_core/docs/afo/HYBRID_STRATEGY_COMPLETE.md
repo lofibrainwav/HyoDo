@@ -58,7 +58,7 @@
 ### 수정된 파일
 
 #### `api_server.py`
-- **위치**: `/Users/brnestrm/AFO_Kingdom/AFO/api_server.py`
+- **위치**: `./AFO/api_server.py`
 - **변경 내용**: `check_postgres()` 함수 수정
   ```python
   # 이전: DATABASE_URL 사용
@@ -94,7 +94,7 @@
 
 #### 방법 1: 스크립트 사용 (권장)
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 python3 scripts/export_keys.py > /tmp/afo_env_keys.sh
 source /tmp/afo_env_keys.sh
 ```
@@ -109,7 +109,7 @@ export ANTHROPIC_API_KEY="지갑에서_추출한_키"
 
 #### RAG 시스템
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 source /tmp/afo_env_keys_clean.sh
 python3 rag_graph.py
 ```

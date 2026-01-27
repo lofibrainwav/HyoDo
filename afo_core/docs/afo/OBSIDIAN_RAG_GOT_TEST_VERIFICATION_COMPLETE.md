@@ -112,7 +112,7 @@
 
 **방법 1: API Wallet에 키 추가 (권장)**
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 python3 api_wallet.py add openai "your-api-key" openai
 ```
 
@@ -129,7 +129,7 @@ export OPENAI_API_KEY="your-api-key"
 
 **1. 초기 인덱싱**
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 source venv_rag/bin/activate
 python3 scripts/rag/index_obsidian_to_qdrant.py --clear
 ```

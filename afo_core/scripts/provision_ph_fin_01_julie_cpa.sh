@@ -35,7 +35,7 @@ class FinancialRecord:
     description: str
     amount: float
     category: str
-    risk_score: int  # 0-100 (Sima Yi Filter)
+    risk_score: int  # 0-100 (Yi Sun-sin Filter)
     status: str      # 'PENDING', 'APPROVED', 'REJECTED'
 
 class JulieService:
@@ -61,7 +61,7 @@ class JulieService:
         return await self.assess_risk(record)
 
     async def assess_risk(self, record: FinancialRecord) -> FinancialRecord:
-        """Step 2: Labeling (Sima Yi Risk Filter)"""
+        """Step 2: Labeling (Yi Sun-sin Risk Filter)"""
         # Simple logic for now: High amount = High risk
         if record.amount > 1000:
             record.risk_score = 80

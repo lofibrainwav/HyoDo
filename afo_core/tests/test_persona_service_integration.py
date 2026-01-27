@@ -88,8 +88,8 @@ async def test_all_personas() -> None:
         "creator",
         "learner",
         "jang_yeong_sil",
-        "sima_yi",
-        "zhou_yu",
+        "yi_sun_sin",
+        "shin_saimdang",
     ]
 
     try:

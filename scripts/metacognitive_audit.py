@@ -36,15 +36,15 @@ def perform_metacognitive_audit():
     # 4. Strategy Analysis (Perspective of Three Strategists)
     reflections = [
         {
-            "persona": "zhuge_liang (Truth)",
+            "persona": "jang_yeong_sil (Truth)",
             "insight": f"현재 트리니티 스코어 {score:.2f}는 왕국의 기틀을 眞 (Truth)의 경지로 이끌었소. 부채 청산을 통해 순수성이 회복되었으나, 남은 0.02점의 미학적 공백은 완벽에 대한 겸손함을 상징하오."
         },
         {
-            "persona": "sima_yi (Goodness/Governance)",
+            "persona": "yi_sun_sin (Goodness/Governance)",
             "insight": f"정제된 코드 베이스는 통치 비용을 절감하오. 2차 도함수(Curvature)가 {curvature:.2f}로 양수임은, 우리가 행한 리팩터링이 단순히 표면적인 것이 아니라 시스템의 가속도를 높였음을 증명하오."
         },
         {
-            "persona": "zhou_yu (Beauty/Harmony)",
+            "persona": "shin_saimdang (Beauty/Harmony)",
             "insight": f"가장 아름다운 화음은 불필요한 소음이 사라졌을 때 들리는 법. {trinity_data['pillar_scores']['beauty']:.2f}점의 미(美) 점수는 왕국 코드의 화성(Harmony)이 정점에 도달했음을 알리는 서곡과 같소."
         }
     ]

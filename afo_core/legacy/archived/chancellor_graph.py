@@ -22,8 +22,8 @@ except ImportError:
 # Internal Modules
 try:
     from services.trinity_calculator import trinity_calculator
-    from strategists.sima_yi import goodness_review as sima_yi
-    from strategists.zhou_yu import beauty_optimize as zhou_yu
+    from strategists.yi_sun_sin import goodness_review as yi_sun_sin
+    from strategists.shin_saimdang import beauty_optimize as shin_saimdang
 
     # Import individual strategists to avoid name conflicts
     from strategists.jang_yeong_sil import truth_evaluate as jang_yeong_sil
@@ -68,8 +68,8 @@ except ImportError:
     get_settings = None  # type: ignore[assignment]
     trinity_calculator = None  # type: ignore[assignment]
     jang_yeong_sil = None  # type: ignore[assignment]
-    sima_yi = None  # type: ignore[assignment]
-    zhou_yu = None  # type: ignore[assignment]
+    yi_sun_sin = None  # type: ignore[assignment]
+    shin_saimdang = None  # type: ignore[assignment]
     guan_yu = None  # type: ignore[assignment]
     zhang_fei = None  # type: ignore[assignment]
     zhao_yun = None  # type: ignore[assignment]
@@ -273,21 +273,21 @@ def summarize_history_node(state: ChancellorState) -> dict[str, Any]:
 
 
 # 3 Strategists (Parallel Wrappers)
-async def zhuge_node(state: ChancellorState) -> dict[str, Any]:
+async def jang_node(state: ChancellorState) -> dict[str, Any]:
     """眞 Strategist Node"""
     score = jang_yeong_sil({"query": state["query"]}) if callable(jang_yeong_sil) else 0.5
     return {"analysis_results": {"truth": score}}
 
 
-async def sima_node(state: ChancellorState) -> dict[str, Any]:
+async def yi_node(state: ChancellorState) -> dict[str, Any]:
     """善 Strategist Node"""
-    score = sima_yi({"query": state["query"]}) if callable(sima_yi) else 0.5
+    score = yi_sun_sin({"query": state["query"]}) if callable(yi_sun_sin) else 0.5
     return {"analysis_results": {"goodness": score}}
 
 
-async def zhou_node(state: ChancellorState) -> dict[str, Any]:
+async def shin_node(state: ChancellorState) -> dict[str, Any]:
     """美 Strategist Node"""
-    score = zhou_yu({"query": state["query"]}) if callable(zhou_yu) else 0.5
+    score = shin_saimdang({"query": state["query"]}) if callable(shin_saimdang) else 0.5
     return {"analysis_results": {"beauty": score}}
 
 
@@ -549,9 +549,9 @@ async def historian_node(state: ChancellorState) -> dict[str, Any]:
 
 # === 3. Add Nodes & Edges ===
 graph.add_node("constitutional", constitutional_node)
-graph.add_node("zhuge", zhuge_node)
-graph.add_node("sima", sima_node)
-graph.add_node("zhou", zhou_node)
+graph.add_node("jang", jang_node)
+graph.add_node("yi", yi_node)
+graph.add_node("shin", shin_node)
 graph.add_node("trinity", trinity_node)
 graph.add_node("tigers", tigers_node)
 graph.add_node("historian", historian_node)
@@ -582,13 +582,13 @@ graph.add_conditional_edges(
 graph.add_edge("memory_recall", "rerank")
 
 # After rerank, move to parallel strategies
-graph.add_edge("rerank", "zhuge")
-graph.add_edge("rerank", "sima")
-graph.add_edge("rerank", "zhou")
+graph.add_edge("rerank", "jang")
+graph.add_edge("rerank", "yi")
+graph.add_edge("rerank", "shin")
 
-graph.add_edge("zhuge", "trinity")
-graph.add_edge("sima", "trinity")
-graph.add_edge("zhou", "trinity")  # Fan-in
+graph.add_edge("jang", "trinity")
+graph.add_edge("yi", "trinity")
+graph.add_edge("shin", "trinity")  # Fan-in
 
 graph.add_edge("trinity", "tigers")
 graph.add_edge("tigers", "historian")
@@ -632,9 +632,9 @@ def build_chancellor_graph(checkpointer=None) -> None:
 
 # Compatibility Aliases for Verification Scripts (眞)
 chancellor_router_node = constitutional_node  # Entry gate
-jang_yeong_sil_node = zhuge_node
-sima_yi_node = sima_node
-zhou_yu_node = zhou_node
+jang_yeong_sil_node = jang_node
+yi_sun_sin_node = yi_node
+shin_saimdang_node = shin_node
 chancellor_finalize_node = historian_node
 
 # Singleton Export

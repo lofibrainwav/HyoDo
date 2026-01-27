@@ -27,7 +27,7 @@
 ### 사용자 설치 (권장)
 
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 pip install --user -r requirements.txt
 ```
 

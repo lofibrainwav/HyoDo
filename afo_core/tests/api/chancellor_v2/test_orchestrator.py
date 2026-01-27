@@ -14,9 +14,9 @@ from api.chancellor_v2.orchestrator import (
 )
 from api.chancellor_v2.sub_agents import (
     BaseStrategist,
-    SimaYiAgent,
-    ZhouYuAgent,
-    ZhugeLiangAgent,
+    YiSunSinAgent,
+    ShinSaimdangAgent,
+    JangYeongSilAgent,
 )
 
 
@@ -26,13 +26,13 @@ class TestStrategistContext:
     def test_create_context(self) -> None:
         """컨텍스트 생성 테스트."""
         ctx = StrategistContext(
-            strategist_name="Zhuge Liang",
+            strategist_name="Jang Yeong-sil",
             pillar="TRUTH",
             command="test command",
             plan={"skill_id": "test_skill", "query": "test query"},
         )
 
-        assert ctx.strategist_name == "Zhuge Liang"
+        assert ctx.strategist_name == "Jang Yeong-sil"
         assert ctx.pillar == "TRUTH"
         assert ctx.skill_id == "test_skill"
         assert ctx.query == "test query"
@@ -54,7 +54,7 @@ class TestStrategistContext:
     def test_to_output_dict(self) -> None:
         """출력 딕셔너리 변환 테스트."""
         ctx = StrategistContext(
-            strategist_name="Sima Yi",
+            strategist_name="Yi Sun-sin",
             pillar="GOODNESS",
         )
         ctx.score = 0.9
@@ -76,7 +76,7 @@ class TestStrategistRegistry:
     def test_register_and_get(self) -> None:
         """등록 및 조회 테스트."""
         registry = StrategistRegistry()
-        agent = ZhugeLiangAgent()
+        agent = JangYeongSilAgent()
 
         registry.register("truth", agent)
 
@@ -87,9 +87,9 @@ class TestStrategistRegistry:
     def test_get_all_pillars(self) -> None:
         """전체 기둥 조회 테스트."""
         registry = StrategistRegistry()
-        registry.register("truth", ZhugeLiangAgent())
-        registry.register("goodness", SimaYiAgent())
-        registry.register("beauty", ZhouYuAgent())
+        registry.register("truth", JangYeongSilAgent())
+        registry.register("goodness", YiSunSinAgent())
+        registry.register("beauty", ShinSaimdangAgent())
 
         pillars = registry.get_pillars()
 
@@ -104,7 +104,7 @@ class TestStrategistAgents:
 
     def test_jang_yeong_sil_heuristic(self) -> None:
         """제갈량 휴리스틱 평가 테스트."""
-        agent = ZhugeLiangAgent()
+        agent = JangYeongSilAgent()
         ctx = StrategistContext(
             plan={"skill_id": "pytest_runner", "query": "type check with mypy"},
         )
@@ -114,9 +114,9 @@ class TestStrategistAgents:
         assert 0.0 <= score <= 1.0
         assert score >= 0.5  # 기본값 이상
 
-    def test_sima_yi_heuristic(self) -> None:
+    def test_yi_sun_sin_heuristic(self) -> None:
         """사마의 휴리스틱 평가 테스트."""
-        agent = SimaYiAgent()
+        agent = YiSunSinAgent()
         ctx = StrategistContext(
             plan={"skill_id": "security_scan", "query": "check authentication"},
         )
@@ -126,9 +126,9 @@ class TestStrategistAgents:
         assert 0.0 <= score <= 1.0
         assert score >= 0.5
 
-    def test_zhou_yu_heuristic(self) -> None:
+    def test_shin_saimdang_heuristic(self) -> None:
         """주유 휴리스틱 평가 테스트."""
-        agent = ZhouYuAgent()
+        agent = ShinSaimdangAgent()
         ctx = StrategistContext(
             plan={"skill_id": "ui_component", "query": "clean minimal design"},
         )
@@ -140,7 +140,7 @@ class TestStrategistAgents:
 
     def test_agent_constants(self) -> None:
         """에이전트 상수 확인 테스트."""
-        agents = [ZhugeLiangAgent(), SimaYiAgent(), ZhouYuAgent()]
+        agents = [JangYeongSilAgent(), YiSunSinAgent(), ShinSaimdangAgent()]
 
         for agent in agents:
             assert agent.PILLAR in ["TRUTH", "GOODNESS", "BEAUTY"]

@@ -122,4 +122,4 @@ Focus on objective, verifiable technical facts.
 
 
 # Backwards compatibility alias
-ZhugeLiangAgent = JangYeongSilAgent
+JangYeongSilAgent = JangYeongSilAgent

@@ -91,18 +91,18 @@ async def run_end_to_end_test():
     # Step 3: Parallel Strategists (眞/善/美)
     print("\n--- Step 3: Parallel Strategists ---")
     # Simulate parallel execution
-    zhuge_res = await graph_module.zhuge_node(state)
-    sima_res = await graph_module.sima_node(state)
-    zhou_res = await graph_module.zhou_node(state)
+    jang_res = await graph_module.jang_node(state)
+    yi_res = await graph_module.yi_node(state)
+    shin_res = await graph_module.shin_node(state)
 
     # Correctly update analysis_results (state definition uses reducer for messages, but analysis_results is dict)
-    state["analysis_results"].update(zhuge_res.get("analysis_results", {}))
-    state["analysis_results"].update(sima_res.get("analysis_results", {}))
-    state["analysis_results"].update(zhou_res.get("analysis_results", {}))
+    state["analysis_results"].update(jang_res.get("analysis_results", {}))
+    state["analysis_results"].update(yi_res.get("analysis_results", {}))
+    state["analysis_results"].update(shin_res.get("analysis_results", {}))
 
-    print(f"✅ Zhuge (眞): {state['analysis_results'].get('zhuge_liang', 0)}")
-    print(f"✅ Sima (善): {state['analysis_results'].get('sima_yi', 0)}")
-    print(f"✅ Zhou (美): {state['analysis_results'].get('zhou_yu', 0)}")
+    print(f"✅ Jang (眞): {state['analysis_results'].get('jang_yeong_sil', 0)}")
+    print(f"✅ Yi (善): {state['analysis_results'].get('yi_sun_sin', 0)}")
+    print(f"✅ Shin (美): {state['analysis_results'].get('shin_saimdang', 0)}")
 
     # Step 4: Trinity Harmonization (⚖️)
     print("\n--- Step 4: Trinity Node ---")

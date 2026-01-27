@@ -8,15 +8,15 @@
 - ShinSaimdangAgent (美 Beauty): 신사임당 - 예술적 아름다움 (초충도, 묵죽도)
 
 Backwards Compatibility (구 삼국지 인물 이름):
-- ZhugeLiangAgent → JangYeongSilAgent
-- SimaYiAgent → YiSunSinAgent
-- ZhouYuAgent → ShinSaimdangAgent
+- JangYeongSilAgent → JangYeongSilAgent
+- YiSunSinAgent → YiSunSinAgent
+- ShinSaimdangAgent → ShinSaimdangAgent
 """
 
 from .base_strategist import BaseStrategist
-from .jang_yeong_sil_agent import JangYeongSilAgent, ZhugeLiangAgent
-from .shin_saimdang_agent import ShinSaimdangAgent, ZhouYuAgent
-from .yi_sun_sin_agent import SimaYiAgent, YiSunSinAgent
+from .jang_yeong_sil_agent import JangYeongSilAgent, JangYeongSilAgent
+from .shin_saimdang_agent import ShinSaimdangAgent, ShinSaimdangAgent
+from .yi_sun_sin_agent import YiSunSinAgent, YiSunSinAgent
 
 __all__ = [
     "BaseStrategist",
@@ -25,7 +25,7 @@ __all__ = [
     "YiSunSinAgent",
     "ShinSaimdangAgent",
     # 이전 삼국지 인물 이름 (Backwards Compatibility)
-    "ZhugeLiangAgent",
-    "SimaYiAgent",
-    "ZhouYuAgent",
+    "JangYeongSilAgent",
+    "YiSunSinAgent",
+    "ShinSaimdangAgent",
 ]

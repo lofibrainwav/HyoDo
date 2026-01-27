@@ -1,7 +1,7 @@
 #!/bin/bash
 # Scholar MCP 도구 테스트 스크립트
 
-cd /Users/brnestrm/AFO_Kingdom
+cd .
 
 echo "=========================================="
 echo "🧪 Scholar MCP Tools Test"

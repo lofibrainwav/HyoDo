@@ -132,7 +132,7 @@ class SequentialAnalyzer:
             # 파일 경로 패턴 찾기
             import re
 
-            file_match = re.search(r"/Users/brnestrm/AFO_Kingdom/([^:]+):", line)
+            file_match = re.search(r"./([^:]+):", line)
             if file_match:
                 file_paths.add(file_match.group(1))
 

@@ -33,8 +33,8 @@ class ChangeImpactAnalysis(BaseModel):
     affected_modules: list[str] = Field(default_factory=list)
     estimated_adaptation_effort: float = Field(description="적응 예상 공수 (Man-hours)")
     jang_yeong_sil_opinion: str | None = Field(None, description="기술적 분석 (眞)")
-    sima_yi_opinion: str | None = Field(None, description="안정성 분석 (善)")
-    zhou_yu_opinion: str | None = Field(None, description="UX 분석 (美)")
+    yi_sun_sin_opinion: str | None = Field(None, description="안정성 분석 (善)")
+    shin_saimdang_opinion: str | None = Field(None, description="UX 분석 (美)")
     requires_manual_intervention: bool = True
 
 

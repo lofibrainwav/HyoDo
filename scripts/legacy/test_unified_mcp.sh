@@ -2,7 +2,7 @@
 # 통합 MCP 서버 테스트 스크립트
 # Scholar MCP 통합 후 전체 기능 검증
 
-cd /Users/brnestrm/AFO_Kingdom
+cd .
 
 echo "=========================================="
 echo "🧪 AFO Ultimate MCP Server Test"

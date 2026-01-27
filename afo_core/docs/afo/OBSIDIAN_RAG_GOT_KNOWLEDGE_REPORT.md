@@ -35,7 +35,7 @@
 
 **확인 출처**: [1] 디렉토리 구조, [9] AFO_Kingdom 전체 구조
 
-- ✅ 위치: `/Users/brnestrm/AFO_Kingdom/AFO`
+- ✅ 위치: `./AFO`
 - ✅ Git 저장소: 존재
 - ✅ 옵시디언 vault: `docs/.obsidian` 존재
 - ✅ RAG 스크립트: `scripts/rag/` 존재
@@ -67,9 +67,9 @@
 
 **확인 출처**: [4] 경로 자동 감지 테스트, [5] 문서 로더 테스트
 
-- ✅ 리포지토리 루트: `/Users/brnestrm/AFO_Kingdom/AFO`
-- ✅ 옵시디언 vault: `/Users/brnestrm/AFO_Kingdom/AFO/docs`
-- ✅ 동기화 상태 파일: `/Users/brnestrm/AFO_Kingdom/AFO/.obsidian_sync_state.json`
+- ✅ 리포지토리 루트: `./AFO`
+- ✅ 옵시디언 vault: `./AFO/docs`
+- ✅ 동기화 상태 파일: `./AFO/.obsidian_sync_state.json`
 - ✅ 자동 감지: 정상 작동
 
 ### 5. 의존성 상태

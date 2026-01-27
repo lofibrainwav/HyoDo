@@ -1,6 +1,6 @@
 # Trinity Score: 90.0 (Established by Chancellor)
 """AFO Evolution Gate
-진화 검증 게이트 - Sima Yi's Shield.
+진화 검증 게이트 - Yi Sun-sin's Shield.
 
 Validates proposed evolutionary changes against safety protocols and constraints.
 Acts as a filter before any change is proposed to the Sovereign.
@@ -42,7 +42,7 @@ class EvolutionGate:
         if risk == "CRITICAL":
             return {
                 "safe": False,
-                "reason": "Risk level CRITICAL is automatically rejected by Sima Yi.",
+                "reason": "Risk level CRITICAL is automatically rejected by Yi Sun-sin.",
                 "action": "REJECT",
             }
 

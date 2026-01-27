@@ -4,7 +4,7 @@ from pathlib import Path
 
 # Configuration
 DOCS_DIR = Path("docs")
-LOCAL_USER_PATH = "/Users/brnestrm"
+LOCAL_USER_PATH = "${HOME}"
 MASK_PLACEHOLDER = "<LOCAL_WORKSPACE>"
 
 # Patterns to match file:/// absolute paths

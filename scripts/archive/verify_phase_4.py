@@ -9,12 +9,12 @@ def verify_graph_naming() -> None:
         content = pathlib.Path("packages/afo-core/chancellor_graph.py").read_text(encoding="utf-8")
 
         required_names = [
-            "zhuge_liang",
-            "sima_yi",
-            "zhou_yu",
-            "zhuge_liang_node",
-            "sima_yi_node",
-            "zhou_yu_node",
+            "jang_yeong_sil",
+            "yi_sun_sin",
+            "shin_saimdang",
+            "jang_yeong_sil_node",
+            "yi_sun_sin_node",
+            "shin_saimdang_node",
         ]
 
         forbidden_names = [
@@ -35,7 +35,7 @@ def verify_graph_naming() -> None:
             # Note: If found in comments it's okay, but better to be clean
             sys.exit(1)
 
-        print("✅ Official Naming (Zhuge Liang, Sima Yi, Zhou Yu) verified in code.")
+        print("✅ Official Naming (Jang Yeong-sil, Yi Sun-sin, Shin Saimdang) verified in code.")
 
     except FileNotFoundError:
         print("❌ chancellor_graph.py not found")

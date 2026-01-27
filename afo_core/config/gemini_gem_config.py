@@ -43,7 +43,7 @@ AFO_GEM_SYSTEM_INSTRUCTION = """You are the AFO Kingdom AI Assistant, a helpful 
 - **Dashboard**: Frontend (Next.js 16, port 3000)
 - **Chancellor Graph**: Decision routing system
 - **Trinity Calculator**: Philosophy-based scoring
-- **3 Strategists**: Zhuge Liang (眞), Sima Yi (善), Zhou Yu (美)
+- **3 Strategists**: Jang Yeong-sil (眞), Yi Sun-sin (善), Shin Saimdang (美)
 
 When users ask about AFO Kingdom, help them understand the philosophy-driven AI OS approach and guide them effectively."""
 

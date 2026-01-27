@@ -54,7 +54,7 @@
 ### 1. Obsidian 앱 열기
 
 ```bash
-open -a Obsidian /Users/brnestrm/AFO/docs
+open -a Obsidian ${HOME}/AFO/docs
 ```
 
 ### 2. Community Plugins 활성화

@@ -2,7 +2,7 @@
 """Multi-Agent Router for AFO Kingdom (Council of Minds)
 다중 에이전트 오케스트레이션 API.
 
-Orchestrates the Council of Minds (Zhuge Liang, Sima Yi, Zhou Yu) using LangGraph.
+Orchestrates the Council of Minds (Jang Yeong-sil, Yi Sun-sin, Shin Saimdang) using LangGraph.
 Implements specific nodes for Truth, Goodness, and Beauty, and a Consensus node for final decision.
 """
 
@@ -77,10 +77,10 @@ class CouncilState(TypedDict):
 
 
 async def truth_node(state: CouncilState) -> dict[str, Any]:
-    """Zhuge Liang (眞) Node: Technical Truth & Architecture."""
+    """Jang Yeong-sil (眞) Node: Technical Truth & Architecture."""
     logger.info(f"🦾 [TruthNode] Analyzing: {state['task'][:50]}...")
     prompt = f"""
-    You are Zhuge Liang (眞), the Technical Strategist.
+    You are Jang Yeong-sil (眞), the Technical Strategist.
     Analyze the following task for technical feasibility, architectural soundness, and truth.
 
     Task: {state["task"]}
@@ -105,10 +105,10 @@ async def truth_node(state: CouncilState) -> dict[str, Any]:
 
 
 async def goodness_node(state: CouncilState) -> dict[str, Any]:
-    """Sima Yi (善) Node: Ethics, Risk, & Stability."""
+    """Yi Sun-sin (善) Node: Ethics, Risk, & Stability."""
     logger.info(f"🛡️ [GoodnessNode] Assessing risk: {state['task'][:50]}...")
     prompt = f"""
-    You are Sima Yi (善), the Guardian Strategist.
+    You are Yi Sun-sin (善), the Guardian Strategist.
     Analyze the following task for ethical safety, security risks, and stability.
 
     Task: {state["task"]}
@@ -131,10 +131,10 @@ async def goodness_node(state: CouncilState) -> dict[str, Any]:
 
 
 async def beauty_node(state: CouncilState) -> dict[str, Any]:
-    """Zhou Yu (美) Node: UX, Narrative, & Aesthetics."""
+    """Shin Saimdang (美) Node: UX, Narrative, & Aesthetics."""
     logger.info(f"🎭 [BeautyNode] Designing: {state['task'][:50]}...")
     prompt = f"""
-    You are Zhou Yu (美), the Art Strategist.
+    You are Shin Saimdang (美), the Art Strategist.
     Analyze the following task for user experience, narrative flow, and beauty.
 
     Task: {state["task"]}
@@ -176,9 +176,9 @@ async def consensus_node(state: CouncilState) -> dict[str, Any]:
     final_summary = f"""
     🤝 Council Consensus Reached: {consensus_reached} (Score: {trinity_score:.1f})
 
-    🦾 Truth (Zhuge Liang): {t_out.get("analysis")}
-    🛡️ Goodness (Sima Yi): {g_out.get("analysis")}
-    🎭 Beauty (Zhou Yu): {b_out.get("analysis")}
+    🦾 Truth (Jang Yeong-sil): {t_out.get("analysis")}
+    🛡️ Goodness (Yi Sun-sin): {g_out.get("analysis")}
+    🎭 Beauty (Shin Saimdang): {b_out.get("analysis")}
     """
 
     return {
@@ -268,6 +268,6 @@ async def council_health() -> dict[str, Any]:
     return {
         "status": "healthy",
         "system": "Council of Minds (LangGraph)",
-        "agents": ["Zhuge Liang", "Sima Yi", "Zhou Yu"],
+        "agents": ["Jang Yeong-sil", "Yi Sun-sin", "Shin Saimdang"],
         "graph_state": "Compiled",
     }

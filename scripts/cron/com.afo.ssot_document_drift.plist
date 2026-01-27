@@ -8,12 +8,12 @@
     <key>ProgramArguments</key>
     <array>
         <string>/usr/bin/python3</string>
-        <string>/Users/brnestrm/AFO_Kingdom/scripts/ssot_document_drift.py</string>
+        <string>./scripts/ssot_document_drift.py</string>
         <string>--create-issue</string>
     </array>
 
     <key>WorkingDirectory</key>
-    <string>/Users/brnestrm/AFO_Kingdom</string>
+    <string>.</string>
 
     <key>StartInterval</key>
     <integer>86400</integer>
@@ -22,10 +22,10 @@
     <true/>
 
     <key>StandardOutPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/ssot_document_drift.out</string>
+    <string>./artifacts/run/ssot_document_drift.out</string>
 
     <key>StandardErrorPath</key>
-    <string>/Users/brnestrm/AFO_Kingdom/artifacts/run/ssot_document_drift.err</string>
+    <string>./artifacts/run/ssot_document_drift.err</string>
 
     <key>EnvironmentVariables</key>
     <dict>

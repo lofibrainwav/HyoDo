@@ -387,7 +387,7 @@ class SecureAgentChannel:
         if to_agent == "ALL":
             return [f"agent:{agent.value}:{session_id}" for agent in AgentType]
         elif to_agent == "STRATEGISTS":
-            strategists = [AgentType.ZHUGE_LIANG, AgentType.SIMA_YI, AgentType.ZHOU_YU]
+            strategists = [AgentType.JANG_YEONG_SIL, AgentType.YI_SUN_SIN, AgentType.SHIN_SAIMDANG]
             return [f"agent:{agent.value}:{session_id}" for agent in strategists]
         elif to_agent == "SCHOLARS":
             scholars = [

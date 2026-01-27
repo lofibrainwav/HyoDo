@@ -20,9 +20,9 @@
 - **모든 원격 브랜치**: ❌ 발견되지 않음
 
 #### 다른 AFO 디렉토리
-- `/Users/brnestrm/AFO`: Git 저장소 아님
-- `/Users/brnestrm/AFO_EMERGENCY_BACKUP_20251201_135905/AFO`: 확인 필요
-- `/Users/brnestrm/Obsidian/AFO`: 확인 필요
+- `${HOME}/AFO`: Git 저장소 아님
+- `${HOME}/AFO_EMERGENCY_BACKUP_20251201_135905/AFO`: 확인 필요
+- `${HOME}/Obsidian/AFO`: 확인 필요
 
 ### 결론
 커밋 `3343f712e9c97e5139971273351ccbc3bbe646b3`는 현재 확인 가능한 모든 저장소에서 발견되지 않았습니다.

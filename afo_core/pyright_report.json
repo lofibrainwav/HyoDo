@@ -3,7 +3,7 @@
     "time": "1768177700297",
     "generalDiagnostics": [
         {
-            "file": "/Users/brnestrm/AFO_Kingdom/packages/afo-core/browser_auth/mcp_integration.py",
+            "file": "./packages/afo-core/browser_auth/mcp_integration.py",
             "severity": "error",
             "message": "Except clause is unreachable because exception is already handled\n  \"ImportError\" is a subclass of \"ImportError\"",
             "range": {

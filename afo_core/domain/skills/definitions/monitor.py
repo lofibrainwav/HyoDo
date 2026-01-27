@@ -77,13 +77,13 @@ def get_monitor_skills() -> list[AFOSkillCard]:
     )
     skills.append(skill_017)
 
-    # Skill 18: Docker Recovery (Sima Yi)
+    # Skill 18: Docker Recovery (Yi Sun-sin)
     skill_018 = AFOSkillCard(
         skill_id="skill_018_docker_recovery",
-        name="Docker Auto-Recovery (Sima Yi)",
+        name="Docker Auto-Recovery (Yi Sun-sin)",
         description="Autonomous health monitoring and self-healing system.",
         category=SkillCategory.HEALTH_MONITORING,
-        tags=["docker", "recovery", "self-healing", "sima-yi", "uptime"],
+        tags=["docker", "recovery", "self-healing", "yi-yi", "uptime"],
         version="1.0.0",
         capabilities=[
             "monitor_containers",

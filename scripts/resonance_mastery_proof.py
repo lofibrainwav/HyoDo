@@ -26,10 +26,10 @@ async def run_mastery_proof():
     context_text = "\n".join([c.content for c in chunks])
 
     ai_req_knowledge = AIRequest(
-        query=knowledge_query, context=context_text, persona="zhuge_liang", stream=True
+        query=knowledge_query, context=context_text, persona="jang_yeong_sil", stream=True
     )
 
-    print("\n📜 Zhuge Liang's Knowledge Report:")
+    print("\n📜 Jang Yeong-sil's Knowledge Report:")
     print("-" * 40)
     async for chunk in ai_gateway.generate_stream(ai_req_knowledge):
         print(chunk, end="", flush=True)
@@ -50,10 +50,10 @@ async def run_mastery_proof():
     """
 
     ai_req_skill = AIRequest(
-        query=skill_query, context=available_skills, persona="sima_yi", stream=True
+        query=skill_query, context=available_skills, persona="yi_sun_sin", stream=True
     )
 
-    print("\n🛡️ Sima Yi's Strategic Proposal:")
+    print("\n🛡️ Yi Sun-sin's Strategic Proposal:")
     print("-" * 40)
     async for chunk in ai_gateway.generate_stream(ai_req_skill):
         print(chunk, end="", flush=True)

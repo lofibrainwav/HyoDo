@@ -1,7 +1,7 @@
 """
 Chancellor Router - API 엔드포인트
 Phase 3: Chancellor Graph API 엔드포인트
-LangGraph 기반 3책사 (Zhuge Liang/Sima Yi/Zhou Yu) 시스템
+LangGraph 기반 3책사 (Jang Yeong-sil/Yi Sun-sin/Shin Saimdang) 시스템
 """
 
 from __future__ import annotations
@@ -117,7 +117,7 @@ async def chancellor_health() -> dict[str, Any]:
         return {
             "status": "healthy",
             "message": "Chancellor Graph 정상 작동 중",
-            "strategists": ["Zhuge Liang", "Sima Yi", "Zhou Yu"],
+            "strategists": ["Jang Yeong-sil", "Yi Sun-sin", "Shin Saimdang"],
         }
     except (ImportError, AttributeError, RuntimeError) as e:
         logger.error("Chancellor Graph 초기화 실패: %s", str(e))

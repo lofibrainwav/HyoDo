@@ -97,7 +97,7 @@ echo ""
 echo "🐍 5. Python Dependency Verification"
 echo "─────────────────────────────────────"
 
-cd /Users/brnestrm/AFO_Kingdom
+cd .
 source .venv/bin/activate 2>/dev/null || true
 
 PIP_CHECK=$(pip check 2>&1)

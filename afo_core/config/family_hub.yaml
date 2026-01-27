@@ -17,23 +17,23 @@ family_hub:
       color: "blue"
       description: "Guardian of the Kingdom's extensive knowledge base and memory systems."
 
-    ZhugeLiang:
+    JangYeongSil:
       role: "Prime Strategist (Truth)"
-      persona_id: "zhuge_liang_truth"
+      persona_id: "jang_yeong_sil_truth"
       icon: "⚔️"
       color: "cyan"
       description: "Architect of grand strategy, ensuring all actions align with Truth (眞)."
 
-    SimaYi:
+    YiSunSin:
       role: "Grand Guardian (Goodness)"
-      persona_id: "sima_yi_goodness"
+      persona_id: "yi_sun_sin_goodness"
       icon: "🛡️"
       color: "amber"
       description: "Defender of stability and ethics, prioritizing Goodness (善)."
 
-    ZhouYu:
+    ShinSaimdang:
       role: "Grand Architect (Beauty)"
-      persona_id: "zhou_yu_beauty"
+      persona_id: "shin_saimdang_beauty"
       icon: "🌉"
       color: "pink"
       description: "Master of aesthetics and user experience, ensuring Beauty (美)."

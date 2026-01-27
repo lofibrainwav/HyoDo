@@ -48,7 +48,7 @@ class TestTrinityScoreOptimizer:
                 collaboration_impact=0.1,
             ),
             TrinityScoreUpdate(
-                agent_type="sima_yi",
+                agent_type="yi_sun_sin",
                 session_id="test-session-1",
                 previous_score=0.75,
                 new_score=0.80,

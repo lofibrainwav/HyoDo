@@ -31,13 +31,13 @@
 
 ```bash
 # macOS
-open -a Obsidian /Users/brnestrm/AFO/docs
+open -a Obsidian ${HOME}/AFO/docs
 ```
 
 또는:
 1. Obsidian 앱 실행
 2. "Open folder as vault" 선택
-3. `/Users/brnestrm/AFO/docs` 선택
+3. `${HOME}/AFO/docs` 선택
 
 #### 2단계: Community Plugins 활성화
 
@@ -94,12 +94,12 @@ open -a Obsidian /Users/brnestrm/AFO/docs
 
 ```bash
 # 플러그인 디렉토리 확인
-ls -la /Users/brnestrm/AFO/docs/.obsidian/plugins/
+ls -la ${HOME}/AFO/docs/.obsidian/plugins/
 
 # 필수 파일 확인
 for plugin in obsidian-git dataview; do
     echo "=== $plugin ==="
-    ls -la /Users/brnestrm/AFO/docs/.obsidian/plugins/$plugin/ | grep -E "(main.js|manifest.json)"
+    ls -la ${HOME}/AFO/docs/.obsidian/plugins/$plugin/ | grep -E "(main.js|manifest.json)"
 done
 ```
 
@@ -141,7 +141,7 @@ done
 2. 10분 대기 (또는 수동 커밋: `Cmd+Shift+K`)
 3. Git 로그 확인:
    ```bash
-   cd /Users/brnestrm/AFO/docs
+   cd ${HOME}/AFO/docs
    git log --oneline -5
    ```
 
@@ -182,12 +182,12 @@ done
 1. **Obsidian 재시작**
    ```bash
    killall Obsidian
-   open -a Obsidian /Users/brnestrm/AFO/docs
+   open -a Obsidian ${HOME}/AFO/docs
    ```
 
 2. **플러그인 디렉토리 확인**
    ```bash
-   ls -la /Users/brnestrm/AFO/docs/.obsidian/plugins/
+   ls -la ${HOME}/AFO/docs/.obsidian/plugins/
    ```
 
 3. **필수 파일 확인**
@@ -197,7 +197,7 @@ done
 
 1. **Git 저장소 확인**
    ```bash
-   cd /Users/brnestrm/AFO/docs
+   cd ${HOME}/AFO/docs
    git status
    ```
 

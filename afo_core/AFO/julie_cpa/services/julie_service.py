@@ -9,7 +9,7 @@ class FinancialRecord:
     description: str
     amount: float
     category: str
-    risk_score: int  # 0-100 (Sima Yi Filter)
+    risk_score: int  # 0-100 (Yi Sun-sin Filter)
     status: str  # 'PENDING', 'APPROVED', 'REJECTED'
 
 
@@ -32,7 +32,7 @@ class JulieService:
         from datetime import datetime
 
         self._log_to_db(
-            f"[{datetime.now().strftime('%H:%M:%S')}] [BRAIN] System initialized with Sima Yi Risk Module."
+            f"[{datetime.now().strftime('%H:%M:%S')}] [BRAIN] System initialized with Yi Sun-sin Risk Module."
         )
 
         # Hydrate with mock records
@@ -148,7 +148,7 @@ class JulieService:
 
     @julie_breaker
     async def assess_risk(self, record: FinancialRecord) -> FinancialRecord:
-        """Step 2: Labeling (Sima Yi Risk Filter)"""
+        """Step 2: Labeling (Yi Sun-sin Risk Filter)"""
         # Simple logic for now: High amount = High risk
         if record.amount > 1000:
             record.risk_score = 80

@@ -25,7 +25,7 @@ with open(output_file, "w") as f:
 
 for d in dirs:
     print(f"Running vulture on {d}...")
-    cmd = ["/Users/brnestrm/AFO_Kingdom/.venv/bin/python", "-m", "vulture", d]
+    cmd = ["./.venv/bin/python", "-m", "vulture", d]
     if d == "packages/afo-core/AFO":
         # For the root, exclude subdirectories already scanned
         cmd += ["--exclude", "agents,api,audit,core,domain,health,irs,julie,memory_system,multimodal,schemas,services,utils"]

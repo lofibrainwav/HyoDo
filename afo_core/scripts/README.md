@@ -11,7 +11,7 @@
 
 **사용법**:
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 python3 scripts/export_keys.py > /tmp/afo_env_keys.sh
 source /tmp/afo_env_keys.sh
 ```
@@ -31,7 +31,7 @@ export ANTHROPIC_API_KEY='...'
 
 **사용법**:
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 ./scripts/sync_workflow.sh
 ```
 

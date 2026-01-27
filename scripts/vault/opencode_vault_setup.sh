@@ -17,7 +17,7 @@ set -e  # 에러 발생 시 즉시 종료
 # ============================================================================
 # 환경 설정
 # ============================================================================
-AFO_CORE="${AFO_KINGDOM:-/Users/brnestrm/AFO_Kingdom/packages/afo-core}"
+AFO_CORE="${AFO_KINGDOM:-./afo_core}"
 OPENCODE_AUTH="$HOME/.local/share/opencode/auth.json"
 PYTHON_CMD="python3"
 

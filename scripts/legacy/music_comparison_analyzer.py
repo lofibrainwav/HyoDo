@@ -15,7 +15,7 @@ from pathlib import Path
 from typing import Any
 
 # PYTHONPATH 설정
-sys.path.insert(0, "/Users/brnestrm/Library/Python/3.9/lib/python/site-packages")
+sys.path.insert(0, "${HOME}/Library/Python/3.9/lib/python/site-packages")
 
 # AFO 모듈 import (Python 3.9 호환성 문제로 독립 실행 모드만 사용)
 print("⚠️ Python 3.9 호환성 문제로 AFO 모듈 직접 import 생략 - 독립 실행 모드로 진행")

@@ -51,7 +51,7 @@ async def consult_jang_yeong_sil(query: str) -> StrategistResponse:
     )
 
 
-async def consult_sima_yi(query: str) -> StrategistResponse:
+async def consult_yi_sun_sin(query: str) -> StrategistResponse:
     """사마의 (善: Goodness) - Risk Assessment via Claude"""
     # Mock implementation - would connect to actual LLM
     await asyncio.sleep(0.1)
@@ -63,7 +63,7 @@ async def consult_sima_yi(query: str) -> StrategistResponse:
     )
 
 
-async def consult_zhou_yu(query: str) -> StrategistResponse:
+async def consult_shin_saimdang(query: str) -> StrategistResponse:
     """주유 (美: Beauty) - UX/Narrative via GPT"""
     # Mock implementation - would connect to actual LLM
     await asyncio.sleep(0.1)
@@ -107,8 +107,8 @@ async def deliberate(query: CouncilQuery) -> CouncilResponse:
     responses = list(
         await asyncio.gather(
             consult_jang_yeong_sil(query.query),
-            consult_sima_yi(query.query),
-            consult_zhou_yu(query.query),
+            consult_yi_sun_sin(query.query),
+            consult_shin_saimdang(query.query),
         )
     )
 

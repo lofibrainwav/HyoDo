@@ -15,9 +15,9 @@ The system is orchestrated by a **LangGraph StateGraph** that manages state, rou
 ### 2. The Strategists (3책사)
 | Name | Persona | Role | Technology |
 |------|---------|------|------------|
-| **Zhuge Liang** (제갈량) | **眞 (Truth)** | Architecture & Strategy | LangChain / CrewAI |
-| **Sima Yi** (사마의) | **善 (Goodness)** | Risk & Ethics | NeMo Guardrails / AutoGen |
-| **Zhou Yu** (주유) | **美 (Beauty)** | Narrative & UX | Prompt Engineering |
+| **Jang Yeong-sil** (제갈량) | **眞 (Truth)** | Architecture & Strategy | LangChain / CrewAI |
+| **Yi Sun-sin** (사마의) | **善 (Goodness)** | Risk & Ethics | NeMo Guardrails / AutoGen |
+| **Shin Saimdang** (주유) | **美 (Beauty)** | Narrative & UX | Prompt Engineering |
 
 ### 3. The Pillars (5기둥)
 - **眞 (Truth)**: Technical Certainty.

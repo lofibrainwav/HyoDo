@@ -6,8 +6,8 @@ from pathlib import Path
 from typing import Dict, Any, List
 
 # Configuration
-PYTHON_EXE = "/Users/brnestrm/AFO_Kingdom/.venv/bin/python"
-PROJECT_ROOT = Path("/Users/brnestrm/AFO_Kingdom")
+PYTHON_EXE = "./.venv/bin/python"
+PROJECT_ROOT = Path(".")
 CORE_PATH = PROJECT_ROOT / "packages" / "afo-core"
 AFO_PATH = CORE_PATH / "AFO"
 LOGS = [

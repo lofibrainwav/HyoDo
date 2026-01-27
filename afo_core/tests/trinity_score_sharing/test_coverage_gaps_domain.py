@@ -137,7 +137,7 @@ class TestDomainModelsCoverageGaps:
         before = datetime.now()
         event = TrinityScoreUpdateEvent(
             session_id="test-session",
-            agent_id="sima_yi",
+            agent_id="yi_sun_sin",
             new_scores=PillarScores(
                 truth=0.75, goodness=0.70, beauty=0.65, serenity=0.60, eternity=0.55
             ),
@@ -155,7 +155,7 @@ class TestDomainModelsCoverageGaps:
             session_id="test-session",
             average_trinity_score=0.85,
             consensus_level=0.90,
-            active_agents=["jang_yeong_sil", "sima_yi", "zhou_yu"],
+            active_agents=["jang_yeong_sil", "yi_sun_sin", "shin_saimdang"],
         )
 
         assert snapshot.session_id == "test-session"

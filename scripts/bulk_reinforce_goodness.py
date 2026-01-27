@@ -59,7 +59,7 @@ def reinforce_goodness(file_path):
 
 
 def main():
-    project_root = Path("/Users/brnestrm/AFO_Kingdom")
+    project_root = Path(".")
     exclude_dirs = {".git", "__pycache__", ".venv", "node_modules", "dist", "build"}
     healed_count = 0
     print(f"🚀 Reinforcing {project_root} for Goodness (善)...")

@@ -105,7 +105,7 @@ class SevenDimensionalAudit:
         """永 - History and Continuity."""
         print("  - [D5: Eternity] Blueprint audit...")
         # Verify the existence of implementation_plan in the brain
-        brain_dir = Path("/Users/brnestrm/.gemini/antigravity/brain")
+        brain_dir = Path("${HOME}/.gemini/antigravity/brain")
         # Find latest talk dir
         latest_dir = sorted(brain_dir.glob("*"))[-1]
         plans = list(latest_dir.glob("*.md"))

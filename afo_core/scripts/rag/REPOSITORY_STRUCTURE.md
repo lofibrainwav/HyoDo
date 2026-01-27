@@ -35,7 +35,7 @@ export QDRANT_URL="http://localhost:6333"
 
 ### AFO 리포지토리
 
-- **위치**: `/Users/brnestrm/AFO` 또는 `AFO_Kingdom/AFO`
+- **위치**: `${HOME}/AFO` 또는 `AFO_Kingdom/AFO`
 - **옵시디언 vault**: `{repo_root}/docs`
 - **RAG 스크립트**: `{repo_root}/scripts/rag/`
 

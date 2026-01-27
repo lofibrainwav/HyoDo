@@ -11,9 +11,9 @@ def test_modules() -> None:
 
     try:
         # Import Strategists
-        from strategists import sima_yi, zhou_yu, zhuge_liang
+        from strategists import yi_sun_sin, shin_saimdang, jang_yeong_sil
 
-        print("✅ Imported Strategists (Zhuge Liang, Sima Yi, Zhou Yu)")
+        print("✅ Imported Strategists (Jang Yeong-sil, Yi Sun-sin, Shin Saimdang)")
 
         # Import Tigers
         from tigers import guan_yu, huang_zhong, ma_chao, zhang_fei, zhao_yun
@@ -28,9 +28,9 @@ def test_modules() -> None:
             "narrative": "glassmorphism",
         }
 
-        s1 = zhuge_liang.evaluate(q_data)
-        s2 = sima_yi.review(q_data)
-        s3 = zhou_yu.optimize(q_data)
+        s1 = jang_yeong_sil.evaluate(q_data)
+        s2 = yi_sun_sin.review(q_data)
+        s3 = shin_saimdang.optimize(q_data)
         print(f"Strategists Output: Truth={s1}, Goodness={s2}, Beauty={s3}")
 
         # Test Tigers

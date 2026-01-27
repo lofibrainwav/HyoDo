@@ -93,7 +93,7 @@ LangGraph RAG Pipeline
 ### 1. 의존성 설치
 
 ```bash
-cd /Users/brnestrm/AFO/scripts/rag
+cd ${HOME}/AFO/scripts/rag
 pip install -r requirements.txt
 ```
 
@@ -162,7 +162,7 @@ python sync_obsidian_vault.py --initial-sync
 
 1. **의존성 설치**
    ```bash
-   cd /Users/brnestrm/AFO/scripts/rag
+   cd ${HOME}/AFO/scripts/rag
    pip install -r requirements.txt
    ```
 

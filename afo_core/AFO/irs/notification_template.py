@@ -1,7 +1,7 @@
 """
 Notification Template - 알림 템플릿 및 포맷
 
-美 (Zhou Yu): 단순함/일관성
+美 (Shin Saimdang): 단순함/일관성
 - 알림 템플릿 설계
 - 단순한 API 포맷
 """

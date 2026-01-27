@@ -11,7 +11,7 @@
 ### ❌ 연결 상태: 확인되지 않음
 
 **확인 사항**:
-- ✅ 옵시디언 vault 경로: `/Users/brnestrm/AFO/docs`
+- ✅ 옵시디언 vault 경로: `${HOME}/AFO/docs`
 - ❌ RAG 관련 Python 파일: 없음
 - ❌ 벡터 DB 관련 파일: 없음
 - ❌ 문서 로더 스크립트: 없음
@@ -62,7 +62,7 @@
 
 ### 옵션 1: RAG 시스템에 옵시디언 vault 추가
 
-옵시디언 vault(`/Users/brnestrm/AFO/docs`)를 RAG 시스템의 문서 소스로 추가:
+옵시디언 vault(`${HOME}/AFO/docs`)를 RAG 시스템의 문서 소스로 추가:
 
 1. **문서 로더 생성**
    - Markdown 파일 로더

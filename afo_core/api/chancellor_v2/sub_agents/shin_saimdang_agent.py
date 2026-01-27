@@ -133,4 +133,4 @@ Beauty is in clarity, elegance, and user delight.
 
 
 # Backwards compatibility alias
-ZhouYuAgent = ShinSaimdangAgent
+ShinSaimdangAgent = ShinSaimdangAgent

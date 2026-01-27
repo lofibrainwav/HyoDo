@@ -180,7 +180,7 @@ class LogChunker:
 
         for i, line in enumerate(lines):
             # 파일 경로 패턴 찾기
-            file_match = re.search(r"/Users/brnestrm/AFO_Kingdom/([^:]+):", line)
+            file_match = re.search(r"./([^:]+):", line)
             if file_match:
                 current_file = file_match.group(1)
 

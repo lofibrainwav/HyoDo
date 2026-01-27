@@ -22,7 +22,7 @@ class VisionVerifier:
     def __init__(self) -> None:
         # Use absolute path to shared artifact directory
         self.screenshot_dir = (
-            "/Users/brnestrm/.gemini/antigravity/brain/a805a42d-de23-4690-bbb3-e36fd1dfc691"
+            "${HOME}/.gemini/antigravity/brain/a805a42d-de23-4690-bbb3-e36fd1dfc691"
         )
         # Ensure dir exists in a safe location
         os.makedirs(self.screenshot_dir, exist_ok=True)

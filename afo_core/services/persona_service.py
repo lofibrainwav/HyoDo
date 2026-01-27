@@ -36,8 +36,8 @@ from AFO.domain.persona import (
     current_persona,
     family_head,
     learner,
-    sima_yi,
-    zhou_yu,
+    yi_sun_sin,
+    shin_saimdang,
     jang_yeong_sil,
 )
 
@@ -51,8 +51,8 @@ PERSONA_MAPPING: dict[str, Persona | None] = {
     "creator": creator,
     "learner": learner,  # Phase 2 구현 완료
     "jang_yeong_sil": jang_yeong_sil,
-    "sima_yi": sima_yi,
-    "zhou_yu": zhou_yu,
+    "yi_sun_sin": yi_sun_sin,
+    "shin_saimdang": shin_saimdang,
 }
 
 

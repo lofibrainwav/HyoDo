@@ -17,7 +17,7 @@ async def verify_streaming_debate():
 
     print("⏳ Convening the Council (Streaming Parallel Analysis)...")
 
-    counts = {"zhuge_liang": 0, "sima_yi": 0, "zhou_yu": 0, "synthesis": 0}
+    counts = {"jang_yeong_sil": 0, "yi_sun_sin": 0, "shin_saimdang": 0, "synthesis": 0}
 
     try:
         async for chunk_data in trinity_service.conduct_debate_stream(query):
@@ -37,7 +37,7 @@ async def verify_streaming_debate():
 
     # Assertions
     success = True
-    for strategist in ["zhuge_liang", "sima_yi", "zhou_yu"]:
+    for strategist in ["jang_yeong_sil", "yi_sun_sin", "shin_saimdang"]:
         if counts[strategist] == 0:
             print(f"❌ FAIL: {strategist} did not stream any chunks!")
             success = False

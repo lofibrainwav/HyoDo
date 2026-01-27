@@ -1,7 +1,7 @@
 #!/bin/bash
 set -euo pipefail
 
-cd /Users/brnestrm/AFO_Kingdom
+cd .
 
 ts="$(date +%Y%m%d_%H%M%S)"
 out="artifacts/royal_lock_verify_${ts}.log"

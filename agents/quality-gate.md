@@ -131,4 +131,4 @@ make test        # Gate 3
 
 ## 워크스페이스 루트
 
-모든 명령은 `/Users/brnestrm/AFO_Kingdom`에서 실행됩니다.
+모든 명령은 `.`에서 실행됩니다.

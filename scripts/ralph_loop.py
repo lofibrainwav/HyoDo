@@ -6,7 +6,7 @@ import sys
 from datetime import datetime
 
 # Add workspace root to sys.path to enable AFO imports
-WORKSPACE_ROOT = os.environ.get("WORKSPACE_ROOT", "/Users/brnestrm/AFO_Kingdom/packages/afo-core")
+WORKSPACE_ROOT = os.environ.get("WORKSPACE_ROOT", "./packages/afo-core")
 if WORKSPACE_ROOT not in sys.path:
     sys.path.append(WORKSPACE_ROOT)
 

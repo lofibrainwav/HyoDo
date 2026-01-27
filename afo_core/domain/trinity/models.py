@@ -4,9 +4,9 @@ from pydantic import BaseModel, Field
 
 
 class StrategistType(str, Enum):
-    ZHUGE_LIANG = "jang_yeong_sil"  # Truth (眞) - Logic, Facts, Code
-    SIMA_YI = "sima_yi"  # Goodness (善) - Risk, Safety, Conservative
-    ZHOU_YU = "zhou_yu"  # Beauty (美) - UX, Narrative, Empathy
+    JANG_YEONG_SIL = "jang_yeong_sil"  # Truth (眞) - Logic, Facts, Code
+    YI_SUN_SIN = "yi_sun_sin"  # Goodness (善) - Risk, Safety, Conservative
+    SHIN_SAIMDANG = "shin_saimdang"  # Beauty (美) - UX, Narrative, Empathy
 
 
 class StrategistOpinion(BaseModel):

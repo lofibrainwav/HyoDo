@@ -23,14 +23,14 @@ async def main():
     print("✅ agent_deltas present")
 
     # 2. Simulate Trigger
-    print("\n[2] Simulate Trigger on Zhuge Liang")
-    trinity_manager.apply_trigger("ELEGANT_RESPONSE", agent_name="zhuge_liang")
+    print("\n[2] Simulate Trigger on Jang Yeong-sil")
+    trinity_manager.apply_trigger("ELEGANT_RESPONSE", agent_name="jang_yeong_sil")
 
-    metrics = trinity_manager.get_agent_metrics("zhuge_liang")
-    print(f"   Zhuge Liang Beauty Delta: {trinity_manager.agent_deltas['zhuge_liang']['beauty']}")
-    print(f"   Zhuge Liang Score: {metrics.trinity_score}")
+    metrics = trinity_manager.get_agent_metrics("jang_yeong_sil")
+    print(f"   Jang Yeong-sil Beauty Delta: {trinity_manager.agent_deltas['jang_yeong_sil']['beauty']}")
+    print(f"   Jang Yeong-sil Score: {metrics.trinity_score}")
 
-    if trinity_manager.agent_deltas["zhuge_liang"]["beauty"] <= 0:
+    if trinity_manager.agent_deltas["jang_yeong_sil"]["beauty"] <= 0:
         print("❌ Trigger failed to update delta")
         sys.exit(1)
 
@@ -45,8 +45,8 @@ async def main():
         print(response.keys())
         sys.exit(1)
 
-    if "zhuge_liang" not in response["agents"]:
-        print("❌ Zhuge Liang missing in API response")
+    if "jang_yeong_sil" not in response["agents"]:
+        print("❌ Jang Yeong-sil missing in API response")
         sys.exit(1)
 
     print("✅ API Schema Verified")

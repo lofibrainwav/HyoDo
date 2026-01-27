@@ -42,7 +42,7 @@ class ClaudeCLIWrapper:
     """
 
     def __init__(self) -> None:
-        self.cli_path = "/Users/brnestrm/.local/bin/claude"
+        self.cli_path = "${HOME}/.local/bin/claude"
         self.available = self._check_availability()
 
         if self.available:

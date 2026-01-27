@@ -72,7 +72,7 @@ async def get_evolution_history():
 @router.post("/verify")
 async def verify_evolution_proposal(proposal: EvolutionProposal):
     """
-    Submit a proposed modification to Sima Yi's Shield for safety verification.
+    Submit a proposed modification to Yi Sun-sin's Shield for safety verification.
     """
     result = evolution_gate.verify_proposal(proposal)
     return result

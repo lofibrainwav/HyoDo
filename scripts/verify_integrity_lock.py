@@ -1,7 +1,7 @@
 import sys
 
 # Add project root to path
-sys.path.insert(0, "/Users/brnestrm/AFO_Kingdom/packages/afo-core")
+sys.path.insert(0, "./packages/afo-core")
 
 try:
     from AFO.api_server import SSE_AVAILABLE

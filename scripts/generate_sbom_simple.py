@@ -19,7 +19,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("/Users/brnestrm/AFO_Kingdom/.cursor/debug.log"),
+        logging.FileHandler("./.cursor/debug.log"),
         logging.StreamHandler(),
     ],
 )

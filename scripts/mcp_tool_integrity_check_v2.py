@@ -4,7 +4,7 @@ import sys
 import json
 
 # Setup paths
-package_root = "/Users/brnestrm/AFO_Kingdom/packages/afo-core"
+package_root = "./packages/afo-core"
 if package_root not in sys.path:
     sys.path.append(package_root)
 
@@ -39,7 +39,7 @@ async def verify_registry():
     # Check Skills Directory
     print("\n" + "-" * 30)
     print("📂 Skills Directory Synchronization Check")
-    skills_dir = "/Users/brnestrm/AFO_Kingdom/skills"
+    skills_dir = "./skills"
     physical_skills = [
         d for d in os.listdir(skills_dir) if os.path.isdir(os.path.join(skills_dir, d))
     ]

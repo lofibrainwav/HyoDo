@@ -19,9 +19,9 @@ class PersonaType(str, Enum):
     FAMILY_HEAD = "family_head"  # 가장 (인·따뜻함)
     CREATOR = "creator"  # 창작자 (美·몰입)
     LEARNER = "learner"  # 배움의 길 (眞·탐구)
-    ZHUGE_LIANG = "jang_yeong_sil"  # 제갈량 (眞 Truth)
-    SIMA_YI = "sima_yi"  # 사마의 (善 Goodness)
-    ZHOU_YU = "zhou_yu"  # 주유 (美 Beauty)
+    JANG_YEONG_SIL = "jang_yeong_sil"  # 제갈량 (眞 Truth)
+    YI_SUN_SIN = "yi_sun_sin"  # 사마의 (善 Goodness)
+    SHIN_SAIMDANG = "shin_saimdang"  # 주유 (美 Beauty)
 
 
 class Persona(BaseModel):
@@ -119,7 +119,7 @@ creator = Persona(
 
 jang_yeong_sil = Persona(
     id="p004",
-    type=PersonaType.ZHUGE_LIANG,
+    type=PersonaType.JANG_YEONG_SIL,
     name="제갈량 (眞 Truth)",
     trinity_scores={
         "truth": 100.0,
@@ -130,9 +130,9 @@ jang_yeong_sil = Persona(
     },
 )
 
-sima_yi = Persona(
+yi_sun_sin = Persona(
     id="p005",
-    type=PersonaType.SIMA_YI,
+    type=PersonaType.YI_SUN_SIN,
     name="사마의 (善 Goodness)",
     trinity_scores={
         "truth": 85.0,
@@ -143,9 +143,9 @@ sima_yi = Persona(
     },
 )
 
-zhou_yu = Persona(
+shin_saimdang = Persona(
     id="p006",
-    type=PersonaType.ZHOU_YU,
+    type=PersonaType.SHIN_SAIMDANG,
     name="주유 (美 Beauty)",
     trinity_scores={
         "truth": 80.0,

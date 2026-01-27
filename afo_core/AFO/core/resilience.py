@@ -1,5 +1,5 @@
 """
-Resilience Core Module (The Shield of Sima Yi)
+Resilience Core Module (The Shield of Yi Sun-sin)
 Provides Circuit Breaker and other stability patterns.
 Implemented manually to avoid external dependencies.
 """
@@ -24,7 +24,7 @@ class CircuitBreakerOpenException(Exception):
 
 class CircuitBreaker:
     """
-    Sima Yi's Shield: Prevents cascading failures.
+    Yi Sun-sin's Shield: Prevents cascading failures.
     Manual implementation of Circuit Breaker pattern.
     """
 

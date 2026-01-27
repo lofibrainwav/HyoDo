@@ -13,7 +13,7 @@ class SafeOperation:
     Goodness (善) Pillar Utility: SafeOperation
 
     Wraps critical operations in a safety net to prevent system crashes.
-    Follows the 'Shield' philosophy of Sima Yi.
+    Follows the 'Shield' philosophy of Yi Sun-sin.
     """
 
     @staticmethod

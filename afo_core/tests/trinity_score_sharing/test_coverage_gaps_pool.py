@@ -186,8 +186,8 @@ class TestTrinityScorePoolCoverage:
             ),
         )
         entry2 = AgentScoreEntry(
-            agent_id="sima_yi_001",
-            agent_type="sima_yi",
+            agent_id="yi_sun_sin_001",
+            agent_type="yi_sun_sin",
             pillar_scores=PillarScores(
                 truth=0.86, goodness=0.84, beauty=0.86, serenity=0.84, eternity=0.86
             ),
@@ -220,8 +220,8 @@ class TestTrinityScorePoolCoverage:
             ),
         )
         entry2 = AgentScoreEntry(
-            agent_id="sima_yi_001",
-            agent_type="sima_yi",
+            agent_id="yi_sun_sin_001",
+            agent_type="yi_sun_sin",
             pillar_scores=PillarScores(
                 truth=0.0, goodness=0.0, beauty=0.0, serenity=0.0, eternity=0.0
             ),

@@ -47,9 +47,9 @@ class MetacognitiveAuditService:
                 if active_counts["val"] == 0:
                     await queue.put(None)
 
-        tasks.append(asyncio.create_task(_stream_to_queue(StrategistType.ZHUGE_LIANG)))
-        tasks.append(asyncio.create_task(_stream_to_queue(StrategistType.SIMA_YI)))
-        tasks.append(asyncio.create_task(_stream_to_queue(StrategistType.ZHOU_YU)))
+        tasks.append(asyncio.create_task(_stream_to_queue(StrategistType.JANG_YEONG_SIL)))
+        tasks.append(asyncio.create_task(_stream_to_queue(StrategistType.YI_SUN_SIN)))
+        tasks.append(asyncio.create_task(_stream_to_queue(StrategistType.SHIN_SAIMDANG)))
 
         while True:
             item = await queue.get()

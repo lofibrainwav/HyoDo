@@ -109,23 +109,23 @@ DEFAULT_PERSONAS: dict[str, dict[str, Any]] = {
         "color": "cyan",
         "trinity_os_persona_id": "jang_yeong_sil_truth",
     },
-    "sima_yi": {
-        "id": "sima_yi",
+    "yi_sun_sin": {
+        "id": "yi_sun_sin",
         "name": "사마의",
         "role": "Grand Guardian (Goodness)",
         "description": "善 (Goodness) - 안정성과 윤리",
         "icon": "🛡️",
         "color": "amber",
-        "trinity_os_persona_id": "sima_yi_goodness",
+        "trinity_os_persona_id": "yi_sun_sin_goodness",
     },
-    "zhou_yu": {
-        "id": "zhou_yu",
+    "shin_saimdang": {
+        "id": "shin_saimdang",
         "name": "주유",
         "role": "Grand Architect (Beauty)",
         "description": "美 (Beauty) - 우아함과 사용자 경험",
         "icon": "🌉",
         "color": "pink",
-        "trinity_os_persona_id": "zhou_yu_beauty",
+        "trinity_os_persona_id": "shin_saimdang_beauty",
     },
 }
 

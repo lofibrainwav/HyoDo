@@ -10,16 +10,16 @@
 
 | 저장소 | 위치 | Python 파일 | 주요 디렉토리 | Git | 상태 |
 |--------|------|------------|--------------|-----|------|
-| **AFO** | `/Users/brnestrm/AFO_Kingdom/AFO` | 100+ | 15+ | ✅ | 활성 |
-| **TRINITY-OS** | `/Users/brnestrm/AFO_Kingdom/TRINITY-OS` | 확인 필요 | 확인 필요 | 확인 필요 | 확인 필요 |
-| **SixXon** | `/Users/brnestrm/AFO_Kingdom/SixXon` | 확인 필요 | 확인 필요 | 확인 필요 | 확인 필요 |
+| **AFO** | `./AFO` | 100+ | 15+ | ✅ | 활성 |
+| **TRINITY-OS** | `./TRINITY-OS` | 확인 필요 | 확인 필요 | 확인 필요 | 확인 필요 |
+| **SixXon** | `./SixXon` | 확인 필요 | 확인 필요 | 확인 필요 | 확인 필요 |
 
 ---
 
 ## 🎯 AFO 저장소
 
 ### 현재 상태
-- **위치**: `/Users/brnestrm/AFO_Kingdom/AFO`
+- **위치**: `./AFO`
 - **Python 파일**: 100+ 개
 - **주요 디렉토리**:
   - `AFO/` - 메인 패키지
@@ -57,7 +57,7 @@
 ## 🎯 TRINITY-OS 저장소
 
 ### 현재 상태
-- **위치**: `/Users/brnestrm/AFO_Kingdom/TRINITY-OS`
+- **위치**: `./TRINITY-OS`
 - **Python 파일**: 31개
 - **주요 디렉토리**:
   - `trinity_os/` - 메인 패키지
@@ -87,7 +87,7 @@
 ## 🎯 SixXon 저장소
 
 ### 현재 상태
-- **위치**: `/Users/brnestrm/AFO_Kingdom/SixXon`
+- **위치**: `./SixXon`
 - **Python 파일**: 0개 (문서/스크립트 중심)
 - **주요 디렉토리**:
   - `docs/` - 문서 (SIXXON 관련 스펙 및 가이드)

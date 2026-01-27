@@ -9,7 +9,7 @@ import sys
 from datetime import datetime
 from pathlib import Path
 
-LOG_PATH = Path("/Users/brnestrm/AFO_Kingdom/.cursor/debug.log")
+LOG_PATH = Path("./.cursor/debug.log")
 
 
 def log_debug(

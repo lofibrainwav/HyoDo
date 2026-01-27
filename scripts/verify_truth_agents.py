@@ -13,7 +13,7 @@ def audit_agents() -> None:
     # Check for critical agent files existence
     agent_files = [
         "afo_soul_engine/agents/five_pillars_agent.py",
-        "strategists/zhuge_liang.py",
+        "strategists/jang_yeong_sil.py",
         "tigers/guan_yu.py",
         "AFO/julie/ai_agents.py",
     ]

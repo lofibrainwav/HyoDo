@@ -1,7 +1,7 @@
 """
 Encryption Utils - 데이터 암호화 유틸리티
 
-善 (Sima Yi): 보안/리스크 평가
+善 (Yi Sun-sin): 보안/리스크 평가
 - Fernet 암호화 (cryptography 라이브러리)
 - 보안 키 생성 및 관리
 - 데이터 보호

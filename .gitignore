@@ -54,3 +54,17 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Tool Caches
+.ruff_cache/
+.mypy_cache/
+
+# Databases
+*.sqlite3
+chroma_db/
+.pytest_cache/
+
+# Artifacts
+*.backup
+*.egg-info/
+*.db

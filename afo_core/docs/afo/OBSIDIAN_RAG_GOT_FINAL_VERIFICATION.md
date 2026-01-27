@@ -104,7 +104,7 @@ python3 -m pip install --user qdrant-client
 
 1. **문서 로더 사용**
    ```bash
-   cd /Users/brnestrm/AFO_Kingdom/AFO
+   cd ./AFO
    python3 scripts/rag/obsidian_loader.py
    ```
 

@@ -127,7 +127,7 @@ class ContainerDetector:
                 else Path()
             ),
             Path.home() / "AFO" / "afo_soul_engine" / "api_wallet_storage.json",
-            Path("/Users/brnestrm/AFO/afo_soul_engine/api_wallet_storage.json"),
+            Path("${HOME}/AFO/afo_soul_engine/api_wallet_storage.json"),
             Path("/home/user/AFO/afo_soul_engine/api_wallet_storage.json"),
             Path(__file__).parent.parent / "api_wallet_storage.json",  # 상대 경로
         ]

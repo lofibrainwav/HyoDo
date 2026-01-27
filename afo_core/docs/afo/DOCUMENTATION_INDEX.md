@@ -69,7 +69,7 @@
 
 ### 1. 시스템 동기화
 ```bash
-cd /Users/brnestrm/AFO_Kingdom/AFO
+cd ./AFO
 ./scripts/sync_workflow.sh
 ```
 
