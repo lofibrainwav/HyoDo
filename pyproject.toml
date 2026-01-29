@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "3.0.0"
+version = "3.0.1"
 description = "AI Code Quality Automation - Claude Code Extension"
 readme = "README.md"
 license = "MIT"
