@@ -6,7 +6,6 @@ AFO 왕국 스마트 증분 품질 검사 시스템
 
 import hashlib
 import json
-import os
 import subprocess
 import sys
 import time

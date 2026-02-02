@@ -1,43 +1,61 @@
-# AFO 왕국 Cursor IDE 설정 규칙
+# HyoDo AFO Core - Cursor IDE Rules
+
+> **SSOT 참조**: 루트 `CLAUDE.md`, `AGENTS.md` 우선 적용
+
+---
+
+## 5기둥 순차 완성의 철칙 (CRITICAL)
+
+> **"진실 없는 선함은 필요 없고, 그 선한 마음을 제대로 표현하지 못하면 아무짝에도 쓸모없는 것이다"**
+
+```
+眞 (Truth) 100% → 善 (Goodness) 100% → 美 (Beauty) 100% → 孝 → 永
+```
+
+---
 
 ## 프로젝트 컨텍스트
-- Python 3.12+ 프로젝트
-- FastAPI 기반 API 서버
-- PostgreSQL, Redis, Qdrant 사용
-- LangChain, LangGraph 기반 RAG 시스템
+
+- **Python**: 3.12+ (>=3.12, <3.13)
+- **프레임워크**: FastAPI + LangGraph
+- **인프라**: PostgreSQL, Redis, Qdrant
+
+---
 
 ## 코딩 스타일
-- 타입 힌트 필수 (Python 3.10+ 문법 사용)
-- Docstring 작성 (Google 스타일)
-- Ruff 린터/포매터 사용
-- MyPy 타입 체크 준수
+
+- **타입 힌트**: 필수 (Python 3.12+ `X | None` 문법)
+- **Docstring**: Google 스타일
+- **린터**: Ruff (라인 길이 100)
+- **타입 체크**: **Pyright** (NOT MyPy)
+- **Import**: isort 규칙 준수
+
+---
+
+## 품질 게이트
+
+```bash
+make lint                        # Ruff 린트
+make type-check                  # Pyright 타입 체크
+make test                        # 단위 테스트
+make check                       # 4-Gate CI
+```
+
+---
 
 ## 파일 구조
-- `AFO/` - 메인 패키지
-- `api/` - API 라우터
-- `config/` - 설정 파일
-- `services/` - 비즈니스 로직
-- `utils/` - 유틸리티 함수
-- `tests/` - 테스트 파일
 
-## 설정 우선순위
-1. `AFO/config/settings.py` - 중앙 설정
-2. 환경 변수 (`.env` 파일)
-3. 기본값 (settings.py에 정의)
+```
+hyodo/afo_core/
+├── AFO/            # 메인 패키지
+├── api/            # API 라우터
+├── config/         # 설정 파일
+├── services/       # 비즈니스 로직
+├── utils/          # 유틸리티
+└── tests/          # pytest 테스트
+```
 
-## 코드 품질
-- Ruff 자동 수정 가능한 이슈는 자동 수정
-- 타입 힌트는 `X | None` 형식 사용 (Python 3.12+)
-- Import는 isort 규칙 준수
-- 라인 길이: 100자
+---
 
-## 테스트
-- Pytest 사용
-- 테스트 파일: `tests/` 디렉토리
-- 테스트 명명: `test_*.py` 또는 `*_test.py`
-
-## Git
-- 커밋 메시지: 이모지 + 간단한 설명
-- 브랜치: `main`, `develop`
-- `.gitignore` 준수
-
+**SSOT Reference**: 루트 `CLAUDE.md`, `AGENTS.md`
+**眞善美孝永** - 왕국의 영원한 빛

@@ -162,3 +162,163 @@ def test_get_history_unavailable() -> None:
     # Note: INPUT_STORAGE_AVAILABLE was removed during input_server refactoring
     # Skip this test unconditionally since the variable no longer exists
     pytest.skip("INPUT_STORAGE_AVAILABLE removed after input_server refactoring - test obsolete")
+
+
+# ============================================================================
+# 4. JSON API Endpoint Tests (New RESTful endpoints)
+# ============================================================================
+@patch("input_server.api.httpx.AsyncClient")
+def test_api_add_key_success(mock_async_client: MagicMock) -> None:
+    """Test /api/add_key JSON endpoint with successful response."""
+    # Setup mock async client
+    mock_response = MagicMock()
+    mock_response.status_code = 200
+    mock_response.json.return_value = {"status": "success"}
+
+    mock_client_instance = MagicMock()
+
+    async def mock_post(*args, **kwargs):
+        return mock_response
+
+    mock_client_instance.post = mock_post
+    mock_client_instance.__aenter__ = lambda s: mock_client_instance
+    mock_client_instance.__aexit__ = lambda s, *args: None
+
+    # Make the mock return proper async context manager
+    mock_async_client.return_value.__aenter__ = lambda self: mock_client_instance
+    mock_async_client.return_value.__aexit__ = lambda self, *args: None
+
+    response = client.post(
+        "/api/add_key",
+        json={
+            "name": "test_api_key",
+            "provider": "openai",
+            "key": "sk-test-12345",
+            "description": "Test API key",
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["name"] == "test_api_key"
+    assert data["provider"] == "openai"
+
+
+@patch("input_server.api.httpx.AsyncClient")
+def test_api_add_key_wallet_error(mock_async_client: MagicMock) -> None:
+    """Test /api/add_key JSON endpoint with API Wallet error."""
+    # Setup mock async client to return error
+    mock_response = MagicMock()
+    mock_response.status_code = 400
+    mock_response.json.return_value = {"detail": "Key already exists"}
+
+    mock_client_instance = MagicMock()
+
+    async def mock_post(*args, **kwargs):
+        return mock_response
+
+    mock_client_instance.post = mock_post
+    mock_client_instance.__aenter__ = lambda s: mock_client_instance
+    mock_client_instance.__aexit__ = lambda s, *args: None
+
+    mock_async_client.return_value.__aenter__ = lambda self: mock_client_instance
+    mock_async_client.return_value.__aexit__ = lambda self, *args: None
+
+    response = client.post(
+        "/api/add_key",
+        json={
+            "name": "existing_key",
+            "provider": "anthropic",
+            "key": "sk-ant-12345",
+        },
+    )
+
+    assert response.status_code == 400
+    assert "API Wallet error" in response.json()["detail"]
+
+
+def test_api_add_key_validation_error() -> None:
+    """Test /api/add_key JSON endpoint with missing required fields."""
+    # Missing 'key' field
+    response = client.post(
+        "/api/add_key",
+        json={
+            "name": "incomplete_key",
+            "provider": "openai",
+        },
+    )
+
+    assert response.status_code == 422  # Validation error
+
+
+@patch("input_server.api.is_api_wallet_available")
+@patch("input_server.api.import_single_key")
+def test_api_bulk_import_success(
+    mock_import_key: MagicMock, mock_wallet_available: MagicMock
+) -> None:
+    """Test /api/bulk_import JSON endpoint with successful imports."""
+    # Setup mocks
+    mock_wallet_available.return_value = True
+    mock_import_key.return_value = "success"
+
+    response = client.post(
+        "/api/bulk_import",
+        json={
+            "bulk_text": "OPENAI_API_KEY=sk-test-123\nANTHROPIC_API_KEY=sk-ant-456"
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "success"
+    assert data["counts"]["success"] == 2
+    assert data["counts"]["failed"] == 0
+
+
+@patch("input_server.api.is_api_wallet_available")
+@patch("input_server.api.import_single_key")
+def test_api_bulk_import_partial(
+    mock_import_key: MagicMock, mock_wallet_available: MagicMock
+) -> None:
+    """Test /api/bulk_import JSON endpoint with partial success."""
+    mock_wallet_available.return_value = True
+    # First succeeds, second fails
+    mock_import_key.side_effect = ["success", "Connection error"]
+
+    response = client.post(
+        "/api/bulk_import",
+        json={
+            "bulk_text": "KEY_ONE=value1\nKEY_TWO=value2"
+        },
+    )
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["status"] == "partial"
+    assert data["counts"]["success"] == 1
+    assert data["counts"]["failed"] == 1
+    assert len(data["failed_keys"]) == 1
+
+
+def test_api_bulk_import_empty_text() -> None:
+    """Test /api/bulk_import JSON endpoint with empty/invalid text."""
+    response = client.post(
+        "/api/bulk_import",
+        json={
+            "bulk_text": "   \n# Only comments\n   "
+        },
+    )
+
+    assert response.status_code == 400
+    assert "No valid environment variables" in response.json()["detail"]
+
+
+def test_api_bulk_import_validation_error() -> None:
+    """Test /api/bulk_import JSON endpoint with missing bulk_text."""
+    response = client.post(
+        "/api/bulk_import",
+        json={},
+    )
+
+    assert response.status_code == 422  # Validation error

@@ -139,11 +139,11 @@ export function SamahwiGeneratedWidget() {{
             "永": 95,  # Eternity
         }
         weighted_score = (
-            default_scores["眞"] * 0.35 +
-            default_scores["善"] * 0.35 +
-            default_scores["美"] * 0.20 +
-            default_scores["孝"] * 0.08 +
-            default_scores["永"] * 0.02
+            default_scores["眞"] * 0.35
+            + default_scores["善"] * 0.35
+            + default_scores["美"] * 0.20
+            + default_scores["孝"] * 0.08
+            + default_scores["永"] * 0.02
         )
         return f"Trinity Score: {weighted_score:.1f} (Standalone Mode)"
 

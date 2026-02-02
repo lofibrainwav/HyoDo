@@ -208,13 +208,23 @@ def identify_potential_issues() -> None:
     print("\n1. 라우터 Prefix 일관성 확인")
     router_files = list((project_root / "packages" / "afo-core" / "api" / "routers").glob("*.py"))
     prefix_issues = []
-    
+
     # Known routers that are mounted centrally (false positives)
     CENTRAL_MOUNTED_ROUTERS = {
-        "intake", "matrix", "finance_root", "skills", "thoughts", "got", 
-        "rag_query", "modal_data", "n8n", "debugging", "trinity", "multi_agent"
+        "intake",
+        "matrix",
+        "finance_root",
+        "skills",
+        "thoughts",
+        "got",
+        "rag_query",
+        "modal_data",
+        "n8n",
+        "debugging",
+        "trinity",
+        "multi_agent",
     }
-    
+
     for router_file in router_files:
         try:
             content = router_file.read_text(encoding="utf-8")
@@ -229,7 +239,10 @@ def identify_potential_issues() -> None:
                 ):
                     # prefix가 없는 경우
                     router_name = router_file.stem
-                    if router_name not in {"__init__", "health", "root"} and router_name not in CENTRAL_MOUNTED_ROUTERS:
+                    if (
+                        router_name not in {"__init__", "health", "root"}
+                        and router_name not in CENTRAL_MOUNTED_ROUTERS
+                    ):
                         prefix_issues.append(router_name)
         except Exception:
             pass

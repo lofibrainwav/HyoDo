@@ -5,16 +5,15 @@ Generates an RSA Key Pair and a Self-Signed Certificate with STRICT IRS extensio
 Outputs the JWK in the specific format required by the IRS API.
 """
 
-import sys
-import json
 import base64
 import hashlib
+import json
 from datetime import datetime, timedelta, timezone
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import hashes
-from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID
+
 from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
+from cryptography.x509.oid import ExtendedKeyUsageOID, NameOID
 
 
 def base64url_encode(data) -> None:

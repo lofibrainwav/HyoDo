@@ -1,6 +1,5 @@
 import pathlib
 import sys
-from typing import Type
 
 # packages/afo-core를 경로에 추가
 core_path = pathlib.Path("packages/afo-core").resolve()

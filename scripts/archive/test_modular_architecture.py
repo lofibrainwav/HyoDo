@@ -11,7 +11,7 @@ def test_modules() -> None:
 
     try:
         # Import Strategists
-        from strategists import yi_sun_sin, shin_saimdang, jang_yeong_sil
+        from strategists import jang_yeong_sil, shin_saimdang, yi_sun_sin
 
         print("✅ Imported Strategists (Jang Yeong-sil, Yi Sun-sin, Shin Saimdang)")
 

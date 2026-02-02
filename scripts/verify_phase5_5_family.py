@@ -11,7 +11,6 @@ import asyncio
 import sys
 
 from application.family.service import family_service
-from domain.family.models import QuestStatus
 from infrastructure.external.hero_system import hero_adapter
 
 

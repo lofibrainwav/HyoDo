@@ -68,9 +68,7 @@ class TrinityManager:
             },
         }
 
-    def apply_trigger(
-        self, trigger_name: str, agent_name: str | None = None
-    ) -> TrinityMetrics:
+    def apply_trigger(self, trigger_name: str, agent_name: str | None = None) -> TrinityMetrics:
         """Apply a predefined trigger event to modify scores."""
         delta_map = self.TRIGGERS.get(trigger_name, {})
 
@@ -111,8 +109,7 @@ class TrinityManager:
             truth=self.base_inputs.truth + (deltas["truth"] / 100.0),
             goodness=self.base_inputs.goodness + (deltas["goodness"] / 100.0),
             beauty=self.base_inputs.beauty + (deltas["beauty"] / 100.0),
-            filial_serenity=self.base_inputs.filial_serenity
-            + (deltas["filial_serenity"] / 100.0),
+            filial_serenity=self.base_inputs.filial_serenity + (deltas["filial_serenity"] / 100.0),
         )
         new_eternity = self.eternity + (deltas["eternity"] / 100.0)
         return TrinityMetrics.from_inputs(new_inputs, eternity=new_eternity)
@@ -122,8 +119,7 @@ class TrinityManager:
         return {
             "global": self.get_current_metrics().to_dict(),
             "agents": {
-                name: self.get_agent_metrics(name).to_dict()
-                for name in self.agent_deltas.keys()
+                name: self.get_agent_metrics(name).to_dict() for name in self.agent_deltas.keys()
             },
         }
 

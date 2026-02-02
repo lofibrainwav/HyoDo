@@ -1,6 +1,6 @@
-import requests
 import sys
-import json
+
+import requests
 
 BASE_URL = "https://notebook-bridge.vercel.app/api"
 API_KEY = "julie-cpa-2025"

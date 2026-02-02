@@ -39,7 +39,7 @@ def extract_yaml_weights(text: str) -> dict:
             # Match strategist block: 'pillar: "name"' then 'weight: X'
             pattern = rf"pillar:\s*\"{k}\"\s*\n\s*weight:\s*([0-9.]+)"
             m = re.search(pattern, text)
-            
+
         if not m:
             raise ValueError(f"missing weight for pillar: {k}")
         out[k] = float(m.group(1))
@@ -68,13 +68,13 @@ def extract_code_weights(text: str) -> dict:
         pattern = rf'["\']{k}["\']\s*:\s*(0\.[0-9]+)'
         m = re.search(pattern, text)
         if not m:
-            pattern = rf'{k}_weight\s*[:=]\s*(0\.[0-9]+)'
+            pattern = rf"{k}_weight\s*[:=]\s*(0\.[0-9]+)"
             m = re.search(pattern, text)
         if not m:
-             # Also allow explicit TRINITY_WEIGHTS = { "truth": 0.35 } structure
-             pattern = rf'["\']{k}["\']\s*:\s*([0|1]\.[0-9]+)'
-             m = re.search(pattern, text)
-             
+            # Also allow explicit TRINITY_WEIGHTS = { "truth": 0.35 } structure
+            pattern = rf'["\']{k}["\']\s*:\s*([0|1]\.[0-9]+)'
+            m = re.search(pattern, text)
+
         if m:
             out[k] = float(m.group(1))
     return out

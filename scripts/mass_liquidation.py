@@ -12,7 +12,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Dict, List
 
 
 def run_command(cmd: List[str]) -> str:

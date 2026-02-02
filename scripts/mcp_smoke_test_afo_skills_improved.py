@@ -82,7 +82,9 @@ def run_mcp_server_test(timeout_seconds: int = 30) -> bool:
             server_name = server_info.get("name", "Unknown")
             server_version = server_info.get("version", "Unknown")
             print(f"✅ Initialize response: {server_name} v{server_version}")
-            print(f"🧩 Raw initialize result: {json.dumps(init_response.get('result', {}), indent=2)}")
+            print(
+                f"🧩 Raw initialize result: {json.dumps(init_response.get('result', {}), indent=2)}"
+            )
         else:
             print("❌ No initialize response received")
             stderr_output = server_proc.stderr.read()

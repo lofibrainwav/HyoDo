@@ -12,7 +12,6 @@ from rich.console import Console
 from rich.live import Live
 from rich.panel import Panel
 from rich.table import Table
-
 from system_health_check import check_system_health
 
 console = Console()

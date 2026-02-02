@@ -1,5 +1,6 @@
 import asyncio
 import logging
+
 from AFO.utils.resilience_decorator import shield
 
 # Setup logging to see the shield output

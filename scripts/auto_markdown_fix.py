@@ -6,7 +6,6 @@ Truth (眞): Automates MD032 and Table Alignment to ensure pristine documentatio
 
 import re
 import sys
-import unicodedata
 
 
 def fix_md032_list_spacing(lines) -> None:

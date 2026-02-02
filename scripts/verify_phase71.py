@@ -42,7 +42,6 @@ async def verify_redis_circuit_breaker():
 
 async def verify_irs_client_retry():
     print("\n[2] Verifying IRS Client Retry...")
-    from AFO.services.irs_client import irs_client
 
     # Mock connect to fail twice then succeed
     MagicMock(side_effect=[ValueError("Fail 1"), ValueError("Fail 2"), True])
@@ -63,7 +62,7 @@ async def verify_irs_client_retry():
 
 async def verify_resilience_utils():
     print("\n[3] Verifying Resilience Utils directly...")
-    from AFO.utils.resilience import CircuitBreaker, retry_with_backoff
+    from AFO.utils.resilience import retry_with_backoff
 
     # Test Retry
     call_count = 0

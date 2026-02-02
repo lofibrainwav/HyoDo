@@ -16,11 +16,11 @@ __license__ = "MIT"
 
 # Trinity Score weights
 TRINITY_WEIGHTS = {
-    "truth": 0.35,      # 眞
-    "goodness": 0.35,   # 善
-    "beauty": 0.20,     # 美
-    "serenity": 0.08,   # 孝
-    "eternity": 0.02,   # 永
+    "truth": 0.35,  # 眞
+    "goodness": 0.35,  # 善
+    "beauty": 0.20,  # 美
+    "serenity": 0.08,  # 孝
+    "eternity": 0.02,  # 永
 }
 
 

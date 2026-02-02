@@ -8,9 +8,7 @@ Critical 로그 주입 시 Truth Score가 자동으로 하락하는지 확인합
 """
 
 import asyncio
-import json
 import logging
-import tempfile
 import time
 from pathlib import Path
 

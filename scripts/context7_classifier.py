@@ -14,7 +14,7 @@ Context7 카테고리:
 import re
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 
 class ErrorCategory(Enum):

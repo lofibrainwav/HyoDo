@@ -42,14 +42,14 @@ MYGPT_ACTIONS_URL = os.getenv("MYGPT_ACTIONS_URL", "https://api.jangjungwha.com/
 router = APIRouter(prefix="/api/mygpt", tags=["MyGPT"])
 
 
-# Phase 79 - TODO-006: MyGPT API Client
+# Phase 79 - COMPLETED: MyGPT API Client
 async def _call_mygpt_api(
     action: str,
     payload: dict[str, Any],
     api_key: str | None = None,
 ) -> dict[str, Any]:
     """
-    MyGPT Actions API 호출 클라이언트 (Phase 79 - TODO-006)
+    MyGPT Actions API 호출 클라이언트 (Phase 79 - COMPLETED)
 
     Args:
         action: API action (e.g., "receive_context", "sync_state")

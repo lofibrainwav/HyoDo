@@ -5,8 +5,6 @@ Verifies that the VectorMemoryService works and that the TaxDocumentClassifier c
 
 import asyncio
 import os
-import shutil
-from pathlib import Path
 
 from AFO.services.vector_memory_service import vector_memory_service
 

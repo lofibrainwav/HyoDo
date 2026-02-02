@@ -14,9 +14,9 @@ Backwards Compatibility (구 삼국지 인물 이름):
 """
 
 from .base_strategist import BaseStrategist
-from .jang_yeong_sil_agent import JangYeongSilAgent, JangYeongSilAgent
-from .shin_saimdang_agent import ShinSaimdangAgent, ShinSaimdangAgent
-from .yi_sun_sin_agent import YiSunSinAgent, YiSunSinAgent
+from .jang_yeong_sil_agent import JangYeongSilAgent
+from .shin_saimdang_agent import ShinSaimdangAgent
+from .yi_sun_sin_agent import YiSunSinAgent
 
 __all__ = [
     "BaseStrategist",

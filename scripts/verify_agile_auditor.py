@@ -1,9 +1,6 @@
 import asyncio
-import json
 import logging
 import sys
-from datetime import datetime
-from pathlib import Path
 
 import aiohttp
 

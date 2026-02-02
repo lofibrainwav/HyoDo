@@ -5,9 +5,8 @@ import sys
 # Add package root to path
 sys.path.append(os.path.join(pathlib.Path.cwd(), "packages/afo-core"))
 
-from config.settings import settings
-
 from AFO.security.vault_manager import vault
+from config.settings import settings
 
 print("🛡️ Vault Integration Verification 🛡️")
 print("-" * 40)

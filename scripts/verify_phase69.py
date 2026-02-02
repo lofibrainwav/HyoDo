@@ -6,9 +6,8 @@ import sys
 sys.path.append(os.getcwd())
 sys.path.append(os.path.join(os.getcwd(), "packages/afo-core"))
 
-from api.routers.trinity import get_trinity_status
-
 from AFO.domain.metrics.trinity_manager import trinity_manager
+from api.routers.trinity import get_trinity_status
 
 
 async def main():
@@ -27,7 +26,9 @@ async def main():
     trinity_manager.apply_trigger("ELEGANT_RESPONSE", agent_name="jang_yeong_sil")
 
     metrics = trinity_manager.get_agent_metrics("jang_yeong_sil")
-    print(f"   Jang Yeong-sil Beauty Delta: {trinity_manager.agent_deltas['jang_yeong_sil']['beauty']}")
+    print(
+        f"   Jang Yeong-sil Beauty Delta: {trinity_manager.agent_deltas['jang_yeong_sil']['beauty']}"
+    )
     print(f"   Jang Yeong-sil Score: {metrics.trinity_score}")
 
     if trinity_manager.agent_deltas["jang_yeong_sil"]["beauty"] <= 0:

@@ -7,7 +7,6 @@ import asyncio
 import sys
 
 from application.agents.orchestrator import agent_orchestrator
-from domain.ai.models import AIRequest
 
 
 async def verify_streaming_analysis():

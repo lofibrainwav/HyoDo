@@ -5,15 +5,15 @@ Converts a purchased Certificate (PFX/P12 or PEM) into an IRS-compliant JWK.
 Usage: python3 convert_cert_to_jwk.py <cert_path> <password_if_pfx>
 """
 
-import sys
-import json
 import base64
-import hashlib
 import getpass
+import hashlib
+import json
+import sys
+
+from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import hashes
-from cryptography import x509
 from cryptography.hazmat.primitives.serialization import pkcs12
 
 

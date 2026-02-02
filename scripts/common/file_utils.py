@@ -146,5 +146,3 @@ def find_files(
         pattern = f"**/{pattern}"
 
     return sorted(root.glob(pattern))
-
-

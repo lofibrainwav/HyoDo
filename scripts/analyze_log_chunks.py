@@ -6,9 +6,9 @@ log_chunks 분석기 - 캐시를 DNA로 변환
 
 import json
 import re
-from pathlib import Path
 from collections import defaultdict
 from datetime import datetime
+from pathlib import Path
 
 LOG_CHUNKS_DIR = Path("log_chunks")
 OUTPUT_DIR = Path("data/log_embeddings")
@@ -124,15 +124,15 @@ def analyze_chunks():
         with open(OUTPUT_DIR / f"embeddings_{i // chunk_size:04d}.json", "w") as f:
             json.dump(chunk_embeddings, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ 분석 완료!")
+    print("✅ 분석 완료!")
     print(f"   - 총 라인: {stats['total_lines']:,}")
     print(f"   - 총 청크: {stats['total_chunks']:,}")
     print(f"   - 임베딩 데이터: {len(embeddings):,}개")
-    print(f"\n📊 패턴 분포:")
+    print("\n📊 패턴 분포:")
     for pattern, count in sorted(stats["patterns"].items(), key=lambda x: -x[1])[:10]:
         print(f"   - {pattern}: {count:,}")
 
-    print(f"\n🔥 자주 실패한 모듈 (Top 10):")
+    print("\n🔥 자주 실패한 모듈 (Top 10):")
     for module, count in list(stats["modules_failed"].items())[:10]:
         print(f"   - {module}: {count}")
 

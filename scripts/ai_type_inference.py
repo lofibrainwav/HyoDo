@@ -9,7 +9,7 @@ Phase 5: 혁신적 타입 시스템 구현
 import ast
 import os
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 from dotenv import load_dotenv
 

@@ -5,10 +5,10 @@ Generates a dummy tax PDF and runs the TaxDocumentClassifier on it.
 
 import asyncio
 import os
-from reportlab.pdfgen import canvas
 
 # Bypassing the heavy TaxDocumentClassifier for unit testing the service
 from AFO.services.pdf_parsing_service import pdf_parsing_service
+from reportlab.pdfgen import canvas
 
 TEST_PDF_PATH = "test_tax_form.pdf"
 
@@ -35,7 +35,7 @@ async def run_verification():
 
         print("\n--- Result ---")
         if result.get("success"):
-            print(f"✅ Success!")
+            print("✅ Success!")
             print(f"Text Length: {len(result.get('text'))} chars")
             print(f"Content Preview: {result.get('text')[:100]}...")
             print(f"Is Scanned? {result.get('is_scanned')}")

@@ -17,10 +17,10 @@ import logging
 import os
 import re
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Dict, List, Optional
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 

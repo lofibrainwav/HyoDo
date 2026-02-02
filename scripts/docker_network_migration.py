@@ -10,8 +10,7 @@ to a secure, user-defined 'afo-network'.
 import json
 import subprocess
 import sys
-import time
-from typing import Dict, List
+from typing import List
 
 NETWORK_NAME = "afo-network"
 CONTAINERS = {

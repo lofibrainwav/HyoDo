@@ -13,9 +13,9 @@ Sequential Thinking 단계:
 
 import json
 import os
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List
 
 
 @dataclass

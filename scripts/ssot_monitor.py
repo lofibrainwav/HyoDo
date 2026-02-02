@@ -13,7 +13,7 @@ import json
 import logging
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -259,6 +259,7 @@ class SSOTMonitor:
             report_lines.append(f"      {info['description']}")
 
         return "\n".join(report_lines)
+
 
 def main() -> None:
     """CLI 인터페이스"""

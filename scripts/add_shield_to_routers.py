@@ -25,8 +25,6 @@ Priority Categories:
 from __future__ import annotations
 
 import argparse
-import re
-import sys
 from pathlib import Path
 from typing import Dict, List, Tuple
 
@@ -139,34 +137,34 @@ class ShieldApplicator:
 
     def find_route_decorators(self, content: str) -> List[Tuple[int, str]]:
         """Find all @router.* decorators in the file."""
-        pattern = r'(@router\.[^(]+\([^)]*\))'
+        pattern = r"(@router\.[^(]+\([^)]*\))"
         matches = []
         lines = content.split("\n")
-        
+
         for i, line in enumerate(lines, 1):
             if "@router" in line:
                 matches.append((i, line.strip()))
-        
+
         return matches
 
     def add_shield_import_if_missing(self, content: str) -> str:
         """Add shield import if not present."""
         if self.has_shield_import(content):
             return content
-        
+
         # Find the last import statement
         lines = content.split("\n")
         last_import_idx = -1
-        
+
         for i, line in enumerate(lines):
             if line.startswith("from ") or line.startswith("import "):
                 last_import_idx = i
-        
+
         if last_import_idx >= 0:
             lines.insert(last_import_idx + 1, "")
             lines.insert(last_import_idx + 2, self.shield_import)
             return "\n".join(lines)
-        
+
         # No imports found, add at the top
         return self.shield_import + "\n\n" + content
 
@@ -180,35 +178,35 @@ class ShieldApplicator:
         # Check if shield is already present
         if "@shield" in content.split(route_decorator)[0][-100:]:
             return content, False
-        
+
         # Add shield decorator before the route decorator
-        shield_decorator = "@shield(pillar=\"" + pillar + "\")\n"
+        shield_decorator = '@shield(pillar="' + pillar + '")\n'
         return content.replace(route_decorator, shield_decorator + route_decorator), True
 
     def process_router_file(self, router_file: Path) -> bool:
         """Process a single router file."""
         content = router_file.read_text(encoding="utf-8")
         original_content = content
-        
+
         # Determine pillar based on category
         pillar = "善"  # Default
         for category, routers in PRIORITY_CATEGORIES.items():
             if router_file.name in routers:
                 pillar = CATEGORY_TO_PILLAR[category]
                 break
-        
+
         # Add shield import if missing
         content = self.add_shield_import_if_missing(content)
-        
+
         # Find and shield all route decorators
         route_decorators = self.find_route_decorators(content)
         changes = 0
-        
+
         for line_num, decorator in route_decorators:
             content, changed = self.apply_shield_to_endpoint(content, decorator, pillar)
             if changed:
                 changes += 1
-        
+
         if changes > 0 and content != original_content:
             if self.dry_run:
                 print(f"[DRY_RUN] {router_file.name}: {changes} endpoints would be shielded")
@@ -218,37 +216,37 @@ class ShieldApplicator:
                 # Backup original file
                 backup_file = router_file.with_suffix(f"{router_file.suffix}.backup")
                 router_file.rename(backup_file)
-                
+
                 # Write modified content
                 router_file.write_text(content, encoding="utf-8")
                 print(f"[APPLIED] {router_file.name}: {changes} endpoints shielded")
                 self.changes_made[router_file.name] = changes
                 return True
-        
+
         return False
 
     def process_all_routers(self) -> Dict[str, int]:
         """Process all routers that don't have shield."""
         routers = self.get_routers_without_shield()
-        
+
         print(f"\n{'=' * 60}")
         print(f"Processing {len(routers)} router files...")
         print(f"Mode: {'DRY_RUN (no changes)' if self.dry_run else 'APPLY (changes will be made)'}")
         print(f"{'=' * 60}\n")
-        
+
         for router_file in routers:
             self.process_router_file(router_file)
-        
+
         return self.changes_made
 
     def list_routers_by_priority(self) -> None:
         """List routers organized by priority category."""
         routers = self.get_routers_without_shield()
-        
+
         print(f"\n{'=' * 60}")
         print(f"Routers without shield ({len(routers)} files):")
         print(f"{'=' * 60}\n")
-        
+
         for category, router_files in PRIORITY_CATEGORIES.items():
             category_routers = [r for r in routers if r.name in router_files]
             if category_routers:
@@ -260,9 +258,7 @@ class ShieldApplicator:
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Add shield decorator to AFO Kingdom Router files"
-    )
+    parser = argparse.ArgumentParser(description="Add shield decorator to AFO Kingdom Router files")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -281,25 +277,25 @@ def main():
         default=False,
         help="List routers without shield, organized by priority",
     )
-    
+
     args = parser.parse_args()
-    
+
     if args.list:
         applicator = ShieldApplicator(dry_run=True)
         applicator.list_routers_by_priority()
         return
-    
+
     if not args.apply:
         args.dry_run = True
-    
+
     applicator = ShieldApplicator(dry_run=args.dry_run)
     changes = applicator.process_all_routers()
-    
+
     if changes:
         print(f"\n{'=' * 60}")
         print(f"Summary: {sum(changes.values())} endpoints across {len(changes)} files")
         print(f"{'=' * 60}")
-        
+
         if args.dry_run:
             print("\nRun with --apply to apply these changes.")
     else:

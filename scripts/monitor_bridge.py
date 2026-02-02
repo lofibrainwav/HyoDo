@@ -11,10 +11,11 @@ Calculates Real-Time Trinity Score + 5 Pillars (Jin-Seon-Mi-Hyo-Yeong):
 Pushes the calculated metrics to the Vercel Edge.
 """
 
-import sys
 import os
-import time
 import statistics
+import sys
+import time
+
 import requests
 
 # Add package root to path
@@ -129,7 +130,7 @@ def run_sync() -> None:
     pillars = result["pillars"]
     meta = result["meta"]
 
-    print(f"📊 Live Metrics:")
+    print("📊 Live Metrics:")
     print(f"  - Truth (Conn):  {pillars['truth']}")
     print(f"  - Goodness:      {pillars['goodness']}")
     print(f"  - Beauty (Spd):  {pillars['beauty']} (Avg {meta['latency_ms']:.1f}ms)")

@@ -4,7 +4,18 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from .api import add_api_key, api_status, bulk_import, get_history, health_check, home_page
+from .api import (
+    AddKeyResponse,
+    BulkImportResponse,
+    add_api_key,
+    api_add_key,
+    api_bulk_import,
+    api_status,
+    bulk_import,
+    get_history,
+    health_check,
+    home_page,
+)
 
 
 def create_app() -> FastAPI:
@@ -35,6 +46,10 @@ def create_app() -> FastAPI:
     app.get("/api/status")(api_status)
     app.post("/bulk_import")(bulk_import)
     app.get("/api/history")(get_history)
+
+    # JSON-based API endpoints (RESTful)
+    app.post("/api/add_key", response_model=AddKeyResponse)(api_add_key)
+    app.post("/api/bulk_import", response_model=BulkImportResponse)(api_bulk_import)
 
     return app
 

@@ -17,9 +17,7 @@ try:
     print(f"📊 Current Trinity Score (Default): {metrics.trinity_score}")
 
     # Check if TruthSensor service module exists (file check only, not run)
-    truth_sensor_path = (
-        current_dir / "afo_core" / "AFO" / "services" / "truth_sensor.py"
-    )
+    truth_sensor_path = current_dir / "afo_core" / "AFO" / "services" / "truth_sensor.py"
     if truth_sensor_path.exists():
         print("✅ TruthSensor module found.")
     else:

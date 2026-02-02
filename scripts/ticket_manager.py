@@ -14,7 +14,6 @@ Usage:
 import argparse
 import datetime
 import re
-import sys
 from pathlib import Path
 from typing import List, Optional, Tuple
 

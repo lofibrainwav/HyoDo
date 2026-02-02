@@ -1,7 +1,6 @@
 import asyncio
 import os
 import sys
-import json
 
 # Setup paths
 package_root = "./packages/afo-core"

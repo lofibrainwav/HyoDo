@@ -35,10 +35,10 @@ from AFO.domain.persona import (
     creator,
     current_persona,
     family_head,
-    learner,
-    yi_sun_sin,
-    shin_saimdang,
     jang_yeong_sil,
+    learner,
+    shin_saimdang,
+    yi_sun_sin,
 )
 
 logger = logging.getLogger(__name__)

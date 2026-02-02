@@ -144,9 +144,9 @@ def parse_evolution_log() -> dict[str, Any]:
     )
 
     # 출력
-    print(f"✅ 진화 로그 파싱 완료!")
+    print("✅ 진화 로그 파싱 완료!")
     print(f"   - 총 Phase: {len(unique_phases)}개")
-    print(f"\n📊 상태 분포:")
+    print("\n📊 상태 분포:")
     for status, count in summary["status_distribution"].items():
         print(f"   - {status}: {count}")
     print(f"\n📅 기간: {summary['date_range']['earliest']} ~ {summary['date_range']['latest']}")

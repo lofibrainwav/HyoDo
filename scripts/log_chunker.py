@@ -12,11 +12,10 @@ Context7 기반 분류:
 """
 
 import json
-import os
 import re
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List
 
 
 @dataclass

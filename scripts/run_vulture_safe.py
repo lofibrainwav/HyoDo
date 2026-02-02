@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import subprocess
-import os
 
 dirs = [
     "packages/afo-core/AFO/agents",
@@ -16,20 +15,23 @@ dirs = [
     "packages/afo-core/AFO/schemas",
     "packages/afo-core/AFO/services",
     "packages/afo-core/AFO/utils",
-    "packages/afo-core/AFO"
+    "packages/afo-core/AFO",
 ]
 
 output_file = "vulture_report.txt"
 with open(output_file, "w") as f:
-    f.write("") # Clear file
+    f.write("")  # Clear file
 
 for d in dirs:
     print(f"Running vulture on {d}...")
     cmd = ["./.venv/bin/python", "-m", "vulture", d]
     if d == "packages/afo-core/AFO":
         # For the root, exclude subdirectories already scanned
-        cmd += ["--exclude", "agents,api,audit,core,domain,health,irs,julie,memory_system,multimodal,schemas,services,utils"]
-    
+        cmd += [
+            "--exclude",
+            "agents,api,audit,core,domain,health,irs,julie,memory_system,multimodal,schemas,services,utils",
+        ]
+
     result = subprocess.run(cmd, capture_output=True, text=True, check=False)
     with open(output_file, "a") as f:
         f.write(result.stdout)

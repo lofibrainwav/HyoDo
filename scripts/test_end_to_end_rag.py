@@ -6,12 +6,11 @@ Tests the full lifecycle: PDF Creation -> Parsing -> Memory -> Retrieval -> Gene
 import asyncio
 import os
 
-from reportlab.pdfgen import canvas
-
 from AFO.services.langchain_openai_service import initialize_ai_service
 from AFO.services.pdf_parsing_service import pdf_parsing_service
 from AFO.services.rag_service import rag_service
 from AFO.services.vector_memory_service import vector_memory_service
+from reportlab.pdfgen import canvas
 
 PDF_PATH = "protocol_99.pdf"
 

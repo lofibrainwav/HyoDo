@@ -6,8 +6,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 import httpx
-from fastapi import Form, Request
+from fastapi import Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
+from pydantic import BaseModel, Field
 
 # Graceful imports for optional modules
 try:
@@ -33,6 +34,45 @@ except ImportError:
 
 from .templates import get_home_template
 from .utils import import_single_key, is_api_wallet_available, parse_env_text
+
+
+# ============================================================================
+# Pydantic Request/Response Models
+# ============================================================================
+class AddKeyRequest(BaseModel):
+    """Request model for adding a single API key via JSON."""
+
+    name: str = Field(..., description="API key name (identifier)")
+    provider: str = Field(..., description="Service provider (e.g., openai, anthropic)")
+    key: str = Field(..., description="The API key value")
+    description: str | None = Field(None, description="Optional description")
+
+
+class AddKeyResponse(BaseModel):
+    """Response model for add_key operations."""
+
+    status: str = Field(..., description="Operation status (success/error)")
+    message: str = Field(..., description="Human-readable message")
+    name: str | None = Field(None, description="Name of the added key")
+    provider: str | None = Field(None, description="Provider of the added key")
+
+
+class BulkImportRequest(BaseModel):
+    """Request model for bulk importing environment variables via JSON."""
+
+    bulk_text: str = Field(..., description="Environment variables text (KEY=VALUE format)")
+
+
+class BulkImportResponse(BaseModel):
+    """Response model for bulk_import operations."""
+
+    status: str = Field(..., description="Operation status (success/partial/error)")
+    message: str = Field(..., description="Human-readable summary message")
+    counts: dict[str, int] = Field(
+        default_factory=dict, description="Counts: success, skipped, failed"
+    )
+    failed_keys: list[str] = Field(default_factory=list, description="List of failed key names")
+
 
 # Input Storage 모듈 import
 try:
@@ -264,3 +304,174 @@ async def get_history(category: str | None = None, limit: int = 100) -> Any:
         return {"status": "success", "count": len(history), "history": history}
     except Exception as e:
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+# ============================================================================
+# JSON-based API Endpoints (RESTful)
+# ============================================================================
+async def api_add_key(request: AddKeyRequest) -> AddKeyResponse:
+    """
+    Add a single API key via JSON request.
+
+    This endpoint provides a RESTful JSON interface for adding API keys,
+    suitable for programmatic access and API clients.
+
+    Args:
+        request: AddKeyRequest with name, provider, key, and optional description
+
+    Returns:
+        AddKeyResponse with operation status and details
+
+    Raises:
+        HTTPException: On connection errors or API Wallet failures
+    """
+    try:
+        # 1. Send to API Wallet (encrypted storage)
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(
+                f"{API_WALLET_URL}/api/wallet/add",
+                json={
+                    "name": request.name,
+                    "provider": request.provider,
+                    "key": request.key,
+                    "description": request.description or "",
+                    "metadata": {
+                        "source": "input_server_api",
+                        "timestamp": datetime.now(UTC).isoformat(),
+                    },
+                },
+            )
+
+            if response.status_code != 200:
+                error_detail = response.json().get("detail", "Unknown error")
+                raise HTTPException(
+                    status_code=response.status_code,
+                    detail=f"API Wallet error: {error_detail}",
+                )
+
+        # 2. Save metadata to PostgreSQL (key value excluded for security)
+        if INPUT_STORAGE_AVAILABLE:
+            key_hash = hashlib.sha256(request.key.encode()).hexdigest()[:16]
+            save_input_to_db(
+                category="api_key",
+                key=f"api_key_{request.name}_{key_hash}",
+                value=None,  # Never store the actual key
+                metadata={
+                    "name": request.name,
+                    "provider": request.provider,
+                    "description": request.description,
+                    "key_hash": key_hash,
+                    "source": "input_server_api",
+                },
+                confidence=1.0,
+                source="input_server_api",
+            )
+
+        return AddKeyResponse(
+            status="success",
+            message=f"API key '{request.name}' successfully added",
+            name=request.name,
+            provider=request.provider,
+        )
+
+    except httpx.ConnectError as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Cannot connect to API Wallet server at {API_WALLET_URL}",
+        ) from e
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to add API key: {e!s}",
+        ) from e
+
+
+async def api_bulk_import(request: BulkImportRequest) -> BulkImportResponse:
+    """
+    Bulk import environment variables via JSON request.
+
+    This endpoint provides a RESTful JSON interface for bulk importing
+    multiple API keys from environment variable format text.
+
+    Supported formats:
+    - KEY=VALUE
+    - KEY: VALUE
+    - "KEY": "VALUE"
+    - KEY "VALUE"
+
+    Args:
+        request: BulkImportRequest with bulk_text containing env var definitions
+
+    Returns:
+        BulkImportResponse with counts and details of the import operation
+
+    Raises:
+        HTTPException: On parsing errors or when no valid entries found
+    """
+    try:
+        # Parse environment variables from text
+        parsed = parse_env_text(request.bulk_text)
+        if not parsed:
+            raise HTTPException(
+                status_code=400,
+                detail="No valid environment variables found in the input text",
+            )
+
+        # Prepare wallet instance
+        wallet = None
+        try:
+            if APIWallet is not None:
+                wallet = APIWallet()
+        except Exception:
+            pass
+
+        # Check if API server is available
+        server_url = API_WALLET_URL if await is_api_wallet_available(API_WALLET_URL) else None
+
+        # Process each key
+        counts: dict[str, int] = {"success": 0, "skipped": 0, "failed": 0}
+        failed_keys: list[str] = []
+
+        for name, value, service in parsed:
+            result = await import_single_key(name, value, service, wallet, server_url)
+            if result == "success":
+                counts["success"] += 1
+            elif result == "skipped":
+                counts["skipped"] += 1
+            else:
+                counts["failed"] += 1
+                failed_keys.append(f"{name}({result})")
+
+        # Determine overall status
+        if counts["failed"] == len(parsed):
+            status = "error"
+        elif counts["failed"] > 0:
+            status = "partial"
+        else:
+            status = "success"
+
+        # Build summary message
+        summary_parts = []
+        if counts["success"]:
+            summary_parts.append(f"{counts['success']} succeeded")
+        if counts["skipped"]:
+            summary_parts.append(f"{counts['skipped']} skipped")
+        if counts["failed"]:
+            summary_parts.append(f"{counts['failed']} failed")
+
+        return BulkImportResponse(
+            status=status,
+            message=" | ".join(summary_parts) if summary_parts else "No operations performed",
+            counts=counts,
+            failed_keys=failed_keys[:10],  # Limit to first 10 for response size
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Bulk import failed: {e!s}",
+        ) from e

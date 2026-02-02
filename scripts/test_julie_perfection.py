@@ -6,12 +6,11 @@ Tests if JulieCPA can answer questions based on newly injected knowledge.
 import asyncio
 import os
 
-from julie_cpa.core.julie_engine import julie
-from reportlab.pdfgen import canvas
-
 from AFO.services.langchain_openai_service import initialize_ai_service
 from AFO.services.pdf_parsing_service import pdf_parsing_service
 from AFO.services.vector_memory_service import vector_memory_service
+from julie_cpa.core.julie_engine import julie
+from reportlab.pdfgen import canvas
 
 DOC_PATH = "robot_deduction_act.pdf"
 

@@ -8,9 +8,8 @@ sys.path.append("./packages/afo-core")
 
 import pathlib
 
-from langchain_core.messages import HumanMessage
-
 from AFO.chancellor_graph import chancellor_graph
+from langchain_core.messages import HumanMessage
 
 
 async def verify_genesis():
