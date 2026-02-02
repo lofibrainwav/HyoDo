@@ -81,5 +81,8 @@ class KakaoBridgeService:
 
         return command_responses.get(
             command,
-            {"status": "unknown_command", "reply": f"알 수 없는 명령: {command}. /도움 을 입력하세요."},
+            {
+                "status": "unknown_command",
+                "reply": f"알 수 없는 명령: {command}. /도움 을 입력하세요.",
+            },
         )
