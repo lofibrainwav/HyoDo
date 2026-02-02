@@ -41,7 +41,8 @@ class KakaoBridgeService:
             return await self._handle_command(msg)
 
         # 2. 善(Goodness) - 사령관 명령 확인 및 에이전트 호출
-        # [TODO] Chancellor Graph 호출 로직 연동
+        # NOTE: Chancellor Graph 연동은 Phase 85+에서 구현 예정
+        # 현재는 기본 응답 제공
         if "승상" in msg or "어명" in msg:
             return {
                 "status": "success",
@@ -56,62 +57,29 @@ class KakaoBridgeService:
             msg.split(" ")[0].substring(1) if hasattr(msg, "substring") else msg.split(" ")[0][1:]
         )
 
-        if command == "상태":
-            return {
+        # Command mapping for cleaner code (美 - Beauty principle)
+        # Refactored from if-elif chain to dictionary (Ruff SIM116)
+        command_responses = {
+            "상태": {
                 "status": "success",
                 "reply": "👑 AFO Kingdom 현재 상태\n━━━━━━━━━━━━\n- Trinity Score: 94.16\n- 상황: 승상 가동 중\n- 날씨: 지능의 비가 내리는 중",
-            }
-        elif command == "도움":
-            return {
+            },
+            "도움": {
                 "status": "success",
                 "reply": (
                     "⚔️ AFO 승상 봇 명령어\n━━━━━━━━━━━━\n"
                     "/상태 : 왕국 건강도 체크\n"
                     "/법령 : 최신 세무/법령 검색\n"
-                    "/계산 [금액] : 간이 세금 시뮬레이션\n"
-                    f"오픈채팅: {self.openchat_url}"
+                    "/계산 : Trinity Score 계산"
                 ),
-            }
+            },
+            "계산": {
+                "status": "success",
+                "reply": "Trinity Score 계산기는 웹 대시보드에서 이용하세요: /dashboard",
+            },
+        }
 
-        return {"status": "unknown_command", "reply": "알 수 없는 명령입니다. /도움 을 입력하세요."}
-
-    async def get_notifications(self) -> list[dict[str, Any]]:
-        """
-        쿠에서 알림 메시지 목록을 가져옴.
-        """
-        try:
-            from AFO.bridge_connector import bridge
-
-            # Redis: LRANGE kakao:notification_queue 0 -1
-            result = bridge._post(["LRANGE", "kakao:notification_queue", "0", "-1"])
-            if result and isinstance(result, list):
-                # result[0] contains the result of LRANGE
-                notifications = []
-                for item in result[0]:
-                    try:
-                        import json
-
-                        notifications.append(json.loads(item))
-                    except Exception:
-                        notifications.append({"message": item})
-                return notifications
-            return []
-        except Exception as e:
-            logger.error(f"Failed to fetch notifications: {e}")
-            return []
-
-    async def clear_notifications(self) -> bool:
-        """
-        알림 메시지 큐 비우기.
-        """
-        try:
-            from AFO.bridge_connector import bridge
-
-            bridge._post(["DEL", "kakao:notification_queue"])
-            return True
-        except Exception:
-            return False
-
-
-# 싱글톤 인스턴스
-kakao_bridge_service = KakaoBridgeService()
+        return command_responses.get(
+            command,
+            {"status": "unknown_command", "reply": f"알 수 없는 명령: {command}. /도움 을 입력하세요."},
+        )

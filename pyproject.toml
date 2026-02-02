@@ -4,8 +4,8 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "3.0.1"
-description = "AI Code Quality Automation - Claude Code Extension"
+version = "3.1.0"
+description = "AI Code Quality Automation - Philosophy-Driven Code Review"
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -18,7 +18,9 @@ keywords = [
     "claude-code",
     "automation",
     "trinity-score",
-    "llm"
+    "llm",
+    "cli",
+    "code-review"
 ]
 classifiers = [
     "Development Status :: 4 - Beta",
@@ -32,22 +34,36 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
+    "Topic :: Utilities",
 ]
 requires-python = ">=3.10"
-dependencies = []
+dependencies = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+]
 
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
+    "pytest-cov>=4.0",
     "ruff>=0.4",
+    "pyright>=1.1",
 ]
+cli = [
+    "typer>=0.9.0",
+    "rich>=13.0.0",
+]
+
+[project.scripts]
+hyodo = "hyodo.cli.main:app"
 
 [project.urls]
 Homepage = "https://github.com/lofibrainwav/HyoDo"
 Documentation = "https://github.com/lofibrainwav/HyoDo#readme"
 Repository = "https://github.com/lofibrainwav/HyoDo"
 Issues = "https://github.com/lofibrainwav/HyoDo/issues"
+Changelog = "https://github.com/lofibrainwav/HyoDo/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["hyodo"]
@@ -62,4 +78,28 @@ ignore = ["E501"]
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
+testpaths = ["afo_core/tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"
+markers = [
+    "unit: Unit tests (fast, isolated)",
+    "integration: Integration tests (DB, API)",
+    "e2e: End-to-end tests (slow)",
+    "slow: Slow tests",
+    "skip_ci: Skip in CI",
+]
+
+[tool.coverage.run]
+source = ["hyodo"]
+omit = ["*/tests/*", "*/legacy/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

@@ -1,0 +1,59 @@
+# ─────────────────────────────────────────────────────────────────
+# HyoDo Minimal Docker Compose
+# "세종대왕의 정신: 백성을 위한 실용적 혁신"
+# 
+# 이 파일은 HyoDo의 최소 실행 환경만 제공합니다.
+# 전체 기능을 사용하려면 docker-compose.yml을 사용하세요.
+# ─────────────────────────────────────────────────────────────────
+
+version: '3.8'
+
+services:
+  # 心 (Heart) - Redis: 캐시 및 세션 관리
+  redis:
+    image: redis:7-alpine
+    container_name: hyodo-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - hyodo-network
+
+  # 肝 (Liver) - PostgreSQL: 영구 데이터 저장
+  postgres:
+    image: postgres:15-alpine
+    container_name: hyodo-postgres
+    ports:
+      - "15432:5432"
+    environment:
+      POSTGRES_USER: hyodo
+      POSTGRES_PASSWORD: hyodo_dev
+      POSTGRES_DB: hyodo
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hyodo"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - hyodo-network
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  hyodo-network:
+    driver: bridge

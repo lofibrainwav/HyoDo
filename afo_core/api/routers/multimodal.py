@@ -112,6 +112,47 @@ async def analyze_image(
 
 
 @shield(pillar="眞")
+@router.post("/vision/ocr")
+async def extract_text_from_image(
+    file: UploadFile = File(...),
+    prompt: str = Form(default="Extract all text from this image."),
+    language: str = Form(default="en"),
+) -> dict[str, Any]:
+    """
+    Extract text/OCR from an image using Vision AI (qwen3-vl).
+
+    Args:
+        file: Image file (jpg, png, webp)
+        prompt: OCR prompt (optional)
+        language: Response language (en, ko)
+    """
+    try:
+        from services.vision_service import get_vision_service
+
+        vision = get_vision_service()
+
+        if not vision._ollama_available:
+            raise HTTPException(status_code=503, detail="Vision service not available")
+
+        with tempfile.NamedTemporaryFile(delete=False, suffix=Path(file.filename).suffix) as tmp:
+            content = await file.read()
+            tmp.write(content)
+            tmp_path = tmp.name
+
+        try:
+            result = vision.extract_text(tmp_path)
+            return result
+        finally:
+            Path(tmp_path).unlink(missing_ok=True)
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OCR failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@shield(pillar="眞")
 @router.post("/audio/transcribe")
 async def transcribe_audio(
     file: UploadFile = File(...),

@@ -29,7 +29,7 @@ class VisionService:
     """
 
     def __init__(self, model: str | None = None) -> None:
-        self.model = model or settings.OLLAMA_MODEL
+        self.model = model or settings.VISION_MODEL
         self._ollama_available = self._check_ollama()
         logger.info(f"VisionService initialized with model: {self.model} (host: {OLLAMA_HOST})")
 
