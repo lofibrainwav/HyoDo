@@ -6,18 +6,34 @@
 import asyncio
 import json
 import logging
+import os
 import time
 from collections.abc import Callable
 from typing import Any
+
+# 환경 변수에서 Redis 설정 로드 (하드코딩 제거)
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
 
 # Assume AFO redis client wrapper or standard redis
 try:
     import redis  # type: ignore[import-untyped]
 
-    redis_client: Any | None = redis.Redis(host="localhost", port=6379, decode_responses=True)
+    redis_client: Any | None = redis.Redis(
+        host=REDIS_HOST,
+        port=REDIS_PORT,
+        db=REDIS_DB,
+        decode_responses=True
+    )
+    logger = logging.getLogger(__name__)
+    logger.info(f"[SWR] Redis connected to {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
 except ImportError:
     redis_client = None
     print("⚠️ Redis not installed, SWR cache falling back to pass-through")
+except Exception as e:
+    redis_client = None
+    print(f"⚠️ Redis connection failed: {e}, SWR cache falling back to pass-through")
 
 logger = logging.getLogger(__name__)
 
