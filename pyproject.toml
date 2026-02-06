@@ -91,15 +91,29 @@ markers = [
     "skip_ci: Skip in CI",
 ]
 
+
+# ============================================================================
+# Coverage Configuration (pytest-cov) - Phase 93
+# ============================================================================
 [tool.coverage.run]
-source = ["hyodo"]
-omit = ["*/tests/*", "*/legacy/*"]
+source = ["hyodo", "afo_core"]
+omit = [
+    "*/tests/*",
+    "*/__pycache__/*",
+    "*/legacy/*",
+    "*/node_modules/*",
+    "*/scripts/*",
+]
 
 [tool.coverage.report]
+# Phase 93: Kaizen 지속적 개선 - 50% 커버리지 목표
+fail_under = 50
+show_missing = true
+skip_covered = false
 exclude_lines = [
     "pragma: no cover",
-    "def __repr__",
-    "raise AssertionError",
-    "raise NotImplementedError",
+    "if TYPE_CHECKING:",
     "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "def __repr__",
 ]

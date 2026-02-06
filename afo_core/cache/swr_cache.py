@@ -21,10 +21,7 @@ try:
     import redis  # type: ignore[import-untyped]
 
     redis_client: Any | None = redis.Redis(
-        host=REDIS_HOST,
-        port=REDIS_PORT,
-        db=REDIS_DB,
-        decode_responses=True
+        host=REDIS_HOST, port=REDIS_PORT, db=REDIS_DB, decode_responses=True
     )
     logger = logging.getLogger(__name__)
     logger.info(f"[SWR] Redis connected to {REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}")
