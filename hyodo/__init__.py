@@ -10,7 +10,7 @@ Built with the Five Pillars:
 - 永 (Eternity): Long-term maintainability
 """
 
-__version__ = "3.0.1"
+__version__ = "3.1.0"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
 
