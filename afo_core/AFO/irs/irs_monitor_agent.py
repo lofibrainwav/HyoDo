@@ -147,11 +147,20 @@ class IRSMonitorAgent:
         logger.info(f"문서 해시 확인 중: {document_id}")
 
         try:
-            # TODO: 실제 다운로드 로직 구현 (crawler.py 통합)
-            # 현재는 시뮬레이션
-            content = f"simulated_content_{document_id}_{datetime.now().isoformat()}"
+            # Use real document crawler
+            from .document_crawler import IRSDocumentCrawler
 
-            current_hash = self._calculate_hash(content)
+            async with IRSDocumentCrawler() as crawler:
+                result = await crawler.download_with_retry(document_url)
+
+            if not result.success:
+                logger.error(f"Failed to download {document_id}: {result.error_message}")
+                return None
+
+            content = result.content if result.content else b""
+            current_hash = (
+                result.content_hash if result.content_hash else self._calculate_hash(content)
+            )
             category = self._get_document_category(document_id)
 
             # 기존 해시 확인
@@ -189,13 +198,17 @@ class IRSMonitorAgent:
                 [change_detection.to_dict()] if change_detection is not None else []
             )
 
+            size_bytes = result.size_bytes if result.success else len(content)
+
             document_hash = DocumentHash(
                 document_id=document_id,
                 document_url=document_url,
                 hash=current_hash,
-                last_modified=datetime.now().isoformat(),
+                last_modified=result.last_modified
+                if result.last_modified
+                else datetime.now().isoformat(),
                 last_check=datetime.now().isoformat(),
-                size_bytes=len(content),
+                size_bytes=size_bytes,
                 category=category,
                 detected_changes=detected_changes_list,
             )

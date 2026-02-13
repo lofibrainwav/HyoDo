@@ -58,6 +58,7 @@ targets = [
   ]),
   ("Royal Library", [
     "docs/AFO_ROYAL_LIBRARY.md",
+    "docs/AFO_FIELD_MANUAL_2026.md",
     "docs/field_manual/AFO_FIELD_MANUAL.md",
   ]),
   ("Kingdom Main", [

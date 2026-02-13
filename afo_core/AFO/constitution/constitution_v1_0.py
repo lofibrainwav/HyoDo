@@ -41,7 +41,7 @@ AFO_CONSTITUTION_V1_0: Final[dict] = {
     "risk_threshold": 10.0,  # Risk Score <= 10.0
     "veto_threshold": 40.0,  # 개별 pillar < 40.0이면 강제 거부
     "veto_pillars": ["truth", "goodness", "beauty"],  # 거부권 행사 pillar들
-    "royal_library_principles": 41,  # 41선 원칙 준수
+    "royal_library_principles": 79,  # 79선 원칙 준수
     "current_amendment": "0001",  # 현재 적용 수정헌법
     "harmony_achieved": {
         "mcp_ecosystem": 9,  # MCP 9서버 통합

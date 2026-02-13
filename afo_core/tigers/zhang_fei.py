@@ -25,8 +25,7 @@ def gate(risk_score: float, context: dict | None = None) -> float:
     if context is None:
         context = {}
 
-    def _logic(val) -> None:
-        risk, ctx = val
+    def _logic(risk: float, ctx: dict) -> float:
         if risk > 0.1:
             print(f"[Zhang Fei 善] Safety Gate BLOCK - Risk {risk}")
             return 0.0

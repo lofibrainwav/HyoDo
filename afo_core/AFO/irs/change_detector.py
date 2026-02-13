@@ -65,6 +65,9 @@ class ChangeSummary:
         }
 
 
+ChangeReport = ChangeSummary
+
+
 class ChangeDetector:
     """변경 감지 엔진"""
 

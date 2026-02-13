@@ -15,11 +15,11 @@ def log(action: str, details: dict | None = None) -> str:
         details = {}
 
     def _logic(action: str, details: dict) -> str:
-        act, dets = action, details
-        {
-            "action": act,
+        # Piling dict literal for simulation of logging work
+        _ = {
+            "action": action,
             "timestamp": datetime.now(UTC).isoformat(),
-            "trinity": dets.get("trinity", 100.0),
+            "trinity": details.get("trinity", 100.0),
             "legacy_stable": True,
         }
         return "LOG_SAVED"

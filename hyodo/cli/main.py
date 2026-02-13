@@ -12,9 +12,10 @@ Examples:
     hyodo trinity "작업"      # 상세 분석
 """
 
+import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -34,6 +35,108 @@ app = typer.Typer(
 console = Console()
 
 
+def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
+    """Gate 1: Pyright (眞 - Truth) - Type checking."""
+    cmd = ["pyright", "--project", "packages/afo-core/pyproject.toml"]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+
+        if result.returncode == 0:
+            return True, "0 errors, 0 warnings"
+
+        error_count = result.stdout.count("error:") + result.stderr.count("error:")
+        warning_count = result.stdout.count("warning:") + result.stderr.count("warning:")
+
+        return False, f"{error_count} errors, {warning_count} warnings"
+
+    except FileNotFoundError:
+        return False, "pyright not found (install: pip install pyright)"
+    except subprocess.TimeoutExpired:
+        return False, "timeout (>120s)"
+    except Exception as e:
+        return False, f"exception: {e}"
+
+
+def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]:
+    """Gate 2: Ruff (美 - Beauty) - Lint & Format."""
+    cmd = ["ruff", "check", "."]
+    if fix:
+        cmd.append("--fix")
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, timeout=60, cwd="packages/afo-core"
+        )
+
+        if result.returncode == 0:
+            return True, "All checks passed!"
+
+        violations = result.stdout.strip() if result.stdout else result.stderr.strip()
+        return False, violations[:200] + "..." if len(violations) > 200 else violations
+
+    except FileNotFoundError:
+        return False, "ruff not found (install: pip install ruff)"
+    except subprocess.TimeoutExpired:
+        return False, "timeout (>60s)"
+    except Exception as e:
+        return False, f"exception: {e}"
+
+
+def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
+    """Gate 3: pytest (善 - Goodness) - Test coverage."""
+    cmd = [
+        "pytest",
+        "tests/",
+        "-q",
+        "--tb=short",
+        "--ignore=tests/integration",
+        "--ignore=tests/_legacy",
+        "--ignore=tests/_obsolete",
+        "-m",
+        "not external and not integration",
+    ]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+
+        if result.returncode == 0:
+            for line in result.stdout.split("\n"):
+                if "passed" in line.lower():
+                    return True, line.strip()
+            return True, "All tests passed!"
+
+        return False, f"exit code {result.returncode}"
+
+    except FileNotFoundError:
+        return False, "pytest not found (install: pip install pytest)"
+    except subprocess.TimeoutExpired:
+        return False, "timeout (>300s)"
+    except Exception as e:
+        return False, f"exception: {e}"
+
+
+def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
+    """Gate 4: SBOM (永 - Eternity) - Security seal."""
+    cmd = ["python", "scripts/generate_sbom.py"]
+
+    try:
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+
+        if result.returncode == 0:
+            return True, "SBOM generated successfully"
+
+        error_msg = result.stderr.strip() or result.stdout.strip()
+        return False, error_msg[:200] if len(error_msg) > 200 else error_msg
+
+    except FileNotFoundError:
+        return False, "generate_sbom.py not found"
+    except subprocess.TimeoutExpired:
+        return False, "timeout (>60s)"
+    except Exception as e:
+        return False, f"exception: {e}"
+
+
 @app.command()
 def check(
     path: Optional[str] = typer.Argument(None, help="검사할 파일/디렉토리 경로"),
@@ -50,27 +153,49 @@ def check(
     target = path or "."
     console.print(f"대상: {target}")
 
-    # Gate 1: Pyright (眞)
+    all_passed = True
+
     console.print("\n[1/4] 眞 (Truth) - Type checking...")
-    # TODO: Implement Pyright check
-    console.print("  ✅ 타입 검사 통과")
+    pyright_ok, pyright_msg = run_pyright_check(verbose)
+    if pyright_ok:
+        console.print(f"  [green]✅ {pyright_msg}[/green]")
+    else:
+        console.print(f"  [red]❌ {pyright_msg}[/red]")
+        all_passed = False
 
-    # Gate 2: Ruff (美)
     console.print("\n[2/4] 美 (Beauty) - Lint & Format...")
-    # TODO: Implement Ruff check
-    console.print("  ✅ 린트 검사 통과")
+    ruff_ok, ruff_msg = run_ruff_check(fix, verbose)
+    if ruff_ok:
+        console.print(f"  [green]✅ {ruff_msg}[/green]")
+    else:
+        console.print(f"  [red]❌ {ruff_msg}[/red]")
+        if "not found" not in ruff_msg and fix:
+            console.print("  [yellow]   Try running with --fix to auto-fix issues[/yellow]")
+        all_passed = False
 
-    # Gate 3: pytest (善)
     console.print("\n[3/4] 善 (Goodness) - Test coverage...")
-    # TODO: Implement pytest check
-    console.print("  ✅ 테스트 통과")
+    pytest_ok, pytest_msg = run_pytest_check(verbose)
+    if pytest_ok:
+        console.print(f"  [green]✅ {pytest_msg}[/green]")
+    else:
+        console.print(f"  [red]❌ {pytest_msg}[/red]")
+        all_passed = False
 
-    # Gate 4: SBOM (永)
     console.print("\n[4/4] 永 (Eternity) - Security seal...")
-    # TODO: Implement SBOM check
-    console.print("  ✅ 보안 검사 통과")
+    sbom_ok, sbom_msg = run_sbom_check(verbose)
+    if sbom_ok:
+        console.print(f"  [green]✅ {sbom_msg}[/green]")
+    else:
+        console.print(f"  [red]❌ {sbom_msg}[/red]")
+        all_passed = False
 
-    console.print("\n[bold green]✅ 모든 게이트 통과![/bold green]")
+    console.print("\n" + "=" * 50)
+    if all_passed:
+        console.print("[bold green]✅ 모든 게이트 통과![/bold green]")
+        console.print("[green]Trinity Score: 90+ (AUTO_RUN 가능)[/green]")
+    else:
+        console.print("[bold red]❌ 일부 게이트 실패[/bold red]")
+        console.print("[yellow]Trinity Score: <90 (수정 후 재시도)[/yellow]")
 
 
 @app.command()
