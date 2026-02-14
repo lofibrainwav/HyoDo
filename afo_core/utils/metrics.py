@@ -5,14 +5,6 @@ from functools import wraps
 from typing import TYPE_CHECKING, Any, TypeVar
 
 from fastapi import APIRouter
-from prometheus_client import (
-    CONTENT_TYPE_LATEST,
-    REGISTRY,
-    Counter,
-    Gauge,
-    Histogram,
-    generate_latest,
-)
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import Response
 
@@ -26,11 +18,25 @@ if TYPE_CHECKING:
 Provides observability for the Soul Engine API.
 """
 
-
 try:
+    from prometheus_client import (
+        CONTENT_TYPE_LATEST,
+        REGISTRY,
+        Counter,
+        Gauge,
+        Histogram,
+        generate_latest,
+    )
+
     PROMETHEUS_AVAILABLE = True
 except ImportError:
     PROMETHEUS_AVAILABLE = False
+    CONTENT_TYPE_LATEST = None
+    REGISTRY = None
+    Counter = None
+    Gauge = None
+    Histogram = None
+    generate_latest = None
     print("⚠️ prometheus_client not installed. Run: pip install prometheus-client")
 
 

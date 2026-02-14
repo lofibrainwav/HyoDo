@@ -85,14 +85,16 @@ def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]
 
 def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 3: pytest (善 - Goodness) - Test coverage."""
+    # Use packages/afo-core/tests (verified: 3,185 tests, 0 collection errors)
+    # Excludes: hyodo/afo_core/tests (experimental, import issues)
     cmd = [
         "pytest",
-        "tests/",
+        "packages/afo-core/tests",
         "-q",
         "--tb=short",
-        "--ignore=tests/integration",
-        "--ignore=tests/_legacy",
-        "--ignore=tests/_obsolete",
+        "--ignore=packages/afo-core/tests/integration",
+        "--ignore=packages/afo-core/tests/_legacy",
+        "--ignore=packages/afo-core/tests/_obsolete",
         "-m",
         "not external and not integration",
     ]
