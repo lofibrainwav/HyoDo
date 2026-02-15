@@ -135,4 +135,72 @@
 
 ---
 
+## 9) Security Checklist (보안 체크리스트 - 야전교범)
+
+> **"측정 도구를 의심하라"** — AFO Royal Library Principle #21
+
+### 🚨 지피지기: gh CLI dependabot 명령어
+
+**중요**: gh CLI의 core 명령어에는 dependabot이 없습니다. **확장(Extension)**으로 제공됩니다.
+
+```bash
+# ❌ 잘못된 인식
+gh dependabot  # 명령어 없음 에러
+
+# ✅ 올바른 해결책 (지피지기)
+# 1. 왜 없는지 이해: gh CLI는 경량 core + 확장 아키텍처
+# 2. 확장 설치: 
+gh extension install kumak1/gh-dependabot-alerts
+
+# 3. 사용
+gh dependabot-alerts --repo owner/repo
+```
+
+### 🛠️ 필수 보안 도구
+
+#### 1. 로컬 스캐닝: pip-audit
+```bash
+pip install pip-audit
+pip-audit --desc --format=table
+```
+
+#### 2. GitHub 통합: gh dependabot-alerts
+```bash
+# 설치
+gh extension install kumak1/gh-dependabot-alerts
+
+# 사용
+gh dependabot-alerts --repo owner/repo --severity critical,high
+```
+
+#### 3. 통합 스캐너 (AFO Kingdom 표준)
+```bash
+python afo_core/scripts/security_scanner.py --repo owner/repo
+```
+
+### 📋 보안 체크리스트
+
+#### 매일 (Daily)
+- [ ] `python afo_core/scripts/security_scanner.py` 실행
+- [ ] Critical 취약점 존재 여부 확인
+
+#### 매주 (Weekly)
+- [ ] `gh dependabot-alerts --repo owner/repo` 실행
+- [ ] High 이상 취약점 목록 검토
+- [ ] 패치 가능한 취약점 업데이트
+
+#### 보안 이슈 발견 시
+1. **즉시 BLOCK**: Critical 취약점은 즉시 보고
+2. **DRY_RUN**: 패치 전 영향도 분석
+3. **지식 공유**: mem/qmd에 기록, 다른 승상들에게 알림
+4. **문서화**: `docs/SECURITY_SCANNING.md` 참조
+
+### 📚 참고 자료
+
+- **상세 문서**: `docs/SECURITY_SCANNING.md`
+- **지식 저장소**: mem ("gh CLI dependabot 명령어 부재 이유")
+- **통합 스크립트**: `afo_core/scripts/security_scanner.py`
+
+---
+
 # End of ./packages/afo-core/agents.md
