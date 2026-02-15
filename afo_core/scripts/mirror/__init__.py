@@ -9,7 +9,7 @@ Modules:
 - models: Data models (TrinityScoreAlert, MirrorConfig)
 - core: ChancellorMirror main class
 - alerts: Alert management
-- notifiers: Multi-channel notifications (Discord/Slack/Local)
+- notifiers: Multi-channel notifications (Discord/Slack/Email/Local)
 - recovery: Auto-recovery engine
 """
 
@@ -18,6 +18,7 @@ from scripts.mirror.core import ChancellorMirror
 from scripts.mirror.models import MirrorConfig, TrinityScoreAlert
 from scripts.mirror.notifiers import (
     DiscordNotifier,
+    EmailNotifier,
     LocalLogNotifier,
     NotifierBase,
     SlackNotifier,
@@ -32,6 +33,7 @@ __all__ = [
     "NotifierBase",
     "DiscordNotifier",
     "SlackNotifier",
+    "EmailNotifier",
     "LocalLogNotifier",
     "RecoveryEngine",
 ]

@@ -13,7 +13,7 @@ import logging
 from typing import TYPE_CHECKING
 
 from scripts.mirror.models import TrinityScoreAlert
-from scripts.mirror.notifiers import DiscordNotifier, LocalLogNotifier, SlackNotifier
+from scripts.mirror.notifiers import DiscordNotifier, EmailNotifier, LocalLogNotifier, SlackNotifier
 
 if TYPE_CHECKING:
     from scripts.mirror.recovery import RecoveryEngine
@@ -28,6 +28,7 @@ class AlertManager:
         self.active_alerts: list[TrinityScoreAlert] = []
         self.discord = DiscordNotifier()
         self.slack = SlackNotifier()
+        self.email = EmailNotifier()
         self.local_log = LocalLogNotifier()
         self._publish_thought = publish_thought_callback
         self._recovery_engine: RecoveryEngine | None = None
@@ -119,6 +120,12 @@ class AlertManager:
             notification_results.append({"channel": "slack", "success": True})
         else:
             notification_results.append({"channel": "slack", "success": False})
+
+        # Email (critical notifications)
+        if await self.email.send(alert, is_critical=True):
+            notification_results.append({"channel": "email", "success": True})
+        else:
+            notification_results.append({"channel": "email", "success": False})
 
         # Local log (always)
         if await self.local_log.send(alert, is_critical=True):
