@@ -87,11 +87,17 @@ class IRSProductionConfig:
 
     # ===== 외부 서비스 설정 =====
     IRS_WEBHOOK_URL: str | None = None
-    IRS_EMAIL_ENABLED: bool = False
-    IRS_EMAIL_SMTP_HOST: str = "smtp.gmail.com"
-    IRS_EMAIL_SMTP_PORT: int = 587
-    IRS_EMAIL_FROM: str = "alerts@afo-kingdom.com"
-    IRS_EMAIL_TO: str = "cpa-team@afo-kingdom.com"
+    IRS_EMAIL_ENABLED: bool = field(
+        default_factory=lambda: os.environ.get("IRS_EMAIL_ENABLED", "false").lower() == "true"
+    )
+    IRS_EMAIL_SMTP_HOST: str = field(
+        default_factory=lambda: os.environ.get("IRS_EMAIL_SMTP_HOST", "")
+    )
+    IRS_EMAIL_SMTP_PORT: int = field(
+        default_factory=lambda: int(os.environ.get("IRS_EMAIL_SMTP_PORT", "587"))
+    )
+    IRS_EMAIL_FROM: str = field(default_factory=lambda: os.environ.get("IRS_EMAIL_FROM", ""))
+    IRS_EMAIL_TO: str = field(default_factory=lambda: os.environ.get("IRS_EMAIL_TO", ""))
 
     # ===== 모니터링 설정 =====
     IRS_HEALTH_CHECK_ENABLED: bool = True
