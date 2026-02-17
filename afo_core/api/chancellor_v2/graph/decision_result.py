@@ -22,11 +22,11 @@ class DecisionResult:
     risk_score: float  # 0-100
     weights: dict[str, float] = field(
         default_factory=lambda: {
-            "truth": 0.35,
-            "goodness": 0.35,
-            "beauty": 0.20,
-            "serenity": 0.08,
-            "eternity": 0.02,
+            "truth": 0.18,
+            "goodness": 0.18,
+            "beauty": 0.12,
+            "serenity": 0.40,
+            "eternity": 0.12,
         }
     )
     pillar_scores: dict[str, float] = field(default_factory=dict)

@@ -72,11 +72,11 @@ class TrinityVerificationEngine:
     """
 
     EXPECTED_WEIGHTS = {
-        "truth": 0.35,
-        "goodness": 0.35,
-        "beauty": 0.20,
-        "serenity": 0.08,
-        "eternity": 0.02,
+        "truth": 0.18,
+        "goodness": 0.18,
+        "beauty": 0.12,
+        "serenity": 0.40,
+        "eternity": 0.12,
     }
 
     @shield(default_return=0.0, pillar="眞")

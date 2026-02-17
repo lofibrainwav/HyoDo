@@ -44,11 +44,11 @@ class EvidenceBundle:
 
         # Trinity Score 가중치 설정
         self.trinity_weights = {
-            "眞": 0.35,  # Truth - 기술적 정확성
-            "善": 0.35,  # Goodness - 윤리적 타당성
-            "美": 0.20,  # Beauty - 구조적 일관성
-            "孝": 0.08,  # Serenity - 평온한 검증
-            "永": 0.02,  # Eternity - 장기적 유효성
+            "眞": 0.18,  # Truth - 기술적 정확성
+            "善": 0.18,  # Goodness - 윤리적 타당성
+            "美": 0.12,  # Beauty - 구조적 일관성
+            "孝": 0.40,  # Serenity - 평온한 검증
+            "永": 0.12,  # Eternity - 장기적 유효성
         }
 
     def add_evidence(self, evidence_data: EvidenceData, source: str = "manual") -> str:

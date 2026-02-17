@@ -85,11 +85,11 @@ PHILOSOPHICAL_CONSTANTS = {
     "mencius_virtue": "인정지심",
     "plato_harmony": "영혼의 조화",
     "trinity_weights": {
-        "truth": 0.35,  # 眞: 기술적 확실성
-        "goodness": 0.35,  # 善: 윤리·안정성
-        "beauty": 0.20,  # 美: 단순함·우아함
-        "serenity": 0.08,  # 孝: 평온·연속성
-        "eternity": 0.02,  # 永: 영속성·레거시 유지
+        "truth": 0.18,  # 眞: 기술적 확실성
+        "goodness": 0.18,  # 善: 윤리·안정성
+        "beauty": 0.12,  # 美: 단순함·우아함
+        "serenity": 0.40,  # 孝: 평온·연속성
+        "eternity": 0.12,  # 永: 영속성·레거시 유지
     },
 }
 

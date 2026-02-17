@@ -106,9 +106,9 @@ def calculate_trinity_score(
 ) -> TrinityScoreResult:
     """Calculate Trinity Score with weights.
 
-    Weights: 眞=35%, 善=35%, 美=20%, 孝=8%, 永=2%
+    Weights: 眞=18%, 善=18%, 美=12%, 孝=40%, 永=12%
     """
-    total = truth * 0.35 + goodness * 0.35 + beauty * 0.20 + serenity * 0.08 + eternity * 0.02
+    total = truth * 0.18 + goodness * 0.18 + beauty * 0.12 + serenity * 0.40 + eternity * 0.02
 
     return TrinityScoreResult(
         truth=truth,

@@ -274,13 +274,13 @@ class SSOTAutoUpdater:
         # 永 (Eternity): 영속성
         eternity_score = 1.0
 
-        # 가중평균 (眞35% + 善35% + 美20% + 孝8% + 永2%)
+        # 가중평균 (眞18% + 善18% + 美12% + 孝40% + 永12%)
         total_score = (
             (truth_score * 0.35)
             + (goodness_score * 0.35)
             + (beauty_score * 0.20)
             + (serenity_score * 0.08)
-            + (eternity_score * 0.02)
+            + (eternity_score * 0.12)
         )
 
         return TrinityScore(

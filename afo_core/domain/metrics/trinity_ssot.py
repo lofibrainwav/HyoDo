@@ -1,4 +1,4 @@
-# Trinity Score SSOT - Aligned with TRINITY_OS_PERSONAS.yaml v3 (2025-12-21)
+# Trinity Score SSOT - v4 Commander-Ordered Rebalance (2026-02-13)
 """[TRUTH WIRING]
 Trinity Pillar SSOT (Single Source of Truth)
 Defines the immutable weights for the 5 Pillars of the AFO Kingdom.
@@ -10,22 +10,22 @@ This file must be treated as a constant law.
 
 from typing import Final
 
-# 🏛️ SSOT Trinity Weights (眞善美孝永) - TRINITY_OS_PERSONAS.yaml v3 정본
-# Formula: 0.35×眞 + 0.35×善 + 0.20×美 + 0.08×孝 + 0.02×永 = 1.00
+# 🏛️ SSOT Trinity Weights (眞善美孝永) - v4 Commander-Ordered (2026-02-13)
+# Formula: 0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永 = 1.00
 WEIGHTS = {
-    "truth": 0.35,  # 眞: 장영실 (Technical Certainty)
-    "goodness": 0.35,  # 善: 이순신 (Ethical Safety)
-    "beauty": 0.20,  # 美: 신사임당 (UX/Aesthetics)
-    "serenity": 0.08,  # 孝: 승상 (Filial Serenity)
-    "eternity": 0.02,  # 永: 승상 (Eternal Legacy)
+    "truth": 0.18,  # 眞: 장영실 (Technical Certainty)
+    "goodness": 0.18,  # 善: 이순신 (Ethical Safety)
+    "beauty": 0.12,  # 美: 신사임당 (UX/Aesthetics)
+    "serenity": 0.40,  # 孝: 승상 (Filial Serenity) — 최우선
+    "eternity": 0.12,  # 永: 승상 (Eternal Legacy)
 }
 
-# 🏛️ 5 Pillar Weights (Total: 1.0) - SSOT Canonical Values
-WEIGHT_TRUTH: Final[float] = 0.35
-WEIGHT_GOODNESS: Final[float] = 0.35
-WEIGHT_BEAUTY: Final[float] = 0.20
-WEIGHT_SERENITY: Final[float] = 0.08
-WEIGHT_ETERNITY: Final[float] = 0.02
+# 🏛️ 5 Pillar Weights (Total: 1.0) - SSOT Canonical Values (v4)
+WEIGHT_TRUTH: Final[float] = 0.18
+WEIGHT_GOODNESS: Final[float] = 0.18
+WEIGHT_BEAUTY: Final[float] = 0.12
+WEIGHT_SERENITY: Final[float] = 0.40
+WEIGHT_ETERNITY: Final[float] = 0.12
 
 # 🛡️ Governance Thresholds - AUTO_RUN (Trinity >= 90 AND Risk <= 10)
 THRESHOLD_AUTO_RUN_SCORE: Final[float] = 90.0

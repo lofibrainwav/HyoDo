@@ -21,7 +21,7 @@ class DetailedPillarsCalculator:
     @shield(default_return=0.0, pillar="善")
     def calculate_goodness_score(self, context: dict[str, Any]) -> float:
         """
-        선 (Goodness) - 35%: 윤리, 안정성, 리스크 관리
+        선 (Goodness 18%: 윤리, 안정성, 리스크 관리
         Target: Risk Score <= 0.1, Ethical Guardrails Active
         """
         score = 0.0
@@ -49,7 +49,7 @@ class DetailedPillarsCalculator:
     @shield(default_return=0.0, pillar="美")
     def calculate_beauty_score(self, code_snippet: str, context: dict[str, Any]) -> float:
         """
-        미 (Beauty) - 20%: 미학, 단순함, UX 우아함
+        미 (Beauty 12%: 미학, 단순함, UX 우아함
         Target: Modularity, Naming Consistency, Glassmorphism
         """
         score = 0.0
@@ -78,7 +78,7 @@ class DetailedPillarsCalculator:
 
     def calculate_serenity_score(self, context: dict[str, Any]) -> float:
         """
-        효 (Serenity) - 8%: 평온, 마찰 제거, 자동화
+        효 (Serenity 40%: 평온, 마찰 제거, 자동화
         Target: Automation, Speed < 1s, Env Consistency
         """
         score = 0.0
@@ -103,7 +103,7 @@ class DetailedPillarsCalculator:
 
     def calculate_eternity_score(self, code_snippet: str, context: dict[str, Any]) -> float:
         """
-        영 (Eternity) - 2%: 영속성, 지속 가능성, 문서화
+        영 (Eternity 12%: 영속성, 지속 가능성, 문서화
         Target: Docs, Git, Evolution Logs
         """
         score = 0.0

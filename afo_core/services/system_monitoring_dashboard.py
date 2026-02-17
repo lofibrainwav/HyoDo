@@ -341,7 +341,7 @@ class SystemMonitoringDashboard:
             eternity_score = min(100, 100 - latest_system.disk_percent)
 
             # 종합 점수 계산
-            weights = [0.35, 0.35, 0.20, 0.08, 0.02]  # Trinity 가중치
+            weights = [0.18, 0.18, 0.12, 0.40, 0.12]  # Trinity 가중치
             scores = [
                 truth_score,
                 goodness_score,

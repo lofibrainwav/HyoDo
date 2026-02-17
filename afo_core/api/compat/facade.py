@@ -70,17 +70,17 @@ class HTMLDataFacade:
             {
                 "name": "제갈량",
                 "code": "JangYeongSil",
-                "role": "眞 35% - 아키텍처/전략",
+                "role": "眞 18% - 아키텍처/전략",
             },
             {
                 "name": "사마의",
                 "code": "YiSunSin",
-                "role": "善 35% - 윤리/안정/보안",
+                "role": "善 18% - 윤리/안정/보안",
             },
             {
                 "name": "주유",
                 "code": "ShinSaimdang",
-                "role": "美 20% - 서사/UX/디자인",
+                "role": "美 12% - 서사/UX/디자인",
             },
             {
                 "name": "자룡",

@@ -130,37 +130,37 @@ class AutomatedDebuggingSystem:
 
         try:
             # ═══════════════════════════════════════════════════════════════
-            # Gate 1: Pyright (眞 Truth - 35%)
+            # Gate 1: Pyright (眞 Truth 18%)
             # ═══════════════════════════════════════════════════════════════
-            await self._emit("scan", "⚔️ Gate 1/4: Pyright 타입 안정성 (眞 35%) 분석 중...")
+            await self._emit("scan", "⚔️ Gate 1/4: Pyright 타입 안정성 (眞 18%) 분석 중...")
             truth_result = await self._analyze_truth()
             await self._emit_pillar_result("眞", truth_result)
 
             # ═══════════════════════════════════════════════════════════════
-            # Gate 2: Ruff (美 Beauty - 20%)
+            # Gate 2: Ruff (美 Beauty 12%)
             # ═══════════════════════════════════════════════════════════════
-            await self._emit("scan", "🌉 Gate 2/4: Ruff 코드 품질 (美 20%) 분석 중...")
+            await self._emit("scan", "🌉 Gate 2/4: Ruff 코드 품질 (美 12%) 분석 중...")
             beauty_result = await self._analyze_beauty()
             await self._emit_pillar_result("美", beauty_result)
 
             # ═══════════════════════════════════════════════════════════════
-            # Gate 3: pytest (善 Goodness - 35%)
+            # Gate 3: pytest (善 Goodness 18%)
             # ═══════════════════════════════════════════════════════════════
-            await self._emit("scan", "🛡️ Gate 3/4: pytest 테스트 통과율 (善 35%) 분석 중...")
+            await self._emit("scan", "🛡️ Gate 3/4: pytest 테스트 통과율 (善 18%) 분석 중...")
             goodness_result = await self._analyze_goodness()
             await self._emit_pillar_result("善", goodness_result)
 
             # ═══════════════════════════════════════════════════════════════
-            # Gate 4: SBOM (永 Eternity - 2%)
+            # Gate 4: SBOM (永 Eternity 12%)
             # ═══════════════════════════════════════════════════════════════
-            await self._emit("scan", "♾️ Gate 4/4: SBOM 보안 봉인 (永 2%) 확인 중...")
+            await self._emit("scan", "♾️ Gate 4/4: SBOM 보안 봉인 (永 12%) 확인 중...")
             eternity_result = await self._analyze_eternity()
             await self._emit_pillar_result("永", eternity_result)
 
             # ═══════════════════════════════════════════════════════════════
-            # Bonus: Friction Analysis (孝 Serenity - 8%)
+            # Bonus: Friction Analysis (孝 Serenity 40%)
             # ═══════════════════════════════════════════════════════════════
-            await self._emit("scan", "🙏 Bonus: 마찰 분석 (孝 8%) 측정 중...")
+            await self._emit("scan", "🙏 Bonus: 마찰 분석 (孝 40%) 측정 중...")
             serenity_result = await self._analyze_serenity()
             await self._emit_pillar_result("孝", serenity_result)
 
@@ -275,10 +275,10 @@ class AutomatedDebuggingSystem:
     # 眞 (Truth) - Pyright 분석
     # ═══════════════════════════════════════════════════════════════════
     async def _analyze_truth(self) -> PillarScore:
-        """Pyright 타입 안정성 분석 (眞 35%)"""
+        """Pyright 타입 안정성 분석 (眞 18%)"""
         errors = await self._run_pyright()
         # 에러 0개 = 1.0, 에러 많을수록 점수 감소
-        score = max(0.0, 1.0 - (len(errors) * 0.02))  # 50개 에러 = 0점
+        score = max(0.0, 1.0 - (len(errors) * 0.12))  # 50개 에러 = 0점
         return PillarScore(
             name="Pyright",
             score=score,
@@ -324,7 +324,7 @@ class AutomatedDebuggingSystem:
     # 美 (Beauty) - Ruff 분석
     # ═══════════════════════════════════════════════════════════════════
     async def _analyze_beauty(self) -> PillarScore:
-        """Ruff 코드 품질 분석 (美 20%)"""
+        """Ruff 코드 품질 분석 (美 12%)"""
         errors = await self._run_ruff()
         score = max(0.0, 1.0 - (len(errors) * 0.01))  # 100개 에러 = 0점
         return PillarScore(
@@ -362,7 +362,7 @@ class AutomatedDebuggingSystem:
     # 善 (Goodness) - pytest 분석
     # ═══════════════════════════════════════════════════════════════════
     async def _analyze_goodness(self) -> PillarScore:
-        """pytest 테스트 통과율 분석 (善 35%)"""
+        """pytest 테스트 통과율 분석 (善 18%)"""
         passed, failed, skipped = await self._run_pytest()
         total = passed + failed
         score = 0.5 if total == 0 else passed / total  # 테스트 없으면 중립
@@ -411,7 +411,7 @@ class AutomatedDebuggingSystem:
     # 永 (Eternity) - SBOM 분석
     # ═══════════════════════════════════════════════════════════════════
     async def _analyze_eternity(self) -> PillarScore:
-        """SBOM 보안 봉인 확인 (永 2%)"""
+        """SBOM 보안 봉인 확인 (永 12%)"""
         sbom_exists = await self._check_sbom()
         if sbom_exists:
             return PillarScore(name="SBOM", score=1.0, errors=0, details="SBOM artifacts present")
@@ -430,7 +430,7 @@ class AutomatedDebuggingSystem:
     # 孝 (Serenity) - 마찰 분석
     # ═══════════════════════════════════════════════════════════════════
     async def _analyze_serenity(self) -> PillarScore:
-        """마찰/안정성 분석 (孝 8%)"""
+        """마찰/안정성 분석 (孝 40%)"""
         try:
             metrics = friction_calibrator.calculate_serenity()
             score = metrics.score / 100.0  # 0-100 -> 0-1

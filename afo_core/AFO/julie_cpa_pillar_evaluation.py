@@ -177,11 +177,7 @@ class JulieCPAPillarEvaluator:
 
         # Trinity Score 계산 (AFO Kingdom 표준 가중치)
         trinity_score = (
-            pillar_scores.get("truth", 0.8) * 0.35
-            + pillar_scores.get("goodness", 0.8) * 0.35
-            + pillar_scores.get("beauty", 0.8) * 0.20
-            + pillar_scores.get("serenity", 0.8) * 0.08
-            + 0.02  # eternity는 항상 최소값
+            pillar_scores.get("truth", 0.8) * 0.18 + pillar_scores.get("goodness", 0.8) * 0.18 + pillar_scores.get("beauty", 0.8) * 0.12 + pillar_scores.get("serenity", 0.8) * 0.40 + 0.02  # eternity는 항상 최소값
         ) * 100
 
         return {

@@ -90,13 +90,13 @@ class TrinityMetrics:
     """眞善美孝永 5기둥 메트릭 계산 결과 (SSOT: TRINITY_OS_PERSONAS.yaml)
 
     Attributes:
-        truth: 眞 점수 (35% 가중치)
-        goodness: 善 점수 (35% 가중치)
-        beauty: 美 점수 (20% 가중치)
-        filial_serenity: 孝 점수 (8% 가중치)
-        eternity: 永 점수 (2% 가중치)
+        Truth 18% 가중치)
+        Goodness 18% 가중치)
+        Beauty 12% 가중치)
+        filial_Serenity 40% 가중치)
+        Eternity 12% 가중치)
         serenity_core: Serenity(§) = ∛(T × G × B) - 기하평균
-        trinity_score: Trinity Score = 가중 합 (0.35×眞 + 0.35×善 + 0.20×美 + 0.08×孝 + 0.02×永)
+        trinity_score: Trinity Score = 가중 합 (0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永)
         balance_delta: ΔTrinity = Max - Min
         balance_status: 균형 상태 ("balanced" | "warning" | "imbalanced")
 
@@ -141,7 +141,7 @@ class TrinityMetrics:
             else:
                 serenity_core = prod([t, g, b]) ** (1.0 / 3.0)
 
-            # Trinity Score: SSOT 가중 합 (0.35×眞 + 0.35×善 + 0.20×美 + 0.08×孝 + 0.02×永)
+            # Trinity Score: SSOT 가중 합 (0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永)
             trinity_score = (
                 cls.WEIGHT_TRUTH * t
                 + cls.WEIGHT_GOODNESS * g
@@ -222,11 +222,11 @@ class TrinityMetrics:
         try:
             return (
                 f"TrinityMetrics(\n"
-                f"  眞 (Truth 35%): {self.truth:.3f}\n"
-                f"  善 (Goodness 35%): {self.goodness:.3f}\n"
-                f"  美 (Beauty 20%): {self.beauty:.3f}\n"
-                f"  孝 (Serenity 8%): {self.filial_serenity:.3f}\n"
-                f"  永 (Eternity 2%): {self.eternity:.3f}\n"
+                f"  眞 (Truth 18%): {self.truth:.3f}\n"
+                f"  善 (Goodness 18%): {self.goodness:.3f}\n"
+                f"  美 (Beauty 12%): {self.beauty:.3f}\n"
+                f"  孝 (Serenity 40%): {self.filial_serenity:.3f}\n"
+                f"  永 (Eternity 12%): {self.eternity:.3f}\n"
                 f"  Serenity(§): {self.serenity_core:.3f}\n"
                 f"  Trinity Score: {self.trinity_score:.3f}\n"
                 f"  ΔTrinity: {self.balance_delta:.3f} ({self.balance_status})\n"

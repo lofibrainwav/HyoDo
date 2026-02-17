@@ -56,7 +56,7 @@ _modals: dict[str, ModalContent] = {
     "trinity_info": ModalContent(
         id="trinity_info",
         title="Trinity Score 안내",
-        content="Trinity Score = 0.35×眞 + 0.35×善 + 0.20×美 + 0.08×孝 + 0.02×永",
+        content="Trinity Score = 0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永",
         modal_type="info",
         actions=[{"label": "확인", "action": "close"}],
     ),

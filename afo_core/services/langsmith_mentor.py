@@ -380,11 +380,11 @@ class LangSmithMentor:
         if not runs:
             return 0.0
 
-        # 眞 (Truth) - 기술적 성공률: 35%
+        # 眞 (Truth 18%
         success_count = sum(1 for r in runs if getattr(r, "success", False))
         truth_score = (success_count / len(runs)) * 35
 
-        # 善 (Goodness) - 안정성: 35%
+        # 善 (Goodness 18%
         # 실행 시간 일관성 기반
         execution_times = [
             getattr(r, "execution_time", 5) for r in runs if getattr(r, "execution_time", 0) > 0
@@ -401,7 +401,7 @@ class LangSmithMentor:
         else:
             goodness_score = 17.5
 
-        # 美 (Beauty) - 효율성: 20%
+        # 美 (Beauty 12%
         # 실행 시간 기반 (30초 이내 완료 시 최대 점수)
         if execution_times:
             avg_time = sum(execution_times) / len(execution_times)
@@ -409,12 +409,12 @@ class LangSmithMentor:
         else:
             beauty_score = 10
 
-        # 孝 (Serenity) - 일관성: 8%
+        # 孝 (Serenity 40%
         # 성공률 기반
         success_rate = success_count / len(runs) if runs else 0
         serenity_score = success_rate * 8
 
-        # 永 (Eternity) - 지속성: 2%
+        # 永 (Eternity 12%
         # 기본 점수
         eternity_score = 2.0
 

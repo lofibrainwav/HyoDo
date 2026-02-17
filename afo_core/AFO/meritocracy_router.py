@@ -180,8 +180,8 @@ class MeritocracyRouter(BackgroundAgent):
                 "role_description": "코드 탐색·분석 특화 에이전트",
                 "primary_tasks": ["code_analysis", "pattern_discovery", "dependency_mapping"],
                 "trinity_weights": {
-                    "truth": 0.35,  # 정확한 코드 분석
-                    "goodness": 0.35,  # 안전한 탐색
+                    "truth": 0.18,  # 정확한 코드 분석
+                    "goodness": 0.18,  # 안전한 탐색
                     "beauty": 0.10,  # 깔끔한 구조화
                     "serenity": 0.15,  # 안정적인 분석
                     "eternity": 0.05,  # 지속적인 모니터링
@@ -242,7 +242,7 @@ class MeritocracyRouter(BackgroundAgent):
                 "trinity_weights": {
                     "truth": 0.30,  # 전략적 정확성
                     "goodness": 0.25,  # 윤리적 판단
-                    "beauty": 0.20,  # 전략적 우아함
+                    "beauty": 0.12,  # 전략적 우아함
                     "serenity": 0.15,  # 평온한 전략
                     "eternity": 0.10,  # 영속적 지혜
                 },

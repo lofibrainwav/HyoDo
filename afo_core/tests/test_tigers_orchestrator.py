@@ -229,7 +229,7 @@ class TestTigerGeneralsOrchestration:
         # Trinity Score 계산
         trinity_score = scoring_aggregator.calculate_trinity_score()
 
-        # 가중치 검증 (예상: 95*0.35 + 90*0.35 + 85*0.20 + 88*0.05 + 100*0.05 = 91.15)
+        # 가중치 검증 (예상: 95* 0.18 + 90* 0.18 + 85* 0.12 + 88*0.05 + 100*0.05 = 91.15)
         assert abs(trinity_score - 91.15) < 0.1
 
     @pytest.mark.asyncio
@@ -242,7 +242,7 @@ class TestTigerGeneralsOrchestration:
         scoring_aggregator.add_score("beauty_craft", 90.0)
         scoring_aggregator.add_score("serenity_deploy", 90.0)
         scoring_aggregator.add_score("eternity_log", 90.0)
-        # Trinity: 95*0.35 + 95*0.35 + 90*0.20 + 90*0.05 + 90*0.05 = 93.5
+        # Trinity: 95* 0.18 + 95* 0.18 + 90* 0.12 + 90*0.05 + 90*0.05 = 93.5
 
         decision = scoring_aggregator.get_decision()
         assert decision == "AUTO_RUN"
@@ -254,7 +254,7 @@ class TestTigerGeneralsOrchestration:
         scoring_aggregator2.add_score("beauty_craft", 75.0)
         scoring_aggregator2.add_score("serenity_deploy", 75.0)
         scoring_aggregator2.add_score("eternity_log", 75.0)
-        # Trinity: 80*0.35 + 80*0.35 + 75*0.20 + 75*0.05 + 75*0.05 = 78.5
+        # Trinity: 80* 0.18 + 80* 0.18 + 75* 0.12 + 75*0.05 + 75*0.05 = 78.5
 
         decision = scoring_aggregator2.get_decision()
         assert decision == "ASK_COMMANDER"

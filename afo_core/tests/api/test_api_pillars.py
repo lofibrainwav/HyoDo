@@ -74,20 +74,20 @@ class TestTrinityScoreCalculation:
     """Trinity Score 계산 테스트"""
 
     def test_trinity_formula_weights(self) -> None:
-        """Trinity Score 가중치 공식 테스트: 0.35眞 + 0.35善 + 0.20美 + 0.08孝 + 0.02永"""
+        """Trinity Score 가중치 공식 테스트: 0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永"""
         truth = 1.0
         goodness = 1.0
         beauty = 1.0
         serenity = 1.0
         eternity = 1.0
 
-        score = 0.35 * truth + 0.35 * goodness + 0.20 * beauty + 0.08 * serenity + 0.02 * eternity
+        score = 0.18×Truth + 0.18×Goodness + 0.12×Beauty + 0.40×Serenity + 0.12×Eternity
 
         assert score == pytest.approx(1.0)
 
     def test_trinity_weights_sum_to_one(self) -> None:
         """가중치 합이 1.0인지 테스트"""
-        weights = [0.35, 0.35, 0.20, 0.08, 0.02]
+        weights = [0.18, 0.18, 0.12, 0.40, 0.12]
         assert sum(weights) == pytest.approx(1.0)
 
     def test_trinity_partial_scores(self) -> None:

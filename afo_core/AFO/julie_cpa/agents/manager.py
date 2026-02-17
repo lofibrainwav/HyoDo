@@ -122,11 +122,6 @@ class JulieManagerAgent:
         eternity_score = 0.80  # Enhanced documentation
 
         trinity_score = (
-            truth_score * 0.35
-            + goodness_score * 0.35
-            + beauty_score * 0.20
-            + serenity_score * 0.08
-            + eternity_score * 0.02
-        )
+            truth_score * 0.18 + goodness_score * 0.18 + beauty_score * 0.12 + serenity_score * 0.40 + eternity_score * 0.12)
 
         return trinity_score

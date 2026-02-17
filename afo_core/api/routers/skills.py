@@ -167,10 +167,7 @@ async def list_skills() -> dict[str, Any]:
         for skill in skills:
             # Calculate Trinity Score
             trinity_score = (
-                skill.philosophy_scores.truth * 0.35
-                + skill.philosophy_scores.goodness * 0.35
-                + skill.philosophy_scores.beauty * 0.20
-                + skill.philosophy_scores.serenity * 0.08
+                skill.philosophy_scores.truth * 0.18 + skill.philosophy_scores.goodness * 0.18 + skill.philosophy_scores.beauty * 0.12 + skill.philosophy_scores.serenity * 0.08
             )
 
             skill_info = {
@@ -243,10 +240,7 @@ async def get_skill_detail(skill_id: str) -> dict[str, Any]:
 
         # Calculate Trinity Score
         trinity_score = (
-            skill.philosophy_scores.truth * 0.35
-            + skill.philosophy_scores.goodness * 0.35
-            + skill.philosophy_scores.beauty * 0.20
-            + skill.philosophy_scores.serenity * 0.08
+            skill.philosophy_scores.truth * 0.18 + skill.philosophy_scores.goodness * 0.18 + skill.philosophy_scores.beauty * 0.12 + skill.philosophy_scores.serenity * 0.08
         )
 
         skill_info = {
@@ -342,10 +336,7 @@ async def skills_health() -> dict[str, Any]:
             skill_statuses: dict[str, dict[str, Any]] = {}
             for skill in skills[:5]:  # 처음 5개만 표시
                 trinity_score = (
-                    skill.philosophy_scores.truth * 0.35
-                    + skill.philosophy_scores.goodness * 0.35
-                    + skill.philosophy_scores.beauty * 0.20
-                    + skill.philosophy_scores.serenity * 0.08
+                    skill.philosophy_scores.truth * 0.18 + skill.philosophy_scores.goodness * 0.18 + skill.philosophy_scores.beauty * 0.12 + skill.philosophy_scores.serenity * 0.08
                 )
                 skill_statuses[skill.skill_id] = {
                     "name": skill.name,

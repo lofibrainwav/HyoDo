@@ -331,40 +331,58 @@ class TrinityTypeValidator:
         post_validation: dict[str, Any],
         execution_time: float,
     ) -> float:
-        """Trinity Score 계산 (眞善美孝永)"""
+        """Trinity Score 계산 (HYOGOOK V5: 仁眞善忠美)"""
+        # 仁 (Benevolence): 개발자 경험 (was Serenity 孝)
+        benevolence_score = self._evaluate_serenity(pre_validation, post_validation)
+
         # 眞 (Truth): 타입 정확성
         truth_score = self._evaluate_truth(pre_validation, post_validation)
 
         # 善 (Goodness): 안전성
         goodness_score = self._evaluate_goodness(func, execution_time)
 
+        # 忠 (Loyalty): SSOT 준수 (was Eternity 永)
+        loyalty_score = self._evaluate_eternity(func)
+
         # 美 (Beauty): 코드 품질
         beauty_score = self._evaluate_beauty(func)
 
-        # 孝 (Serenity): 안정성
-        serenity_score = self._evaluate_serenity(pre_validation, post_validation)
-
-        # 永 (Eternity): 유지보수성
-        eternity_score = self._evaluate_eternity(func)
-
-        # 가중 평균 계산
+        # HYOGOOK V5 가중치 계산
         weights = {
-            "truth": 0.35,
-            "goodness": 0.35,
-            "beauty": 0.20,
-            "serenity": 0.08,
-            "eternity": 0.02,
+            "benevolence": 0.25,  # 仁 (was serenity 0.40)
+            "truth": 0.22,  # 眞 (was 0.18)
+            "goodness": 0.18,  # 善 (unchanged)
+            "loyalty": 0.15,  # 忠 (was eternity 0.12)
+            "beauty": 0.15,  # 美 (was 0.12)
         }
 
-        trinity_score = (
-            truth_score * weights["truth"]
+        # 기하평균으로 永 (Eternity) 계산
+        values = [benevolence_score, truth_score, goodness_score, loyalty_score, beauty_score]
+        eternity_score = self._calculate_geometric_mean(values)
+
+        # HYOGOOK V5: F = (T+G+In+B+C) + S
+        arithmetic_sum = (
+            benevolence_score * weights["benevolence"]
+            + truth_score * weights["truth"]
             + goodness_score * weights["goodness"]
+            + loyalty_score * weights["loyalty"]
             + beauty_score * weights["beauty"]
-            + serenity_score * weights["serenity"]
-            + eternity_score * weights["eternity"]
         )
 
-        return round(trinity_score, 2)
+        trinity_score = arithmetic_sum + eternity_score
+
+        return round(trinity_score * 100, 2)
+
+    def _calculate_geometric_mean(self, values: list[float]) -> float:
+        """기하평균 계산 (永 Eternity)"""
+        if not values or len(values) != 5:
+            return 1.0
+        product = 1.0
+        for v in values:
+            if v <= 0:
+                return 0.0
+            product *= v
+        return product ** (1 / 5)
 
     def _calculate_error_trinity_score(
         self,

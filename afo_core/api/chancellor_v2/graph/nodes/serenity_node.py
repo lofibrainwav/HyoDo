@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 async def serenity_node(state: GraphState) -> GraphState:
     """Evaluate automation, error recovery, and user friction reduction aspects.
 
-    孝 (Serenity) - 평온·연속성, 자동화, 실패 복구 용이성 (8% 가중치)
+    孝 (Serenity 40% 가중치)
     Scholar: Yeongdeok (Ollama / Local Scholar)
     """
     skill_id = state.plan.get("skill_id", "")

@@ -35,11 +35,11 @@ def calculate_trinity(scores: dict[str, float]) -> float:
         계산된 Trinity Score (0-100)
     """
     weights = {
-        "truth": 0.35,
-        "goodness": 0.35,
-        "beauty": 0.20,
-        "serenity": 0.08,
-        "eternity": 0.02,
+        "truth": 0.18,
+        "goodness": 0.18,
+        "beauty": 0.12,
+        "serenity": 0.40,
+        "eternity": 0.12,
     }
 
     normalized = {k: v / 100.0 for k, v in scores.items()}

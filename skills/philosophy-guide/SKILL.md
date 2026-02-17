@@ -113,7 +113,7 @@ The philosophical foundation of AFO Kingdom, guiding all decisions through the w
 ## Trinity Score Formula
 
 ```
-Trinity Score = (眞 × 0.35) + (善 × 0.35) + (美 × 0.20) + (孝 × 0.08) + (永 × 0.02)
+Trinity Score = (眞 × 0.18) + (善 × 0.18) + (美 × 0.12) + (孝 × 0.40) + (永 × 0.12)
 ```
 
 ## Decision Matrix

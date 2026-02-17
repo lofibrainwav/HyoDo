@@ -38,7 +38,7 @@ class TrinityPolicyConfig(BaseModel):
     pillars: list[PillarConfig]
     auto_run_threshold: float = 90.0
     risk_threshold: float = 10.0
-    formula: str = "Trinity Score = 0.35×眞 + 0.35×善 + 0.20×美 + 0.08×孝 + 0.02×永"
+    formula: str = "Trinity Score = 0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永"
     updated_at: str = Field(default_factory=lambda: datetime.now(UTC).isoformat())
 
 

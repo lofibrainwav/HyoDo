@@ -48,13 +48,14 @@ IDENTITY_CORE = {
         "4. 집현전 학자: 방통, 자룡, 육손, 영덕",
     ],
     "pillars": {
-        "眞 (Truth)": "35% - 기술적 확실성 - 장영실",
-        "善 (Goodness)": "35% - 윤리/안정성 - 이순신",
-        "美 (Beauty)": "20% - 단순함/우아함 - 신사임당",
-        "孝 (Serenity)": "8% - 평온/연속성 - 승상",
-        "永 (Eternity)": "2% - 영속성/레거시 - 승상",
+        "仁 (Benevolence 25% - 자비·개발자 경험 - 승상",
+        "眞 (Truth 22% - 기술적 확실성 - 장영실",
+        "善 (Goodness 18% - 윤리/안정성 - 이순신",
+        "忠 (Loyalty 15% - 충성·SSOT 준수 - 김유신",
+        "美 (Beauty 15% - 단순함/우아함 - 신사임당",
+        "永 (Eternity calculated) - ⁵√(仁×眞×善×忠×美) 기하평균",
     },
-    "trinity_formula": "Trinity Score = 0.35×眞 + 0.35×善 + 0.20×美 + 0.08×孝 + 0.02×永",
+    "trinity_formula": "HYOGOOK V5: F = (In+T+G+C+B) + ⁵√(In×T×G×C×B)",
     "governance": {
         "AUTO_RUN": "Trinity ≥ 90 AND Risk ≤ 10",
         "ASK_COMMANDER": "위 조건 미충족 시",
@@ -273,11 +274,11 @@ async def generate_bootstrap_context() -> str:
 3. 3책사: 장영실(眞), 이순신(善), 신사임당(美)
 
 ## 眞善美孝永 5기둥
-- 眞 (Truth): 35% - 기술적 확실성 (장영실)
-- 善 (Goodness): 35% - 윤리/안정성 (이순신)
-- 美 (Beauty): 20% - 단순함/우아함 (신사임당)
-- 孝 (Serenity): 8% - 평온/연속성
-- 永 (Eternity): 2% - 영속성
+- 眞 (Truth 18% - 기술적 확실성 (장영실)
+- 善 (Goodness 18% - 윤리/안정성 (이순신)
+- 美 (Beauty 12% - 단순함/우아함 (신사임당)
+- 孝 (Serenity 40% - 평온/연속성
+- 永 (Eternity 12% - 영속성
 
 ## 거버넌스
 - AUTO_RUN: Trinity ≥ 90 AND Risk ≤ 10

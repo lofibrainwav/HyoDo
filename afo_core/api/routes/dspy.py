@@ -139,11 +139,11 @@ class MIPROv2Optimizer:
 
             # Return combined score (weighted average)
             weights = {
-                "truth": 0.35,
-                "goodness": 0.35,
-                "beauty": 0.20,
-                "serenity": 0.08,
-                "eternity": 0.02,
+                "truth": 0.18,
+                "goodness": 0.18,
+                "beauty": 0.12,
+                "serenity": 0.40,
+                "eternity": 0.12,
             }
             combined_score = sum(scores.get(k, 0.5) * v for k, v in weights.items())
 

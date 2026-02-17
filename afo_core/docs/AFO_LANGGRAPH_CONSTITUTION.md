@@ -26,11 +26,11 @@
 
 | 기둥 | 역할 및 수학적 의미 | 핵심 규범 및 시스템 적용 |
 |------|---------------------|-------------------------|
-| **眞 (Truth)** | **기술적/수학적 확실성 (35% 가중치)**. | LangGraph의 **StateGraph**가 객관적 Trinity Score를 유지하여 LLM의 자가 채점(환각)을 원천 봉쇄합니다. [AFO_TRINITY_BRAIN_HUB_SPEC_v2.md] |
-| **善 (Goodness)** | **윤리적 안정성 및 시스템 안전성 (35% 가중치)**. | Conditional Edges와 Checkpoints를 통해 오류 복구와 Risk ≤ 10 강제를 구현합니다. [AFO_SERENITY_OPERATIONS.md] |
-| **美 (Beauty)** | **형식·서사·인터페이스의 아름다움 (20-30% 가중치)**. | 그래프 흐름의 명확성과 서사적 일관성을 통해 인지적 미학적 마찰을 제거합니다. [AFO_VISUAL_ARTS_MANUAL.md] |
-| **孝 (Serenity)** | **평온의 지혜 (마찰 제거) (8% 가중치)**. | Serenity Gate를 그래프 노드로 내장하여 **AUTO_RUN**을 평온 기준으로만 허가합니다. [AFO_ENHANCE_BRIDGE_CONSTITUTION_v1.md] |
-| **永 (Eternity)** | **영속성 및 무한한 창의성의 기반 (2% 가중치)**. | Checkpoints(Persistence)로 상태를 영속화하여 시스템의 무한 진화를 보장합니다. [AFO_MAINTENANCE_PROTOCOL.md] |
+| **眞 (Truth)** | **기술적/수학적 확실성 (18% 가중치)**. | LangGraph의 **StateGraph**가 객관적 Trinity Score를 유지하여 LLM의 자가 채점(환각)을 원천 봉쇄합니다. [AFO_TRINITY_BRAIN_HUB_SPEC_v2.md] |
+| **善 (Goodness)** | **윤리적 안정성 및 시스템 안전성 (18% 가중치)**. | Conditional Edges와 Checkpoints를 통해 오류 복구와 Risk ≤ 10 강제를 구현합니다. [AFO_SERENITY_OPERATIONS.md] |
+| **美 (Beauty)** | **형식·서사·인터페이스의 아름다움 (12% 가중치)**. | 그래프 흐름의 명확성과 서사적 일관성을 통해 인지적 미학적 마찰을 제거합니다. [AFO_VISUAL_ARTS_MANUAL.md] |
+| **孝 (Serenity)** | **평온의 지혜 (마찰 제거) (40% 가중치)**. | Serenity Gate를 그래프 노드로 내장하여 **AUTO_RUN**을 평온 기준으로만 허가합니다. [AFO_ENHANCE_BRIDGE_CONSTITUTION_v1.md] |
+| **永 (Eternity)** | **영속성 및 무한한 창의성의 기반 (12% 가중치)**. | Checkpoints(Persistence)로 상태를 영속화하여 시스템의 무한 진화를 보장합니다. [AFO_MAINTENANCE_PROTOCOL.md] |
 
 ### 2. 4대 절대 명령 (Royal Library)
 

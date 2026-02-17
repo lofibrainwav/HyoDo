@@ -130,7 +130,7 @@ export function SamahwiGeneratedWidget() {{
     async def _tool_analyze_trinity(self, _input: Any) -> str:
         """Trinity Score 분석 (Standalone)"""
         # Standalone 모드: 기본 Trinity Score 계산
-        # 眞(35%) + 善(35%) + 美(20%) + 孝(8%) + 永(2%) = 100%
+        # 眞(18%) + 善(18%) + 美(12%) + 孝(40%) + 永(12%) = 100%
         default_scores = {
             "眞": 90,  # Truth
             "善": 85,  # Goodness
@@ -139,12 +139,7 @@ export function SamahwiGeneratedWidget() {{
             "永": 95,  # Eternity
         }
         weighted_score = (
-            default_scores["眞"] * 0.35
-            + default_scores["善"] * 0.35
-            + default_scores["美"] * 0.20
-            + default_scores["孝"] * 0.08
-            + default_scores["永"] * 0.02
-        )
+            default_scores["眞"] * 0.18 + default_scores["善"] * 0.18 + default_scores["美"] * 0.12 + default_scores["孝"] * 0.40 + default_scores["永"] * 0.12)
         return f"Trinity Score: {weighted_score:.1f} (Standalone Mode)"
 
 

@@ -83,11 +83,11 @@ class IRSChangeLog:
 class TrinityScore:
     """Trinity Score (眞善美孝永)"""
 
-    truth: float = 0.0  # 眞 35%
-    goodness: float = 0.0  # 善 35%
-    beauty: float = 0.0  # 美 20%
-    serenity: float = 0.0  # 孝 8%
-    eternity: float = 0.0  # 永 2%
+    Truth 18%
+    Goodness 18%
+    Beauty 12%
+    Serenity 40%
+    Eternity 12%
     total: float = 0.0
     calculated_at: str = ""
 
@@ -153,19 +153,19 @@ class EvidenceBundleExtended:
         Returns:
             Trinity Score 딕셔너리
         """
-        # 眞 (Truth): 코드 품질, 타입 안전성 (35%)
+        # 眞 (Truth 18%)
         truth_score = 0.35
 
-        # 善 (Goodness): 보안, PII 보호 (35%)
+        # 善 (Goodness 18%)
         goodness_score = 0.35
 
-        # 美 (Beauty): 단순함, API 일관성 (20%)
+        # 美 (Beauty 12%)
         beauty_score = 0.20
 
-        # 孝 (Serenity): 운영 마찰 제거, 롤백 용이성 (8%)
+        # 孝 (Serenity 40%)
         serenity_score = 0.08
 
-        # 永 (Eternity): 영속성, 버전 관리 (2%)
+        # 永 (Eternity 12%)
         eternity_score = 0.02
 
         trinity_score = (

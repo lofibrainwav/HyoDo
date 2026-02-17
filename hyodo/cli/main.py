@@ -120,7 +120,12 @@ def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
 
 def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 4: SBOM (永 - Eternity) - Security seal."""
-    cmd = ["python", "scripts/generate_sbom.py"]
+    # Calculate absolute path to SBOM script (from project root)
+    cli_dir = Path(__file__).parent.parent.parent  # hyodo/hyodo/cli -> hyodo
+    project_root = cli_dir.parent  # AFO Kingdom root
+    sbom_script = project_root / "scripts" / "generate_sbom.py"
+
+    cmd = ["python", str(sbom_script)]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
@@ -202,33 +207,59 @@ def check(
 
 @app.command()
 def score(
+    benevolence: float = typer.Option(1.0, "--benevolence", "-i", help="仁 점수 (0-1)"),
     truth: float = typer.Option(1.0, "--truth", "-t", help="眞 점수 (0-1)"),
     goodness: float = typer.Option(1.0, "--goodness", "-g", help="善 점수 (0-1)"),
+    loyalty: float = typer.Option(1.0, "--loyalty", "-c", help="忠 점수 (0-1)"),
     beauty: float = typer.Option(1.0, "--beauty", "-b", help="美 점수 (0-1)"),
-    serenity: float = typer.Option(1.0, "--serenity", "-s", help="孝 점수 (0-1)"),
-    eternity: float = typer.Option(1.0, "--eternity", "-e", help="永 점수 (0-1)"),
+    # Legacy options for backward compatibility
+    serenity: float = typer.Option(
+        1.0, "--serenity", "-s", help="[Legacy] 孝 점수 (0-1) - maps to benevolence"
+    ),
+    eternity: float = typer.Option(
+        1.0, "--eternity", "-e", help="[Legacy] 永 점수 (0-1) - maps to loyalty"
+    ),
 ):
     """
-    Trinity Score 계산
+    Trinity Score 계산 (HYOGOOK V5)
 
-    5기둥 가중치: 眞(35%) 善(35%) 美(20%) 孝(8%) 永(2%)
+    5덕 가중치: 仁(25%) 眞(22%) 善(18%) 忠(15%) 美(15%)
+    永(Eternity) = ⁵√(仁×眞×善×忠×美) 기하평균
     """
-    score = calculate_trinity_score(truth, goodness, beauty, serenity, eternity)
+    from hyodo import calculate_hygook_v5_score
+
+    # Use legacy mapping if V5 pillars not explicitly provided
+    effective_benevolence = benevolence if serenity == 1.0 else serenity
+    effective_loyalty = loyalty if eternity == 1.0 else eternity
+
+    F, S = calculate_hygook_v5_score(
+        effective_benevolence, truth, goodness, effective_loyalty, beauty
+    )
+    # Convert F to percentage
+    score = ((F - 6) / (60 - 6)) * 100
 
     # Create results table
-    table = Table(title="Trinity Score", show_header=True)
+    table = Table(title="HYOGOOK V5 Trinity Score", show_header=True)
     table.add_column("Pillar", style="cyan")
     table.add_column("Score", justify="right")
     table.add_column("Weight", justify="right")
-    table.add_column("Weighted", justify="right")
+    table.add_column("Value", justify="right")
 
-    table.add_row("眞 Truth", f"{truth * 100:.0f}", "35%", f"{truth * 0.35 * 100:.1f}")
-    table.add_row("善 Goodness", f"{goodness * 100:.0f}", "35%", f"{goodness * 0.35 * 100:.1f}")
-    table.add_row("美 Beauty", f"{beauty * 100:.0f}", "20%", f"{beauty * 0.20 * 100:.1f}")
-    table.add_row("孝 Serenity", f"{serenity * 100:.0f}", "8%", f"{serenity * 0.08 * 100:.1f}")
-    table.add_row("永 Eternity", f"{eternity * 100:.0f}", "2%", f"{eternity * 0.02 * 100:.1f}")
+    table.add_row(
+        "仁 Benevolence",
+        f"{effective_benevolence * 100:.0f}",
+        "25%",
+        f"{effective_benevolence:.2f}",
+    )
+    table.add_row("眞 Truth", f"{truth * 100:.0f}", "22%", f"{truth:.2f}")
+    table.add_row("善 Goodness", f"{goodness * 100:.0f}", "18%", f"{goodness:.2f}")
+    table.add_row("忠 Loyalty", f"{effective_loyalty * 100:.0f}", "15%", f"{effective_loyalty:.2f}")
+    table.add_row("美 Beauty", f"{beauty * 100:.0f}", "15%", f"{beauty:.2f}")
     table.add_row("", "", "", "")
-    table.add_row("[bold]TOTAL", "", "", f"[bold]{score:.1f}[/bold]")
+    table.add_row("永 Eternity (S)", "", "계산값", f"{S:.4f}")
+    table.add_row("F Score", "", "", f"{F:.2f}")
+    table.add_row("", "", "", "")
+    table.add_row("[bold]TOTAL", "", "", f"[bold]{score:.1f}%[/bold]")
 
     console.print(table)
 

@@ -170,12 +170,7 @@ def score(
 
     # Calculate weighted total
     total = (
-        scores["truth"] * 0.35
-        + scores["goodness"] * 0.35
-        + scores["beauty"] * 0.20
-        + scores["serenity"] * 0.08
-        + scores["eternity"] * 0.02
-    )
+        scores["truth"] * 0.18 + scores["goodness"] * 0.18 + scores["beauty"] * 0.12 + scores["serenity"] * 0.40 + scores["eternity"] * 0.12)
 
     typer.echo(f"\n🏆 Trinity Score: {total:.2f}/100")
 

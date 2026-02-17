@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 async def eternity_node(state: GraphState) -> GraphState:
     """Evaluate persistence, documentation, and reproducibility aspects.
 
-    永 (Eternity) - 영속성, 기록 보존, 재현 가능성 (2% 가중치)
+    永 (Eternity 12% 가중치)
     Scholar: Yeongdeok (Ollama / Local Scholar)
     """
     skill_id = state.plan.get("skill_id", "")

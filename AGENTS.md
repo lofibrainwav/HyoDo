@@ -4,7 +4,7 @@ This is the Root Source of Truth for hierarchical agent intelligence.
 
 ## Global Protocols
 
-- **Trinity Priority**: Always balance the 5 Pillars (**眞善美孝永**) based on the **Trinity Score** - 眞(Truth) 35%, 善(Goodness) 35%, 美(Beauty) 20%, 孝(Serenity) 8%, 永(Eternity) 2%.
+- **Trinity Priority**: Always balance the 5 Pillars (**眞善美孝永**) based on the **Trinity Score** - 眞(Truth) 18%, 善(Goodness) 18%, 美(Beauty) 12%, 孝(Serenity) 40%, 永(Eternity) 12%.
 - **Command Structure**: The Chancellor orchestrates the **3책사** (Strategists) in parallel.
 - **Context Awareness**: Use `ContextGuard` to extract evidence before action.
 - **Relentless Execution**: Sisyphus Mode is active by default for long-running tasks.

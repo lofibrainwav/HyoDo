@@ -1,16 +1,7 @@
-# HyoDo (孝道) — AFO Kingdom's Guardian
+# HyoDo (孝道)
 
-> **Automated Code Quality for AI-Assisted Development**
-> 
-> *"Where Eastern Philosophy Meets Modern Software Engineering"*
-
-<p align="center">
-  <img src="https://img.shields.io/badge/Version-3.1.0-success" alt="Version">
-  <img src="https://img.shields.io/badge/Python-3.10+-blue?logo=python" alt="Python">
-  <img.shields.io/badge/Trinity_Score-94.16-brightgreen" alt="Trinity Score">
-  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
-  <img src="https://img.shields.io/badge/Security-Patched-success" alt="Security">
-</p>
+> **Automated Code Review for AI-Assisted Development**
+> Built Where Philosophy Breathes Through Code
 
 <p align="center">
   <a href="./i18n/ko/README.md">한국어</a> •
@@ -18,184 +9,83 @@
   <a href="./i18n/ja/README.md">日本語</a>
 </p>
 
----
-
-## 🎯 Executive Summary
-
-HyoDo is the **entry point** to the AFO Kingdom ecosystem—a philosophy-driven AI development framework that evaluates code through the lens of ancient wisdom. Built as a Claude Code extension, HyoDo brings the power of the **Trinity Score** to every developer's fingertips.
-
-Unlike traditional linters that only check syntax, HyoDo evaluates your code against five philosophical pillars, ensuring not just working code, but **wise code**.
-
-### Key Metrics
-- **Cost Reduction**: 50-70% savings on AI API costs
-- **Quality Gate**: 4-stage automated validation
-- **Philosophy Engine**: 44 principles from 2,000 years of wisdom
-- **Security**: Zero critical vulnerabilities (continuously patched)
+<p align="center">
+  <img src="https://img.shields.io/badge/Works_with-Claude_Code-blueviolet" alt="Claude Code">
+  <img src="https://img.shields.io/badge/Saves-50--70%25_AI_Costs-green" alt="Cost Savings">
+  <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
+  <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
+  <img src="https://img.shields.io/badge/Version-3.1.0-success" alt="Version">
+</p>
 
 ---
 
-## 🏛️ The Five Pillars (眞善美孝永)
+## 🚀 What's New in v3.1.0
 
-Every decision in HyoDo is governed by the **Trinity Score**—a weighted evaluation system derived from Confucian and strategic philosophy:
-
-| Pillar | Hanja | Weight | Focus | Question |
-|:------:|:-----:|:------:|:------|:---------|
-| **Truth** | 眞 | 35% | Technical accuracy, type safety, evidence-based decisions | *"Will this work in 3 years?"* |
-| **Goodness** | 善 | 35% | Security, stability, risk assessment, ethics | *"What's the worst case?"* |
-| **Beauty** | 美 | 20% | Code clarity, documentation, UX, cognitive load | *"Can humans understand this?"* |
-| **Serenity** | 孝 | 8% | Developer experience, frictionless workflows | *"Is this effortless?"* |
-| **Eternity** | 永 | 2% | Long-term maintainability, knowledge preservation | *"Will this survive us?"* |
-
-### Trinity Score Formula
-```
-Score = 0.35×眞 + 0.35×善 + 0.20×美 + 0.08×孝 + 0.02×永
-```
-
-### Decision Matrix
-
-| Trinity Score | Risk Score | Action | Description |
-|:-------------:|:----------:|:-------|:------------|
-| ≥ 90 | ≤ 10 | **AUTO_RUN** | Proceed automatically—code meets royal standards |
-| 70-89 | ≤ 10 | **ASK_COMMANDER** | Request approval—review recommended |
-| < 70 | any | **BLOCK** | Changes required—fixes mandatory |
+- **🎯 대화형 설치**: `install_interactive.sh` - 초보자용 5단계 설치
+- **⚡ 최소 설치 모드**: Docker 없이 2분 완료
+- **📦 경량 Docker**: `docker-compose.minimal.yml` - Redis + PostgreSQL만
+- **📚 간편 가이드**: `QUICK_START_SIMPLE.md` - 3분 퀵스타트
 
 ---
 
-## ⚔️ The Three Strategists (3책사)
+## What is HyoDo?
 
-HyoDo implements parallel strategist analysis through the **Chancellor Orchestrator**, inspired by King Sejong's court:
+HyoDo is a **code quality automation system** designed for AI-assisted development workflows. It integrates with [Claude Code](https://claude.ai/code) to provide:
 
+- **Trinity Score** - 5-pillar philosophy-based code evaluation
+- **Automated Quality Gates** - CI/CD integration with smart routing
+- **Cost-Aware Routing** - Reduce AI API costs by 40-70%
+- **Multi-Agent Collaboration** - Parallel strategist analysis
+
+## The Five Pillars (眞善美孝永)
+
+HyoDo evaluates code through five philosophical pillars:
+
+| Pillar | Weight | Focus |
+|--------|--------|-------|
+| **眞 (Truth)** | 18% | Technical accuracy, type safety, test coverage |
+| **善 (Goodness)** | 18% | Security, stability, error handling |
+| **美 (Beauty)** | 12% | Code clarity, documentation, UX |
+| **孝 (Serenity)** | 40% | Maintainability, low cognitive load |
+| **永 (Eternity)** | 12% | Long-term sustainability |
+
+**Trinity Score Formula:**
 ```
-                    ┌─────────────────────────────┐
-                    │   👑 Chancellor (승상)      │
-                    │   Decision Orchestrator     │
-                    └──────────────┬──────────────┘
-                                   │
-           ┌───────────────────────┼───────────────────────┐
-           │                       │                       │
-           ▼                       ▼                       ▼
-    ┌─────────────┐        ┌─────────────┐        ┌─────────────┐
-    │ 眞 Jang     │        │ 善 Yi       │        │ 美 Shin     │
-    │ Yeong-sil   │        │ Sun-sin     │        │ Saimdang    │
-    │ ⚔️ Spear    │        │ 🛡️ Shield   │        │ 🌉 Bridge   │
-    │ (35%)       │        │ (35%)       │        │ (20%)       │
-    └─────────────┘        └─────────────┘        └─────────────┘
-```
-
-| Strategist | Symbol | Persona | Role | Internal Engine |
-|:-----------|:------:|:--------|:-----|:----------------|
-| **Jang Yeong-sil** | ⚔️ | Jeong Yak-yong | Architecture, technical strategy | qwen2.5-coder |
-| **Yi Sun-sin** | 🛡️ | Ryu Seong-ryong | Security, risk assessment, ethics | deepseek-r1 |
-| **Shin Saimdang** | 🌉 | Heo Jun | UX, documentation, clarity | qwen3-vl |
-
-Each strategist operates in parallel, providing independent analysis that is synthesized into the final Trinity Score.
-
----
-
-## 🏗️ Architecture
-
-### The 11 Organs (十一臟六腑)
-
-HyoDo connects to the AFO Kingdom's distributed organ system:
-
-| Organ | Hanja | Service | Port | Role |
-|:------|:-----:|:--------|:----:|:-----|
-| Heart | 心 | Redis | 6379 | Session, cache, pub/sub |
-| Liver | 肝 | PostgreSQL | 15432 | Persistent data storage |
-| Brain | 腦 | Soul Engine | 8010 | Main FastAPI API |
-| Tongue | 舌 | Ollama | 11434 | Local LLM (Qwen3-VL + Gemma) |
-| Lungs | 肺 | LanceDB | — | Vector embeddings |
-| Eyes | 眼 | Dashboard | 3000 | Next.js 16 monitoring UI |
-| Kidney | 腎 | MCP | — | External tool connections |
-
-### Core Components
-
-```
-HyoDo/
-├── commands/          # 19 Claude Code slash commands
-│   ├── /start         # Welcome guide
-│   ├── /check         # 4-Gate CI validation
-│   ├── /score         # Trinity Score calculation
-│   ├── /safe          # Security scan (Yi Sun-sin)
-│   ├── /trinity       # Full pillar audit
-│   └── /cost          # AI cost estimation
-├── skills/            # 4 skill categories
-│   ├── trinity-score-calculator/
-│   ├── strategy-engine/
-│   ├── philosophy-guide/
-│   └── kingdom-navigator/
-├── agents/            # 3 Strategist configurations
-└── afo_core/          # Backend API (FastAPI)
+Score = 0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永
 ```
 
----
+## Quick Start (3분 완료)
 
-## 📜 Philosophy in Code: The Royal Library
-
-HyoDo encodes **44 principles** from classical texts into software engineering practices:
-
-### I. The Art of War (손자병법) — 13 Principles
-> **Truth (眞) 70% / Serenity (孝) 30%**
-
-1. **Know Thyself (지피지기)**: Query Context7/database before any action—hallucination prevention
-2. **Win Without Fighting (상병벌모)**: Import existing libraries over writing new code
-3. **DRY_RUN First (병자궤도야)**: Show simulation results before dangerous operations
-4. **Speed is Value (병귀신속)**: Async/Celery for slow operations
-5. **Five Factors (도천지장법)**: Align goals, environment, resources, leadership, method
-6. **Regular & Irregular (정병)**: Standard patterns first, then customization
-7. **Profiling (허실)**: Find bottlenecks through measurement
-8. **Exception Handling (구변)**: Graceful degradation paths
-9. **Observability (용간)**: Logs and monitoring as intelligence
-10. **Destructive Actions (화공)**: Confirm dangerous operations with gates
-11. **Ship Fast (졸속)**: MVP over perfect delay
-12. **True Automation (부전이굴)**: Zero user friction
-13. **Infrastructure != Code (도구와 대상의 분리)**: Docker status doesn't affect quality scores
-
-### II. Romance of Three Kingdoms (삼국지) — 15 Principles
-> **Eternity (永) 60% / Goodness (善) 40%**
-
-14. **Loose Coupling (도원결의)**: Modules united by shared goals, not tight binding
-15. **Three Retries (삼고초려)**: `Retry(max=3, backoff=exponential)` for external APIs
-16. **Graceful Degradation (공성계)**: Fallback UI even when broken
-17. **Borrow Arrows (초선차전)**: Leverage open source effectively
-18. **Chain Strategy (연환계)**: Microservices linked into powerful pipelines
-19. **Beauty Trap (미인계)**: Complex logic behind beautiful UI
-20. **Iterate (칠종칠금)**: Write → Critique → Refine loop
-21. **Doubt the Instrument (측정 도구의 의심)**: Verify measurement code before blaming services
-22. **Environment Contracts (환경변수의 계약)**: Defensive parsing of HOST variables
-23. **Optional Means N/A**: Exclude optional services from scoring (not zero)
-24. **Timing (동남풍)**: Scheduler utilization
-
-*[See full 44 principles in AFO_ROYAL_LIBRARY.md]*
-
----
-
-## 🚀 Quick Start
-
-### Prerequisites
-- Python 3.10+
-- Claude Code CLI
-- Git
-
-### Installation
+### ⚡ 초보자용 설치 (추천)
 
 ```bash
-# Interactive installation (recommended)
+# 대화형 설치 (5단계, 3분)
 curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install_interactive.sh | bash
 
-# Or manual installation
-git clone https://github.com/lofibrainwav/HyoDo.git ~/.hyodo
-cd ~/.hyodo && ./install.sh
+# Claude Code에서 실행
+cd ~/.hyodo && claude
+/start    # 시작 가이드
 ```
 
-### Configuration
+### 📦 수동 설치
 
 ```bash
-# Copy environment template
-cp .env.minimal .env
+# Clone the repository
+git clone https://github.com/lofibrainwav/HyoDo.git
+cd HyoDo
 
-# Edit with your API keys
-nano .env
+# Install (creates Claude Code skills)
+./install.sh
+```
+
+### 🐳 Docker 설치 (전체 기능)
+
+```bash
+# 최소 설치 (Redis + PostgreSQL)
+docker-compose -f docker-compose.minimal.yml up -d
+
+# 전체 설치 (모든 11장기)
+docker-compose up -d
 ```
 
 ### Basic Usage
@@ -203,158 +93,119 @@ nano .env
 In Claude Code, use these commands:
 
 ```bash
-/start              # Welcome guide and help
-/check              # Run 4-Gate CI quality check
-/score              # Calculate Trinity Score
-/safe               # Security and risk scan
-/trinity "analyze"  # Full pillar audit
-/cost "feature"     # Estimate AI cost
+/check          # Run 4-Gate CI quality check
+/score          # Calculate Trinity Score
+/safe           # Security and risk scan
+/trinity        # Full Trinity analysis
 ```
 
----
+### Score Interpretation
 
-## 🛡️ Security: Zero Tolerance Policy
+| Score | Status | Action |
+|-------|--------|--------|
+| **90+** | Excellent | Auto-approve eligible |
+| **70-89** | Good | Review recommended |
+| **50-69** | Needs Work | Improvements required |
+| **<50** | Critical | Block until fixed |
 
-### Current Status: ✅ All Critical Vulnerabilities Patched
+## Features
 
-| CVE | Package | Severity | Status |
-|:----|:--------|:---------|:-------|
-| CVE-2026-25528 | langsmith | Medium | ✅ Patched (0.6.3) |
-| CVE-2026-24688 | pypdf | Medium | ✅ Patched (6.6.2) |
-| CVE-2026-24486 | python-multipart | High | ✅ Patched (0.0.22) |
-| CVE-2026-0994 | protobuf | High | ✅ Patched (5.29.6) |
-| CVE-2026-21441 | urllib3 | High | ✅ Patched (2.6.3) |
+### 4-Gate CI Protocol
 
-### Security Scanning
+```
+Gate 1: Pyright (眞 Truth) → Type checking
+Gate 2: Ruff (美 Beauty) → Lint + format
+Gate 3: pytest (善 Goodness) → Test coverage
+Gate 4: SBOM (永 Eternity) → Security seal
+```
 
+### Three Strategists
+
+HyoDo uses three AI strategists for balanced analysis:
+
+- **Jang Yeong-sil (장영실)** - Technical architecture (眞)
+- **Yi Sun-sin (이순신)** - Security & stability (善)
+- **Shin Saimdang (신사임당)** - UX & clarity (美)
+
+### Cost-Aware Routing
+
+Automatically routes tasks to appropriate tiers:
+
+| Tier | Use Case | Cost |
+|------|----------|------|
+| FREE | Read-only, search | $0 |
+| CHEAP | Simple edits | Low |
+| EXPENSIVE | Complex refactors | Standard |
+
+## Project Structure
+
+```
+hyodo/
+├── commands/       # Claude Code slash commands (19개 스킬)
+├── skills/         # Skill definitions (4개 카테고리)
+├── agents/         # AI agent configurations (3책사)
+├── scripts/        # Automation scripts
+├── hooks/          # Git hooks
+└── afo_core/       # Core library
+```
+
+## Requirements
+
+### 최소 설치 (추천)
+- Python 3.10+
+- Claude Code CLI
+- Git
+
+### 전체 설치
+- Python 3.10+
+- Claude Code CLI
+- Git
+- Docker & Docker Compose
+- Redis, PostgreSQL, Ollama (또는 Docker로 실행)
+
+## Configuration
+
+### 최소 설정 (.env.minimal)
 ```bash
-# Run security audit
-pip-audit --desc --format=table
-
-# Check for new vulnerabilities
-safety check
+cp .env.minimal .env
+# ANTHROPIC_API_KEY만 설정하면 OK
 ```
 
-### Security Principles
-
-1. **Never commit secrets**: Pre-commit hooks automatically detect API keys
-2. **PII Redaction**: All logs mask sensitive information
-3. **Sandboxed Execution**: MCP tools run in isolated environments
-4. **Dependency Pinning**: All packages pinned with SHA256 hashes
-
-See [SECURITY_PATCHES.md](SECURITY_PATCHES.md) for detailed vulnerability history.
-
----
-
-## 🧪 Quality Gates: 4-Gate CI Protocol
-
-Every change runs through the CI Lock Protocol:
-
+### 전체 설정 (.env.example)
 ```bash
-make check    # Run all 4 gates
+cp .env.example .env
+# 12개 변수 설정 (Ollama, Redis, PostgreSQL 등)
 ```
 
-| Gate | Pillar | Tool | Purpose |
-|:-----|:------:|:-----|:--------|
-| **Gate 1** | 眞 | Pyright | Type checking, regression detection |
-| **Gate 2** | 美 | Ruff | Linting, formatting (line-length: 100) |
-| **Gate 3** | 善 | pytest | Unit tests (316+ tests) |
-| **Gate 4** | 永 | SBOM | Security seal, dependency audit |
+## Documentation
 
-### Test Markers
+| 문서 | 설명 |
+|------|------|
+| [QUICK_START_SIMPLE.md](QUICK_START_SIMPLE.md) | 🚀 3분 퀵스타트 |
+| [QUICK_START.md](QUICK_START.md) | 📚 상세 가이드 |
+| [install_interactive.sh](install_interactive.sh) | 🎯 대화형 설치 |
+| [docker-compose.minimal.yml](docker-compose.minimal.yml) | ⚡ 경량 Docker |
 
-```bash
-pytest -m smoke         # Quick smoke tests
-pytest -m integration   # Integration tests
-pytest -m slow          # Pre-deployment tests
-pytest --cov=hyodo      # Coverage report
-```
+## Contributing
 
----
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
-## 📊 Evolution Timeline
+All contributions are evaluated using the Five Pillars. A Trinity Score >= 70 is required for PRs.
 
-| Phase | Date | Milestone |
-|:------|:-----|:----------|
-| **Genesis** | Dec 2024 | Visual Creator awakening |
-| **Awakening** | Dec 2025 | Trinity Philosophy installed (v1.0) |
-| **Harmony** | Dec 2025 | 11 Organs + Dashboard + CPA (v2.0) |
-| **Expansion** | Dec 2025 | Self-expanding mode activated (v2.5) |
-| **Metacognition** | Feb 2026 | Phase 106: "Doubt the Instrument" (v3.0) |
-| **Royal Library** | Feb 2026 | Phase 111: 44 Principles codified (v3.1) |
+## License
 
-*[See full evolution in AFO_EVOLUTION_LOG.md]*
+MIT License - see [LICENSE](./LICENSE)
 
----
+## Links
 
-## 🌍 AFO Kingdom Ecosystem
-
-HyoDo is the **beginner's entry point** to the larger AFO Kingdom:
-
-| Component | Description | Tech Stack |
-|:----------|:------------|:-----------|
-| **HyoDo** | CLI plugin for Claude Code | Python, Typer |
-| **afo-core** | Backend API, Chancellor Graph | FastAPI, LangGraph |
-| **dashboard** | Real-time monitoring UI | Next.js 16, React 19 |
-| **trinity-os** | Philosophy engine, RAG | LanceDB, Ollama |
-
----
-
-## 🤝 Contributing
-
-### Quality Requirements
-
-1. **All changes must pass 4-Gate CI**
-2. **Trinity Score ≥ 70 required** for merge
-3. **Evidence required**: Cite file paths, test outputs, or existing patterns
-4. **No drive-by refactoring**: Keep diffs minimal
-
-### Commit Convention
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-- Trinity Score: <score>
-- Risk Score: <risk>
-- 4-Gate CI: <status>
-```
-
-Types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`, `security`
-
-### Decision Labels
-
-- 🟢 **AUTO_RUN**: Trinity ≥ 90, Risk ≤ 10
-- 🟡 **ASK_COMMANDER**: Trinity 70-89
-- 🔴 **BLOCK**: Trinity < 70
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for full guidelines.
-
----
-
-## 📚 Documentation
-
-| Document | Purpose |
-|:---------|:--------|
-| [QUICK_START_SIMPLE.md](QUICK_START_SIMPLE.md) | 3-minute quickstart guide |
-| [QUICK_START.md](QUICK_START.md) | Detailed setup instructions |
-| [AGENTS.md](AGENTS.md) | AI agent governance rules |
-| [SECURITY_PATCHES.md](SECURITY_PATCHES.md) | Vulnerability tracking |
-| [CHANGELOG.md](CHANGELOG.md) | Version history |
-| [PHILOSOPHY.md](PHILOSOPHY.md) | Five Pillars deep dive |
-
----
-
-## 📄 License
-
-MIT License — See [LICENSE](LICENSE)
+- [Documentation](./docs/)
+- [Roadmap](./ROADMAP.md)
+- [Changelog](./CHANGELOG.md)
+- [Security Policy](./SECURITY.md)
 
 ---
 
 <p align="center">
-  <em>"One Truth, One System, One Kingdom"</em><br>
-  <strong>하나의 진리, 하나의 시스템, 하나의 왕국</strong><br><br>
-  <em>Built with the Spirit of King Sejong</em><br>
-  <strong>세종대왕의 정신으로</strong>
+  <em>"孝道 (HyoDo) - The Way of Devotion"</em><br>
+  Built with the Spirit of King Sejong
 </p>
