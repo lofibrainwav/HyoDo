@@ -1,6 +1,7 @@
 # HyoDo (孝道)
 
 > **Automated Code Review for AI-Assisted Development**
+> **HYOGOOK V5 (五德憲章) — Phase 127+**
 > Built Where Philosophy Breathes Through Code
 
 <p align="center">
@@ -32,27 +33,32 @@
 
 HyoDo is a **code quality automation system** designed for AI-assisted development workflows. It integrates with [Claude Code](https://claude.ai/code) to provide:
 
-- **Trinity Score** - 5-pillar philosophy-based code evaluation
+- **Trinity Score** - 6-pillar philosophy-based code evaluation (HYOGOOK V5)
 - **Automated Quality Gates** - CI/CD integration with smart routing
 - **Cost-Aware Routing** - Reduce AI API costs by 40-70%
 - **Multi-Agent Collaboration** - Parallel strategist analysis
 
-## The Five Pillars (眞善美孝永)
+## The Six Pillars (仁眞善忠美永)
 
-HyoDo evaluates code through five philosophical pillars:
+HyoDo evaluates code through six philosophical pillars using **HYOGOOK V5 (五德憲章)**:
 
-| Pillar | Weight | Focus |
-|--------|--------|-------|
-| **眞 (Truth)** | 18% | Technical accuracy, type safety, test coverage |
-| **善 (Goodness)** | 18% | Security, stability, error handling |
-| **美 (Beauty)** | 12% | Code clarity, documentation, UX |
-| **孝 (Serenity)** | 40% | Maintainability, low cognitive load |
-| **永 (Eternity)** | 12% | Long-term sustainability |
-
-**Trinity Score Formula:**
 ```
-Score = 0.18×眞 + 0.18×善 + 0.12×美 + 0.40×孝 + 0.12×永
+F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
+S = ⁵√(T × G × In × B × C)  # Geometric Mean (永)
 ```
+
+| Pillar | Hanja | Weight | Role | Focus |
+|:------:|:-----:|:------:|:-----|:------|
+| **仁** | Benevolence | **25%** | Chancellors | Developer experience, user serenity |
+| **眞** | Truth | **22%** | Jang Yeong-sil | Technical accuracy, architecture |
+| **善** | Goodness | **18%** | Yi Sun-sin | Security, stability, ethics |
+| **忠** | Loyalty | **15%** | Kim Yu-sin | SSOT compliance, cultural continuity |
+| **美** | Beauty | **15%** | Shin Saimdang | Clean code, UX, documentation |
+| **永** | Eternity | **Geometric** | System | Harmony & sustainability |
+
+**Range**: F ∈ [6, 60], S ∈ [1, 10]
+
+> **Note**: Legacy WEIGHTED_V1 (Phase ≤126) used: 眞18%, 善18%, 美12%, 孝40%, 永12%.
 
 ## Quick Start (3분 완료)
 
@@ -99,14 +105,13 @@ In Claude Code, use these commands:
 /trinity        # Full Trinity analysis
 ```
 
-### Score Interpretation
+### Score Interpretation (HYOGOOK V5)
 
-| Score | Status | Action |
-|-------|--------|--------|
-| **90+** | Excellent | Auto-approve eligible |
-| **70-89** | Good | Review recommended |
-| **50-69** | Needs Work | Improvements required |
-| **<50** | Critical | Block until fixed |
+| F Score | S Score | Status | Action |
+|:-------:|:-------:|:-------|:-------|
+| **F ≥ 54** | **S ≥ 8** | Excellent | `AUTO_RUN` — Auto-approve |
+| **F ≥ 45** | **S ≥ 7** | Good | `ASK_COMMANDER` — Review recommended |
+| **F < 45** | — | Needs Work | `BLOCK` — Improvements required |
 
 ## Features
 
@@ -190,7 +195,7 @@ cp .env.example .env
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
-All contributions are evaluated using the Five Pillars. A Trinity Score >= 70 is required for PRs.
+All contributions are evaluated using the Six Pillars. A Trinity Score of F ≥ 45 AND S ≥ 7 is required for PRs (HYOGOOK V5).
 
 ## License
 
