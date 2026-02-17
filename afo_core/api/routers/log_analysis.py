@@ -62,7 +62,7 @@ async def trigger_analysis(request: AnalysisRequest, background_tasks: Backgroun
     logger.info(f"Received analysis request for {path}")
 
     # Execute Pipeline
-    # TODO: In future, offload to Celery or proper async worker via background_tasks
+    # BACKLOG: Celery/async worker 연동 (Phase 127+)
     result = _service.run_pipeline(str(path), chunk_size=request.chunk_size)
 
     status = "success"

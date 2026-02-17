@@ -84,7 +84,7 @@ class LogAnalysisService:
                     "trinity_score": 0.0,
                 }
 
-            # TODO: In future, offload to Celery or proper async worker via background_tasks
+            # BACKLOG: Celery/async worker 연동 (Phase 127+)
             # For now, process synchronously with chunked reading for large files
 
             results = {

@@ -309,7 +309,7 @@ class AntigravityEngine:
     def _format_decision_message(self, result: dict[str, Any]) -> str:
         """결정 메시지 포맷팅"""
         # Logic extracted to Reporter but kept here as it's used by evaluate_quality_gate directly
-        # TODO: Move this to Reporter too later if needed
+        # BACKLOG: Reporter 클래스로 이동 검토 (Phase 127+)
         report_lang = getattr(antigravity, "REPORT_LANGUAGE", "ko") if antigravity else "ko"
         d, t, r, c = (
             result.get("decision"),

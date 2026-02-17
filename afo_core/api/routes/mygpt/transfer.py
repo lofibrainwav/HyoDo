@@ -139,7 +139,7 @@ async def transfer_to_mygpt(request: MyGPTTransferRequest) -> MyGPTTransferRespo
             # Redis 실패 시에도 전송은 성공으로 처리할지 여부는 비즈니스 로직에 따름.
             # 현재는 경고만 로그하고 진행 (Simulation/Fallback)
 
-        # 2. MyGPT Actions API 호출 (Phase 79 - TODO-006)
+        # 2. MyGPT Actions API 호출 (BACKLOG-006: MyGPT sync implementation)
         api_result = await _call_mygpt_api(
             action="receive_context",
             payload={
@@ -204,7 +204,7 @@ async def sync_mygpt_contexts():
     3. jangjungwha.com 업데이트
     """
     try:
-        # 실제 동기화 로직 구현 (Phase 79 - TODO-006)
+        # 실제 동기화 로직 구현 (BACKLOG-006: MyGPT sync implementation)
         # 1. MyGPT에서 최신 컨텍스트 조회
         api_result = await _call_mygpt_api(
             action="sync_state",

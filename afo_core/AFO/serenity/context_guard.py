@@ -65,7 +65,7 @@ class ContextGuard:
         """
         [Phase 50] 전체 컨텍스트를 분석하여 토큰 효율성을 극대화한 메시지 묶음 생성.
         """
-        # TODO: 실제 토큰 계산 로직 (tiktoken 등) 연동
+        # BACKLOG: tiktoken 등 토큰 계산 로직 연동 (Phase 127+)
         # 지금은 문자열 길이 기반 근사치 사용
         total_len = len(system_prompt) + len(user_prompt) + sum(len(m["content"]) for m in history)
 

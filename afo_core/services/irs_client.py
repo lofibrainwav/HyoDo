@@ -17,7 +17,7 @@ from AFO.utils.resilience import retry_with_backoff
 
 logger = logging.getLogger(__name__)
 
-# IRS OAuth2 Configuration (Phase 79 - TODO-001)
+# IRS OAuth2 Configuration (BACKLOG-001: Full OAuth2 mTLS flow)
 IRS_TOKEN_URL = os.getenv("IRS_TOKEN_URL", "https://api.irs.gov/oauth2/token")
 IRS_CLIENT_SECRET = os.getenv("IRS_CLIENT_SECRET")
 
@@ -62,7 +62,7 @@ class IRSClient:
             return True
 
         try:
-            # Phase 79 - TODO-001: Full OAuth2 Client Credentials flow with mTLS
+            # BACKLOG-001: Full OAuth2 Client Credentials flow with mTLS
             if not self.ssl_context or not self.client_id:
                 logger.warning("🔐 Missing SSL context or client_id for OAuth2 flow")
                 return False
