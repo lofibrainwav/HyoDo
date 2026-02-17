@@ -235,60 +235,85 @@ class SSOTAutoUpdater:
         return info
 
     def _calculate_trinity_score(
-        self, change: ChangeDetection, parameters: dict[str, Any]
+        self, change: ChangeDetection, parameters: dict[str, Any], use_hyogook_v5: bool = True
     ) -> TrinityScore:
         """
-        Trinity Score 계산
+        Trinity Score 계산 (Phase-aware)
 
-        Args:
-            change: 변경 감지 결과
-            parameters: 파싱된 파라미터
-
-        Returns:
-            Trinity Score
+        HYOGOOK V5 (Phase 127+): F = (T+G+In+B+C) + ⁵√(T×G×In×B×C)
+        Legacy (Phase ≤126): F = T×0.18 + G×0.18 + B×0.12 + S×0.40 + E×0.12
         """
+        import math
+
         # 眞 (Truth): 기술적 확실성
         truth_score = 1.0
         if change.impact.category == "critical":
-            truth_score = 0.95  # Critical 변경은 약간의 불확실성
+            truth_score = 0.95
         elif not parameters:
-            truth_score = 0.5  # 파라미터 파싱 실패
+            truth_score = 0.5
 
         # 善 (Goodness): 보안/리스크
         goodness_score = 1.0
         if change.impact.category == "critical":
-            goodness_score = 0.85  # Critical 변경은 리스크 높음
+            goodness_score = 0.85
         elif change.impact.category == "high":
             goodness_score = 0.90
 
         # 美 (Beauty): 단순함/일관성
         beauty_score = 1.0
         if len(parameters) == 0:
-            beauty_score = 0.5  # 파라미터 없음
+            beauty_score = 0.5
 
-        # 孝 (Serenity): 평온 수호
-        serenity_score = 1.0
+        # 孝/仁 (Serenity/Benevolence): 평온 수호
+        serenity_or_benevolence_score = 1.0
         if change.impact.category == "critical":
-            serenity_score = 0.8  # 운영 마찰 우려
+            serenity_or_benevolence_score = 0.8
 
-        # 永 (Eternity): 영속성
-        eternity_score = 1.0
+        # 永/忠 (Eternity/Loyalty): 영속성/충성
+        eternity_or_loyalty_score = 1.0
 
-        # 가중평균 (眞18% + 善18% + 美12% + 孝40% + 永12%)
-        total_score = (
-            (truth_score * 0.35)
-            + (goodness_score * 0.35)
-            + (beauty_score * 0.20)
-            + (serenity_score * 0.08)
-            + (eternity_score * 0.12)
-        )
+        if use_hyogook_v5:
+            # HYOGOOK V5 (Phase 127+): 仁25% 眞22% 善18% 忠15% 美15%
+            weights = {
+                "truth": 0.22,
+                "goodness": 0.18,
+                "beauty": 0.15,
+                "benevolence": 0.25,
+                "loyalty": 0.15,
+            }
+            weighted_sum = (
+                truth_score * weights["truth"]
+                + goodness_score * weights["goodness"]
+                + beauty_score * weights["beauty"]
+                + serenity_or_benevolence_score * weights["benevolence"]
+                + eternity_or_loyalty_score * weights["loyalty"]
+            )
+            # S = ⁵√(T × G × In × B × C) - 기하평균 (永)
+            geometric_mean = math.pow(
+                truth_score
+                * goodness_score
+                * serenity_or_benevolence_score
+                * beauty_score
+                * eternity_or_loyalty_score,
+                1 / 5,
+            )
+            total_score = weighted_sum + geometric_mean
+        else:
+            # Legacy WEIGHTED_V1 (Phase ≤126): 眞18% 善18% 美12% 孝40% 永12%
+            total_score = (
+                (truth_score * 0.18)
+                + (goodness_score * 0.18)
+                + (beauty_score * 0.12)
+                + (serenity_or_benevolence_score * 0.40)
+                + (eternity_or_loyalty_score * 0.12)
+            )
 
         return TrinityScore(
             truth=truth_score,
             goodness=goodness_score,
             beauty=beauty_score,
-            serenity=serenity_score,
-            eternity=eternity_score,
+            serenity=serenity_or_benevolence_score,
+            eternity=eternity_or_loyalty_score,
             total=total_score,
             calculated_at=datetime.now().isoformat(),
         )

@@ -262,11 +262,11 @@ class TrinityCalculator:
         base_scores = PERSONA_SCORE_MAP[persona_type]
 
         scores = [
+            base_scores.benevolence,
             base_scores.truth,
             base_scores.goodness,
+            base_scores.loyalty,
             base_scores.beauty,
-            base_scores.serenity,
-            base_scores.eternity,
         ]
 
         # 컨텍스트 부스트 적용
@@ -277,11 +277,11 @@ class TrinityCalculator:
         self._record_prometheus_metrics(scores)
 
         return {
-            "truth": scores[0],
-            "goodness": scores[1],
-            "beauty": scores[2],
-            "serenity": scores[3],
-            "eternity": scores[4],
+            "benevolence": scores[0],
+            "truth": scores[1],
+            "goodness": scores[2],
+            "loyalty": scores[3],
+            "beauty": scores[4],
         }
 
     @staticmethod
@@ -290,7 +290,7 @@ class TrinityCalculator:
         try:
             from AFO.api.middleware.prometheus import record_trinity_score
 
-            pillars = ["truth", "goodness", "beauty", "serenity", "eternity"]
+            pillars = ["benevolence", "truth", "goodness", "loyalty", "beauty"]
             for pillar, score in zip(pillars, scores, strict=True):
                 record_trinity_score(pillar, score)
         except ImportError:

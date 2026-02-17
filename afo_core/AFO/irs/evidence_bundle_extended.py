@@ -81,15 +81,20 @@ class IRSChangeLog:
 
 @dataclass
 class TrinityScore:
-    """Trinity Score (眞善美孝永)"""
+    """Trinity Score (眞善美孝永) - Phase-aware weights
 
-    Truth 18%
-    Goodness 18%
-    Beauty 12%
-    Serenity 40%
-    Eternity 12%
+    HYOGOOK V5 (Phase 127+): 仁25% 眞22% 善18% 忠15% 美15%
+    Legacy (Phase ≤126): 眞18% 善18% 美12% 孝40% 永12%
+    """
+
+    truth: float = 0.0
+    goodness: float = 0.0
+    beauty: float = 0.0
+    serenity: float = 0.0  # Legacy: 孝 / HYOGOOK V5: 仁(benevolence)
+    eternity: float = 0.0  # Legacy: 永 / HYOGOOK V5: 忠(loyalty)
     total: float = 0.0
     calculated_at: str = ""
+    formula_version: str = "hyogook_v5"  # "weighted_v1" or "hyogook_v5"
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -100,6 +105,7 @@ class TrinityScore:
             "eternity": self.eternity,
             "total": self.total,
             "calculated_at": self.calculated_at,
+            "formula_version": self.formula_version,
         }
 
 
@@ -144,68 +150,94 @@ class EvidenceBundleExtended:
 
         return self.bundle_id
 
-    def calculate_trinity_score(
-        self,
-    ) -> dict[str, float]:
+    def calculate_trinity_score(self, use_hyogook_v5: bool = True) -> dict[str, float | str]:
         """
-        Trinity Score 계산 (확장)
+        Trinity Score 계산 (Phase-aware)
 
-        Returns:
-            Trinity Score 딕셔너리
+        HYOGOOK V5 (Phase 127+): F = (T+G+In+B+C) + ⁵√(T×G×In×B×C)
+        Legacy (Phase ≤126): F = T×0.18 + G×0.18 + B×0.12 + S×0.40 + E×0.12
         """
-        # 眞 (Truth 18%)
-        truth_score = 0.35
+        import math
 
-        # 善 (Goodness 18%)
-        goodness_score = 0.35
+        serenity_score: float = 0.0
+        benevolence_score: float = 0.0
+        eternity_score: float = 0.0
+        loyalty_score: float = 0.0
 
-        # 美 (Beauty 12%)
-        beauty_score = 0.20
+        if use_hyogook_v5:
+            # HYOGOOK V5 Weights: 仁25% 眞22% 善18% 忠15% 美15%
+            truth_weight = 0.22
+            goodness_weight = 0.18
+            beauty_weight = 0.15
+            benevolence_weight = 0.25
+            loyalty_weight = 0.15
 
-        # 孝 (Serenity 40%)
-        serenity_score = 0.08
+            truth_score = self.trinity_score.get("truth", 0.18)
+            goodness_score = self.trinity_score.get("goodness", 0.18)
+            beauty_score = self.trinity_score.get("beauty", 0.12)
+            benevolence_score = self.trinity_score.get("benevolence", 0.25)
+            loyalty_score = self.trinity_score.get("loyalty", 0.15)
 
-        # 永 (Eternity 12%)
-        eternity_score = 0.02
+            weighted_sum = (
+                truth_score * truth_weight
+                + goodness_score * goodness_weight
+                + beauty_score * beauty_weight
+                + benevolence_score * benevolence_weight
+                + loyalty_score * loyalty_weight
+            )
+            # S = ⁵√(T × G × In × B × C) - 기하평균 (永)
+            geometric_mean = math.pow(
+                truth_score * goodness_score * benevolence_score * beauty_score * loyalty_score,
+                1 / 5,
+            )
+            total = weighted_sum + geometric_mean
+            version = "hyogook_v5"
+        else:
+            # Legacy WEIGHTED_V1: 眞18% 善18% 美12% 孝40% 永12%
+            truth_weight = 0.18
+            goodness_weight = 0.18
+            beauty_weight = 0.12
+            serenity_weight = 0.40
+            eternity_weight = 0.12
 
-        trinity_score = (
-            truth_score + goodness_score + beauty_score + serenity_score + eternity_score
-        )
+            truth_score = self.trinity_score.get("truth", 0.18)
+            goodness_score = self.trinity_score.get("goodness", 0.18)
+            beauty_score = self.trinity_score.get("beauty", 0.12)
+            serenity_score = self.trinity_score.get("serenity", 0.40)
+            eternity_score = self.trinity_score.get("eternity", 0.12)
+
+            total = (
+                truth_score * truth_weight
+                + goodness_score * goodness_weight
+                + beauty_score * beauty_weight
+                + serenity_score * serenity_weight
+                + eternity_score * eternity_weight
+            )
+            version = "weighted_v1"
 
         return {
             "眞": truth_score,
             "善": goodness_score,
             "美": beauty_score,
-            "孝": serenity_score,
-            "永": eternity_score,
-            "total": trinity_score,
+            "孝": serenity_score if not use_hyogook_v5 else benevolence_score,
+            "永": eternity_score if not use_hyogook_v5 else loyalty_score,
+            "total": total,
+            "formula_version": version,
         }
 
     def verify_integrity(self) -> bool:
-        """
-        무결성 검증
-
-        Returns:
-            True if 무결함, False if 손상됨
-        """
-        # 번들 계산
+        """무결성 검증"""
         integrity_hash = self._calculate_bundle_hash()
-
-        # 해시 비교
         previous_hash = None
-        all_hashes_match = True
 
         for log in self.change_logs:
             if previous_hash is not None and log.previous_hash != integrity_hash:
-                all_hashes_match = False
-
-            if not all_hashes_match:
                 logger.warning("무결성 검증 실패: 해시 불일치")
                 return False
+            previous_hash = log.current_hash
 
-            logger.debug("무결성 검증 완료: 모든 해시 일치")
-
-            return True
+        logger.debug("무결성 검증 완료: 모든 해시 일치")
+        return True
 
     def _calculate_bundle_hash(self) -> str:
         """
@@ -221,16 +253,7 @@ class EvidenceBundleExtended:
 
         return bundle_hash
 
-    def export_to_json(self, output_path: Path | str) -> None:
-        """
-        JSON으로 내보내기
-
-        Args:
-            output_path: 출력 파일 경로
-
-        Returns:
-            JSON 파일 경로
-        """
+    def export_to_json(self, output_path: Path | str) -> str:
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -297,13 +320,7 @@ class EvidenceBundleManager:
     def __init__(self, storage_path: Path | None = None) -> None:
         self.storage_path = storage_path or EvidenceBundleManager.STORAGE_PATH
 
-    def create_bundle(self) -> EvidenceBundleExtended:
-        """
-        새 Evidence Bundle 생성
-
-        Returns:
-            Evidence Bundle ID
-        """
+    def create_bundle(self) -> str:
         bundle = EvidenceBundleExtended(
             bundle_id=str(uuid4()),
             timestamp=datetime.now().isoformat(),
@@ -314,7 +331,6 @@ class EvidenceBundleManager:
 
         logger.info(f"Evidence Bundle 생성: {bundle.bundle_id}")
 
-        # 저장
         self.storage_path.mkdir(parents=True, exist_ok=True)
         bundle_file = self.storage_path / f"{bundle.bundle_id}.json"
         bundle.export_to_json(bundle_file)

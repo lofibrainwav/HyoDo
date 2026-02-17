@@ -63,7 +63,7 @@ async def trigger_analysis(request: AnalysisRequest, background_tasks: Backgroun
 
     # Execute Pipeline
     # BACKLOG: Celery/async worker 연동 (Phase 127+)
-    result = _service.run_pipeline(str(path), chunk_size=request.chunk_size)
+    result = await _service.run_pipeline(str(path), chunk_size=request.chunk_size)
 
     status = "success"
     message = "Analysis completed successfully."

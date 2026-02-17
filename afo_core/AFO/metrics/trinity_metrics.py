@@ -50,12 +50,13 @@ class TrinityScoreResult:
 
     @property
     def pillars(self) -> list[PillarScore]:
+        # HYOGOOK V5 weights (Phase 127+): 仁25% 眞22% 善18% 忠15% 美15%
         return [
-            PillarScore("眞", self.truth, 0.35),
-            PillarScore("善", self.goodness, 0.35),
-            PillarScore("美", self.beauty, 0.20),
-            PillarScore("孝", self.serenity, 0.08),
-            PillarScore("永", self.eternity, 0.02),
+            PillarScore("眞", self.truth, 0.22),
+            PillarScore("善", self.goodness, 0.18),
+            PillarScore("美", self.beauty, 0.15),
+            PillarScore("仁", self.serenity, 0.25),
+            PillarScore("忠", self.eternity, 0.15),
         ]
 
 
@@ -103,12 +104,36 @@ def calculate_trinity_score(
     beauty: float,
     serenity: float,
     eternity: float,
+    use_hyogook_v5: bool = True,
 ) -> TrinityScoreResult:
-    """Calculate Trinity Score with weights.
+    """Calculate Trinity Score with Phase-aware weights.
 
-    Weights: 眞=18%, 善=18%, 美=12%, 孝=40%, 永=12%
+    HYOGOOK V5 (Phase 127+): F = (T+G+In+B+C) + ⁵√(T×G×In×B×C)
+    Legacy (Phase ≤126): F = T×0.18 + G×0.18 + B×0.12 + S×0.40 + E×0.12
     """
-    total = truth * 0.18 + goodness * 0.18 + beauty * 0.12 + serenity * 0.40 + eternity * 0.02
+    import math
+
+    if use_hyogook_v5:
+        # HYOGOOK V5 Weights: 仁25% 眞22% 善18% 忠15% 美15%
+        weights = {
+            "truth": 0.22,
+            "goodness": 0.18,
+            "beauty": 0.15,
+            "benevolence": 0.25,
+            "loyalty": 0.15,
+        }
+        weighted_sum = (
+            truth * weights["truth"]
+            + goodness * weights["goodness"]
+            + beauty * weights["beauty"]
+            + serenity * weights["benevolence"]
+            + eternity * weights["loyalty"]
+        )
+        geometric_mean = math.pow(truth * goodness * serenity * beauty * eternity, 1 / 5)
+        total = weighted_sum + geometric_mean
+    else:
+        # Legacy WEIGHTED_V1: 眞18% 善18% 美12% 孝40% 永12%
+        total = truth * 0.18 + goodness * 0.18 + beauty * 0.12 + serenity * 0.40 + eternity * 0.12
 
     return TrinityScoreResult(
         truth=truth,
