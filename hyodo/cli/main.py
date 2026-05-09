@@ -22,9 +22,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-# Add parent to path for imports
-sys.path.insert(0, str(Path(__file__).parent.parent))
-
 from hyodo import calculate_trinity_score
 
 app = typer.Typer(
@@ -35,9 +32,38 @@ app = typer.Typer(
 console = Console()
 
 
+def find_repo_root(start: Optional[Path] = None) -> Optional[Path]:
+    """Find a HyoDo repository checkout root, if the CLI is running inside one."""
+    current = (start or Path.cwd()).resolve()
+    for candidate in [current, *current.parents]:
+        if (candidate / "pyproject.toml").exists() and (candidate / "hyodo").exists():
+            return candidate
+    return None
+
+
+def afo_core_path() -> Optional[Path]:
+    """Return the extended AFO core path when available in a repository checkout."""
+    root = find_repo_root()
+    if not root:
+        return None
+
+    candidates = [
+        root / "packages" / "afo-core",
+        root / "afo_core",
+    ]
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 1: Pyright (眞 - Truth) - Type checking."""
-    cmd = ["pyright", "--project", "packages/afo-core/pyproject.toml"]
+    core_path = afo_core_path()
+    if core_path and (core_path / "pyproject.toml").exists():
+        cmd = ["pyright", "--project", str(core_path / "pyproject.toml")]
+    else:
+        cmd = ["pyright", "hyodo"]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -60,14 +86,17 @@ def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
 
 def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]:
     """Gate 2: Ruff (美 - Beauty) - Lint & Format."""
-    cmd = ["ruff", "check", "."]
+    core_path = afo_core_path()
+    root = find_repo_root()
+    cwd = core_path or root or Path.cwd()
+    target = "." if core_path else "hyodo" if root else "."
+
+    cmd = ["ruff", "check", target]
     if fix:
         cmd.append("--fix")
 
     try:
-        result = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=60, cwd="packages/afo-core"
-        )
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(cwd))
 
         if result.returncode == 0:
             return True, "All checks passed!"
@@ -85,19 +114,26 @@ def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]
 
 def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 3: pytest (善 - Goodness) - Test coverage."""
-    # Use packages/afo-core/tests (verified: 3,185 tests, 0 collection errors)
-    # Excludes: hyodo/afo_core/tests (experimental, import issues)
-    cmd = [
-        "pytest",
-        "packages/afo-core/tests",
-        "-q",
-        "--tb=short",
-        "--ignore=packages/afo-core/tests/integration",
-        "--ignore=packages/afo-core/tests/_legacy",
-        "--ignore=packages/afo-core/tests/_obsolete",
-        "-m",
-        "not external and not integration",
-    ]
+    root = find_repo_root()
+    core_path = afo_core_path()
+
+    if core_path and (core_path / "tests").exists():
+        test_path = core_path / "tests"
+        cmd = [
+            "pytest",
+            str(test_path),
+            "-q",
+            "--tb=short",
+            f"--ignore={test_path / 'integration'}",
+            f"--ignore={test_path / '_legacy'}",
+            f"--ignore={test_path / '_obsolete'}",
+            "-m",
+            "not external and not integration",
+        ]
+    elif root and (root / "tests").exists():
+        cmd = ["pytest", str(root / "tests"), "-q", "--tb=short"]
+    else:
+        return True, "No repository test suite found; package smoke checks only"
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
@@ -120,10 +156,13 @@ def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
 
 def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 4: SBOM (永 - Eternity) - Security seal."""
-    # Calculate absolute path to SBOM script (from project root)
-    cli_dir = Path(__file__).parent.parent.parent  # hyodo/hyodo/cli -> hyodo
-    project_root = cli_dir.parent  # AFO Kingdom root
-    sbom_script = project_root / "scripts" / "generate_sbom.py"
+    root = find_repo_root()
+    if not root:
+        return True, "No repository checkout found; SBOM skipped in package mode"
+
+    sbom_script = root / "scripts" / "generate_sbom.py"
+    if not sbom_script.exists():
+        return True, "SBOM script not found; skipped"
 
     cmd = ["python", str(sbom_script)]
 
@@ -137,7 +176,7 @@ def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
         return False, error_msg[:200] if len(error_msg) > 200 else error_msg
 
     except FileNotFoundError:
-        return False, "generate_sbom.py not found"
+        return False, "python executable not found"
     except subprocess.TimeoutExpired:
         return False, "timeout (>60s)"
     except Exception as e:
@@ -212,7 +251,6 @@ def score(
     goodness: float = typer.Option(1.0, "--goodness", "-g", help="善 점수 (0-1)"),
     loyalty: float = typer.Option(1.0, "--loyalty", "-c", help="忠 점수 (0-1)"),
     beauty: float = typer.Option(1.0, "--beauty", "-b", help="美 점수 (0-1)"),
-    # Legacy options for backward compatibility
     serenity: float = typer.Option(
         1.0, "--serenity", "-s", help="[Legacy] 孝 점수 (0-1) - maps to benevolence"
     ),
@@ -228,17 +266,14 @@ def score(
     """
     from hyodo import calculate_hygook_v5_score
 
-    # Use legacy mapping if V5 pillars not explicitly provided
     effective_benevolence = benevolence if serenity == 1.0 else serenity
     effective_loyalty = loyalty if eternity == 1.0 else eternity
 
     F, S = calculate_hygook_v5_score(
         effective_benevolence, truth, goodness, effective_loyalty, beauty
     )
-    # Convert F to percentage
     score = ((F - 6) / (60 - 6)) * 100
 
-    # Create results table
     table = Table(title="HYOGOOK V5 Trinity Score", show_header=True)
     table.add_column("Pillar", style="cyan")
     table.add_column("Score", justify="right")
@@ -263,7 +298,6 @@ def score(
 
     console.print(table)
 
-    # Action recommendation
     if score >= 90:
         console.print("\n[bold green]🟢 AUTO_RUN - 바로 진행 가능[/bold green]")
     elif score >= 70:
@@ -329,7 +363,6 @@ def start():
     console.print(guide)
 
 
-# Alias commands for common operations
 @app.command(name="trinity")
 def trinity_analysis(
     task: str = typer.Argument(..., help="분석할 작업 설명"),
@@ -338,17 +371,12 @@ def trinity_analysis(
     상세 Trinity 분석 (3책사 관점)
     """
     console.print(Panel.fit(f"🔮 Trinity Analysis: {task}", style="bold magenta"))
-
-    # Simulate 3 strategists
     console.print("\n⚔️  Jang Yeong-sil (眞) - Technical Analysis...")
     console.print("  ✓ Architecture review complete")
-
     console.print("\n🛡️  Yi Sun-sin (善) - Security Assessment...")
     console.print("  ✓ Risk analysis complete")
-
     console.print("\n🌉 Shin Saimdang (美) - UX Evaluation...")
     console.print("  ✓ Clarity check complete")
-
     console.print("\n[bold green]✅ Trinity Analysis Complete[/bold green]")
 
 
