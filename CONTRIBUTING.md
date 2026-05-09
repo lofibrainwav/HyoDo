@@ -10,17 +10,30 @@
 
 Thank you for your interest in contributing to HyoDo!
 
-## 眞善美孝永 Contribution Principles
+## HYOGOOK V5 Contribution Principles
 
-All contributions are evaluated according to the Five Pillars:
+All contributions are evaluated according to the six pillars used in the public HyoDo v3.1.0 documentation.
 
-| Pillar | Weight | Contribution Criteria |
-|--------|--------|----------------------|
-| **眞 (Truth)** | 35% | Is it technically accurate? Does it have tests? |
-| **善 (Goodness)** | 35% | Is it safe and stable? No security issues? |
-| **美 (Beauty)** | 20% | Is the code readable and well-documented? |
-| **孝 (Serenity)** | 8% | Does it improve user experience? |
-| **永 (Eternity)** | 2% | Is it maintainable long-term? |
+| Pillar | Meaning | Focus |
+|--------|---------|-------|
+| **仁** | Benevolence | Developer experience and user serenity |
+| **眞** | Truth | Technical accuracy and architecture |
+| **善** | Goodness | Security, safety, stability |
+| **忠** | Loyalty | SSOT continuity and project integrity |
+| **美** | Beauty | Readability, UX, documentation |
+| **永** | Eternity | Long-term harmony and sustainability |
+
+### Score Expectations
+
+HyoDo currently uses the HYOGOOK V5 evaluation model documented in `README.md`.
+
+| Result | Meaning | Action |
+|--------|---------|--------|
+| F ≥ 54 and S ≥ 8 | Excellent | Auto approval candidate |
+| F ≥ 45 and S ≥ 7 | Good | Review recommended |
+| F < 45 | Needs work | Changes required |
+
+> Legacy WEIGHTED_V1 contribution weights are preserved only for historical reference.
 
 ## Contribution Process
 
@@ -42,6 +55,7 @@ git checkout -b feature/your-feature-name
 - Add tests for new functionality
 - Update documentation as needed
 - Keep commits focused and atomic
+- Avoid changing philosophy or scoring logic without documentation updates
 
 ### 4. Testing
 
@@ -62,7 +76,7 @@ If using Claude Code:
 
 ```bash
 /check          # Full 4-gate CI check
-/trinity        # Trinity Score analysis
+/trinity        # HYOGOOK V5 analysis
 ```
 
 ### 5. Pull Request
@@ -70,7 +84,8 @@ If using Claude Code:
 - Write a clear PR title describing the change
 - Fill out the PR template
 - Link related Issues
-- **Trinity Score >= 70 required** for merge
+- Ensure documentation matches implementation
+- Ensure HYOGOOK V5 scoring references stay consistent
 
 ## Code Style
 
@@ -93,6 +108,15 @@ test: add tests
 refactor: code improvement
 ```
 
+## Testing Structure
+
+The public `hyodo` package and the extended `afo_core` modules currently share validation infrastructure.
+
+```text
+hyodo/            -> public package and CLI
+afo_core/tests/   -> extended evaluation and integration tests
+```
+
 ## Getting Help
 
 - Open an Issue for questions
@@ -105,4 +129,4 @@ Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing.
 
 ---
 
-*"Strategists command, warriors execute"* - AFO Kingdom Philosophy
+*"Strategists command, warriors execute"* - HyoDo OSS Philosophy
