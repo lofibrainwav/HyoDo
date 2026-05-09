@@ -2,7 +2,7 @@
 
 This checklist blocks the final public release until the package, CLI, and workflow path are verified.
 
-## Current release candidate
+## Current Release Candidate
 
 - Target version: `3.1.0`
 - Candidate commit: `9ada2114169b078e96eedd320c182b6809e5b2af`
@@ -85,6 +85,6 @@ Do not perform these until the smoke workflow is visibly green.
 
 ## Release decision
 
-Current state: **release candidate, not final release**.
+Current state: **Release Candidate, not final release**.
 
 Reason: workflow files are present, but the release candidate still needs a visible green GitHub Actions run before final tag/release.
