@@ -36,19 +36,26 @@ jobs:
 
       - name: Install Python Dependencies
         run: |
-          pip install ruff pyright pytest
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
 
       - name: Ruff Lint Check
         run: |
           echo "Ruff lint check..."
-          ruff check afo_core/ --output-format=concise
+          ruff check hyodo/ afo_core/ --output-format=concise
           echo "Lint check passed"
 
       - name: Ruff Format Check
         run: |
           echo "Ruff format check..."
-          ruff format --check afo_core/
+          ruff format --check hyodo/ afo_core/
           echo "Format check passed"
+
+      - name: Pyright Type Check
+        run: |
+          echo "Pyright type check..."
+          pyright hyodo afo_core || true
+          echo "Pyright check complete"
 
       - name: Validate JSON
         run: |
@@ -62,10 +69,10 @@ jobs:
           python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"
           echo "YAML files are valid"
 
-      - name: Check New Files Exist
+      - name: Check v3.1.0 Files Exist
         run: |
-          echo "v3.1.0 new files check..."
-          new_files=(
+          echo "v3.1.0 files check..."
+          required_files=(
             "install_interactive.sh"
             "docker-compose.minimal.yml"
             ".env.minimal"
@@ -73,11 +80,12 @@ jobs:
             "commands/SKILL_INDEX.md"
             "commands/SKILL_TEMPLATE.md"
           )
-          for file in "${new_files[@]}"; do
+          for file in "${required_files[@]}"; do
             if [ -f "$file" ]; then
               echo "Found: $file"
             else
-              echo "Missing: $file (optional)"
+              echo "Missing required v3.1.0 file: $file"
+              exit 1
             fi
           done
 
@@ -99,12 +107,14 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install pytest pydantic
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+          pip install pydantic
 
       - name: Run Unit Tests
         run: |
           echo "Running unit tests..."
-          python -m pytest afo_core/tests/unit/ -v --tb=short || echo "No unit tests found"
+          python -m pytest -v --tb=short
 
       - name: Security Scan
         run: |
@@ -117,12 +127,9 @@ jobs:
 
       - name: Check Environment Files
         run: |
-          if [ -f ".env.example" ]; then
-            echo ".env.example exists"
-          fi
-          if [ -f ".env.minimal" ]; then
-            echo ".env.minimal exists (v3.1.0)"
-          fi
+          test -f ".env.example"
+          test -f ".env.minimal"
+          echo "Environment template files exist"
 
   # -------------------------------------------------------------------------
   # Beauty Gate - Documentation and Structure
@@ -133,6 +140,9 @@ jobs:
 
     steps:
       - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
@@ -156,18 +166,32 @@ jobs:
             "CONTRIBUTING.md"
             "CHANGELOG.md"
             "LICENSE"
+            "SECURITY.md"
+            "pyproject.toml"
           )
           for file in "${required_files[@]}"; do
             if [ -f "$file" ]; then
               echo "Found: $file"
+            else
+              echo "Missing required file: $file"
+              exit 1
             fi
           done
+
+      - name: Check v3.1.0 Documentation Consistency
+        run: |
+          grep -q "3.1.0" README.md
+          grep -q "3.1.0" CHANGELOG.md
+          grep -q "HYOGOOK V5" README.md
+          grep -q "HYOGOOK V5" QUICK_START_SIMPLE.md
+          grep -q "HYOGOOK V5" CONTRIBUTING.md
+          echo "v3.1.0 documentation consistency verified"
 
   # -------------------------------------------------------------------------
   # Final Trinity Score Validation
   # -------------------------------------------------------------------------
   trinity-score:
-    name: "Trinity Score"
+    name: "HYOGOOK V5 Score"
     runs-on: ubuntu-latest
     needs: [truth-gate, goodness-gate, beauty-gate]
 
@@ -175,27 +199,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Calculate Trinity Score
+      - name: Calculate HYOGOOK V5 Score
         run: |
           echo "============================================"
-          echo "     HyoDo Trinity Score Validation"
+          echo "     HyoDo HYOGOOK V5 Score Validation"
           echo "============================================"
           echo ""
-          echo "v1.0.0 Python Compatibility Edition"
+          echo "v3.1.0 Public OSS Release"
           echo ""
-          echo "Improvements:"
+          echo "Validated signals:"
           echo "  - Python 3.10/3.11/3.12 support"
-          echo "  - Optional dependency groups"
-          echo "  - Dependabot security updates"
-          echo ""
-          echo "Python: 3.10+ compatibility enabled"
-          echo "Dependencies: Optional groups (rag, browser, agents, ml, monitoring, db)"
+          echo "  - HYOGOOK V5 documentation consistency"
+          echo "  - Quick start, contributing, security policy sync"
+          echo "  - Required release files present"
           echo ""
           echo "============================================"
-          echo "     Trinity Score: 87/100 - AUTO_RUN"
+          echo "     Status: READY_FOR_RELEASE_REVIEW"
           echo "============================================"
 
-      - name: Create Score Badge
+      - name: Create Score Badge Artifact
         run: |
-          echo "Trinity Score 87" > trinity_score.txt
-          echo "Status: AUTO_RUN" >> trinity_score.txt
+          echo "HYOGOOK V5" > trinity_score.txt
+          echo "Status: READY_FOR_RELEASE_REVIEW" >> trinity_score.txt
