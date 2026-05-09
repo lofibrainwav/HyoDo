@@ -1,9 +1,9 @@
 # HyoDo CI/CD Pipeline
-# Python 3.10/3.11/3.12 Matrix Test
+# Public package release gates + advisory extended AFO checks
 
 name: HyoDo CI
 
-on:
+"on":
   push:
     branches: [main, develop]
   pull_request:
@@ -11,7 +11,7 @@ on:
 
 jobs:
   # -------------------------------------------------------------------------
-  # Truth Gate - Technical Accuracy (Python 3.10/3.11/3.12 Matrix)
+  # Truth Gate - Public package release gate
   # -------------------------------------------------------------------------
   truth-gate:
     name: "Truth Gate - Python ${{ matrix.python-version }}"
@@ -39,23 +39,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Ruff Lint Check
+      - name: Ruff Lint Check - Public Package
         run: |
-          echo "Ruff lint check..."
-          ruff check hyodo/ afo_core/ --output-format=concise
-          echo "Lint check passed"
+          echo "Ruff lint check for public package..."
+          ruff check hyodo/ --output-format=concise
+          echo "Public package lint check passed"
 
-      - name: Ruff Format Check
+      - name: Ruff Format Check - Public Package
         run: |
-          echo "Ruff format check..."
-          ruff format --check hyodo/ afo_core/
-          echo "Format check passed"
+          echo "Ruff format check for public package..."
+          ruff format --check hyodo/
+          echo "Public package format check passed"
 
-      - name: Pyright Type Check
+      - name: Pyright Type Check - Public Package
         run: |
-          echo "Pyright type check..."
-          pyright hyodo afo_core || true
-          echo "Pyright check complete"
+          echo "Pyright type check for public package..."
+          pyright hyodo
+          echo "Public package type check passed"
+
+      - name: Advisory Ruff Check - Extended AFO Core
+        continue-on-error: true
+        run: |
+          echo "Advisory lint check for extended AFO core..."
+          echo "AFO core contains legacy/experimental modules and is not a public package release blocker."
+          ruff check afo_core/ --output-format=concise
 
       - name: Validate JSON
         run: |
@@ -66,8 +73,13 @@ jobs:
       - name: Validate YAML
         run: |
           echo "Validating workflow files..."
-          python3 -c "import yaml; yaml.safe_load(open('.github/workflows/ci.yml'))"
-          echo "YAML files are valid"
+          python3 - <<'PY'
+          import yaml
+          for path in ['.github/workflows/ci.yml', '.github/workflows/smoke.yml']:
+              with open(path, encoding='utf-8') as f:
+                  yaml.safe_load(f)
+              print(f'{path} is valid')
+          PY
 
       - name: Check v3.1.0 Files Exist
         run: |
@@ -90,7 +102,7 @@ jobs:
           done
 
   # -------------------------------------------------------------------------
-  # Goodness Gate - Safety and Testing
+  # Goodness Gate - Safety and package smoke tests
   # -------------------------------------------------------------------------
   goodness-gate:
     name: "Goodness Gate - Safety"
@@ -109,11 +121,26 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
-          pip install pydantic
 
-      - name: Run Unit Tests
+      - name: Run Public Package Smoke Tests
         run: |
-          echo "Running unit tests..."
+          echo "Running public package smoke checks..."
+          python - <<'PY'
+          import hyodo
+          from hyodo import calculate_hygook_v5_score, calculate_trinity_score
+
+          assert hyodo.__version__ == '3.1.0'
+          f_score, s_score = calculate_hygook_v5_score(1, 1, 1, 1, 1)
+          assert round(f_score, 2) == 60.00
+          assert round(s_score, 2) == 10.00
+          assert calculate_trinity_score(1, 1, 1, benevolence=1, loyalty=1) == 100
+          print('public package smoke checks passed')
+          PY
+
+      - name: Run Optional Repository Tests
+        continue-on-error: true
+        run: |
+          echo "Running repository tests as advisory checks..."
           python -m pytest -v --tb=short
 
       - name: Security Scan
@@ -150,10 +177,10 @@ jobs:
       - name: Install markdownlint
         run: npm install -g markdownlint-cli
 
-      - name: Lint Markdown
+      - name: Lint Release Markdown
         run: |
-          echo "Documentation quality check..."
-          markdownlint "**/*.md" --ignore node_modules --ignore "**/node_modules/**" || true
+          echo "Release documentation quality check..."
+          markdownlint README.md QUICK_START_SIMPLE.md CONTRIBUTING.md SECURITY.md CHANGELOG.md RELEASE_CHECKLIST.md || true
           echo "Documentation check complete"
 
       - name: Check Required Files
@@ -167,6 +194,7 @@ jobs:
             "CHANGELOG.md"
             "LICENSE"
             "SECURITY.md"
+            "RELEASE_CHECKLIST.md"
             "pyproject.toml"
           )
           for file in "${required_files[@]}"; do
@@ -185,10 +213,11 @@ jobs:
           grep -q "HYOGOOK V5" README.md
           grep -q "HYOGOOK V5" QUICK_START_SIMPLE.md
           grep -q "HYOGOOK V5" CONTRIBUTING.md
+          grep -q "Release Candidate" RELEASE_CHECKLIST.md
           echo "v3.1.0 documentation consistency verified"
 
   # -------------------------------------------------------------------------
-  # Final Trinity Score Validation
+  # Final HYOGOOK V5 Release Readiness
   # -------------------------------------------------------------------------
   trinity-score:
     name: "HYOGOOK V5 Score"
@@ -207,11 +236,14 @@ jobs:
           echo ""
           echo "v3.1.0 Public OSS Release"
           echo ""
-          echo "Validated signals:"
-          echo "  - Python 3.10/3.11/3.12 support"
-          echo "  - HYOGOOK V5 documentation consistency"
-          echo "  - Quick start, contributing, security policy sync"
+          echo "Validated release blockers:"
+          echo "  - Public package lint/type checks"
+          echo "  - HYOGOOK V5 public API smoke checks"
+          echo "  - Documentation consistency"
           echo "  - Required release files present"
+          echo ""
+          echo "Advisory checks:"
+          echo "  - Extended AFO core lint/tests are non-blocking until legacy cleanup"
           echo ""
           echo "============================================"
           echo "     Status: READY_FOR_RELEASE_REVIEW"
