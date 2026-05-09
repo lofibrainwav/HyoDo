@@ -5,9 +5,10 @@ This checklist blocks the final public release until the package, CLI, and workf
 ## Current Release Candidate
 
 - Target version: `3.1.0`
-- Candidate commit: `9ada2114169b078e96eedd320c182b6809e5b2af`
+- Candidate commit: `61dd647cf4791f5b0ed4af457a446e0da61732c1`
 - Core runtime hardening commit: `8688a4bc0a95b3375937ec706face9edda2914a1`
 - Release governance commit: `c2b5b86cbfcd82e093db37f65943d53f6e26f440`
+- Final lint convergence commit: `61dd647cf4791f5b0ed4af457a446e0da61732c1`
 - Release issue: <https://github.com/lofibrainwav/HyoDo/issues/1>
 
 ## Pre-release gates
@@ -28,16 +29,19 @@ This checklist blocks the final public release until the package, CLI, and workf
 - [x] scoring inputs are clamped for numeric safety
 - [x] CLI supports repository mode and standalone package mode
 - [x] `hyodo check` no longer assumes `packages/afo-core` always exists
+- [x] unused CLI import removed for Ruff hard gate convergence
+- [x] safe `.env.example` template added for onboarding and CI contract
 
 ### CI and smoke validation
 
 - [x] `.github/workflows/ci.yml` fixed for checkout behavior
+- [x] `.github/workflows/ci.yml` separates public package gates from extended AFO advisory checks
 - [x] `.github/workflows/smoke.yml` added
 - [x] smoke workflow validates shell syntax
 - [x] smoke workflow validates package build
 - [x] smoke workflow validates `twine check dist/*`
 - [x] smoke workflow validates wheel install
-- [x] smoke workflow validates `hyodo --help`, `hyodo --version`, `hyodo safe`, and `hyodo score`
+- [x] smoke workflow validates `hyodo --help`, `hyodo --version`, `hyodo version`, `hyodo start`, `hyodo safe`, and `hyodo score`
 - [x] smoke workflow validates public HYOGOOK V5 API and formula outputs
 - [x] smoke workflow validates package-mode `hyodo check`
 - [ ] GitHub Actions run is visible for the release candidate
@@ -59,7 +63,7 @@ Do not perform these until the smoke workflow is visibly green.
 3. After green smoke and CI, create tag:
 
    ```bash
-   git tag -a v3.1.0 9ada2114169b078e96eedd320c182b6809e5b2af -m "HyoDo v3.1.0"
+   git tag -a v3.1.0 61dd647cf4791f5b0ed4af457a446e0da61732c1 -m "HyoDo v3.1.0"
    git push origin v3.1.0
    ```
 
@@ -74,6 +78,8 @@ Do not perform these until the smoke workflow is visibly green.
    pip install dist/*.whl
    hyodo --help
    hyodo --version
+   hyodo version
+   hyodo start
    hyodo safe
    hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
    python -c "import hyodo; print(hyodo.__version__)"
