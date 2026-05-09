@@ -21,7 +21,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from hyodo import __version__, calculate_trinity_score
+from hyodo import __version__
 
 app = typer.Typer(
     name="hyodo",
