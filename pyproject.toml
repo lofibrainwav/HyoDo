@@ -54,6 +54,7 @@ dev = [
     "twine>=5.0",
     "fastapi>=0.115",
     "httpx>=0.27",
+    "PyYAML>=6.0",
 ]
 cli = [
     "typer>=0.9.0",
