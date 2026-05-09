@@ -287,7 +287,7 @@ def safe(
     checks = [
         ("비밀키 노출", "✅", "green"),
         ("위험 명령", "✅", "green"),
-        ("프로덕션 영향", "⚠️", "yellow" if not strict else "✅", "yellow"),
+        ("프로덕션 영향", "✅" if strict else "⚠️", "green" if strict else "yellow"),
         ("롤백 가능성", "✅", "green"),
     ]
 
