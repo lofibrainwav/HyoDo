@@ -4,6 +4,8 @@
 > **HYOGOOK V5 (五德憲章) — Phase 127+**
 > Built Where Philosophy Breathes Through Code
 
+HyoDo is a public open-source workflow kit for Claude Code and AI-assisted development teams. Use it first as a command-driven quality system; the Python package provides reusable scoring and CLI utilities.
+
 <p align="center">
   <a href="./i18n/ko/README.md">한국어</a> •
   <a href="./i18n/zh/README.md">中文</a> •
