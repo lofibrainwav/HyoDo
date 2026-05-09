@@ -5,8 +5,9 @@ This checklist blocks the final public release until the package, CLI, and workf
 ## Current release candidate
 
 - Target version: `3.1.0`
-- Candidate commit: `0ba17c63398138d38c3438ec8d54a3c5aaf97056`
+- Candidate commit: `9ada2114169b078e96eedd320c182b6809e5b2af`
 - Core runtime hardening commit: `8688a4bc0a95b3375937ec706face9edda2914a1`
+- Release governance commit: `c2b5b86cbfcd82e093db37f65943d53f6e26f440`
 - Release issue: <https://github.com/lofibrainwav/HyoDo/issues/1>
 
 ## Pre-release gates
@@ -32,7 +33,13 @@ This checklist blocks the final public release until the package, CLI, and workf
 
 - [x] `.github/workflows/ci.yml` fixed for checkout behavior
 - [x] `.github/workflows/smoke.yml` added
-- [x] smoke workflow validates shell syntax, package build, wheel install, CLI help, and package import
+- [x] smoke workflow validates shell syntax
+- [x] smoke workflow validates package build
+- [x] smoke workflow validates `twine check dist/*`
+- [x] smoke workflow validates wheel install
+- [x] smoke workflow validates `hyodo --help`, `hyodo --version`, `hyodo safe`, and `hyodo score`
+- [x] smoke workflow validates public HYOGOOK V5 API and formula outputs
+- [x] smoke workflow validates package-mode `hyodo check`
 - [ ] GitHub Actions run is visible for the release candidate
 - [ ] smoke workflow is green
 - [ ] CI workflow is green
@@ -52,7 +59,7 @@ Do not perform these until the smoke workflow is visibly green.
 3. After green smoke and CI, create tag:
 
    ```bash
-   git tag -a v3.1.0 0ba17c63398138d38c3438ec8d54a3c5aaf97056 -m "HyoDo v3.1.0"
+   git tag -a v3.1.0 9ada2114169b078e96eedd320c182b6809e5b2af -m "HyoDo v3.1.0"
    git push origin v3.1.0
    ```
 
@@ -66,7 +73,9 @@ Do not perform these until the smoke workflow is visibly green.
    python -m twine check dist/*
    pip install dist/*.whl
    hyodo --help
+   hyodo --version
    hyodo safe
+   hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
    python -c "import hyodo; print(hyodo.__version__)"
    ```
 
