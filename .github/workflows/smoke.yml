@@ -1,0 +1,59 @@
+name: HyoDo Smoke Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    name: Install and CLI Smoke Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate shell scripts
+        run: |
+          bash -n install.sh
+          bash -n install_interactive.sh
+
+      - name: Install build dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install build
+
+      - name: Build package
+        run: |
+          python -m build
+
+      - name: Install package
+        run: |
+          pip install dist/*.whl
+
+      - name: Validate CLI entrypoint
+        run: |
+          hyodo --help
+
+      - name: Validate package import
+        run: |
+          python - <<'PY'
+          import hyodo
+          print("hyodo import ok")
+          PY
+
+      - name: Validate release docs
+        run: |
+          grep -q "3.1.0" README.md
+          grep -q "3.1.0" CHANGELOG.md
+          grep -q "HYOGOOK V5" README.md
+          grep -q "HYOGOOK V5" QUICK_START_SIMPLE.md
+          grep -q "HYOGOOK V5" CONTRIBUTING.md
