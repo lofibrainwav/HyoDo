@@ -5,7 +5,8 @@ This checklist blocks the final public release until the package, CLI, and workf
 ## Current release candidate
 
 - Target version: `3.1.0`
-- Candidate commit: `8688a4bc0a95b3375937ec706face9edda2914a1`
+- Candidate commit: `0ba17c63398138d38c3438ec8d54a3c5aaf97056`
+- Core runtime hardening commit: `8688a4bc0a95b3375937ec706face9edda2914a1`
 - Release issue: <https://github.com/lofibrainwav/HyoDo/issues/1>
 
 ## Pre-release gates
@@ -17,6 +18,7 @@ This checklist blocks the final public release until the package, CLI, and workf
 - [x] `QUICK_START_SIMPLE.md` uses HYOGOOK V5
 - [x] `CONTRIBUTING.md` uses HYOGOOK V5
 - [x] `SECURITY.md` supports v3.1.x and avoids invalid security contact info
+- [x] `RELEASE_CHECKLIST.md` documents the v3.1.0 release gate
 
 ### Runtime and package safety
 
@@ -50,7 +52,7 @@ Do not perform these until the smoke workflow is visibly green.
 3. After green smoke and CI, create tag:
 
    ```bash
-   git tag -a v3.1.0 8688a4bc0a95b3375937ec706face9edda2914a1 -m "HyoDo v3.1.0"
+   git tag -a v3.1.0 0ba17c63398138d38c3438ec8d54a3c5aaf97056 -m "HyoDo v3.1.0"
    git push origin v3.1.0
    ```
 
