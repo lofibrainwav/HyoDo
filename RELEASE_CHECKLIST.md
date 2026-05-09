@@ -5,10 +5,11 @@ This checklist blocks the final public release until the package, CLI, and workf
 ## Current Release Candidate
 
 - Target version: `3.1.0`
-- Candidate commit: `61dd647cf4791f5b0ed4af457a446e0da61732c1`
+- Candidate commit: `8981d46bfa96c9482f568a24befc85997c24fa82`
 - Core runtime hardening commit: `8688a4bc0a95b3375937ec706face9edda2914a1`
 - Release governance commit: `c2b5b86cbfcd82e093db37f65943d53f6e26f440`
 - Final lint convergence commit: `61dd647cf4791f5b0ed4af457a446e0da61732c1`
+- CI PyYAML dependency fix commit: `8981d46bfa96c9482f568a24befc85997c24fa82`
 - Release issue: <https://github.com/lofibrainwav/HyoDo/issues/1>
 
 ## Pre-release gates
@@ -35,7 +36,9 @@ This checklist blocks the final public release until the package, CLI, and workf
 ### CI and smoke validation
 
 - [x] `.github/workflows/ci.yml` fixed for checkout behavior
+- [x] `.github/workflows/ci.yml` supports manual `workflow_dispatch`
 - [x] `.github/workflows/ci.yml` separates public package gates from extended AFO advisory checks
+- [x] `PyYAML>=6.0` added to the `dev` extra for YAML workflow validation
 - [x] `.github/workflows/smoke.yml` added
 - [x] smoke workflow validates shell syntax
 - [x] smoke workflow validates package build
@@ -60,16 +63,19 @@ Do not perform these until the smoke workflow is visibly green.
 2. Run the smoke workflow manually if needed:
    - `Actions → HyoDo Smoke Test → Run workflow`
 
-3. After green smoke and CI, create tag:
+3. Run the CI workflow manually if needed:
+   - `Actions → HyoDo CI → Run workflow`
+
+4. After green smoke and CI, create tag:
 
    ```bash
-   git tag -a v3.1.0 61dd647cf4791f5b0ed4af457a446e0da61732c1 -m "HyoDo v3.1.0"
+   git tag -a v3.1.0 8981d46bfa96c9482f568a24befc85997c24fa82 -m "HyoDo v3.1.0"
    git push origin v3.1.0
    ```
 
-4. Create GitHub Release `v3.1.0` with notes from `CHANGELOG.md`.
+5. Create GitHub Release `v3.1.0` with notes from `CHANGELOG.md`.
 
-5. Verify package build locally or in CI:
+6. Verify package build locally or in CI:
 
    ```bash
    python -m pip install --upgrade pip build twine
@@ -85,9 +91,9 @@ Do not perform these until the smoke workflow is visibly green.
    python -c "import hyodo; print(hyodo.__version__)"
    ```
 
-6. Publish to PyPI only after the package check passes.
+7. Publish to PyPI only after the package check passes.
 
-7. Add PyPI badges to `README.md` only after PyPI confirms the package is live.
+8. Add PyPI badges to `README.md` only after PyPI confirms the package is live.
 
 ## Release decision
 
