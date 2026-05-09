@@ -47,6 +47,8 @@ jobs:
         run: |
           hyodo --help
           hyodo --version
+          hyodo version
+          hyodo start
           hyodo safe
           hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
 
