@@ -13,7 +13,6 @@ Examples:
 """
 
 import subprocess
-import sys
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -22,7 +21,7 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from hyodo import calculate_trinity_score
+from hyodo import __version__, calculate_trinity_score
 
 app = typer.Typer(
     name="hyodo",
@@ -181,6 +180,12 @@ def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
         return False, "timeout (>60s)"
     except Exception as e:
         return False, f"exception: {e}"
+
+
+@app.command()
+def version():
+    """Print HyoDo version."""
+    console.print(f"HyoDo v{__version__} - The Way of Devotion")
 
 
 @app.command()
@@ -380,15 +385,18 @@ def trinity_analysis(
     console.print("\n[bold green]✅ Trinity Analysis Complete[/bold green]")
 
 
-@app.callback()
+@app.callback(invoke_without_command=True)
 def main(
-    version: bool = typer.Option(False, "--version", "-v", help="버전 정보"),
+    ctx: typer.Context,
+    version_flag: bool = typer.Option(False, "--version", "-v", help="버전 정보"),
 ):
-    """
-    HyoDo - Philosophy-driven code quality automation
-    """
-    if version:
-        console.print("HyoDo v3.1.0 - The Way of Devotion")
+    """HyoDo - Philosophy-driven code quality automation."""
+    if version_flag:
+        console.print(f"HyoDo v{__version__} - The Way of Devotion")
+        raise typer.Exit()
+
+    if ctx.invoked_subcommand is None:
+        console.print(ctx.get_help())
         raise typer.Exit()
 
 
