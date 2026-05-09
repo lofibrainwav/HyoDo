@@ -68,7 +68,7 @@ jobs:
         run: |
           mkdir -p /tmp/hyodo-smoke-empty
           cd /tmp/hyodo-smoke-empty
-          hyodo check || true
+          hyodo check
 
       - name: Validate release docs
         run: |
