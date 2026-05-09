@@ -5,6 +5,26 @@ All notable changes to HyoDo (孝道) will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.1.0] - 2026-05-08
+
+### Added
+
+- **Interactive installer** - `install_interactive.sh` provides a beginner-friendly 5-step setup flow.
+- **Simple quick start** - `QUICK_START_SIMPLE.md` documents a 3-minute path from install to first Claude Code command.
+- **Minimal Docker mode** - `docker-compose.minimal.yml` runs the lightweight Redis + PostgreSQL setup.
+- **HYOGOOK V5 public documentation** - README now presents the six-pillar scoring model: 仁, 眞, 善, 忠, 美, 永.
+
+### Changed
+
+- **Version alignment** - public README badge and `pyproject.toml` now identify HyoDo as version `3.1.0`.
+- **Installation guidance** - README emphasizes the interactive installer and minimal setup path before the full Docker stack.
+- **Score interpretation** - public docs now distinguish HYOGOOK V5 scoring from the legacy WEIGHTED_V1 model.
+
+### Notes
+
+- Legacy WEIGHTED_V1 documentation used 眞18%, 善18%, 美12%, 孝40%, 永12%.
+- HYOGOOK V5 uses six pillars and geometric harmony for 永.
+
 ## [3.0.1] - 2026-01-29
 
 ### Added
