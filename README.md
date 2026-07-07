@@ -1,10 +1,8 @@
-# HyoDo (孝道)
+# HyoDo
 
-> **Automated Code Review for AI-Assisted Development**
-> **HYOGOOK V5 (五德憲章) — Phase 127+**
-> Built Where Philosophy Breathes Through Code
+> **A Claude Code quality gate and cost-aware review kit for AI-assisted developers.**
 
-HyoDo is a public open-source workflow kit for Claude Code and AI-assisted development teams. Use it first as a command-driven quality system; the Python package provides reusable scoring and CLI utilities.
+HyoDo helps developers using Claude Code review, score, and ship AI-assisted code with a repeatable quality workflow. It provides slash commands, scoring utilities, safety checks, and CI-friendly gates so AI-generated changes can be inspected before they become trusted code.
 
 <p align="center">
   <a href="./i18n/ko/README.md">한국어</a> •
@@ -14,7 +12,7 @@ HyoDo is a public open-source workflow kit for Claude Code and AI-assisted devel
 
 <p align="center">
   <img src="https://img.shields.io/badge/Works_with-Claude_Code-blueviolet" alt="Claude Code">
-  <img src="https://img.shields.io/badge/Saves-50--70%25_AI_Costs-green" alt="Cost Savings">
+  <img src="https://img.shields.io/badge/Cost_Aware-Routing-green" alt="Cost-aware routing">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
   <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/Version-3.1.0-success" alt="Version">
@@ -22,182 +20,197 @@ HyoDo is a public open-source workflow kit for Claude Code and AI-assisted devel
 
 ---
 
-## 🚀 What's New in v3.1.0
+## Who is this for?
 
-- **🎯 대화형 설치**: `install_interactive.sh` - 초보자용 5단계 설치
-- **⚡ 최소 설치 모드**: Docker 없이 2분 완료
-- **📦 경량 Docker**: `docker-compose.minimal.yml` - Redis + PostgreSQL만
-- **📚 간편 가이드**: `QUICK_START_SIMPLE.md` - 3분 퀵스타트
+HyoDo is for developers and small teams who:
 
----
+- use Claude Code or AI-assisted coding workflows;
+- want a repeatable review checklist before trusting AI-generated changes;
+- need fast local checks for linting, typing, tests, and safety;
+- want to route simple tasks away from expensive model calls when possible;
+- prefer command-driven workflows that can later be connected to CI.
 
-## What is HyoDo?
+## What problem does it solve?
 
-HyoDo is a **code quality automation system** designed for AI-assisted development workflows. It integrates with [Claude Code](https://claude.ai/code) to provide:
+AI-assisted development is fast, but speed without review creates risk. HyoDo turns review into a simple operating loop:
 
-- **Trinity Score** - 6-pillar philosophy-based code evaluation (HYOGOOK V5)
-- **Automated Quality Gates** - CI/CD integration with smart routing
-- **Cost-Aware Routing** - Reduce AI API costs by 40-70%
-- **Multi-Agent Collaboration** - Parallel strategist analysis
-
-## The Six Pillars (仁眞善忠美永)
-
-HyoDo evaluates code through six philosophical pillars using **HYOGOOK V5 (五德憲章)**:
-
-```
-F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
-S = ⁵√(T × G × In × B × C)  # Geometric Mean (永)
+```text
+AI-assisted change
+→ /check
+→ score + safety review
+→ fix or escalate
+→ ship with a visible quality trail
 ```
 
-| Pillar | Hanja | Weight | Role | Focus |
-|:------:|:-----:|:------:|:-----|:------|
-| **仁** | Benevolence | **25%** | Chancellors | Developer experience, user serenity |
-| **眞** | Truth | **22%** | Jang Yeong-sil | Technical accuracy, architecture |
-| **善** | Goodness | **18%** | Yi Sun-sin | Security, stability, ethics |
-| **忠** | Loyalty | **15%** | Kim Yu-sin | SSOT compliance, cultural continuity |
-| **美** | Beauty | **15%** | Shin Saimdang | Clean code, UX, documentation |
-| **永** | Eternity | **Geometric** | System | Harmony & sustainability |
+The goal is not blind automation. The goal is to make AI-assisted work easier to inspect, safer to merge, and cheaper to operate.
 
-**Range**: F ∈ [6, 60], S ∈ [1, 10]
+## What is included?
 
-> **Note**: Legacy WEIGHTED_V1 (Phase ≤126) used: 眞18%, 善18%, 美12%, 孝40%, 永12%.
+- **Claude Code commands** — `/check`, `/score`, `/safe`, `/trinity`, and related workflow helpers.
+- **Quality gates** — lint, format, type, test, and security-oriented checks.
+- **Scoring utilities** — Python package and CLI helpers for repeatable review scoring.
+- **Cost-aware routing** — designed to reduce unnecessary premium-model usage by routing work by risk and complexity.
+- **Public package gates** — CI checks for the public `hyodo` package, with extended legacy checks separated as advisory.
 
-## Quick Start (3분 완료)
+## Quick Start
 
-### ⚡ 초보자용 설치 (추천)
+### Recommended install: clone, inspect, then run
 
 ```bash
-# 대화형 설치 (5단계, 3분)
+git clone https://github.com/lofibrainwav/HyoDo.git ~/.hyodo
+cd ~/.hyodo
+
+# Optional: inspect the installer before running it
+sed -n '1,220p' install_interactive.sh
+
+# Interactive setup
+./install_interactive.sh
+```
+
+### One-line install for trusted environments
+
+```bash
 curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install_interactive.sh | bash
+```
 
-# Claude Code에서 실행
+### Run with Claude Code
+
+```bash
 cd ~/.hyodo && claude
-/start    # 시작 가이드
-```
-
-### 📦 수동 설치
-
-```bash
-# Clone the repository
-git clone https://github.com/lofibrainwav/HyoDo.git
-cd HyoDo
-
-# Install (creates Claude Code skills)
-./install.sh
-```
-
-### 🐳 Docker 설치 (전체 기능)
-
-```bash
-# 최소 설치 (Redis + PostgreSQL)
-docker-compose -f docker-compose.minimal.yml up -d
-
-# 전체 설치 (모든 11장기)
-docker-compose up -d
-```
-
-### Basic Usage
-
-In Claude Code, use these commands:
-
-```bash
-/check          # Run 4-Gate CI quality check
-/score          # Calculate Trinity Score
-/safe           # Security and risk scan
-/trinity        # Full Trinity analysis
-```
-
-### Score Interpretation (HYOGOOK V5)
-
-| F Score | S Score | Status | Action |
-|:-------:|:-------:|:-------|:-------|
-| **F ≥ 54** | **S ≥ 8** | Excellent | `AUTO_RUN` — Auto-approve |
-| **F ≥ 45** | **S ≥ 7** | Good | `ASK_COMMANDER` — Review recommended |
-| **F < 45** | — | Needs Work | `BLOCK` — Improvements required |
-
-## Features
-
-### 4-Gate CI Protocol
-
-```
-Gate 1: Pyright (眞 Truth) → Type checking
-Gate 2: Ruff (美 Beauty) → Lint + format
-Gate 3: pytest (善 Goodness) → Test coverage
-Gate 4: SBOM (永 Eternity) → Security seal
-```
-
-### Three Strategists
-
-HyoDo uses three AI strategists for balanced analysis:
-
-- **Jang Yeong-sil (장영실)** - Technical architecture (眞)
-- **Yi Sun-sin (이순신)** - Security & stability (善)
-- **Shin Saimdang (신사임당)** - UX & clarity (美)
-
-### Cost-Aware Routing
-
-Automatically routes tasks to appropriate tiers:
-
-| Tier | Use Case | Cost |
-|------|----------|------|
-| FREE | Read-only, search | $0 |
-| CHEAP | Simple edits | Low |
-| EXPENSIVE | Complex refactors | Standard |
-
-## Project Structure
-
-```
-hyodo/
-├── commands/       # Claude Code slash commands (19개 스킬)
-├── skills/         # Skill definitions (4개 카테고리)
-├── agents/         # AI agent configurations (3책사)
-├── scripts/        # Automation scripts
-├── hooks/          # Git hooks
-└── afo_core/       # Core library
+/start    # onboarding guide
+/check    # quality gate
+/score    # scoring utility
+/safe     # safety-oriented review
 ```
 
 ## Requirements
 
-### 최소 설치 (추천)
+### Minimal setup
+
 - Python 3.10+
 - Claude Code CLI
 - Git
 
-### 전체 설치
+### Full setup
+
 - Python 3.10+
 - Claude Code CLI
 - Git
 - Docker & Docker Compose
-- Redis, PostgreSQL, Ollama (또는 Docker로 실행)
+- Redis, PostgreSQL, Ollama, or the provided Docker setup
 
 ## Configuration
 
-### 최소 설정 (.env.minimal)
+### Minimal configuration
+
 ```bash
 cp .env.minimal .env
-# ANTHROPIC_API_KEY만 설정하면 OK
+# Set ANTHROPIC_API_KEY in .env
 ```
 
-### 전체 설정 (.env.example)
+### Full configuration
+
 ```bash
 cp .env.example .env
-# 12개 변수 설정 (Ollama, Redis, PostgreSQL 등)
+# Fill in the services you plan to use
+```
+
+Keep secrets out of git history. Never commit `.env` files containing real credentials.
+
+## Basic Usage
+
+In Claude Code, use these commands:
+
+```bash
+/check          # Run quality gates
+/score          # Calculate review score
+/safe           # Security and risk scan
+/trinity        # Full scoring analysis
+```
+
+## Score Interpretation
+
+| F Score | S Score | Status | Suggested Action |
+|:-------:|:-------:|:-------|:-----------------|
+| **F ≥ 54** | **S ≥ 8** | Excellent | Candidate for approval after human review |
+| **F ≥ 45** | **S ≥ 7** | Good | Review recommended |
+| **F < 45** | — | Needs Work | Improve before merge |
+
+Scores are decision support, not a replacement for human review.
+
+## Quality Gates
+
+### 4-Gate CI Protocol
+
+```text
+Gate 1: Pyright → type checking
+Gate 2: Ruff → lint + format
+Gate 3: pytest → tests
+Gate 4: SBOM / security-oriented seal
+```
+
+## Cost-Aware Routing
+
+HyoDo is designed to avoid sending every task to the most expensive model path.
+
+| Tier | Use Case | Cost Profile |
+|------|----------|--------------|
+| FREE | Read-only, search, inspection | $0 where available |
+| CHEAP | Simple edits, low-risk cleanup | Low |
+| EXPENSIVE | Complex refactors, high-risk decisions | Standard |
+
+> Public claim note: earlier internal docs referenced 40–70% cost reduction targets. Treat those as target/observed internal ranges, not a guaranteed benchmark, unless a public benchmark is linked.
+
+## Philosophy Layer: HYOGOOK V5
+
+HyoDo also includes an optional philosophy-driven scoring model called **HYOGOOK V5**. It evaluates code through six review pillars and uses a geometric mean component so weak dimensions cannot be fully hidden by strong ones.
+
+```text
+F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
+S = ⁵√(T × G × In × B × C)
+```
+
+| Pillar | Hanja | Weight | Focus |
+|:------:|:-----:|:------:|:------|
+| **Benevolence** | 仁 | **25%** | Developer experience, user serenity |
+| **Truth** | 眞 | **22%** | Technical accuracy, architecture |
+| **Goodness** | 善 | **18%** | Security, stability, ethics |
+| **Loyalty** | 忠 | **15%** | SSOT compliance, project context |
+| **Beauty** | 美 | **15%** | Clean code, UX, documentation |
+| **Eternity** | 永 | **Geometric** | Harmony and sustainability |
+
+**Range**: F ∈ [6, 60], S ∈ [1, 10]
+
+> Legacy note: WEIGHTED_V1 used 眞/善/美/孝/永. HyoDo v3.1.0 public docs use the HYOGOOK V5 six-pillar model.
+
+## Project Structure
+
+```text
+hyodo/
+├── commands/       # Claude Code slash commands
+├── skills/         # Skill definitions
+├── agents/         # AI agent configurations
+├── scripts/        # Automation scripts
+├── hooks/          # Git hooks
+└── afo_core/       # Extended core modules
 ```
 
 ## Documentation
 
-| 문서 | 설명 |
-|------|------|
-| [QUICK_START_SIMPLE.md](QUICK_START_SIMPLE.md) | 🚀 3분 퀵스타트 |
-| [QUICK_START.md](QUICK_START.md) | 📚 상세 가이드 |
-| [install_interactive.sh](install_interactive.sh) | 🎯 대화형 설치 |
-| [docker-compose.minimal.yml](docker-compose.minimal.yml) | ⚡ 경량 Docker |
+| Document | Purpose |
+|----------|---------|
+| [QUICK_START_SIMPLE.md](QUICK_START_SIMPLE.md) | 3-minute quick start |
+| [QUICK_START.md](QUICK_START.md) | Detailed guide |
+| [install_interactive.sh](install_interactive.sh) | Interactive installer |
+| [docker-compose.minimal.yml](docker-compose.minimal.yml) | Lightweight Docker setup |
+| [SECURITY.md](SECURITY.md) | Security policy |
+| [CHANGELOG.md](CHANGELOG.md) | Release notes |
 
 ## Contributing
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
-All contributions are evaluated using the Six Pillars. A Trinity Score of F ≥ 45 AND S ≥ 7 is required for PRs (HYOGOOK V5).
+All contributions are evaluated with practical quality gates first. The HYOGOOK V5 score can be used as an additional review signal, but passing tests, security checks, and human review remains required.
 
 ## License
 
@@ -213,6 +226,5 @@ MIT License - see [LICENSE](./LICENSE)
 ---
 
 <p align="center">
-  <em>"孝道 (HyoDo) - The Way of Devotion"</em><br>
-  Built with the Spirit of King Sejong
+  <em>HyoDo — safer AI-assisted development through visible quality gates.</em>
 </p>

@@ -1,120 +1,140 @@
-# HyoDo 3분 퀵스타트 🚀
+# HyoDo 3-Minute Quick Start
 
-> **"코드 품질, 이제 AI에게 맡기세요"**
+> A fast, inspectable setup path for using HyoDo with Claude Code.
 
-HyoDo는 Claude Code 워크플로우를 위한 코드 품질 자동화 키트입니다. 먼저 Claude Code 명령어로 쓰고, Python 패키지는 점수 계산과 CLI 유틸리티에 활용합니다.
+HyoDo is a code-quality workflow kit for Claude Code. Start with the slash commands for review and safety checks; use the Python package for scoring and CLI utilities.
 
-## ⚡ 3단계 설치 (3분)
+## 1. Install
 
-### 1단계: 설치 (1분)
+### Recommended: clone, inspect, then run
 
 ```bash
-# 대화형 설치 스크립트 실행
-curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install_interactive.sh | bash
-
-# 또는 수동 설치
 git clone https://github.com/lofibrainwav/HyoDo.git ~/.hyodo
 cd ~/.hyodo
+
+# Optional but recommended for first-time users
+sed -n '1,220p' install_interactive.sh
+
 ./install_interactive.sh
 ```
 
-### 2단계: API 키 설정 (1분)
+### One-line install for trusted environments
 
 ```bash
-# .env 파일 편집
-nano ~/.hyodo/.env
-
-# ANTHROPIC_API_KEY에 발급받은 키 입력
-# 키 발급: https://console.anthropic.com/
+curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install_interactive.sh | bash
 ```
 
-### 3단계: 실행 (1분)
+## 2. Configure your API key
 
 ```bash
-# Claude Code 실행
+cd ~/.hyodo
+cp .env.minimal .env
+nano .env
+```
+
+Set:
+
+```bash
+ANTHROPIC_API_KEY=your_key_here
+```
+
+Do not commit `.env` files with real credentials.
+
+## 3. Run with Claude Code
+
+```bash
 cd ~/.hyodo && claude
+```
 
-# 첫 명령어
-/start    # 시작 가이드
-/check    # 코드 품질 검사
-/score    # HYOGOOK V5 점수 확인
+Try these first commands:
+
+```text
+/start    # onboarding guide
+/check    # code quality check
+/score    # review score
+/safe     # safety-oriented review
 ```
 
 ---
 
-## 🎯 주요 명령어 5가지
+## Core Commands
 
-| 명령어 | 설명 | 사용 예시 |
-|--------|------|-----------|
-| `/start` | 시작 가이드 | `/start` |
-| `/check` | 코드 품질 검사 | `/check` |
-| `/score` | HYOGOOK V5 점수 계산 | `/score` |
-| `/safe` | 보안 검사 | `/safe` |
-| `/cost` | 비용 예측 | `/cost` |
+| Command | Purpose | Example |
+|--------|---------|---------|
+| `/start` | Onboarding guide | `/start` |
+| `/check` | Code quality check | `/check` |
+| `/score` | Review score | `/score` |
+| `/safe` | Security and risk scan | `/safe` |
+| `/cost` | Cost estimate / routing signal | `/cost` |
 
 ---
 
-## 📊 HYOGOOK V5 점수란?
+## What is HYOGOOK V5?
 
-HyoDo는 코드를 6가지 기준으로 봅니다.
+HYOGOOK V5 is HyoDo's optional scoring model. It reviews code through six dimensions and uses a geometric mean component so weak areas remain visible instead of being hidden by stronger ones.
 
-| 기둥 | 의미 | 확인하는 것 |
-|------|------|-------------|
-| 仁 | 배려 | 개발자 경험, 사용자의 평온 |
-| 眞 | 진실 | 기술 정확성, 아키텍처 |
-| 善 | 선함 | 보안, 안정성, 윤리 |
-| 忠 | 충성 | SSOT 준수, 프로젝트 맥락 유지 |
-| 美 | 아름다움 | 읽기 쉬운 코드, 문서, UX |
-| 永 | 영속 | 조화, 유지 가능성 |
-
-기본 공식은 README의 HYOGOOK V5 모델을 따릅니다.
+| Pillar | Meaning | What it checks |
+|------|---------|----------------|
+| 仁 | Benevolence | Developer experience, user serenity |
+| 眞 | Truth | Technical accuracy, architecture |
+| 善 | Goodness | Security, stability, ethics |
+| 忠 | Loyalty | Project context, SSOT alignment |
+| 美 | Beauty | Readable code, documentation, UX |
+| 永 | Eternity | Maintainability and long-term harmony |
 
 ```text
 F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
 S = ⁵√(T × G × In × B × C)
 ```
 
-| F 점수 | S 점수 | 의미 | 조치 |
-|--------|--------|------|------|
-| F ≥ 54 | S ≥ 8 | 🟢 우수 | 자동 승인 가능 |
-| F ≥ 45 | S ≥ 7 | 🟡 양호 | 리뷰 권장 |
-| F < 45 | - | 🔴 개선 필요 | 차단 또는 수정 필요 |
+| F Score | S Score | Meaning | Suggested action |
+|--------|--------|---------|------------------|
+| F ≥ 54 | S ≥ 8 | Strong | Candidate for approval after human review |
+| F ≥ 45 | S ≥ 7 | Good | Review recommended |
+| F < 45 | - | Needs work | Fix before merge |
 
-> 참고: 예전 WEIGHTED_V1 문서는 眞/善/美/孝/永 5기둥을 사용했습니다. HyoDo v3.1.0 공개 문서는 HYOGOOK V5 6기둥 기준입니다.
+Scores support review. They do not replace human judgment, tests, or security checks.
 
 ---
 
-## 🆘 문제 해결
+## Troubleshooting
 
-### Claude Code가 없어요
+### I do not have Claude Code installed
+
 ```bash
-# Claude Code 설치
 npm install -g @anthropic-ai/claude-code
 ```
 
-### API 키 오류
-```bash
-# .env 파일 확인
-cat ~/.hyodo/.env | grep ANTHROPIC
+### I need to confirm the API key is configured
 
-# 키 형식: sk-ant-... (48자 이상)
+Use a masked check instead of printing the key:
+
+```bash
+grep '^ANTHROPIC_API_KEY=' ~/.hyodo/.env | sed 's/=.*/=***configured***/'
 ```
 
-### 명령어가 안 보여요
+### Commands do not appear
+
 ```bash
-# HyoDo 디렉토리에서 실행
 cd ~/.hyodo
 claude
 ```
 
----
+Then run:
 
-## 📚 다음 단계
-
-- [전체 문서](README.md)
-- [상세 가이드](QUICK_START.md)
-- [기여 가이드](CONTRIBUTING.md)
+```text
+/start
+```
 
 ---
 
-**"지피지기 백전백승" - HyoDo와 함께 코드 품질을 향상시켜보세요!** ⚔️
+## Next Steps
+
+- [Full README](README.md)
+- [Detailed guide](QUICK_START.md)
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+
+---
+
+**HyoDo helps make AI-assisted code easier to inspect before it is trusted.**
