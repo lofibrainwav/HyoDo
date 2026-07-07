@@ -172,12 +172,12 @@ S = ⁵√(T × G × In × B × C)
 
 | Pillar | Hanja | Weight | Focus |
 |:------:|:-----:|:------:|:------|
-| **仁** | Benevolence | **25%** | Developer experience, user serenity |
-| **眞** | Truth | **22%** | Technical accuracy, architecture |
-| **善** | Goodness | **18%** | Security, stability, ethics |
-| **忠** | Loyalty | **15%** | SSOT compliance, project context |
-| **美** | Beauty | **15%** | Clean code, UX, documentation |
-| **永** | Eternity | **Geometric** | Harmony and sustainability |
+| **Benevolence** | 仁 | **25%** | Developer experience, user serenity |
+| **Truth** | 眞 | **22%** | Technical accuracy, architecture |
+| **Goodness** | 善 | **18%** | Security, stability, ethics |
+| **Loyalty** | 忠 | **15%** | SSOT compliance, project context |
+| **Beauty** | 美 | **15%** | Clean code, UX, documentation |
+| **Eternity** | 永 | **Geometric** | Harmony and sustainability |
 
 **Range**: F ∈ [6, 60], S ∈ [1, 10]
 
