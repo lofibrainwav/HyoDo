@@ -217,6 +217,32 @@ jobs:
           grep -q "Release Candidate" RELEASE_CHECKLIST.md
           echo "v3.1.0 documentation consistency verified"
 
+      - name: Public docs external-first regression guard
+        run: |
+          echo "Public docs external-first regression guard..."
+          fail=0
+          DOCS="README.md QUICK_START_SIMPLE.md SECURITY.md"
+          # 1. Unevidenced cost claim: "Saves 50-70%" badge/text
+          if grep -rEn "Saves[ _-]?50[-–]?70|badge/Saves.*50.*70" $DOCS 2>/dev/null; then
+            echo "::error::Banned: 'Saves 50-70%' cost claim (unevidenced). Use softened wording like 'designed to reduce unnecessary expensive-model usage'."
+            fail=1
+          fi
+          # 2. Automation overclaim: "AUTO_RUN — Auto-approve"
+          if grep -rEn "Auto-approve" $DOCS 2>/dev/null; then
+            echo "::error::Banned: 'Auto-approve' / 'AUTO_RUN — Auto-approve' phrasing (overclaims automation authority). Scores support review, not replace it."
+            fail=1
+          fi
+          # 3. HYOGOOK/Hanja must not lead README (top 15 lines) — practical value first
+          if head -15 README.md | grep -En "HYOGOOK|五德|[仁眞善忠美永孝]"; then
+            echo "::error::Banned: HYOGOOK/Hanja in README top-15 lines. Lead with practical value; keep philosophy below usage."
+            fail=1
+          fi
+          if [ "$fail" = "1" ]; then
+            echo "Public docs external-first regression guard FAILED (BIG-188 policy)"
+            exit 1
+          fi
+          echo "Public docs external-first regression guard passed"
+
   # -------------------------------------------------------------------------
   # Final HYOGOOK V5 Release Readiness
   # -------------------------------------------------------------------------
