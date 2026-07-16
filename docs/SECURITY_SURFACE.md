@@ -109,3 +109,10 @@ pip-audit -r afo_core/requirements.txt || true
 - [`SECURITY.md`](../SECURITY.md) — reporting and keyword safety gates
 - [`SECURITY_PATCHES.md`](../SECURITY_PATCHES.md) — historical patch log (may be stale)
 - [`.github/dependabot.yml`](../.github/dependabot.yml) — update grouping
+
+
+### P1 high-volume patch (2026-07-16)
+
+Raised floors and re-locked: aiohttp>=3.14.1, starlette>=1.3.1, fastapi>=0.139,
+Mako, PyJWT, banks, langsmith, lxml, mcp, orjson, protobuf, soupsieve.
+Stale chromadb Dependabot alerts (package absent from lock) should auto-close on re-scan.

@@ -70,3 +70,23 @@ Residual: chromadb 1.4.1 critical class **removed from lock** by dropping the de
 Later Dependabot findings may re-open or supersede these rows (new CVEs, new
 transitive deps, or lockfile drift). Always re-check GitHub Security alerts
 before claiming a clean tree.
+
+
+## 2026-07-16: afo_core P1 high-volume
+
+| Package | Target |
+|---------|--------|
+| aiohttp | >=3.14.1 |
+| starlette | >=1.3.1 |
+| fastapi | >=0.139.0 |
+| Mako | >=1.3.12 |
+| PyJWT | >=2.13.0 |
+| banks | >=2.4.2 |
+| langsmith | >=0.8.18 |
+| lxml | >=6.1.0 |
+| mcp | >=1.27.2 |
+| orjson | >=3.11.6 |
+| protobuf | >=5.29.6 |
+| soupsieve | >=2.8.4 |
+
+Lock regenerated; chromadb package remains absent.

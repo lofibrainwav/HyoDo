@@ -18,6 +18,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - afo_core Python range tightened to `>=3.10,<3.14` for litellm compatibility.
 - Removed `chromadb` / `llama-index-vector-stores-chroma` from afo_core (Qdrant SSOT;
   eliminates residual critical Dependabot surface with no safe patched release).
+- P1 high-volume security floors: aiohttp 3.14.1, starlette 1.3.1, fastapi 0.139+,
+  Mako/PyJWT/banks/langsmith/lxml/mcp/orjson/protobuf/soupsieve.
 
 ### Added
 
