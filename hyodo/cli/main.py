@@ -63,11 +63,35 @@ def _tool_cmd(module: str, *args: str) -> List[str]:
     return [sys.executable, "-m", module, *args]
 
 
+def _module_importable(module: str) -> bool:
+    """Return True if `python -m <module>` is available in this interpreter."""
+    probe = subprocess.run(
+        [sys.executable, "-c", f"import importlib.util; raise SystemExit(0 if importlib.util.find_spec({module!r}) else 1)"],
+        capture_output=True,
+        text=True,
+        timeout=30,
+    )
+    return probe.returncode == 0
+
+
+def _missing_tool_result(tool: str, root: Optional[Path]) -> Tuple[bool, str]:
+    """In package mode, missing dev tools are soft-skips; in repo mode they fail."""
+    if root is None:
+        return True, f"{tool} not installed; skipped in package mode"
+    return False, f"{tool} not found (install: pip install {tool} or hyodo[dev])"
+
+
 def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 1: Pyright - Truth - Type checking."""
     # Public package is the release gate. Extended afo_core is advisory only.
     root = find_repo_root()
-    cwd = root or Path.cwd()
+    # Wheel/package mode has no checkout tree; typecheck belongs to repo gates.
+    if root is None:
+        return True, "package mode; typecheck skipped"
+    if not _module_importable("pyright"):
+        return _missing_tool_result("pyright", root)
+
+    cwd = root
     cmd = _tool_cmd("pyright", "hyodo")
 
     try:
@@ -85,7 +109,7 @@ def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
         return False, f"{error_count} errors, {warning_count} warnings"
 
     except FileNotFoundError:
-        return False, "pyright not found (install: pip install pyright)"
+        return _missing_tool_result("pyright", root)
     except subprocess.TimeoutExpired:
         return False, "timeout (>120s)"
     except Exception as e:
@@ -95,9 +119,13 @@ def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
 def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]:
     """Gate 2: Ruff - Beauty - Lint & Format."""
     root = find_repo_root()
-    cwd = root or Path.cwd()
-    target = "hyodo" if root else "."
+    if root is None:
+        return True, "package mode; lint skipped"
+    if not _module_importable("ruff"):
+        return _missing_tool_result("ruff", root)
 
+    cwd = root
+    target = "hyodo"
     cmd = _tool_cmd("ruff", "check", target)
     if fix:
         cmd.append("--fix")
@@ -112,7 +140,7 @@ def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]
         return False, violations[:200] + "..." if len(violations) > 200 else violations
 
     except FileNotFoundError:
-        return False, "ruff not found (install: pip install ruff)"
+        return _missing_tool_result("ruff", root)
     except subprocess.TimeoutExpired:
         return False, "timeout (>60s)"
     except Exception as e:
@@ -124,11 +152,14 @@ def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
     root = find_repo_root()
 
     # Public package tests first. afo_core remains optional/advisory.
-    if root and (root / "tests").exists():
-        cmd = _tool_cmd("pytest", str(root / "tests"), "-q", "--tb=short")
-        cwd = str(root)
-    else:
+    if not (root and (root / "tests").exists()):
         return True, "No repository test suite found; package smoke checks only"
+
+    if not _module_importable("pytest"):
+        return _missing_tool_result("pytest", root)
+
+    cmd = _tool_cmd("pytest", str(root / "tests"), "-q", "--tb=short")
+    cwd = str(root)
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=cwd)
@@ -149,7 +180,7 @@ def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
         return False, f"exit code {result.returncode}"
 
     except FileNotFoundError:
-        return False, "pytest not found (install: pip install pytest)"
+        return _missing_tool_result("pytest", root)
     except subprocess.TimeoutExpired:
         return False, "timeout (>300s)"
     except Exception as e:

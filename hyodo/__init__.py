@@ -11,7 +11,7 @@ Built with the Six Pillars (HYOGOOK V5):
 - Eternity: Geometric mean of harmony (calculated)
 """
 
-__version__ = "3.1.2"
+__version__ = "3.1.3"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
 

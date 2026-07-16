@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.3] - 2026-07-16
+
+### Fixed
+
+- `hyodo check` package mode (wheel-only / empty cwd): skip type/lint when no repo checkout,
+  so smoke `hyodo check` after `pip install dist/*.whl` exits 0 without dev extras.
+- Missing pyright/ruff/pytest soft-skip in package mode; still hard-fail inside a repo.
+
 ## [3.1.2] - 2026-07-16
 
 ### Fixed
