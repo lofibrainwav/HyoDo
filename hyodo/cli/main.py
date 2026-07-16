@@ -66,7 +66,11 @@ def _tool_cmd(module: str, *args: str) -> List[str]:
 def _module_importable(module: str) -> bool:
     """Return True if `python -m <module>` is available in this interpreter."""
     probe = subprocess.run(
-        [sys.executable, "-c", f"import importlib.util; raise SystemExit(0 if importlib.util.find_spec({module!r}) else 1)"],
+        [
+            sys.executable,
+            "-c",
+            f"import importlib.util; raise SystemExit(0 if importlib.util.find_spec({module!r}) else 1)",
+        ],
         capture_output=True,
         text=True,
         timeout=30,
