@@ -6,14 +6,13 @@ tags: [simple, help, beginner, onboarding]
 mode: simple
 ---
 
-# /start - Welcome to the Kingdom of HyoDo
+# /start - HyoDo quick start
 
-"I am the Chancellor. Welcome, traveler, to HyoDo (孝道). Here, we do not just write code; we cultivate a digital organism guided by Truth, Goodness, and Beauty."
+HyoDo is a Claude Code quality gate and cost-aware review kit for AI-assisted
+developers. It helps you inspect AI-generated changes before you trust them.
 
-If this is your first time, allow me to introduce your guides:
-- **Jang Yeong-sil (眞)**: Your Lead Architect. He seeks technical truth.
-- **Yi Sun-sin (善)**: Your Guardian. He shields the system from harm.
-- **Shin Saimdang (美)**: Your Artist. She builds bridges of clarity and grace.
+Start practical. Philosophy and advanced scoring are optional layers after the
+basic review loop works.
 
 ## 핵심 명령어 5개
 
@@ -25,21 +24,21 @@ If this is your first time, allow me to introduce your guides:
 | `/cost` | 비용 예측 | `/cost "작업"` |
 | `/start` | 이 도움말 | `/start` |
 
-## 30초 퀵스타트
+## 30-second quick start
 
 ```bash
-1. /score          ← 현재 점수 확인
-2. /check          ← 품질 체크
-3. /safe           ← 안전한지 확인
-4. 완료!
+1. /check          # quality gates
+2. /score          # review score
+3. /safe           # safety-oriented review
+4. fix or escalate
 ```
 
-## 점수 시스템
+## Score system
 
 ```text
-90점 이상  →  ✅ 바로 진행
-70-89점   →  ⚠️ 확인 후 진행
-70점 미만  →  ❌ 수정 필요
+F >= 54 and S >= 8  -> strong candidate after human review
+F >= 45 and S >= 7  -> review recommended
+F < 45              -> fix before merge
 ```
 
 ## 더 알고 싶다면
@@ -52,11 +51,12 @@ If this is your first time, allow me to introduce your guides:
 
 ## HyoDo란?
 
-- **코드 품질** 자동 체크
-- **비용 절감** 50-70%
-- **안전성** 자동 검증
+- **Code quality** gates for AI-assisted changes
+- **Cost-aware routing** to avoid unnecessary premium-model usage
+- **Safety review** before risky changes are trusted
 
-복잡한 건 나중에! 일단 `/check`부터 시작하세요.
+Scores support review. They do not replace tests, security review, or human
+judgment. Start with `/check`.
 
 ---
 

@@ -10,7 +10,7 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/연동-Claude_Code-blueviolet" alt="Claude Code">
-  <img src="https://img.shields.io/badge/절감-AI_비용_50--70%25-green" alt="Cost Savings">
+  <img src="https://img.shields.io/badge/라우팅-비용_인식-green" alt="Cost-aware routing">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
 </p>
 

@@ -16,7 +16,7 @@
 - [x] 五虎大将軍 - Ollama デバッグ軍団
 - [x] Hook システム (pre_tool, post_tool, on_error)
 - [x] ultrawork 並列実行
-- [x] 50-70% トークン最適化
+- [x] Cost-aware routing and token usage optimization
 
 ### Q2 2026
 

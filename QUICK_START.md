@@ -1,6 +1,6 @@
 # HyoDo 1-Minute Quick Start Guide
 
-> Code quality check + cost savings = Done!
+> Code quality check + visible review trail = Done.
 
 <p align="center">
   <a href="./i18n/ko/QUICK_START.md">한국어</a> •
@@ -53,12 +53,15 @@ cd HyoDo && ./install.sh
 
 ## Cost Savings
 
-```
-Standard AI usage:    $0.015/1k tokens
-With HyoDo:           $0.00 ~ $0.0025/1k tokens
+HyoDo is designed to reduce unnecessary premium-model usage by routing work by
+risk and complexity. Treat historic percentage claims as internal observations
+from selected workflows, not as a guaranteed benchmark.
 
-Savings: 50-70%
-```
+| Task shape | Suggested path |
+|------------|----------------|
+| Read-only inspection | Use local search, `/check`, or free/low-cost review first |
+| Simple cleanup | Use lower-cost model paths and verify with gates |
+| High-risk changes | Escalate to stronger review, tests, and human approval |
 
 ---
 
@@ -101,4 +104,5 @@ Quality scores consist of 5 pillars:
 ## Next Steps
 
 - Want to learn more: [README.md](README.md)
+- Want a reviewer-facing proof map: [docs/ANTHROPIC_PROOF.md](docs/ANTHROPIC_PROOF.md)
 - Want to contribute: [CONTRIBUTING.md](CONTRIBUTING.md)

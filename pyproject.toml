@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hyodo"
 version = "3.1.0"
-description = "AI Code Quality Automation - Philosophy-Driven Code Review"
+description = "Claude Code quality gate and cost-aware review kit for AI-assisted developers"
 readme = "README.md"
 license = "MIT"
 authors = [
