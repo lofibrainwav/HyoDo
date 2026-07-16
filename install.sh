@@ -15,7 +15,7 @@ WARN="WARN"
 echo ""
 echo -e "${BLUE}=======================================================${NC}"
 echo -e "${BLUE}     HyoDo installer${NC}"
-echo -e "${BLUE}         v3.1.0${NC}"
+echo -e "${BLUE}         v3.1.1${NC}"
 echo -e "${BLUE}=======================================================${NC}"
 echo ""
 

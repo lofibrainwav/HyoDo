@@ -9,7 +9,7 @@ surface is the public `hyodo` CLI and CI gates. Optional agent adapters live in
 `commands/`. Extended backend modules live in `afo_core/` and are advisory for
 public release.
 
-**Version**: 3.1.0  
+**Version**: 3.1.1  
 **Python**: 3.10+  
 **Public language**: English only
 

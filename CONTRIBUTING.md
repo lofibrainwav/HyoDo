@@ -6,24 +6,25 @@ Thank you for your interest in contributing to HyoDo!
 
 ## HYOGOOK V5 Contribution Principles
 
-All contributions are evaluated according to the six pillars used in the public HyoDo v3.1.0 documentation.
+All contributions are evaluated according to the six pillars used in the public HyoDo v3.1.x documentation.
 
 | Pillar | Meaning | Focus |
 |--------|---------|-------|
-| **** | Benevolence | Developer experience and user serenity |
-| **** | Truth | Technical accuracy and architecture |
-| **** | Goodness | Security, safety, stability |
-| **** | Loyalty | SSOT continuity and project integrity |
-| **** | Beauty | Readability, UX, documentation |
-| **** | Eternity | Long-term harmony and sustainability |
+| Benevolence | Developer experience | User serenity and clear DX |
+| Truth | Technical accuracy | Architecture and evidence |
+| Goodness | Security and stability | Safe defaults, no secrets |
+| Loyalty | Continuity | SSOT and project integrity |
+| Beauty | Clarity | Readability, UX, docs |
+| Eternity | Harmony | Long-term maintainability |
 
 ### Score Expectations
 
 HyoDo currently uses the HYOGOOK V5 evaluation model documented in `README.md`.
+Scores are **review signals only** — they never replace human review or merge authority.
 
 | Result | Meaning | Action |
 |--------|---------|--------|
-| F ≥ 54 and S ≥ 8 | Excellent | Auto approval candidate |
+| F ≥ 54 and S ≥ 8 | Excellent | Strong review signal |
 | F ≥ 45 and S ≥ 7 | Good | Review recommended |
 | F < 45 | Needs work | Changes required |
 

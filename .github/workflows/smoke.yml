@@ -26,6 +26,11 @@ jobs:
           bash -n install.sh
           bash -n install_interactive.sh
 
+      - name: Version sync
+        run: |
+          python scripts/release/check_version_sync.py
+          echo "EXPECTED_VERSION=$(tr -d '[:space:]' < VERSION)" >> "$GITHUB_ENV"
+
       - name: Install build dependencies
         run: |
           python -m pip install --upgrade pip
@@ -38,6 +43,20 @@ jobs:
       - name: Validate package metadata
         run: |
           python -m twine check dist/*
+
+      - name: Guard sdist (no afo_core)
+        run: |
+          python - <<'PY'
+          import tarfile
+          from pathlib import Path
+          sdist = next(Path("dist").glob("*.tar.gz"))
+          with tarfile.open(sdist) as t:
+              names = t.getnames()
+          bad = [n for n in names if "/afo_core/" in n or n.endswith("/afo_core")]
+          assert not bad, f"sdist includes afo_core: {bad[:5]}"
+          assert sdist.stat().st_size < 500_000, sdist.stat().st_size
+          print(f"sdist clean: {sdist.name} {sdist.stat().st_size} bytes")
+          PY
 
       - name: Install package
         run: |
@@ -54,16 +73,17 @@ jobs:
 
       - name: Validate package import and public API
         run: |
-          python - <<'PY'
+          python - <<PY
           import hyodo
-          from hyodo import calculate_hygook_v5_score, calculate_trinity_score
+          from hyodo import calculate_hygook_v5_score, calculate_trinity_score, is_strong_review_signal
 
-          assert hyodo.__version__ == "3.1.0"
+          assert hyodo.__version__ == "${{ env.EXPECTED_VERSION }}"
           f_score, s_score = calculate_hygook_v5_score(1, 1, 1, 1, 1)
           assert round(f_score, 2) == 60.00
           assert round(s_score, 2) == 10.00
           assert calculate_trinity_score(1, 1, 1, benevolence=1, loyalty=1) == 100
-          print("hyodo public API ok")
+          assert is_strong_review_signal(95, 5) is True
+          print("hyodo public API ok", hyodo.__version__)
           PY
 
       - name: Validate package-mode check command
@@ -74,9 +94,10 @@ jobs:
 
       - name: Validate release docs
         run: |
-          grep -q "3.1.0" README.md
-          grep -q "3.1.0" CHANGELOG.md
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          grep -q "$VERSION" README.md
+          grep -q "$VERSION" CHANGELOG.md
           grep -q "HYOGOOK V5" README.md
           grep -q "HYOGOOK V5" QUICK_START_SIMPLE.md
           grep -q "HYOGOOK V5" CONTRIBUTING.md
-          grep -q "Release Candidate" RELEASE_CHECKLIST.md
+          grep -q "Release readiness" RELEASE_CHECKLIST.md

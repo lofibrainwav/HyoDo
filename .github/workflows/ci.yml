@@ -82,9 +82,9 @@ jobs:
               print(f'{path} is valid')
           PY
 
-      - name: Check v3.1.0 Files Exist
+      - name: Check release surface files exist
         run: |
-          echo "v3.1.0 files check..."
+          echo "Release surface files check..."
           required_files=(
             "install_interactive.sh"
             "docker-compose.minimal.yml"
@@ -92,15 +92,20 @@ jobs:
             "QUICK_START_SIMPLE.md"
             "commands/SKILL_INDEX.md"
             "commands/SKILL_TEMPLATE.md"
+            "VERSION"
+            "scripts/verify-public.sh"
+            "scripts/release/check_version_sync.py"
+            "RELEASE_CHECKLIST.md"
           )
           for file in "${required_files[@]}"; do
             if [ -f "$file" ]; then
               echo "Found: $file"
             else
-              echo "Missing required v3.1.0 file: $file"
+              echo "Missing required release file: $file"
               exit 1
             fi
           done
+          python scripts/release/check_version_sync.py
 
   # -------------------------------------------------------------------------
   # Goodness Gate - Safety and package smoke tests
@@ -126,16 +131,18 @@ jobs:
       - name: Run Public Package Smoke Tests
         run: |
           echo "Running public package smoke checks..."
-          python - <<'PY'
+          EXPECTED="$(tr -d '[:space:]' < VERSION)"
+          python - <<PY
           import hyodo
-          from hyodo import calculate_hygook_v5_score, calculate_trinity_score
+          from hyodo import calculate_hygook_v5_score, calculate_trinity_score, is_strong_review_signal
 
-          assert hyodo.__version__ == '3.1.0'
+          assert hyodo.__version__ == "${EXPECTED}"
           f_score, s_score = calculate_hygook_v5_score(1, 1, 1, 1, 1)
           assert round(f_score, 2) == 60.00
           assert round(s_score, 2) == 10.00
           assert calculate_trinity_score(1, 1, 1, benevolence=1, loyalty=1) == 100
-          print('public package smoke checks passed')
+          assert is_strong_review_signal(95, 5) is True
+          print('public package smoke checks passed', hyodo.__version__)
           PY
 
       - name: Run Optional Repository Tests
@@ -207,15 +214,16 @@ jobs:
             fi
           done
 
-      - name: Check v3.1.0 Documentation Consistency
+      - name: Check documentation version consistency
         run: |
-          grep -q "3.1.0" README.md
-          grep -q "3.1.0" CHANGELOG.md
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          grep -q "$VERSION" README.md
+          grep -q "$VERSION" CHANGELOG.md
           grep -q "HYOGOOK V5" README.md
           grep -q "HYOGOOK V5" QUICK_START_SIMPLE.md
           grep -q "HYOGOOK V5" CONTRIBUTING.md
-          grep -q "Release Candidate" RELEASE_CHECKLIST.md
-          echo "v3.1.0 documentation consistency verified"
+          grep -q "Release readiness" RELEASE_CHECKLIST.md
+          echo "Documentation consistency verified for $VERSION"
 
       - name: Public docs external-first regression guard
         run: |
@@ -228,7 +236,7 @@ jobs:
             fail=1
           fi
           # 2. Automation overclaim: auto-approve language on public surfaces
-          if grep -rEn "Auto-approve|AUTO_RUN" $DOCS hyodo/cli/main.py commands/score.md commands/check.md 2>/dev/null; then
+          if grep -rEn "Auto-approve|AUTO_RUN" $DOCS CONTRIBUTING.md RELEASE_CHECKLIST.md hyodo/cli/main.py commands/score.md commands/check.md 2>/dev/null; then
             echo "::error::Banned: auto-approve / AUTO_RUN phrasing on public surfaces. Scores support review, not replace it."
             fail=1
           fi
@@ -261,7 +269,7 @@ jobs:
           echo "     HyoDo HYOGOOK V5 Score Validation"
           echo "============================================"
           echo ""
-          echo "v3.1.0 Public OSS Release"
+          echo "Public OSS Release readiness (see VERSION)"
           echo ""
           echo "Validated release blockers:"
           echo "  - Public package lint/type checks"
