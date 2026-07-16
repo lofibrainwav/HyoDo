@@ -116,3 +116,9 @@ pip-audit -r afo_core/requirements.txt || true
 Raised floors and re-locked: aiohttp>=3.14.1, starlette>=1.3.1, fastapi>=0.139,
 Mako, PyJWT, banks, langsmith, lxml, mcp, orjson, protobuf, soupsieve.
 Stale chromadb Dependabot alerts (package absent from lock) should auto-close on re-scan.
+
+
+### Dependabot double-count fix
+
+`requirements.txt` is no longer a pinned export. Dependabot SSOT for afo_core is
+`poetry.lock` only. This removes the 2x inflation (poetry.lock + requirements.txt).

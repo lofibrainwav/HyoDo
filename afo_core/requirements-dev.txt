@@ -1,5 +1,5 @@
-# Local development helper for afo_core.
-# Full dependency SSOT is poetry.lock (exported to requirements.txt).
-
--r requirements.txt
--e .
+# Dev helper. Full stack SSOT: poetry.lock
+# cd afo_core && poetry install --all-extras
+setuptools>=78.1.1
+pytest>=8.0.0
+ruff>=0.8.0

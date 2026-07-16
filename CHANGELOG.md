@@ -20,6 +20,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   eliminates residual critical Dependabot surface with no safe patched release).
 - P1 high-volume security floors: aiohttp 3.14.1, starlette 1.3.1, fastapi 0.139+,
   Mako/PyJWT/banks/langsmith/lxml/mcp/orjson/protobuf/soupsieve.
+- Stop committing pinned afo_core requirements export to avoid Dependabot double-count
+  (poetry.lock is the only SSOT).
 
 ### Added
 

@@ -17,6 +17,7 @@ updates:
       include: "scope"
 
   - package-ecosystem: "pip"
+    # SSOT: afo_core/poetry.lock (requirements.txt is intentionally not a pin list)
     directory: "/afo_core"
     schedule:
       interval: "weekly"
