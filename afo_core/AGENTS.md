@@ -193,11 +193,11 @@ python afo_core/scripts/security_scanner.py --repo owner/repo
 1. **즉시 BLOCK**: Critical 취약점은 즉시 보고
 2. **DRY_RUN**: 패치 전 영향도 분석
 3. **지식 공유**: mem/qmd에 기록, 다른 승상들에게 알림
-4. **문서화**: `docs/SECURITY_SCANNING.md` 참조
+4. **문서화**: `docs/SECURITY_SURFACE.md` 참조
 
 ### 📚 참고 자료
 
-- **상세 문서**: `docs/SECURITY_SCANNING.md`
+- **상세 문서**: `docs/SECURITY_SURFACE.md` (정책: `SECURITY.md`)
 - **지식 저장소**: mem ("gh CLI dependabot 명령어 부재 이유")
 - **통합 스크립트**: `afo_core/scripts/security_scanner.py`
 

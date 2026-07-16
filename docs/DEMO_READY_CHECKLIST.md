@@ -1,6 +1,7 @@
 # Demo Ready Checklist
 
-Use this before recording the 3-minute HyoDo demo.
+Use this **only after** the product surface is clean. Recording is the **final**
+step when everything works — not a progress ritual mid-cleanup.
 
 ## Preconditions (measured)
 

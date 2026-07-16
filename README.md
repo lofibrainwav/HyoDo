@@ -31,8 +31,9 @@ AI-generated changes can be inspected before they become trusted code.
 If you are reviewing HyoDo for a role, partnership, or technical screen, start with
 [`QUICK_START_SIMPLE.md`](./QUICK_START_SIMPLE.md),
 [`docs/PROVIDER_PROOF.md`](./docs/PROVIDER_PROOF.md),
-[`docs/EXTERNAL_CLAIM_AUDIT.md`](./docs/EXTERNAL_CLAIM_AUDIT.md), and optionally
-[`docs/ANTHROPIC_PROOF.md`](./docs/ANTHROPIC_PROOF.md) for Claude-specific mapping.
+[`docs/EXTERNAL_CLAIM_AUDIT.md`](./docs/EXTERNAL_CLAIM_AUDIT.md), and the
+[`docs/`](./docs/README.md) index. Claude-specific mapping is optional appendix only
+([`docs/ANTHROPIC_PROOF.md`](./docs/ANTHROPIC_PROOF.md)).
 
 ## Who is this for?
 

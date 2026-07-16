@@ -12,6 +12,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Score / docs wording: "strong review signal" only — never "proceed immediately"
   or bare "candidate for approval" without human-gate language.
 - `QUICK_START.md` rewritten as CLI-first pointer to `QUICK_START_SIMPLE.md`.
+- `hyodo safe` action strings: low/caution use human-gate language only.
+- `LICENSE.md` points at canonical `LICENSE` (same MIT).
+- `PHILOSOPHY.md` rewritten as short HYOGOOK V5 public note.
+
+### Removed
+
+- Empty English-SSOT stub docs (`docs/ARCHITECTURE.md`, JS/TS stub, security-scanning stub).
+- Stale tracked `artifacts/sbom` and `memory/` placeholder notes.
 
 ## [3.1.3] - 2026-07-16
 

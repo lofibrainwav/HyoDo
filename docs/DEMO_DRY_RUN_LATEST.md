@@ -1,8 +1,8 @@
 # HyoDo demo dry-run
 
-Generated: 2026-07-16T21:00:27Z
-Branch: fix/hyodo-check-package-mode
-Commit: 999fae0
+Generated: 2026-07-16T21:17:11Z
+Branch: fix/hyodo-pre-demo-clutter-purge
+Commit: b4f25c9 (pre-commit working tree)
 Version: 3.1.3
 
 ## hyodo --version
@@ -10,7 +10,7 @@ Version: 3.1.3
 HyoDo v3.1.3 - model-agnostic quality gates
 ```
 
-## hyodo check (repo)
+## hyodo check
 ```
 ╭──────────────────────────╮
 │ HyoDo Code Quality Check │
@@ -29,30 +29,6 @@ Target: .
 
 [4/4] Eternity - Security seal...
   PASS SBOM script not found; skipped
-
-==================================================
-All gates passed
-Gates support review readiness. Human approval still required.
-```
-
-## hyodo check (package mode empty cwd)
-```
-╭──────────────────────────╮
-│ HyoDo Code Quality Check │
-╰──────────────────────────╯
-Target: .
-
-[1/4] Truth - Type checking...
-  PASS package mode; typecheck skipped
-
-[2/4] Beauty - Lint & Format...
-  PASS package mode; lint skipped
-
-[3/4] Goodness - Tests...
-  PASS No repository test suite found; package smoke checks only
-
-[4/4] Eternity - Security seal...
-  PASS No repository checkout found; SBOM skipped in package mode
 
 ==================================================
 All gates passed
@@ -78,5 +54,42 @@ Gates support review readiness. Human approval still required.
 └──────────────┴───────┴─────────┴────────┘
 
 REVIEW_SIGNAL_STRONG (90+)
-Candidate for approval after tests, security checks, and human review.
+Strong review signal only. Still run tests/security checks; human approval required.
 ```
+
+## hyodo safe
+```
+╭────────────────────────────────────╮
+│ HyoDo Safety Check (early warning) │
+╰────────────────────────────────────╯
+source: git diff HEAD
+  ✅ Secrets exposure
+  ✅ Dangerous commands
+  ⚠️ Production impact
+  ✅ Rollback signal
+
+Risk: low (5/100)
+-> Low early-warning risk — final approval remains human
+Note: early warning only. Not a full SAST/secret-scan/dependency audit.
+```
+
+## hyodo safe (secret fixture)
+```
+╭────────────────────────────────────╮
+│ HyoDo Safety Check (early warning) │
+╰────────────────────────────────────╯
+source: file:/tmp/hyodo-demo-safe.txt
+  ❌ Secrets exposure
+  ✅ Dangerous commands
+  ⚠️ Production impact
+  ✅ Rollback signal
+
+Findings
+  -  secret/github_token: Possible credential or secret material matched
+
+Risk: high (45/100)
+-> Review required — do not proceed without human approval
+Note: early warning only. Not a full SAST/secret-scan/dependency audit.
+```
+
+Note: Full `bash scripts/verify-public.sh` is the release gate; this receipt is CLI surface only.
