@@ -8,8 +8,9 @@ mode: simple
 
 # /start - HyoDo quick start
 
-HyoDo is a Claude Code quality gate and cost-aware review kit for AI-assisted
-developers. It helps you inspect AI-generated changes before you trust them.
+HyoDo is a model-agnostic quality gate and cost-aware review kit for AI-assisted
+developers. It helps you inspect AI-generated changes before you trust them
+(CLI first; optional slash-command adapters).
 
 Start practical. Philosophy and advanced scoring are optional layers after the
 basic review loop works.
@@ -27,10 +28,10 @@ basic review loop works.
 ## 30-second quick start
 
 ```bash
-1. /check          # quality gates
-2. /score          # review score
-3. /safe           # safety-oriented review
-4. fix or escalate
+1. hyodo check     # quality gates (or /check)
+2. hyodo score     # review signal only (or /score)
+3. hyodo safe      # safety early warning (or /safe)
+4. fix or escalate — human approval still required
 ```
 
 ## Score system

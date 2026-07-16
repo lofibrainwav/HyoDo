@@ -60,7 +60,7 @@ total = (眞 * 0.18) + (善 * 0.18) + (美 * 0.12) + (孝 * 0.40) + (永 * 0.12)
 
 | 조건 | 행동 |
 | :--- | :--- |
-| **Trinity >= 90 AND Risk <= 10** | **AUTO_RUN** (즉시 승인) |
+| **Trinity >= 90 AND Risk <= 10** | **REVIEW_SIGNAL_STRONG** (사람 승인 후보 — 자동 merge 아님) |
 | **Trinity >= 75 AND Risk <= 25** | **ASK_COMMANDER** (사령관 확인 필요) |
 | **Trinity < 70 OR Risk > 30** | **BLOCK** (기술적/철학적 차단) |
 | **Secrets/Auth 영향 감지** | **CRITICAL_BLOCK** (이순신 방패) |
@@ -77,5 +77,5 @@ trinity_score:
     孝: [점수] # 근거
     永: [점수] # 근거
   risk_score: [점수]/100
-  decision: [AUTO_RUN | ASK_COMMANDER | BLOCK]
+  decision: [REVIEW_SIGNAL_STRONG | ASK_HUMAN | BLOCK]  # not auto-merge
 ```

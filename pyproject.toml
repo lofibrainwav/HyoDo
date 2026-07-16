@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hyodo"
 version = "3.1.0"
-description = "Claude Code quality gate and cost-aware review kit for AI-assisted developers"
+description = "Model-agnostic quality gate and cost-aware review kit for AI-assisted developers"
 readme = "README.md"
 license = "MIT"
 authors = [
@@ -15,6 +15,10 @@ keywords = [
     "ai",
     "code-quality",
     "claude",
+    "model-agnostic",
+    "codex",
+    "grok",
+    "gemini",
     "claude-code",
     "automation",
     "trinity-score",

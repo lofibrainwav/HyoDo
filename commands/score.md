@@ -1,6 +1,6 @@
 ---
 description: "[Simple] 현재 코드의 품질 점수 확인"
-allowed-tools: Read, Glob, Grep
+allowed-tools: Read, Glob, Grep, Bash(hyodo:*)
 impact: LOW
 tags: [simple, score, beginner]
 mode: simple
@@ -9,16 +9,26 @@ alias: trinity
 
 # /score - 품질 점수 확인
 
-현재 코드의 품질 점수를 보여줍니다. (Advanced: `/trinity`)
+현재 변경에 대한 **리뷰 신호(review signal)** 를 보여줍니다. (Advanced: `/trinity`)
+
+점수는 의사결정 지원입니다. 높은 점수도 위험한 변경의 자동 승인을 의미하지 않습니다.
 
 ## 사용법
 
-```bash
-/score              # 전체 점수 확인
-/score "변경사항"   # 특정 변경에 대한 점수
+Agent slash command:
+
+```text
+/score
+/score "변경사항"
 ```
 
-## 점수 구성
+벤더 무관 CLI:
+
+```bash
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+```
+
+## 점수 구성 (리뷰 가중 힌트)
 
 | 항목 | 비중 | 의미 |
 | :--- | :--- | :--- |
@@ -28,30 +38,32 @@ alias: trinity
 | 편의성 | 8% | 쓰기 편한가? |
 | 지속성 | 2% | 오래 유지되는가? |
 
+공개 패키지 CLI의 HYOGOOK V5는 仁/眞/善/忠/美 입력으로 F/S를 계산합니다. 위 표는 초급 설명용 힌트입니다.
+
 ## 결과 예시 (The North Star Report)
 
 ```text
 품질 점수: 92/100 (North Star Balance: OPTIMAL)
 
-⚔️ [眞] 정확성: 95점 - "측우기처럼 명확한 타입 설계"
-🛡️ [善] 안전성: 90점 - "거북선처럼 탄탄한 방어 코드"
-🌉 [美] 가독성: 88점 - "초충도처럼 간결한 표현력"
-孝 [평온] 편의성: 92점 - "사령관님의 마음을 지키는 편리함"
-永 [지속] 지속성: 90점 - "미래를 위한 확실한 흔적"
+[眞] 정확성: 95
+[善] 안전성: 90
+[美] 가독성: 88
+[평온] 편의성: 92
+[지속] 지속성: 90
 
-→ 자동 실행 승인 (90점 이상)
+→ REVIEW_SIGNAL_STRONG (90+)
+→ 사람 최종 승인 · 테스트 · 보안 리뷰 필요
 ```
-
-> [!TIP]
-> **Filial Tip (孝)**: Clean code is a gift to your future self. By writing legible logic today, you save your "future self" from the burden of confusion.
 
 ## 점수별 행동
 
 | 점수 | 상태 | 다음 행동 |
 | :--- | :--- | :--- |
-| 90+ | 안전 | 바로 진행 |
+| 90+ | 강한 리뷰 신호 | 테스트/보안/사람 확인 후 진행 후보 |
 | 70-89 | 주의 | 확인 후 진행 |
 | 70 미만 | 위험 | 수정 필요 |
+
+**금지 claim:** 점수만으로 자동 실행·자동 merge·자동 배포.
 
 ---
 

@@ -119,7 +119,7 @@ quality_gate_report:
 
 전체 게이트 한 번에 실행:
 ```bash
-make check
+hyodo check
 ```
 
 개별 게이트 실행:

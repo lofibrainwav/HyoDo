@@ -1,11 +1,11 @@
 # HyoDo
 
-> **A Claude Code quality gate and cost-aware review kit for AI-assisted developers.**
+> **A model-agnostic quality gate and cost-aware review kit for AI-assisted developers.**
 
-HyoDo helps developers using Claude Code review, score, and ship AI-assisted code with
-a repeatable quality workflow. It provides slash commands, scoring utilities, safety
-checks, and CI-friendly gates so AI-generated changes can be inspected before they
-become trusted code.
+HyoDo helps developers review, score, and ship AI-assisted code with a repeatable
+quality workflow. Primary surface is the `hyodo` CLI and CI gates. Optional adapters
+cover Claude Code, Codex, Grok, Gemini CLI, Cursor, and other agent UIs so
+AI-generated changes can be inspected before they become trusted code.
 
 <p align="center">
   <a href="./i18n/ko/README.md">한국어</a> •
@@ -14,7 +14,8 @@ become trusted code.
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/Works_with-Claude_Code-blueviolet" alt="Claude Code">
+  <img src="https://img.shields.io/badge/Model-Agnostic-0A7-blue" alt="Model agnostic">
+  <img src="https://img.shields.io/badge/CLI%2BCI-First-blueviolet" alt="CLI and CI first">
   <img src="https://img.shields.io/badge/Cost_Aware-Routing-green" alt="Cost-aware routing">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
   <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
@@ -28,24 +29,25 @@ become trusted code.
 | Proof point | What to inspect |
 |-------------|-----------------|
 | Public package | `hyodo/` Python package, `pyproject.toml`, and `hyodo` CLI entrypoint |
-| Claude Code workflow | `commands/` slash commands for `/start`, `/check`, `/score`, `/safe`, and `/cost` |
+| Agent adapters | `commands/` slash-command docs (Claude and compatible agents) plus plain CLI |
 | Quality gates | `.github/workflows/ci.yml` and `.github/workflows/smoke.yml` |
-| Safety posture | `SECURITY.md`, `.env.example`, `.env.minimal`, and installer inspection steps |
+| Safety posture | `SECURITY.md`, `docs/SECURITY_SURFACE.md`, `.env.example`, `.env.minimal` |
 | Cost discipline | Cost-aware routing language and public claim note below; no guaranteed savings claim |
 
 If you are reviewing HyoDo for a role, partnership, or technical screen, start with
-[`QUICK_START_SIMPLE.md`](./QUICK_START_SIMPLE.md) and
-[`docs/ANTHROPIC_PROOF.md`](./docs/ANTHROPIC_PROOF.md).
+[`QUICK_START_SIMPLE.md`](./QUICK_START_SIMPLE.md),
+[`docs/PROVIDER_PROOF.md`](./docs/PROVIDER_PROOF.md), and optionally
+[`docs/ANTHROPIC_PROOF.md`](./docs/ANTHROPIC_PROOF.md) for Claude-specific mapping.
 
 ## Who is this for?
 
 HyoDo is for developers and small teams who:
 
-- use Claude Code or AI-assisted coding workflows;
+- use AI-assisted coding workflows (any major model vendor or local models);
 - want a repeatable review checklist before trusting AI-generated changes;
 - need fast local checks for linting, typing, tests, and safety;
 - want to route simple tasks away from expensive model calls when possible;
-- prefer command-driven workflows that can later be connected to CI.
+- prefer CLI/CI-first workflows that optional agent UIs can wrap.
 
 ## What problem does it solve?
 
@@ -53,8 +55,8 @@ AI-assisted development is fast, but speed without review creates risk. HyoDo tu
 
 ```text
 AI-assisted change
-→ /check
-→ score + safety review
+→ hyodo check   (or /check in an agent adapter)
+→ hyodo score + hyodo safe
 → fix or escalate
 → ship with a visible quality trail
 ```
@@ -67,14 +69,16 @@ The goal is not blind automation. The goal is to make AI-assisted work easier to
 - It does **not** guarantee a fixed cost-reduction percentage.
 - It does **not** auto-approve risky changes just because a score is high.
 - It does **not** require the optional philosophy layer to use the practical gates.
+- It does **not** treat Dependabot alerts on optional/legacy `afo_core` as failures of the public `hyodo` package.
 
 ## What is included?
 
-- **Claude Code commands** — `/check`, `/score`, `/safe`, `/trinity`, and related workflow helpers.
+- **CLI-first quality loop** — `hyodo check`, `hyodo score`, `hyodo safe`, `hyodo trinity`.
+- **Agent adapters** — `commands/` docs for slash-command UIs (Claude Code and compatible tools).
 - **Quality gates** — lint, format, type, test, and security-oriented checks.
-- **Scoring utilities** — Python package and CLI helpers for repeatable review scoring.
-- **Cost-aware routing** — designed to reduce unnecessary premium-model usage by routing work by risk and complexity.
-- **Public package gates** — CI checks for the public `hyodo` package, with extended legacy checks separated as advisory.
+- **Scoring utilities** — Python package helpers for repeatable review signals.
+- **Cost-aware routing** — designed to reduce unnecessary premium-model usage by routing work by risk and complexity (vendor-neutral tiers).
+- **Public package gates** — CI checks for the public `hyodo` package, with extended `afo_core` checks separated as advisory.
 
 ## Quick Start
 
@@ -97,14 +101,28 @@ sed -n '1,220p' install_interactive.sh
 curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install_interactive.sh | bash
 ```
 
-### Run with Claude Code
+### Run with the CLI (recommended, model-agnostic)
 
 ```bash
-cd ~/.hyodo && claude
-/start    # onboarding guide
-/check    # quality gate
-/score    # scoring utility
-/safe     # safety-oriented review
+cd ~/.hyodo
+pip install -e ".[dev]"
+hyodo start
+hyodo check
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+hyodo safe
+```
+
+### Optional: agent slash-command adapter
+
+If you use Claude Code or another slash-command agent that can load `commands/`:
+
+```bash
+cd ~/.hyodo
+# open your agent of choice, then:
+/start
+/check
+/score
+/safe
 ```
 
 ## Requirements
@@ -112,16 +130,16 @@ cd ~/.hyodo && claude
 ### Minimal setup
 
 - Python 3.10+
-- Claude Code CLI
 - Git
+- Terminal (any agent UI optional)
 
 ### Full setup
 
 - Python 3.10+
-- Claude Code CLI
 - Git
-- Docker & Docker Compose
-- Redis, PostgreSQL, Ollama, or the provided Docker setup
+- Optional agent CLI (Claude Code, Codex, Grok, Gemini CLI, Cursor, etc.)
+- Docker & Docker Compose when using extended local services
+- Redis, PostgreSQL, Ollama, or the provided Docker setup only if you need extended modules
 
 ## Configuration
 
@@ -129,7 +147,7 @@ cd ~/.hyodo && claude
 
 ```bash
 cp .env.minimal .env
-# Set ANTHROPIC_API_KEY in .env
+# Set provider keys only for the adapters you actually use
 ```
 
 ### Full configuration
@@ -143,13 +161,11 @@ Keep secrets out of git history. Never commit `.env` files containing real crede
 
 ## Basic Usage
 
-In Claude Code, use these commands:
-
 ```bash
-/check          # Run quality gates
-/score          # Calculate review score
-/safe           # Security and risk scan
-/trinity        # Full scoring analysis
+hyodo check     # Run quality gates
+hyodo score     # Calculate review signal (not auto-approval)
+hyodo safe      # Lightweight safety early-warning scan
+hyodo trinity "describe change"  # Structured review checklist
 ```
 
 ## Score Interpretation
@@ -177,11 +193,11 @@ Gate 4: SBOM / security-oriented seal
 
 HyoDo is designed to avoid sending every task to the most expensive model path.
 
-| Tier | Use Case | Cost Profile |
-|------|----------|--------------|
-| FREE | Read-only, search, inspection | $0 where available |
-| CHEAP | Simple edits, low-risk cleanup | Low |
-| EXPENSIVE | Complex refactors, high-risk decisions | Standard |
+| Tier | Use Case | Example providers (not exclusive) | Cost Profile |
+|------|----------|-----------------------------------|--------------|
+| FREE / local | Read-only, search, lint, tests | Ollama, local open models | $0 where available |
+| STANDARD | Simple edits, low-risk cleanup | Codex, Gemini, Grok, mid-tier APIs | Low-moderate |
+| PREMIUM | Complex refactors, high-risk decisions | Claude, GPT, Gemini pro tiers, etc. | Higher |
 
 > Public claim note: earlier internal docs referenced percentage-based cost targets.
 > Treat those as selected-workflow observations, not a guaranteed benchmark,
@@ -212,13 +228,11 @@ S = ⁵√(T × G × In × B × C)
 ## Project Structure
 
 ```text
-hyodo/
-├── commands/       # Claude Code slash commands
-├── skills/         # Skill definitions
-├── agents/         # AI agent configurations
-├── scripts/        # Automation scripts
-├── hooks/          # Git hooks
-└── afo_core/       # Extended core modules
+hyodo/              # Public Python package (release surface)
+commands/           # Optional agent slash-command adapters
+docs/               # Architecture, proof maps, security surface
+.github/workflows/  # CI/smoke gates for public package
+afo_core/           # Extended/legacy modules (advisory, not public gate)
 ```
 
 ## Documentation
@@ -226,6 +240,8 @@ hyodo/
 | Document | Purpose |
 |----------|---------|
 | [QUICK_START_SIMPLE.md](QUICK_START_SIMPLE.md) | 3-minute quick start |
+| [docs/PROVIDER_PROOF.md](docs/PROVIDER_PROOF.md) | Model-agnostic proof map |
+| [docs/SECURITY_SURFACE.md](docs/SECURITY_SURFACE.md) | Public package vs afo_core security boundary |
 | [QUICK_START.md](QUICK_START.md) | Detailed guide |
 | [install_interactive.sh](install_interactive.sh) | Interactive installer |
 | [docker-compose.minimal.yml](docker-compose.minimal.yml) | Lightweight Docker setup |

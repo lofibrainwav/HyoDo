@@ -97,7 +97,7 @@ git stash push -m "pre-rollback-backup"
 git revert [commit] --no-edit
 
 # 3. CI 검증
-make check
+hyodo check
 
 # 4. 성공 시 커밋
 git push
@@ -108,7 +108,7 @@ git push
 ### 검증 체크리스트
 ```bash
 # CI 재실행
-make check
+hyodo check
 
 # Health 체크
 curl -s http://localhost:8010/health

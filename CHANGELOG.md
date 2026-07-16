@@ -9,17 +9,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Model-agnostic provider proof map (`docs/PROVIDER_PROOF.md`).
+- Security surface boundary doc (`docs/SECURITY_SURFACE.md`) separating public
+  `hyodo/` from advisory `afo_core/`.
+- Real early-warning safety scanner module (`hyodo/safety.py`) used by `hyodo safe`.
+- Unit tests for safety scan helpers (`tests/test_safety.py`).
+- Dependabot config with public-surface and grouped `afo_core` updates.
 - Reviewer-facing proof map for Claude Code / Anthropic-style enablement review.
 - 3-minute HyoDo demo script for recorded walkthroughs and live technical screens.
 
 ### Changed
 
-- Public docs now avoid guaranteed cost-reduction language and describe cost-aware
-  routing as risk-based premium-model avoidance.
-- `/start` now opens with a practical quality-gate workflow before optional
-  philosophy language.
-- Package metadata now describes HyoDo as a Claude Code quality gate and
-  cost-aware review kit.
+- Public docs and CLI now lead with model-agnostic CLI/CI; Claude Code is an
+  optional adapter, not the only surface.
+- Removed public auto-approval language (`AUTO_RUN` / automatic execution approval)
+  from CLI score/check outputs and `commands/score.md`.
+- `commands/check.md` now documents `hyodo check` and CI commands instead of missing
+  `make check`.
+- `SECURITY_PATCHES.md` marked as historical; Dependabot is live inventory for
+  extended-tree alerts.
+- Cost routing docs use FREE / STANDARD / PREMIUM tiers instead of vendor-hardcoded
+  exclusivity.
+- Package metadata describes HyoDo as a model-agnostic quality gate kit.
+- CI regression guard bans auto-approve phrasing on public CLI/docs surfaces.
 
 ## [3.1.0] - 2026-05-08
 

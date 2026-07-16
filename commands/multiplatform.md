@@ -1,53 +1,51 @@
 ---
-description: "멀티플랫폼 오케스트레이션 - Claude/Ollama/Codex/OpenCode 라우팅"
-allowed-tools: Read, Grep, Bash(curl:*)
+description: "멀티플랫폼 오케스트레이션 - vendor-neutral tier 라우팅"
+allowed-tools: Read, Grep, Bash(curl:*), Bash(hyodo:*)
 impact: MEDIUM
 tags: [multiplatform, orchestration, routing, cost-optimization]
 ---
 
 # /multiplatform - 멀티플랫폼 오케스트레이션
 
-> "세종대왕이 지휘하고, 각 플랫폼이 역할에 맞게 실행한다"
+> 티어(위험·복잡도)로 라우팅하고, 벤더 이름은 어댑터일 뿐이다.
 
-$ARGUMENTS 작업을 분석하여 최적의 플랫폼(Claude/Ollama/Codex/OpenCode)으로 라우팅합니다.
+$ARGUMENTS 작업을 분석하여 최적 **비용 티어**로 라우팅합니다.
+예시 provider: Ollama, Codex, Grok, Gemini, Claude, OpenAI, OpenCode, Cursor.
+
+**품질 진실은 모델이 아니라 게이트입니다:** `hyodo check` · `hyodo safe` · CI.
 
 ---
 
-## 플랫폼 계층 구조
+## 티어 계층 구조 (벤더 중립)
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│           Chancellor V3 (총괄 오케스트레이터)          │
-│     CostAwareRouter + KeyTriggerRouter + HookRouter  │
+│              CostAwareRouter (위험 × 복잡도)           │
 └─────────────────────────┬───────────────────────────┘
                           │
     ┌─────────────────────┼─────────────────────┐
     │                     │                     │
     ▼                     ▼                     ▼
 ┌─────────┐         ┌─────────┐         ┌─────────┐
-│ Claude  │         │ Ollama  │         │ Codex   │
-│ Code    │         │ (FREE)  │         │ (API)   │
-│ (CLI)   │         │         │         │         │
+│ FREE    │         │STANDARD │         │ PREMIUM │
+│ local   │         │ mid API │         │ high    │
 └────┬────┘         └────┬────┘         └────┬────┘
      │                   │                   │
      ▼                   ▼                   ▼
-┌─────────┐         ┌─────────┐         ┌─────────┐
-│복잡한 작업│         │디버깅    │         │코드 생성 │
-│설계 결정 │         │테스트    │         │리팩터링  │
-│리뷰      │         │린트      │         │          │
-└─────────┘         └─────────┘         └─────────┘
+ lint/test/debug     implement/edit      design/review
+ Ollama 등           Codex/Gemini/Grok   Claude/GPT 등
 ```
 
 ---
 
-## 플랫폼별 역할
+## 티어별 역할 (provider 예시는 교체 가능)
 
-| 플랫폼 | 비용 티어 | 주요 역할 | 트리거 키워드 |
-|--------|----------|----------|--------------|
-| **Claude Code** | EXPENSIVE | 복잡한 설계, 아키텍처 결정, 리뷰 | `design`, `architect`, `complex`, `review` |
-| **Ollama** | FREE | 디버깅, 테스트, 린트, 타입체크 | `debug`, `test`, `lint`, `fix`, `type` |
-| **Codex** | CHEAP | 코드 생성, 리팩터링, 구현 | `implement`, `refactor`, `generate`, `code` |
-| **OpenCode** | CHEAP | 빠른 탐색, 검색, 분석 | `search`, `find`, `explore`, `analyze` |
+| 티어 | 예시 provider | 주요 역할 | 트리거 키워드 |
+|------|---------------|----------|--------------|
+| **PREMIUM** | Claude, GPT, Gemini pro | 복잡한 설계, 아키텍처, 고위험 리뷰 | `design`, `architect`, `complex`, `review` |
+| **FREE** | Ollama, local open models | 디버깅, 테스트, 린트, 타입체크 | `debug`, `test`, `lint`, `fix`, `type` |
+| **STANDARD** | Codex, Grok, Gemini, mid-tier | 코드 생성, 리팩터링, 구현 | `implement`, `refactor`, `generate`, `code` |
+| **STANDARD** | OpenCode, Cursor agent | 빠른 탐색, 검색, 분석 | `search`, `find`, `explore`, `analyze` |
 
 ---
 
@@ -63,12 +61,12 @@ condition:
     - lint
     - type_check
     - simple_fix
-action: route_to_ollama
-executor: 오호대장군
+action: route_to_free_tier   # e.g. Ollama / local
 cost: $0.00
+post: hyodo check when code changes
 ```
 
-### 규칙 2: CHEAP 차선 (98% 절감)
+### 규칙 2: STANDARD 차선
 
 ```yaml
 condition:
@@ -77,11 +75,11 @@ condition:
     - refactor
     - generate
   complexity: "<= 5"
-action: route_to_codex
-cost: $0.00025/1k tokens
+action: route_to_standard_tier  # e.g. Codex / Grok / Gemini
+post: hyodo check && hyodo safe
 ```
 
-### 규칙 3: EXPENSIVE 필요시만
+### 규칙 3: PREMIUM 필요시만
 
 ```yaml
 condition:
@@ -92,9 +90,11 @@ condition:
   OR:
     complexity: "> 7"
     risk_score: "> 50"
-action: route_to_claude
-cost: $0.015/1k tokens
+action: route_to_premium_tier  # e.g. Claude / GPT / Gemini pro
+post: hyodo check && hyodo safe && human review
 ```
+
+> 비용 % 절감 수치는 공개 보장 claim이 아닙니다. 티어 라우팅 설계 의도만 설명합니다.
 
 ---
 

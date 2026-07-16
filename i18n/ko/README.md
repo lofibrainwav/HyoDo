@@ -120,7 +120,7 @@ HyoDo 분석 (3가지 영역 검사)
 A: 아니요, HyoDo는 무료 오픈소스입니다 (MIT 라이선스).
 
 **Q: 다른 AI 도우미와도 작동하나요?**
-A: 현재 Claude Code에 최적화되어 있습니다. 다른 통합은 곧 지원 예정.
+A: CLI(`hyodo`)와 CI가 1차 표면입니다. Claude Code·Codex·Grok·Gemini·Cursor 등 에이전트 UI는 선택 어댑터입니다.
 
 **Q: 어떤 언어를 지원하나요?**
 A: Python, TypeScript, JavaScript 등. Claude Code가 지원하면 HyoDo도 검사할 수 있습니다.

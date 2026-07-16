@@ -2,14 +2,14 @@
 """
 HyoDo CLI Main Entry Point
 
-Claude Code 없이 독립 실행 가능한 CLI
+Model-agnostic quality-gate CLI. Works with or without any specific agent UI.
 Usage: hyodo [COMMAND] [OPTIONS]
 
 Examples:
-    hyodo check              # 코드 품질 검사
-    hyodo score              # Trinity Score 확인
-    hyodo safe               # 안전성 검사
-    hyodo trinity "작업"      # 상세 분석
+    hyodo check              # code quality gates
+    hyodo score              # HYOGOOK V5 review signal
+    hyodo safe               # lightweight safety scan
+    hyodo trinity "task"     # detailed review checklist
 """
 
 import subprocess
@@ -22,10 +22,11 @@ from rich.panel import Panel
 from rich.table import Table
 
 from hyodo import __version__
+from hyodo.safety import run_safety_scan
 
 app = typer.Typer(
     name="hyodo",
-    help="HyoDo (孝道) - AI Code Quality Automation",
+    help="HyoDo - model-agnostic AI code quality gates",
     add_completion=True,
 )
 console = Console()
@@ -58,11 +59,8 @@ def afo_core_path() -> Optional[Path]:
 
 def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 1: Pyright (眞 - Truth) - Type checking."""
-    core_path = afo_core_path()
-    if core_path and (core_path / "pyproject.toml").exists():
-        cmd = ["pyright", "--project", str(core_path / "pyproject.toml")]
-    else:
-        cmd = ["pyright", "hyodo"]
+    # Public package is the release gate. Extended afo_core is advisory only.
+    cmd = ["pyright", "hyodo"]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
@@ -85,10 +83,9 @@ def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
 
 def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]:
     """Gate 2: Ruff (美 - Beauty) - Lint & Format."""
-    core_path = afo_core_path()
     root = find_repo_root()
-    cwd = core_path or root or Path.cwd()
-    target = "." if core_path else "hyodo" if root else "."
+    cwd = root or Path.cwd()
+    target = "hyodo" if root else "."
 
     cmd = ["ruff", "check", target]
     if fix:
@@ -114,22 +111,9 @@ def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]
 def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
     """Gate 3: pytest (善 - Goodness) - Test coverage."""
     root = find_repo_root()
-    core_path = afo_core_path()
 
-    if core_path and (core_path / "tests").exists():
-        test_path = core_path / "tests"
-        cmd = [
-            "pytest",
-            str(test_path),
-            "-q",
-            "--tb=short",
-            f"--ignore={test_path / 'integration'}",
-            f"--ignore={test_path / '_legacy'}",
-            f"--ignore={test_path / '_obsolete'}",
-            "-m",
-            "not external and not integration",
-        ]
-    elif root and (root / "tests").exists():
+    # Public package tests first. afo_core remains optional/advisory.
+    if root and (root / "tests").exists():
         cmd = ["pytest", str(root / "tests"), "-q", "--tb=short"]
     else:
         return True, "No repository test suite found; package smoke checks only"
@@ -185,7 +169,7 @@ def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
 @app.command()
 def version():
     """Print HyoDo version."""
-    console.print(f"HyoDo v{__version__} - The Way of Devotion")
+    console.print(f"HyoDo v{__version__} - model-agnostic quality gates")
 
 
 @app.command()
@@ -199,54 +183,56 @@ def check(
 
     Pyright → Ruff → pytest → SBOM 순서로 검사
     """
-    console.print(Panel.fit("🔍 HyoDo Code Quality Check", style="bold blue"))
+    console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
     target = path or "."
     console.print(f"대상: {target}")
 
     all_passed = True
 
-    console.print("\n[1/4] 眞 (Truth) - Type checking...")
+    console.print("\n[1/4] Truth - Type checking...")
     pyright_ok, pyright_msg = run_pyright_check(verbose)
     if pyright_ok:
-        console.print(f"  [green]✅ {pyright_msg}[/green]")
+        console.print(f"  [green]PASS {pyright_msg}[/green]")
     else:
-        console.print(f"  [red]❌ {pyright_msg}[/red]")
+        console.print(f"  [red]FAIL {pyright_msg}[/red]")
         all_passed = False
 
-    console.print("\n[2/4] 美 (Beauty) - Lint & Format...")
+    console.print("\n[2/4] Beauty - Lint & Format...")
     ruff_ok, ruff_msg = run_ruff_check(fix, verbose)
     if ruff_ok:
-        console.print(f"  [green]✅ {ruff_msg}[/green]")
+        console.print(f"  [green]PASS {ruff_msg}[/green]")
     else:
-        console.print(f"  [red]❌ {ruff_msg}[/red]")
+        console.print(f"  [red]FAIL {ruff_msg}[/red]")
         if "not found" not in ruff_msg and fix:
             console.print("  [yellow]   Try running with --fix to auto-fix issues[/yellow]")
         all_passed = False
 
-    console.print("\n[3/4] 善 (Goodness) - Test coverage...")
+    console.print("\n[3/4] Goodness - Tests...")
     pytest_ok, pytest_msg = run_pytest_check(verbose)
     if pytest_ok:
-        console.print(f"  [green]✅ {pytest_msg}[/green]")
+        console.print(f"  [green]PASS {pytest_msg}[/green]")
     else:
-        console.print(f"  [red]❌ {pytest_msg}[/red]")
+        console.print(f"  [red]FAIL {pytest_msg}[/red]")
         all_passed = False
 
-    console.print("\n[4/4] 永 (Eternity) - Security seal...")
+    console.print("\n[4/4] Eternity - Security seal...")
     sbom_ok, sbom_msg = run_sbom_check(verbose)
     if sbom_ok:
-        console.print(f"  [green]✅ {sbom_msg}[/green]")
+        console.print(f"  [green]PASS {sbom_msg}[/green]")
     else:
-        console.print(f"  [red]❌ {sbom_msg}[/red]")
+        console.print(f"  [red]FAIL {sbom_msg}[/red]")
         all_passed = False
 
     console.print("\n" + "=" * 50)
     if all_passed:
-        console.print("[bold green]✅ 모든 게이트 통과![/bold green]")
-        console.print("[green]Trinity Score: 90+ (AUTO_RUN 가능)[/green]")
+        console.print("[bold green]All gates passed[/bold green]")
+        console.print(
+            "[green]Gates support review readiness. Human approval still required.[/green]"
+        )
     else:
-        console.print("[bold red]❌ 일부 게이트 실패[/bold red]")
-        console.print("[yellow]Trinity Score: <90 (수정 후 재시도)[/yellow]")
+        console.print("[bold red]Some gates failed[/bold red]")
+        console.print("[yellow]Fix failures, then re-run hyodo check[/yellow]")
 
 
 @app.command()
@@ -268,6 +254,8 @@ def score(
 
     5덕 가중치: 仁(25%) 眞(22%) 善(18%) 忠(15%) 美(15%)
     永(Eternity) = ⁵√(仁×眞×善×忠×美) 기하평균
+
+    Output is a review signal only — not automatic approval.
     """
     from hyodo import calculate_hygook_v5_score
 
@@ -277,38 +265,45 @@ def score(
     F, S = calculate_hygook_v5_score(
         effective_benevolence, truth, goodness, effective_loyalty, beauty
     )
-    score = ((F - 6) / (60 - 6)) * 100
+    score_value = ((F - 6) / (60 - 6)) * 100
 
-    table = Table(title="HYOGOOK V5 Trinity Score", show_header=True)
+    table = Table(title="HYOGOOK V5 Review Signal", show_header=True)
     table.add_column("Pillar", style="cyan")
     table.add_column("Score", justify="right")
     table.add_column("Weight", justify="right")
     table.add_column("Value", justify="right")
 
     table.add_row(
-        "仁 Benevolence",
+        "Benevolence",
         f"{effective_benevolence * 100:.0f}",
         "25%",
         f"{effective_benevolence:.2f}",
     )
-    table.add_row("眞 Truth", f"{truth * 100:.0f}", "22%", f"{truth:.2f}")
-    table.add_row("善 Goodness", f"{goodness * 100:.0f}", "18%", f"{goodness:.2f}")
-    table.add_row("忠 Loyalty", f"{effective_loyalty * 100:.0f}", "15%", f"{effective_loyalty:.2f}")
-    table.add_row("美 Beauty", f"{beauty * 100:.0f}", "15%", f"{beauty:.2f}")
+    table.add_row("Truth", f"{truth * 100:.0f}", "22%", f"{truth:.2f}")
+    table.add_row("Goodness", f"{goodness * 100:.0f}", "18%", f"{goodness:.2f}")
+    table.add_row("Loyalty", f"{effective_loyalty * 100:.0f}", "15%", f"{effective_loyalty:.2f}")
+    table.add_row("Beauty", f"{beauty * 100:.0f}", "15%", f"{beauty:.2f}")
     table.add_row("", "", "", "")
-    table.add_row("永 Eternity (S)", "", "계산값", f"{S:.4f}")
+    table.add_row("Eternity (S)", "", "derived", f"{S:.4f}")
     table.add_row("F Score", "", "", f"{F:.2f}")
     table.add_row("", "", "", "")
-    table.add_row("[bold]TOTAL", "", "", f"[bold]{score:.1f}%[/bold]")
+    table.add_row("[bold]TOTAL", "", "", f"[bold]{score_value:.1f}%[/bold]")
 
     console.print(table)
 
-    if score >= 90:
-        console.print("\n[bold green]🟢 AUTO_RUN - 바로 진행 가능[/bold green]")
-    elif score >= 70:
-        console.print("\n[bold yellow]🟡 ASK_COMMANDER - 확인 후 진행[/bold yellow]")
+    if score_value >= 90:
+        console.print("\n[bold green]REVIEW_SIGNAL_STRONG (90+)[/bold green]")
+        console.print(
+            "[green]Candidate for approval after tests, security checks, and human review.[/green]"
+        )
+    elif score_value >= 70:
+        console.print("\n[bold yellow]REVIEW_SIGNAL_CAUTION (70-89)[/bold yellow]")
+        console.print("[yellow]Review recommended before proceed.[/yellow]")
     else:
-        console.print("\n[bold red]🔴 BLOCK - 수정 필요[/bold red]")
+        console.print("\n[bold red]REVIEW_SIGNAL_BLOCK (<70)[/bold red]")
+        console.print(
+            "[red]Improve before merge. Score is not a substitute for human judgment.[/red]"
+        )
 
 
 @app.command()
@@ -317,23 +312,31 @@ def safe(
     strict: bool = typer.Option(False, "--strict", help="엄격 모드"),
 ):
     """
-    안전성 검사
+    안전성 검사 (early warning)
 
-    비밀키 노출, 위험 명령, 프로덕션 영향 체크
+    비밀키 패턴, 위험 명령, 프로덕션 영향 신호를 스캔합니다.
+    완전한 보안 스캐너를 대체하지 않습니다.
     """
-    console.print(Panel.fit("🛡️ HyoDo Safety Check", style="bold yellow"))
+    console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
 
-    checks = [
-        ("비밀키 노출", "✅", "green"),
-        ("위험 명령", "✅", "green"),
-        ("프로덕션 영향", "✅" if strict else "⚠️", "green" if strict else "yellow"),
-        ("롤백 가능성", "✅", "green"),
-    ]
+    result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd())
+    console.print(f"source: {result['source']}")
 
-    for check_name, status, color in checks:
+    for check_name, status, color in result["rows"]:
         console.print(f"  [{color}]{status}[/{color}] {check_name}")
 
-    console.print("\n[bold green]✅ 안전성 검사 완료[/bold green]")
+    high_findings = [f for f in result["findings"] if f.severity in {"high", "medium"}]
+    if high_findings:
+        console.print("\n[bold]Findings[/bold]")
+        for finding in high_findings[:12]:
+            console.print(
+                f"  - [{finding.severity}] {finding.category}/{finding.label}: {finding.detail}"
+            )
+
+    console.print(f"\n위험도: {result['level']} ({result['risk_score']}/100)\n→ {result['action']}")
+    console.print(
+        "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit.[/dim]"
+    )
 
 
 @app.command()
@@ -344,26 +347,25 @@ def start():
     HyoDo 소개와 기본 사용법
     """
     guide = """
-[bold blue]🎓 HyoDo (孝道) 시작 가이드[/bold blue]
+[bold blue]HyoDo quick start[/bold blue]
 
-[b]HyoDo는 AI 코드 품질 자동화 도구입니다.[/b]
+[b]HyoDo is a model-agnostic quality-gate kit for AI-assisted development.[/b]
 
-[bold cyan]주요 명령어:[/bold cyan]
-  • [bold]check[/bold]  - 코드 품질 검사
-  • [bold]score[/bold]  - Trinity Score 확인
-  • [bold]safe[/bold]   - 안전성 검사
-  • [bold]trinity[/bold] - 상세 분석
+Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
 
-[bold cyan]사용 예시:[/bold cyan]
+[bold cyan]Core commands:[/bold cyan]
+  • [bold]check[/bold]  - quality gates (ruff/pyright/pytest)
+  • [bold]score[/bold]  - HYOGOOK V5 review signal (not auto-approval)
+  • [bold]safe[/bold]   - lightweight safety early-warning scan
+  • [bold]trinity[/bold] - structured review checklist
+
+[bold cyan]Examples:[/bold cyan]
   $ hyodo check
   $ hyodo score -t 0.9 -g 0.8
   $ hyodo safe --strict
 
-[bold cyan]더 알아보기:[/bold cyan]
-  $ hyodo --help
-  $ hyodo [COMMAND] --help
-
-[i]"지피지기 백전백승"[/i]
+[bold cyan]Boundary:[/bold cyan]
+  Scores and scans support review. Human approval remains required.
     """
     console.print(guide)
 
@@ -373,16 +375,19 @@ def trinity_analysis(
     task: str = typer.Argument(..., help="분석할 작업 설명"),
 ):
     """
-    상세 Trinity 분석 (3책사 관점)
+    상세 Trinity 분석 체크리스트 (리뷰 지원)
+
+    Structured review prompts only — not an automated pass verdict.
     """
-    console.print(Panel.fit(f"🔮 Trinity Analysis: {task}", style="bold magenta"))
-    console.print("\n⚔️  Jang Yeong-sil (眞) - Technical Analysis...")
-    console.print("  ✓ Architecture review complete")
-    console.print("\n🛡️  Yi Sun-sin (善) - Security Assessment...")
-    console.print("  ✓ Risk analysis complete")
-    console.print("\n🌉 Shin Saimdang (美) - UX Evaluation...")
-    console.print("  ✓ Clarity check complete")
-    console.print("\n[bold green]✅ Trinity Analysis Complete[/bold green]")
+    console.print(Panel.fit(f"Trinity review checklist: {task}", style="bold magenta"))
+    console.print("\nTruth - technical accuracy")
+    console.print("  - Types, contracts, and failure modes checked?")
+    console.print("\nGoodness - security and stability")
+    console.print("  - Secrets, destructive commands, production impact reviewed?")
+    console.print("\nBeauty - clarity")
+    console.print("  - Diff readable? Naming/structure understandable?")
+    console.print("\n[bold yellow]Checklist only — no automatic approval[/bold yellow]")
+    console.print("Next: hyodo check && hyodo safe, then human review.")
 
 
 @app.callback(invoke_without_command=True)
@@ -390,9 +395,9 @@ def main(
     ctx: typer.Context,
     version_flag: bool = typer.Option(False, "--version", "-v", help="버전 정보"),
 ):
-    """HyoDo - Philosophy-driven code quality automation."""
+    """HyoDo - model-agnostic quality gates for AI-assisted development."""
     if version_flag:
-        console.print(f"HyoDo v{__version__} - The Way of Devotion")
+        console.print(f"HyoDo v{__version__} - model-agnostic quality gates")
         raise typer.Exit()
 
     if ctx.invoked_subcommand is None:

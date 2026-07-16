@@ -2,6 +2,19 @@
 
 HyoDo is a developer workflow tool for AI-assisted code review. Security reports should be handled carefully and should not expose credentials, exploit payloads, or private operational details in public threads.
 
+## Security surface (read this first)
+
+| Surface | Path | Release gate |
+|---------|------|--------------|
+| Public product | `hyodo/`, root `pyproject.toml` | Yes — CI smoke + truth/goodness gates |
+| Extended / legacy | `afo_core/` | Advisory — not a public package release blocker |
+
+GitHub Dependabot counts on `afo_core` lockfiles can be large even when the public
+install path stays thin. Details: [`docs/SECURITY_SURFACE.md`](docs/SECURITY_SURFACE.md).
+
+Historical patch notes: [`SECURITY_PATCHES.md`](SECURITY_PATCHES.md) (may be stale;
+Dependabot is the live inventory for extended deps).
+
 ## Core Security Question
 
 For every risky operation, HyoDo asks:
@@ -58,7 +71,9 @@ HyoDo uses the `safety_gate` hook to detect and block or escalate risky operatio
 - `credential`, `secret`, `password`
 - `deploy`, `migration`
 
-Keyword checks are not a complete security scanner. They are early warning signals that should be combined with human review, tests, CI, and secret-scanning practices.
+Keyword checks and `hyodo safe` are not a complete security scanner. They are early warning signals that should be combined with human review, tests, CI, Dependabot/pip-audit, and secret-scanning practices.
+
+Scores never auto-approve risky changes.
 
 ## Safe Usage
 
