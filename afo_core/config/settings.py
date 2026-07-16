@@ -91,7 +91,10 @@ class AFOSettings(BaseSettings):
     # ============================================================================
     # Vector Store Settings (LanceDB)
     # ============================================================================
-    VECTOR_DB: str = Field(default="lancedb", description="벡터 DB 타입 (lancedb, qdrant, chroma)")
+    VECTOR_DB: str = Field(
+        default="lancedb",
+        description="Vector DB type (lancedb, qdrant). chroma/chromadb is unsupported.",
+    )
     LANCEDB_PATH: str = Field(default="./data/lancedb", description="LanceDB 데이터베이스 경로")
     EMBED_DIM: str = Field(
         default="dynamic", description="임베딩 차원 (dynamic=자동 감지, 숫자=고정값)"

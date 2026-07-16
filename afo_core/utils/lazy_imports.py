@@ -176,12 +176,12 @@ try:
 except ImportError:
     anthropic = LazyModule("anthropic", type(sys)("dummy_anthropic"))
 
-# Vector 데이터베이스
+# Vector databases
+# chromadb is intentionally NOT imported: removed from dependencies (Qdrant SSOT).
+chromadb = LazyModule("chromadb", type(sys)("dummy_chromadb"))
 try:
-    chromadb = LazyModule("chromadb")
     qdrant_client = LazyModule("qdrant_client")
 except ImportError:
-    chromadb = LazyModule("chromadb", type(sys)("dummy_chromadb"))
     qdrant_client = LazyModule("qdrant_client", type(sys)("dummy_qdrant_client"))
 
 # ============================================================================
@@ -199,7 +199,7 @@ def get_available_modules() -> dict[str, bool]:
         "llama_index": llama_index.is_available(),
         "openai": openai.is_available(),
         "anthropic": anthropic.is_available(),
-        "chromadb": chromadb.is_available(),
+        "chromadb": False,  # removed dependency; Qdrant is SSOT
         "qdrant_client": qdrant_client.is_available(),
     }
     return modules

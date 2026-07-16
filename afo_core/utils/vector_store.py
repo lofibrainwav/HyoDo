@@ -307,10 +307,11 @@ def get_vector_store() -> VectorStoreAdapter:
 
     if store_type == "lancedb":
         _vector_store_instance = LanceDBAdapter()
-    elif store_type == "chroma":
-        # Chroma 어댑터 (향후 구현)
-        _vector_store_instance = QdrantAdapter()  # 임시로 Qdrant 사용
-    else:  # qdrant (기본값)
+    elif store_type in {"chroma", "chromadb"}:
+        # chromadb removed from dependencies (security + Qdrant migration).
+        # Fall back to Qdrant for any legacy VECTOR_DB=chroma setting.
+        _vector_store_instance = QdrantAdapter()
+    else:  # qdrant (default for non-lancedb)
         _vector_store_instance = QdrantAdapter()
 
     return _vector_store_instance

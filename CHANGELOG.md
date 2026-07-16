@@ -16,6 +16,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `afo_core/requirements.txt` is now a Poetry export; removed duplicate `requirements-lock.txt`.
 - Dropped `crewai` and `moviepy` optional deps that blocked secure dependency solves.
 - afo_core Python range tightened to `>=3.10,<3.14` for litellm compatibility.
+- Removed `chromadb` / `llama-index-vector-stores-chroma` from afo_core (Qdrant SSOT;
+  eliminates residual critical Dependabot surface with no safe patched release).
 
 ### Added
 

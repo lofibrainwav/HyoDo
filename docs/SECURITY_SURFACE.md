@@ -73,9 +73,16 @@ Also:
 
 | Item | Status |
 |------|--------|
-| chromadb critical class without patched version | Still residual if rag extra is installed |
+| chromadb | **Removed** from afo_core deps/lock (Qdrant SSOT; was deprecated in compose) |
 | starlette/aiohttp | May still have medium/high depending on advisory DB |
 | agents extras without crewai | Reduced capability until upstream allows secure pins |
+
+### chromadb removal (follow-up)
+
+- Dropped `chromadb` and `llama-index-vector-stores-chroma` from optional `rag`/`all` extras
+- `lazy_imports.chromadb` is a permanent dummy (never imports the package)
+- `VECTOR_DB=chroma` falls back to Qdrant with unsupported note
+- Stale `afo_core/requirements.lock` removed
 
 **Execution rule:** regenerate with Poetry, export `requirements.txt`, never hand-edit lock hashes. Public package CI must remain green without installing full afo_core.
 

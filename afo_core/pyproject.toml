@@ -63,11 +63,11 @@ dependencies = [
 [project.optional-dependencies]
 core = []
 rag = [
+    # chromadb removed: deprecated in favor of Qdrant; residual critical advisory.
+    # Vector store SSOT is Qdrant (see afo_core/docker-compose.yml Phase 8 notes).
     "llama-index>=0.14.12,<0.15.0",
     "llama-index-llms-ollama>=0.9.1,<0.10.0",
     "llama-index-embeddings-ollama>=0.8.5,<0.9.0",
-    "llama-index-vector-stores-chroma>=0.5.5,<0.6.0",
-    "chromadb>=1.4.0,<2.0.0",
 ]
 browser = [
     "playwright>=1.57.0",
@@ -102,8 +102,6 @@ all = [
     "llama-index>=0.14.12,<0.15.0",
     "llama-index-llms-ollama>=0.9.1,<0.10.0",
     "llama-index-embeddings-ollama>=0.8.5,<0.9.0",
-    "llama-index-vector-stores-chroma>=0.5.5,<0.6.0",
-    "chromadb>=1.4.0,<2.0.0",
     "playwright>=1.57.0",
     "dspy-ai>=3.0.4",
     "autogen-agentchat>=0.7.5",

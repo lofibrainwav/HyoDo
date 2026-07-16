@@ -50,7 +50,8 @@ Structural:
 - requirements-lock.txt removed (duplicate surface)
 - crewai / moviepy removed from optional stack (security pin conflicts)
 
-Residual: chromadb 1.4.1 may still carry unpatched critical advisory until upstream ships a safe release.
+Residual: chromadb 1.4.1 critical class **removed from lock** by dropping the dependency
+(Qdrant is vector SSOT; chromadb was already deprecated in afo_core compose).
 
 ## 2026-02-10: Critical Vulnerability Updates (historical)
 
