@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Primary product framing no longer leads with "cost-aware savings".
+- Badge/copy use **tiered routing (intent only)** and state no public savings benchmark.
+- `docs/SECURITY_SURFACE.md` records next afo_core Dependabot patch priorities.
+
 ### Added
 
 - Model-agnostic provider proof map (`docs/PROVIDER_PROOF.md`).
