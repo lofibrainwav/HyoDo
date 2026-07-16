@@ -1,6 +1,5 @@
-# Development Requirements for afo-core
-# Use this for local development with editable install
-# CI uses requirements.txt only
+# Local development helper for afo_core.
+# Full dependency SSOT is poetry.lock (exported to requirements.txt).
 
 -r requirements.txt
 -e .

@@ -10,8 +10,10 @@ name = "afo_core"
 version = "1.0.0"
 description = "AFO Ultimate General Command Post"
 readme = "README.md"
-requires-python = ">=3.10,<4.0"
+requires-python = ">=3.10,<3.14"
 dependencies = [
+    "json-repair>=0.60.1",
+    "litellm>=1.84.0",
     "fastapi>=0.115.0",
     "pydantic-settings>=2.0.0",
     "pydantic>=2.12.5",
@@ -27,20 +29,20 @@ dependencies = [
     "redis>=7.1.0",
     "numpy>=1.24.0",
     "scipy>=1.10.0",
-    "cryptography>=46.0.3",
+    "cryptography>=48.0.1",
     "aiohttp>=3.13.3",
     "sse-starlette>=3.1.2,<5.0.0",
     "certifi>=2026.1.4,<2027.0.0",
     "pillow>=12.2.0,<13.0",
     "werkzeug>=3.1.6",
-    "urllib3>=2.6.3",
+    "urllib3>=2.7.0",
     "pdfminer-six>=20251230",
-    "pypdf>=6.10.2,<7.0.0",
+    "pypdf>=6.12.1,<7.0.0",
     "mcp>=1.23.0",
     "marshmallow>=3.18.0,<4.0.0",
     "fonttools>=4.60.2",
     "filelock>=3.20.1",
-    "langchain-core>=1.2.28,<2.0.0",
+    "langchain-core>=1.3.3,<2.0.0",
     "langchain-community>=0.3.0,<0.4.0",
     "pyright>=1.1.408",
     "python-docx>=1.2.0",
@@ -55,7 +57,7 @@ dependencies = [
     "upstash-redis>=1.5.0,<2.0.0",
     "openai>=2.15.0,<3.0.0",
     "nltk>=3.9.4",
-    "python-multipart>=0.0.26",
+    "python-multipart>=0.0.30",
 ]
 
 [project.optional-dependencies]
@@ -69,20 +71,20 @@ rag = [
 ]
 browser = [
     "playwright>=1.57.0",
-    "moviepy>=2.2.1,<3.0.0",
 ]
 agents = [
+    # crewai removed: its dependency pins force vulnerable litellm/json-repair ranges.
+    # Re-add only when upstream accepts litellm>=1.84 and json-repair>=0.60.1.
     "dspy-ai>=3.0.4",
     "autogen-agentchat>=0.7.5",
     "autogen>=0.10.4",
-    "crewai>=0.102.0",
     "mem0ai>=1.0.2,<2.0.0",
 ]
 ml = [
     "torch>=2.1.0,<2.10.0",
     "bitsandbytes>=0.49.0,<0.50.0 ; sys_platform == 'linux'",
     "peft>=0.18.0,<0.19.0",
-    "transformers>=4.57.3,<6.0.0",
+    "transformers>=5.5.0,<6.0.0",
 ]
 monitoring = [
     "prometheus-client>=0.23.1,<0.24.0",
@@ -95,7 +97,27 @@ db = [
     "langgraph-checkpoint-postgres>=3.0.2,<4.0.0",
 ]
 all = [
-    "afo_core[core,rag,browser,agents,ml,monitoring,db]",
+    # Expanded optional stack without self-reference (poetry lock compatibility).
+    # Install with: pip install -e ".[rag,browser,agents,ml,monitoring,db]"
+    "llama-index>=0.14.12,<0.15.0",
+    "llama-index-llms-ollama>=0.9.1,<0.10.0",
+    "llama-index-embeddings-ollama>=0.8.5,<0.9.0",
+    "llama-index-vector-stores-chroma>=0.5.5,<0.6.0",
+    "chromadb>=1.4.0,<2.0.0",
+    "playwright>=1.57.0",
+    "dspy-ai>=3.0.4",
+    "autogen-agentchat>=0.7.5",
+    "autogen>=0.10.4",
+    "mem0ai>=1.0.2,<2.0.0",
+    "torch>=2.1.0,<2.10.0",
+    "peft>=0.18.0,<0.19.0",
+    "transformers>=5.5.0,<6.0.0",
+    "prometheus-client>=0.23.1,<0.24.0",
+    "psycopg2-binary>=2.9.11",
+    "langgraph>=1.0.5,<2.0.0",
+    "langgraph-checkpoint-redis>=0.3.1,<0.4.0",
+    "psycopg[binary,pool]>=3.3.2,<4.0.0",
+    "langgraph-checkpoint-postgres>=3.0.2,<4.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -106,7 +128,7 @@ exclude = ["tests*", "scripts*", "legacy*", "artifacts*", "node_modules*"]
 # Ruff Configuration (Linter & Formatter)
 # ============================================================================
 [tool.ruff]
-# Python 버전
+# Python 
 target-version = "py310"
 line-length = 100
 exclude = [
@@ -129,7 +151,7 @@ exclude = [
 ]
 
 [tool.ruff.lint]
-# 활성화할 규칙
+#  
 select = [
     "E",   # pycodestyle errors
     "W",   # pycodestyle warnings
@@ -156,7 +178,7 @@ ignore = [
     "ARG001",  # unused function argument
     "ARG002",  # unused method argument
     "T201",   # print statements (allowed in scripts)
-    "RUF001",  # ambiguous unicode (allow 眞善美孝)
+    "RUF001",  # ambiguous unicode (allow )
     "RUF002",  # ambiguous unicode
     "RUF003",  # ambiguous unicode
     "S101",    # assert (vetted)
@@ -191,8 +213,8 @@ ignore = [
     "SIM115",  # open-file-without-context-handler
     "SIM105",  # try-except-pass
     "RUF012",  # mutable-class-default
-    "UP046",   # non-pep695-generic-class (Pydantic Generic 호환성)
-    "TC001",   # typing-only-first-party-import (Runtime 필요 시 허용)
+    "UP046",   # non-pep695-generic-class (Pydantic Generic )
+    "TC001",   # typing-only-first-party-import (Runtime   )
     "TC004",   # typing-only-standard-library-import
     "RUF006",  # asyncio-dangling-task (older)
        # non-pep604-isinstance
@@ -358,7 +380,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-# Phase 25: 현실적인 커버리지 임계값 설정 (점진적 개선)
+# Phase 25:     ( )
 fail_under = 45
 show_missing = true
 skip_covered = false
@@ -389,7 +411,7 @@ strict_equality = true
 show_error_codes = true
 show_error_context = true
 
-# 파일/디렉토리 제외
+# / 
 exclude = [
     "venv/",
     ".venv/",
@@ -402,9 +424,9 @@ exclude = [
     "node_modules/",
 ]
 
-# 모듈별 설정
+#  
 [[tool.mypy.overrides]]
-# 【老子】道生一一生二 - 외부 의존성은 격리하여 왕국의 진실을 보호함
+# 【】 -      
 module = [
     "qdrant_client.*",
     "langchain.*",
@@ -439,7 +461,7 @@ module = [
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
-# 【莊子】無用之用 - 내부 phantom 모듈 (미구현 계획 모듈)
+# 【】 -  phantom  (  )
 module = [
     "strategy_engine",
     "query_expansion_advanced",
@@ -464,7 +486,7 @@ disallow_untyped_defs = false
 disallow_incomplete_defs = false
 
 [[tool.mypy.overrides]]
-# 【孔子】中庸 - 과도한 엄격함은 진행을 막으니, 잠시 눈을 감아 조화를 이룸
+# 【】 -    ,     
 module = [
     # Top Level Legacy
     "api.*", "config.*", "llms.*", "afo_soul_engine.*", "afo_skills_registry", "llm_router", "chancellor_graph",
@@ -497,8 +519,8 @@ module = [
     "AFO.start.*",
     "AFO.utils.*"
 ]
-# Phase 11: ignore_errors 제거 - 진실 검사 유지
-# 이 모듈들은 이제 정상 MyPy 검사 대상
+# Phase 11: ignore_errors  -   
+#     MyPy  
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

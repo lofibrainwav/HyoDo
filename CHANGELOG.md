@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Primary product framing no longer leads with "cost-aware savings".
 - Badge/copy use **tiered routing (intent only)** and state no public savings benchmark.
 - `docs/SECURITY_SURFACE.md` records next afo_core Dependabot patch priorities.
+- Regenerated `afo_core` poetry.lock with security floors (litellm, nltk, transformers, ...).
+- `afo_core/requirements.txt` is now a Poetry export; removed duplicate `requirements-lock.txt`.
+- Dropped `crewai` and `moviepy` optional deps that blocked secure dependency solves.
+- afo_core Python range tightened to `>=3.10,<3.14` for litellm compatibility.
 
 ### Added
 

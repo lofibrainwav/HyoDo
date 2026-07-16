@@ -28,7 +28,29 @@ hyodo safe
 | Replace score/CLI "auto-approve" overclaims with review-signal language | Done |
 | Implement real early-warning `hyodo safe` scan (not fixed green output) | Done |
 | Add Dependabot grouping for `afo_core` | Done |
-| Mass upgrade of entire `afo_core` lock (litellm/chromadb/nltk/...) | **Follow-up track** |
+| Mass upgrade of entire `afo_core` lock (litellm/chromadb/nltk/...) | **In progress / partial** |
+
+## 2026-07-16: afo_core P0 lock refresh
+
+| Package | From | To | Notes |
+|---------|------|----|-------|
+| litellm | 1.72.0 | 1.92.0 | Critical/high auth fixes |
+| nltk | 3.9.2 | 3.10.0 | Critical path/zip issues |
+| json-repair | 0.55.0 | 0.61.5 | High DoS |
+| transformers | 4.57.6 | 5.12.1 | High RCE-class advisories |
+| pypdf | 6.6.0 | 6.14.2 | Medium/high parser issues |
+| python-multipart | 0.0.21 | 0.0.32 | High path/DoS |
+| urllib3 | 2.6.3 | 2.7.0 | High proxy/header issues |
+| cryptography | 46.0.3 | 49.0.0 | High openssl/wheel issues |
+| langchain-core | 1.2.7 | 1.4.9 | High deserialization/path |
+
+Structural:
+- poetry.lock regenerated (SSOT)
+- requirements.txt re-exported from lock
+- requirements-lock.txt removed (duplicate surface)
+- crewai / moviepy removed from optional stack (security pin conflicts)
+
+Residual: chromadb 1.4.1 may still carry unpatched critical advisory until upstream ships a safe release.
 
 ## 2026-02-10: Critical Vulnerability Updates (historical)
 

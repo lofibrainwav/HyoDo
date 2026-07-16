@@ -43,21 +43,41 @@ UI alert count ≠ unique CVE count
 4. **Do not claim "all vulnerabilities patched"** in `SECURITY_PATCHES.md`
    unless a fresh Dependabot/pip-audit readback is attached.
 
-## Next patch track (afo_core, post-#5)
+## Next patch track (afo_core)
 
-Measured 2026-07-16 open Dependabot posture on `afo_core` locks:
+### Applied in Dependabot P0 PR (2026-07-16)
 
-| Priority | Package (examples) | Notes |
-|----------|--------------------|-------|
-| P0 | litellm | Critical/high auth issues; lock was ~1.72 while patches exist at 1.83+ |
-| P0 | nltk | Critical zip-slip/path issues; pyproject asks `>=3.9.4` but lock lagged |
-| P0 | chromadb | Critical pre-auth RCE class; patched version may be unavailable in range |
-| P1 | transformers, json-repair, starlette, aiohttp | High volume High alerts |
-| P2 | lock single-source | Keep one of poetry.lock / requirements.txt / requirements-lock.txt |
+Lock regenerated with Poetry after security floor bumps:
 
-**Execution rule:** regenerate lock with one tool (`uv` or poetry), then export a
-single requirements surface. Do not hand-edit hashes. Public package CI must
-remain green without installing full `afo_core` runtime.
+| Package | Before (stale lock) | After |
+|---------|---------------------|-------|
+| litellm | 1.72.0 | **1.92.0** |
+| nltk | 3.9.2 | **3.10.0** |
+| json-repair | 0.55.0 | **0.61.5** |
+| transformers | 4.57.6 | **5.12.1** |
+| pypdf | 6.6.0 | **6.14.2** |
+| python-multipart | 0.0.21 | **0.0.32** |
+| urllib3 | 2.6.3 | **2.7.0** |
+| cryptography | 46.0.3 | **49.0.0** |
+| langchain-core | 1.2.7 | **1.4.9** |
+| chromadb | 1.4.1 | 1.4.1 (no safe patched release in range yet) |
+
+Also:
+- Removed `requirements-lock.txt` (duplicate Dependabot surface)
+- `requirements.txt` is export of `poetry.lock` (SSOT)
+- Dropped `crewai` (forced vulnerable litellm/json-repair pins)
+- Dropped `moviepy` (conflicted with secure pillow>=12.2)
+- Python range for afo_core: `>=3.10,<3.14` (litellm constraint)
+
+### Residual risk
+
+| Item | Status |
+|------|--------|
+| chromadb critical class without patched version | Still residual if rag extra is installed |
+| starlette/aiohttp | May still have medium/high depending on advisory DB |
+| agents extras without crewai | Reduced capability until upstream allows secure pins |
+
+**Execution rule:** regenerate with Poetry, export `requirements.txt`, never hand-edit lock hashes. Public package CI must remain green without installing full afo_core.
 
 ## Verification commands
 
