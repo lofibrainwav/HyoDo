@@ -149,24 +149,24 @@ optimization_strategies:
   # 전략 1: FREE 티어 최대 활용
   free_first:
     description: "디버깅/테스트는 항상 Ollama"
-    savings: "100%"
+    savings: "avoids premium model usage where local review is sufficient"
 
   # 전략 2: 병렬 분산
   parallel_distribution:
     description: "독립 작업을 오호대장군에게 분배"
-    savings: "60-80%"
+    savings: "depends on task independence and available local models"
 
   # 전략 3: 캐시 활용
   cache_hit:
     description: "유사 작업 결과 재사용"
-    savings: "100%"
+    savings: "avoids repeated model calls"
 
   # 전략 4: 복잡도 기반
   complexity_based:
     description: "복잡도 낮으면 CHEAP 티어"
-    savings: "98%"
+    savings: "routes low-risk work away from premium paths"
 
-expected_total_savings: "50-70%"
+expected_total_savings: "workflow-dependent; benchmark before making public claims"
 ```
 
 ---

@@ -16,7 +16,7 @@
 - [x] Five Tiger Generals (五虎大將軍) - Ollama debugging corps
 - [x] Hook system (pre_tool, post_tool, on_error)
 - [x] ultrawork parallel execution
-- [x] 50-70% token burning optimization
+- [x] Cost-aware routing and token usage optimization
 
 ### Q2 2026
 

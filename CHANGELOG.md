@@ -5,6 +5,22 @@ All notable changes to HyoDo (孝道) will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Reviewer-facing proof map for Claude Code / Anthropic-style enablement review.
+- 3-minute HyoDo demo script for recorded walkthroughs and live technical screens.
+
+### Changed
+
+- Public docs now avoid guaranteed cost-reduction language and describe cost-aware
+  routing as risk-based premium-model avoidance.
+- `/start` now opens with a practical quality-gate workflow before optional
+  philosophy language.
+- Package metadata now describes HyoDo as a Claude Code quality gate and
+  cost-aware review kit.
+
 ## [3.1.0] - 2026-05-08
 
 ### Added
@@ -73,7 +89,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- 토큰 버닝 최적화 50-70% 절감
+- 토큰 버닝 최적화 문구를 고정 절감률 대신 비용 인식 라우팅으로 정리
 
 ## [2.0.0-sejong] - 2026-01-24
 

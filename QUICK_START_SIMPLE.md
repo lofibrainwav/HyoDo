@@ -2,7 +2,8 @@
 
 > A fast, inspectable setup path for using HyoDo with Claude Code.
 
-HyoDo is a code-quality workflow kit for Claude Code. Start with the slash commands for review and safety checks; use the Python package for scoring and CLI utilities.
+HyoDo is a code-quality workflow kit for Claude Code. Start with the slash commands
+for review and safety checks; use the Python package for scoring and CLI utilities.
 
 ## 1. Install
 
@@ -132,6 +133,8 @@ Then run:
 
 - [Full README](README.md)
 - [Detailed guide](QUICK_START.md)
+- [Anthropic proof map](docs/ANTHROPIC_PROOF.md)
+- [3-minute demo script](docs/DEMO_SCRIPT_3_MIN.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Security policy](SECURITY.md)
 

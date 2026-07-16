@@ -2,7 +2,10 @@
 
 > **A Claude Code quality gate and cost-aware review kit for AI-assisted developers.**
 
-HyoDo helps developers using Claude Code review, score, and ship AI-assisted code with a repeatable quality workflow. It provides slash commands, scoring utilities, safety checks, and CI-friendly gates so AI-generated changes can be inspected before they become trusted code.
+HyoDo helps developers using Claude Code review, score, and ship AI-assisted code with
+a repeatable quality workflow. It provides slash commands, scoring utilities, safety
+checks, and CI-friendly gates so AI-generated changes can be inspected before they
+become trusted code.
 
 <p align="center">
   <a href="./i18n/ko/README.md">한국어</a> •
@@ -19,6 +22,20 @@ HyoDo helps developers using Claude Code review, score, and ship AI-assisted cod
 </p>
 
 ---
+
+## 30-second proof
+
+| Proof point | What to inspect |
+|-------------|-----------------|
+| Public package | `hyodo/` Python package, `pyproject.toml`, and `hyodo` CLI entrypoint |
+| Claude Code workflow | `commands/` slash commands for `/start`, `/check`, `/score`, `/safe`, and `/cost` |
+| Quality gates | `.github/workflows/ci.yml` and `.github/workflows/smoke.yml` |
+| Safety posture | `SECURITY.md`, `.env.example`, `.env.minimal`, and installer inspection steps |
+| Cost discipline | Cost-aware routing language and public claim note below; no guaranteed savings claim |
+
+If you are reviewing HyoDo for a role, partnership, or technical screen, start with
+[`QUICK_START_SIMPLE.md`](./QUICK_START_SIMPLE.md) and
+[`docs/ANTHROPIC_PROOF.md`](./docs/ANTHROPIC_PROOF.md).
 
 ## Who is this for?
 
@@ -43,6 +60,13 @@ AI-assisted change
 ```
 
 The goal is not blind automation. The goal is to make AI-assisted work easier to inspect, safer to merge, and cheaper to operate.
+
+## What HyoDo does not claim
+
+- It does **not** replace human code review, tests, or security review.
+- It does **not** guarantee a fixed cost-reduction percentage.
+- It does **not** auto-approve risky changes just because a score is high.
+- It does **not** require the optional philosophy layer to use the practical gates.
 
 ## What is included?
 
@@ -159,7 +183,9 @@ HyoDo is designed to avoid sending every task to the most expensive model path.
 | CHEAP | Simple edits, low-risk cleanup | Low |
 | EXPENSIVE | Complex refactors, high-risk decisions | Standard |
 
-> Public claim note: earlier internal docs referenced 40–70% cost reduction targets. Treat those as target/observed internal ranges, not a guaranteed benchmark, unless a public benchmark is linked.
+> Public claim note: earlier internal docs referenced percentage-based cost targets.
+> Treat those as selected-workflow observations, not a guaranteed benchmark,
+> unless a public benchmark is linked.
 
 ## Philosophy Layer: HYOGOOK V5
 

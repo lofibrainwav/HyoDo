@@ -16,7 +16,7 @@
 - [x] 五虎大将军 - Ollama 调试军团
 - [x] Hook 系统 (pre_tool, post_tool, on_error)
 - [x] ultrawork 并行执行
-- [x] 50-70% token 优化
+- [x] Cost-aware routing and token usage optimization
 
 ### Q2 2026
 

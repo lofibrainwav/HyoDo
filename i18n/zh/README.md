@@ -1,6 +1,6 @@
 # HyoDo (孝道) - AI 代码质量自动化
 
-> **自动代码质量检查 + 节省50-70%成本**
+> **Claude Code quality gate + cost-aware review kit**
 
 <p align="center">
   <a href="../../README.md">English</a> •
