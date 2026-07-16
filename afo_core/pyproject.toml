@@ -89,12 +89,14 @@ browser = [
     "playwright>=1.57.0",
 ]
 agents = [
+    # mem0ai removed: optional long-term memory experiment only;
+    # not required for public hyodo gates or afo_core core runtime.
+    # Code paths soft-fail when mem0 is absent.
     # crewai removed: its dependency pins force vulnerable litellm/json-repair ranges.
     # Re-add only when upstream accepts litellm>=1.84 and json-repair>=0.60.1.
     "dspy-ai>=3.0.4",
     "autogen-agentchat>=0.7.5",
     "autogen>=0.10.4",
-    "mem0ai>=1.0.2,<2.0.0",
 ]
 ml = [
     "torch>=2.10.0,<2.11.0",
@@ -122,7 +124,6 @@ all = [
     "dspy-ai>=3.0.4",
     "autogen-agentchat>=0.7.5",
     "autogen>=0.10.4",
-    "mem0ai>=1.0.2,<2.0.0",
     "torch>=2.10.0,<2.11.0",
     "peft>=0.18.0,<0.19.0",
     "transformers>=5.5.0,<6.0.0",

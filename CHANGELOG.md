@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Stop committing pinned afo_core requirements export to avoid Dependabot double-count
   (poetry.lock is the only SSOT).
 - P2 medium floors: idna/requests/pytest/dotenv/pygments/pydantic-settings/torch 2.10.
+- Removed optional `mem0ai` from afo_core agents extras (not required; soft-fail paths).
 
 ### Added
 

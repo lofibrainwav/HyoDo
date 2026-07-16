@@ -128,3 +128,8 @@ Stale chromadb Dependabot alerts (package absent from lock) should auto-close on
 Raised floors for remaining patchable medium/low: idna, requests, pytest,
 python-dotenv, Pygments, pydantic-settings, torch>=2.10. Residual: diskcache (no
 patch), mem0ai (beta-only fix).
+
+### mem0ai removal
+
+Removed optional `mem0ai` (agent long-term memory experiment). Not used by
+public `hyodo` package. Runtime soft-fails without it. Clears CVE-2026-7597 low.

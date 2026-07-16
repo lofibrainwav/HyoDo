@@ -90,3 +90,9 @@ before claiming a clean tree.
 | soupsieve | >=2.8.4 |
 
 Lock regenerated; chromadb package remains absent.
+
+
+## 2026-07-16: mem0ai removed
+
+Optional agent memory package dropped from afo_core. Public hyodo unaffected.
+Clears Dependabot low CVE-2026-7597 residual.
