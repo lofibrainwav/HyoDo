@@ -263,10 +263,10 @@ def run_safety_scan(
         action = "Review required — do not proceed without human approval"
     elif score >= 11:
         level = "caution"
-        action = "Proceed only after explicit review"
+        action = "Caution — explicit human review before any proceed decision"
     else:
         level = "low"
-        action = "Candidate to proceed — final approval remains human"
+        action = "Low early-warning risk — final approval remains human"
     return {
         "source": source,
         "findings": findings,

@@ -55,6 +55,10 @@ Thumbs.db
 tmp/
 temp/
 
+# Local-only artifacts (never ship stale SBOMs as truth)
+artifacts/
+memory/
+
 # Tool Caches
 .ruff_cache/
 .mypy_cache/
