@@ -93,6 +93,10 @@ print("wheel import API ok")
 PY
 
 echo "-- CLI smoke --"
+# reinstall editable so `hyodo check` uses the working tree sources
+$PYTHON -m pip install -e ".[dev]" -q
+$HYODO check >/tmp/hyodo-check.out 2>&1
+grep -q "All gates passed" /tmp/hyodo-check.out
 $HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9 >/tmp/hyodo-score.out
 grep -q "REVIEW_SIGNAL" /tmp/hyodo-score.out
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' >/tmp/hyodo-safe-fixture.txt

@@ -13,7 +13,7 @@ AI-generated changes can be inspected before they become trusted code.
   <img src="https://img.shields.io/badge/Tiered_Routing-intent_only-lightgrey" alt="Tiered routing intent only">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
   <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
-  <img src="https://img.shields.io/badge/Version-3.1.1-success" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.1.2-success" alt="Version">
 </p>
 
 ---
