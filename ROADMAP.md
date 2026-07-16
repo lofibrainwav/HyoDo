@@ -3,9 +3,9 @@
 > "The Spirit of King Sejong: Practical innovation for the people"
 
 <p align="center">
-  <a href="./i18n/ko/ROADMAP.md">한국어</a> •
-  <a href="./i18n/zh/ROADMAP.md">中文</a> •
-  <a href="./i18n/ja/ROADMAP.md">日本語</a>
+  <a href="./ko/ROADMAP.md"></a> •
+  <a href="./zh/ROADMAP.md"></a> •
+  <a href="./ja/ROADMAP.md"></a>
 </p>
 
 ## 2026 Roadmap
@@ -13,7 +13,7 @@
 ### Q1 2026 (Current)
 
 #### v3.0.0-ultrawork (Complete)
-- [x] Five Tiger Generals (五虎大將軍) - Ollama debugging corps
+- [x] Five Tiger Generals - Ollama debugging corps
 - [x] Hook system (pre_tool, post_tool, on_error)
 - [x] ultrawork parallel execution
 - [x] Cost-aware routing and token usage optimization
@@ -58,23 +58,23 @@
 
 ## Long-term Vision (2027+)
 
-### 眞 (Truth) Evolution
+###  (Truth) Evolution
 - AI-based automated code review
 - Automatic technical debt detection and resolution
 
-### 善 (Goodness) Evolution
+###  (Goodness) Evolution
 - Zero-Trust full automation
 - Real-time security vulnerability patching
 
-### 美 (Beauty) Evolution
+###  (Beauty) Evolution
 - Automated UI/UX generation
 - Design system integration
 
-### 孝 (Serenity) Evolution
+###  (Serenity) Evolution
 - Voice interface
 - Full natural language support
 
-### 永 (Eternity) Evolution
+###  (Eternity) Evolution
 - Self-evolving system
 - Automatic version management
 

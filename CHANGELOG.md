@@ -10,139 +10,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Model-agnostic provider proof map (`docs/PROVIDER_PROOF.md`).
-- Security surface boundary doc (`docs/SECURITY_SURFACE.md`) separating public
-  `hyodo/` from advisory `afo_core/`.
-- Real early-warning safety scanner module (`hyodo/safety.py`) used by `hyodo safe`.
-- Unit tests for safety scan helpers (`tests/test_safety.py`).
-- Dependabot config with public-surface and grouped `afo_core` updates.
-- Reviewer-facing proof map for Claude Code / Anthropic-style enablement review.
-- 3-minute HyoDo demo script for recorded walkthroughs and live technical screens.
+- Security surface boundary doc (`docs/SECURITY_SURFACE.md`).
+- External claim audit with measured evidence (`docs/EXTERNAL_CLAIM_AUDIT.md`).
+- Real early-warning safety scanner (`hyodo/safety.py`) used by `hyodo safe`.
+- Unit tests for safety helpers (`tests/test_safety.py`).
+- Dependabot config for public surface and grouped `afo_core` updates.
 
 ### Changed
 
-- Public docs and CLI now lead with model-agnostic CLI/CI; Claude Code is an
-  optional adapter, not the only surface.
-- Removed public auto-approval language (`AUTO_RUN` / automatic execution approval)
-  from CLI score/check outputs and `commands/score.md`.
-- `commands/check.md` now documents `hyodo check` and CI commands instead of missing
-  `make check`.
-- `SECURITY_PATCHES.md` marked as historical; Dependabot is live inventory for
-  extended-tree alerts.
-- Cost routing docs use FREE / STANDARD / PREMIUM tiers instead of vendor-hardcoded
-  exclusivity.
-- Package metadata describes HyoDo as a model-agnostic quality gate kit.
-- CI regression guard bans auto-approve phrasing on public CLI/docs surfaces.
-- Public English surfaces (CLI, core commands, security/proof docs) are English-first;
-  Korean remains in `i18n/ko/` localization only.
+- Public product language is **English-only**. Locale trees (`i18n/ko|zh|ja`) removed.
+- Public docs and CLI lead with model-agnostic CLI/CI; Claude Code is optional.
+- Removed public auto-approval language from CLI score/check outputs.
+- `commands/check.md` documents `hyodo check` and CI commands (no Makefile check).
+- `SECURITY_PATCHES.md` marked historical; Dependabot is live inventory for extended tree.
+- Install scripts rewritten in English; minimal install does not require Docker/Redis/Postgres.
+- Cost routing docs use FREE / STANDARD / PREMIUM tiers without vendor exclusivity.
+- CI regression guard bans auto-approve phrasing on public surfaces.
+
+### Removed
+
+- Japanese, Chinese, and Korean localization trees under `i18n/`.
+- Language switcher links from root docs.
 
 ## [3.1.0] - 2026-05-08
 
 ### Added
 
-- **Interactive installer** - `install_interactive.sh` provides a beginner-friendly 5-step setup flow.
-- **Simple quick start** - `QUICK_START_SIMPLE.md` documents a 3-minute path from install to first Claude Code command.
-- **Minimal Docker mode** - `docker-compose.minimal.yml` runs the lightweight Redis + PostgreSQL setup.
-- **HYOGOOK V5 public documentation** - README now presents the six-pillar scoring model: 仁, 眞, 善, 忠, 美, 永.
+- Interactive installer and simple quick start path.
+- Minimal Docker compose profile for optional extended services.
+- HYOGOOK V5 public documentation for optional scoring.
 
 ### Changed
 
-- **Version alignment** - public README badge and `pyproject.toml` now identify HyoDo as version `3.1.0`.
-- **Installation guidance** - README emphasizes the interactive installer and minimal setup path before the full Docker stack.
-- **Score interpretation** - public docs now distinguish HYOGOOK V5 scoring from the legacy WEIGHTED_V1 model.
-
-### Notes
-
-- Legacy WEIGHTED_V1 documentation used 眞18%, 善18%, 美12%, 孝40%, 永12%.
-- HYOGOOK V5 uses six pillars and geometric harmony for 永.
-
-## [3.0.1] - 2026-01-29
-
-### Added
-
-- **hyodo Python package** - PyPI 배포용 패키지 생성
-  - `calculate_trinity_score()` - Trinity Score 계산 함수
-  - `should_auto_approve()` - 자동 승인 판단 함수
-  - `TRINITY_WEIGHTS` - 5기둥 가중치 상수
-  - `py.typed` - 타입 힌트 지원
-
-### Changed
-
-- **README.md** - 완전한 영문 문서화
-  - Five Pillars 설명
-  - Quick Start 가이드
-  - Features 및 Project Structure
-- **CONTRIBUTING.md** - 기여 가이드라인 정립
-  - merge conflict 해결
-  - 개발 프로세스 명확화
-
-### Fixed
-
-- CONTRIBUTING.md merge conflict 해결
-
-## [3.0.0-ultrawork] - 2026-01-24
-
-### Added
-
-- **오호대장군 (五虎大將軍)** - Ollama 기반 FREE 티어 디버깅 군단
-  - 관우 (關羽) - qwen2.5-coder:7b - 코드 리뷰
-  - 장비 (張飛) - deepseek-r1:7b - 버그 추적
-  - 조운 (趙雲) - qwen3:8b - 테스트 생성
-  - 마초 (馬超) - codestral:latest - 빠른 코드 생성
-  - 황충 (黃忠) - qwen3-vl:latest - UI 분석
-
-- **훅 시스템**
-  - `cost_check` (pre_tool) - 비용 티어 체크
-  - `safety_gate` (pre_tool) - 이순신 안전 게이트
-  - `ollama_debug` (on_error) - 에러 시 자동 디버깅
-  - `evidence_log` (post_tool) - 결정 증거 기록
-  - `metrics_emit` (post_tool) - 메트릭 수집
-
-- **새로운 커맨드**
-  - `/ultrawork` - 병렬 작업 실행
-  - `/multiplatform` - 멀티플랫폼 라우팅
-
-### Changed
-
-- 토큰 버닝 최적화 문구를 고정 절감률 대신 비용 인식 라우팅으로 정리
-
-## [2.0.0-sejong] - 2026-01-24
-
-### Added
-
-- **세종대왕의 정신** - 삼국지 전략가에서 조선 위인으로 마이그레이션
-  - 장영실 (蔣英實) - 眞 Sword ⚔️
-  - 이순신 (李舜臣) - 善 Shield 🛡️
-  - 신사임당 (申師任堂) - 美 Bridge 🌉
-
-- **Chancellor V3** - CostAwareRouter + KeyTriggerRouter 연동
-- **十一臟腑** - 11 Organs 헬스체크 시스템
-- 비용 최적화 40% 절감 라우팅
-
-- **새로운 커맨드**
-  - `/chancellor-v3` - Chancellor V3 라우팅 시스템 제어
-  - `/organs` - 十一臟腑 건강 상태 체크
-  - `/cost-estimate` - 작업 비용 사전 예측
-  - `/routing` - KeyTriggerRouter 분석
-
-### Changed
-
-- 전략가 마이그레이션:
-  - 제갈량 → 장영실 (眞)
-  - 사마의 → 이순신 (善)
-  - 주유 → 신사임당 (美)
-
-## [1.0.0] - 2026-01-24
-
-### Added
-
-- Initial release
-- 眞善美孝永 철학 기반 에이전트 오케스트레이션
-- Trinity Score 시스템
-- 4-Gate CI Protocol
-- 기본 커맨드: `/trinity`, `/strategist`, `/check`, `/preflight`, `/evidence`, `/rollback`, `/ssot`
-- 에이전트: `trinity-guardian`, `quality-gate`
-- 스킬: `trinity-score-calculator`, `strategy-engine`, `philosophy-guide`, `kingdom-navigator`
-
----
-
-*"세종대왕의 정신: 장영실의 정밀함, 이순신의 수호, 신사임당의 예술"*
+- Version alignment to `3.1.0` across package metadata and badges.

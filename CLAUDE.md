@@ -1,106 +1,85 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for AI coding agents working in this repository.
 
 ## Project Overview
 
-HyoDo (孝道) is an AI code quality automation system and Claude Code extension. It implements a philosophical framework based on the Five Pillars (眞善美孝永) for evaluating code quality through automated Trinity Score analysis.
+HyoDo is a model-agnostic quality-gate kit for AI-assisted development. Primary
+surface is the public `hyodo` CLI and CI gates. Optional agent adapters live in
+`commands/`. Extended backend modules live in `afo_core/` and are advisory for
+public release.
 
-**Version**: 3.1.0
-**Python**: 3.10+
+**Version**: 3.1.0  
+**Python**: 3.10+  
+**Public language**: English only
 
 ## Commands
 
-### Main Commands (Claude Code Extension)
+### Main commands
 
-- `/start` - Help and welcome guide
-- `/check` - Code quality check
-- `/score` - View Trinity Score
-- `/safe` - Safety inspection (Yi Sun-sin strategist)
-- `/trinity` - Full audit of all Five Pillars
-- `/cost "task"` - Cost prediction
+- `hyodo start` / `/start` - onboarding
+- `hyodo check` / `/check` - quality gates
+- `hyodo score` / `/score` - review signal (not auto-approval)
+- `hyodo safe` / `/safe` - safety early-warning scan
+- `hyodo trinity` / `/trinity` - structured review checklist
+- `/cost "task"` - cost routing signal
 
-### Development Commands
+### Development commands
 
 ```bash
-# Install
 pip install -e ".[dev]"
-
-# Lint & Format
-ruff check . --fix && ruff format .
-
-# Tests
-pytest                            # Run all tests
-pytest tests/ -v                  # Verbose output
-pytest -m smoke                   # Quick smoke tests
-pytest -m integration             # Integration tests only
-
-# Type check (afo_core specific)
-mypy afo_core/AFO
+ruff check hyodo/ --fix && ruff format hyodo/
+pytest tests -q
+pyright hyodo
+hyodo check
+hyodo safe
 ```
 
 ## Architecture
 
-### Five Pillars Quality Framework
+### Public package vs extended tree
 
-| Pillar | Weight | Chinese | Focus |
-|--------|--------|---------|-------|
-| Truth (眞) | 35% | 진실 | Technical accuracy, verifiability |
-| Goodness (善) | 35% | 선함 | Safety, ethical stability |
-| Beauty (美) | 20% | 아름다움 | Clarity, elegance, readability |
-| Serenity (孝) | 8% | 평온 | Usability, low cognitive load |
-| Eternity (永) | 2% | 영원함 | Long-term sustainability |
+| Surface | Path | Release gate |
+|---------|------|--------------|
+| Public product | `hyodo/`, root `pyproject.toml` | Yes |
+| Agent adapters | `commands/`, `agents/` | Docs only |
+| Extended / legacy | `afo_core/` | Advisory |
 
-### Three Strategists (3책사)
+### Optional HYOGOOK V5 review signal
 
-| Strategist | Pillar | Internal Persona | Role |
-|------------|--------|------------------|------|
-| Jang Yeong-sil | 眞 | Jeong Yak-yong | Architecture, Code |
-| Yi Sun-sin | 善 | Ryu Seong-ryong | Security, Verification |
-| Shin Saimdang | 美 | Heo Jun | UX/UI, Documentation |
+| Pillar | Weight | Focus |
+|--------|--------|-------|
+| Benevolence | 25% | Developer experience |
+| Truth | 22% | Technical accuracy |
+| Goodness | 18% | Security and stability |
+| Loyalty | 15% | Project/context alignment |
+| Beauty | 15% | Clarity and UX |
+| Eternity | geometric mean | Long-term harmony |
 
-### Directory Structure
+Scores are decision support only. They do not authorize merge/deploy.
 
-```
+### Directory structure
+
+```text
 HyoDo/
-├── agents/              # Strategist agents (Python + MD)
-├── commands/            # Claude Code slash commands (MD)
-├── skills/              # Claude Code skills (SKILL.md format)
-├── hooks/               # Event hooks
-├── scripts/             # Utility scripts
-├── i18n/                # Translations (ko, zh, ja)
-└── afo_core/            # Backend API (FastAPI) - see afo_core/CLAUDE.md
+├── hyodo/               # Public Python package (CLI + scoring)
+├── tests/               # Public package tests
+├── commands/            # Optional agent slash-command docs
+├── agents/              # Optional agent helpers
+├── docs/                # Proof maps, security surface, audits
+├── .github/workflows/   # CI + smoke
+└── afo_core/            # Extended/legacy backend (advisory)
 ```
 
-### afo_core Backend
+### afo_core backend
 
-For backend-specific work in `afo_core/`, refer to [afo_core/CLAUDE.md](afo_core/CLAUDE.md) which covers:
-- FastAPI routing and services
-- PostgreSQL, Redis, Qdrant integration
-- LangChain/LangGraph RAG system
-- DRY_RUN policy for dangerous operations
-- Forbidden zones (antigravity.py, chancellor_graph.py, api_wallet.py)
+For backend-specific work in `afo_core/`, see `afo_core/CLAUDE.md` when present.
+Extended services may involve Redis/Postgres/Docker; they are **not** required
+for the public CLI path.
 
-## Key Conventions
+## Security notes
 
-- **Type Hints**: Required (Python 3.10+ syntax: `X | None`)
-- **Docstrings**: Google style
-- **Line Length**: 100 characters
-- **Imports**: isort ordering via Ruff
-
-## Trinity Score Thresholds
-
-| Score | Status | Action |
-|-------|--------|--------|
-| 90+ | AUTO_RUN | Safe to proceed |
-| 70-89 | ASK_COMMANDER | Review before proceeding |
-| <70 | BLOCK | Fixes required |
-
-## Test Markers
-
-- `smoke` - Quick tests on every commit
-- `slow` - Pre-deployment tests
-- `integration` - Requires Redis, DB, API
-- `api` - API server tests
-- `unit` - Unit tests
-- `bdd` - Behavior-driven tests
+- Do not commit secrets.
+- `hyodo safe` is early warning only.
+- Dependabot volume on `afo_core` lockfiles is not the public package surface.
+- See `docs/SECURITY_SURFACE.md` and `docs/EXTERNAL_CLAIM_AUDIT.md`.

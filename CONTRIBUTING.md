@@ -1,12 +1,6 @@
-# Contributing to HyoDo (孝道)
+# Contributing to HyoDo
 
 > "The Spirit of King Sejong: Practical innovation for the people"
-
-<p align="center">
-  <a href="./i18n/ko/CONTRIBUTING.md">한국어</a> •
-  <a href="./i18n/zh/CONTRIBUTING.md">中文</a> •
-  <a href="./i18n/ja/CONTRIBUTING.md">日本語</a>
-</p>
 
 Thank you for your interest in contributing to HyoDo!
 
@@ -16,12 +10,12 @@ All contributions are evaluated according to the six pillars used in the public 
 
 | Pillar | Meaning | Focus |
 |--------|---------|-------|
-| **仁** | Benevolence | Developer experience and user serenity |
-| **眞** | Truth | Technical accuracy and architecture |
-| **善** | Goodness | Security, safety, stability |
-| **忠** | Loyalty | SSOT continuity and project integrity |
-| **美** | Beauty | Readability, UX, documentation |
-| **永** | Eternity | Long-term harmony and sustainability |
+| **** | Benevolence | Developer experience and user serenity |
+| **** | Truth | Technical accuracy and architecture |
+| **** | Goodness | Security, safety, stability |
+| **** | Loyalty | SSOT continuity and project integrity |
+| **** | Beauty | Readability, UX, documentation |
+| **** | Eternity | Long-term harmony and sustainability |
 
 ### Score Expectations
 

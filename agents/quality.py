@@ -32,7 +32,7 @@ class QualityScoutAgent:
     """Scout agent for initial code quality assessment."""
 
     name = "QualityScout"
-    description = "빠른 코드 품질 스캔"
+    description = "   "
 
     async def analyze(self, code: str) -> QualityResult:
         """Analyze code quality."""
@@ -42,8 +42,8 @@ class QualityScoutAgent:
         # Basic checks
         lines = code.split("\n")
         if len(lines) > 500:
-            issues.append("파일이 500줄을 초과합니다")
-            suggestions.append("파일을 더 작은 모듈로 분리하세요")
+            issues.append(" 500 ")
+            suggestions.append("    ")
 
         # Calculate score
         score = 100.0
@@ -71,7 +71,7 @@ class FastRuffAgent:
     """Fast Ruff linting agent."""
 
     name = "FastRuff"
-    description = "빠른 Ruff 린팅"
+    description = " Ruff "
 
     async def lint(self, file_path: str) -> dict[str, Any]:
         """Run Ruff linting on a file."""

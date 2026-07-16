@@ -1,27 +1,27 @@
 #!/usr/bin/env python3
 """
-AFO Kingdom Memory Manager - 메모리 관리 시스템
+AFO Kingdom Memory Manager -   
 ================================================
 
-제텔카스텐(Zettelkasten) 방법론 기반의 메모리 관리 도구
+(Zettelkasten)     
 
-사용법:
+:
     python memory_manager.py <command> [options]
 
 Commands:
-    search <query>      관련 메모리 검색
-    session             세션 관리
-    fleeting            일시노트 생성
-    daily               일일 노트 업데이트
-    index               인덱스 재생성
-    status              메모리 상태 확인
+    search <query>        
+    session              
+    fleeting             
+    daily                 
+    index                
+    status                
 
 Examples:
     python memory_manager.py search "security scanner"
     python memory_manager.py session --start
-    python memory_manager.py session --save --title "Email 구현" --outcomes "완료"
-    python memory_manager.py fleeting "새로운 아이디어: AI 메모리 캐싱"
-    python memory_manager.py daily --activity "보안 스캐너 구현" --insight "gh extension 필요"
+    python memory_manager.py session --save --title "Email " --outcomes ""
+    python memory_manager.py fleeting " : AI  "
+    python memory_manager.py daily --activity "  " --insight "gh extension "
 """
 
 from __future__ import annotations
@@ -43,7 +43,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# 설정
+# 
 MEMORY_DIR = Path(__file__).parent.parent / "memory"
 DAILY_NOTES_DIR = MEMORY_DIR / "Daily Notes"
 SESSIONS_DIR = MEMORY_DIR / "050_Sessions" / datetime.now().strftime("%Y")
@@ -51,14 +51,14 @@ FLEETING_DIR = MEMORY_DIR / "040_Fleeting" / "TEMP"
 PROJECTS_DIR = MEMORY_DIR / "010_Projects"
 KNOWLEDGE_DIR = MEMORY_DIR / "020_Knowledge"
 
-# 디렉토리 생성
+#  
 for dir_path in [SESSIONS_DIR, FLEETING_DIR]:
     dir_path.mkdir(parents=True, exist_ok=True)
 
 
 @dataclass
 class Session:
-    """세션 데이터"""
+    """ """
 
     id: str
     title: str
@@ -83,29 +83,29 @@ class Session:
 
 
 class MemoryManager:
-    """메모리 관리자"""
+    """ """
 
     def __init__(self) -> None:
         self.current_session: Session | None = None
         self.session_file: Path | None = None
 
     def search(self, query: str, limit: int = 5) -> list[dict[str, Any]]:
-        """관련 메모리 검색"""
-        logger.info(f"🔍 메모리 검색: '{query}'")
+        """  """
+        logger.info(f"🔍  : '{query}'")
         results = []
 
-        # mem MCP 사용
+        # mem MCP 
         try:
-            # 메모리 검색 (MCP 활용)
-            # 실제로는 memory_search_nodes 등의 MCP 도구 사용
+            #   (MCP )
+            #  memory_search_nodes  MCP  
             results = self._search_files(query, limit)
         except Exception as e:
-            logger.error(f"검색 실패: {e}")
+            logger.error(f" : {e}")
 
         return results
 
     def _search_files(self, query: str, limit: int) -> list[dict[str, Any]]:
-        """파일 기반 검색 (fallback)"""
+        """   (fallback)"""
         results = []
         keywords = query.lower().split()
 
@@ -128,12 +128,12 @@ class MemoryManager:
             except Exception:
                 continue
 
-        # 점수순 정렬
+        #  
         results.sort(key=lambda x: x["score"], reverse=True)
         return results[:limit]
 
     def start_session(self, title: str) -> str:
-        """새 세션 시작"""
+        """  """
         session_id = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.current_session = Session(
             id=session_id,
@@ -142,9 +142,9 @@ class MemoryManager:
         )
         self.session_file = SESSIONS_DIR / f"{session_id}_{title.replace(' ', '_')}.md"
 
-        # 세션 파일 생성
+        #   
         self._save_session_file()
-        logger.info(f"✅ 세션 시작: {session_id} - {title}")
+        logger.info(f"✅  : {session_id} - {title}")
 
         return session_id
 
@@ -155,12 +155,12 @@ class MemoryManager:
         decisions: list[str] | None = None,
         insights: list[str] | None = None,
     ) -> None:
-        """현재 세션 저장"""
+        """  """
         if not self.current_session:
-            logger.error("❌ 활성 세션이 없습니다. 먼저 --start로 시작하세요.")
+            logger.error("❌   .  --start .")
             return
 
-        # 데이터 업데이트
+        #  
         if outcomes:
             self.current_session.outcomes.extend(outcomes)
         if files_changed:
@@ -173,10 +173,10 @@ class MemoryManager:
         self.current_session.end_time = datetime.now()
         self._save_session_file()
 
-        logger.info(f"✅ 세션 저장 완료: {self.current_session.id}")
+        logger.info(f"✅   : {self.current_session.id}")
 
     def _save_session_file(self) -> None:
-        """세션 파일 저장"""
+        """  """
         if not self.current_session or not self.session_file:
             return
 
@@ -193,41 +193,41 @@ tags:
 
 # {self.current_session.title}
 
-## 개요
-- **세션 ID**: {self.current_session.id}
-- **시작**: {self.current_session.start_time.strftime("%Y-%m-%d %H:%M")}
-- **종료**: {self.current_session.end_time.strftime("%Y-%m-%d %H:%M") if self.current_session.end_time else "진행중"}
+## 
+- ** ID**: {self.current_session.id}
+- ****: {self.current_session.start_time.strftime("%Y-%m-%d %H:%M")}
+- ****: {self.current_session.end_time.strftime("%Y-%m-%d %H:%M") if self.current_session.end_time else ""}
 
-## 성과 (Outcomes)
+##  (Outcomes)
 """
         for outcome in self.current_session.outcomes:
             content += f"- [x] {outcome}\n"
 
         if self.current_session.decisions:
-            content += "\n## 의사결정 (Decisions)\n"
+            content += "\n##  (Decisions)\n"
             for decision in self.current_session.decisions:
                 content += f"- 🎯 {decision}\n"
 
         if self.current_session.insights:
-            content += "\n## 인사이트 (Insights)\n"
+            content += "\n##  (Insights)\n"
             for insight in self.current_session.insights:
                 content += f"- 💡 {insight}\n"
 
         if self.current_session.files_changed:
-            content += "\n## 변경된 파일\n"
+            content += "\n##  \n"
             for file in self.current_session.files_changed:
                 content += f"- `{file}`\n"
 
-        content += f"\n---\n*세션 기록 자동 생성됨 | AFO Kingdom Memory System*\n"
+        content += f"\n---\n*    | AFO Kingdom Memory System*\n"
 
         self.session_file.write_text(content, encoding="utf-8")
 
     def create_fleeting(self, content: str, tags: list[str] | None = None) -> Path:
-        """일시노트 생성"""
+        """ """
         timestamp = datetime.now()
         note_id = timestamp.strftime("%Y%m%d_%H%M%S")
 
-        # 키워드 추출 (간단한 방법)
+        #   ( )
         keywords = content.split()[:3]
         keyword_str = "_".join(kw[:10] for kw in keywords)
 
@@ -248,27 +248,27 @@ tags:
 {content}
 
 ---
-*일시노트 | 24-48시간 내 정리 필요*
+* | 24-48   *
 """
 
         filepath.write_text(note_content, encoding="utf-8")
-        logger.info(f"✅ 일시노트 생성: {filename}")
+        logger.info(f"✅  : {filename}")
 
         return filepath
 
     def update_daily(self, activity: str, insight: str | None = None) -> None:
-        """일일 노트 업데이트"""
+        """  """
         today = datetime.now()
         date_str = today.strftime("%Y-%m-%d")
-        weekday = ["월", "화", "수", "목", "금", "토", "일"][today.weekday()]
+        weekday = ["", "", "", "", "", "", ""][today.weekday()]
 
         daily_file = DAILY_NOTES_DIR / f"{date_str}_{weekday}.md"
 
-        # 파일이 없으면 생성
+        #   
         if not daily_file.exists():
             self._create_daily_note(daily_file, today, date_str, weekday)
 
-        # 내용 추가
+        #  
         timestamp = today.strftime("%H:%M")
         entry = f"\n- [{timestamp}] {activity}"
         if insight:
@@ -277,12 +277,12 @@ tags:
         with open(daily_file, "a", encoding="utf-8") as f:
             f.write(entry + "\n")
 
-        logger.info(f"✅ 일일 노트 업데이트: {daily_file.name}")
+        logger.info(f"✅   : {daily_file.name}")
 
     def _create_daily_note(
         self, filepath: Path, today: datetime, date_str: str, weekday: str
     ) -> None:
-        """새 일일 노트 생성"""
+        """   """
         content = f"""---
 date: {date_str}
 weekday: {weekday}
@@ -291,22 +291,22 @@ tags:
   - daily
 ---
 
-# {date_str} ({weekday})요일
+# {date_str} ({weekday})
 
-## 🌅 아침
-- [ ] Trinity Score 확인
-- [ ] 오늘의 목표 설정
+## 🌅 
+- [ ] Trinity Score 
+- [ ]   
 
-## 📝 활동 로그
+## 📝  
 """
         filepath.write_text(content, encoding="utf-8")
 
     def status(self) -> None:
-        """메모리 상태 확인"""
-        logger.info("📊 메모리 시스템 상태")
+        """  """
+        logger.info("📊   ")
         logger.info("=" * 50)
 
-        # 통계 수집
+        #  
         stats = {
             "total_notes": len(list(MEMORY_DIR.rglob("*.md"))),
             "daily_notes": len(list(DAILY_NOTES_DIR.glob("*.md"))),
@@ -315,25 +315,25 @@ tags:
             "projects": len([d for d in PROJECTS_DIR.iterdir() if d.is_dir()]),
         }
 
-        logger.info(f"  📚 전체 노트: {stats['total_notes']}개")
-        logger.info(f"  📅 일일 노트: {stats['daily_notes']}개")
-        logger.info(f"  📝 일시노트: {stats['fleeting_notes']}개")
-        logger.info(f"  🎯 세션: {stats['sessions']}개")
-        logger.info(f"  📁 프로젝트: {stats['projects']}개")
+        logger.info(f"  📚  : {stats['total_notes']}")
+        logger.info(f"  📅  : {stats['daily_notes']}")
+        logger.info(f"  📝 : {stats['fleeting_notes']}")
+        logger.info(f"  🎯 : {stats['sessions']}")
+        logger.info(f"  📁 : {stats['projects']}")
 
-        # 현재 세션
+        #  
         if self.current_session:
-            logger.info(f"\n  🟢 활성 세션: {self.current_session.title}")
+            logger.info(f"\n  🟢  : {self.current_session.title}")
             duration = datetime.now() - self.current_session.start_time
-            logger.info(f"     진행 시간: {duration.seconds // 60}분")
+            logger.info(f"      : {duration.seconds // 60}")
 
     def get_recent_sessions(self, limit: int = 3) -> list[dict[str, Any]]:
-        """최근 세션 목록"""
+        """  """
         sessions = []
         for session_file in sorted(SESSIONS_DIR.glob("*.md"), reverse=True)[:limit]:
             try:
                 content = session_file.read_text(encoding="utf-8")
-                # 간단한 파싱
+                #  
                 title = ""
                 for line in content.split("\n"):
                     if line.startswith("# "):
@@ -354,59 +354,59 @@ tags:
 
 
 def main() -> int:
-    """메인 함수"""
+    """ """
     parser = argparse.ArgumentParser(
         description="AFO Kingdom Memory Manager",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
-예시:
-    # 메모리 검색
+:
+    #  
     python memory_manager.py search "security scanner"
     
-    # 세션 관리
-    python memory_manager.py session --start --title "보안 구현"
-    python memory_manager.py session --save --outcomes "Email 알림 완료"
+    #  
+    python memory_manager.py session --start --title " "
+    python memory_manager.py session --save --outcomes "Email  "
     
-    # 일시노트
-    python memory_manager.py fleeting "새로운 아이디어"
+    # 
+    python memory_manager.py fleeting " "
     
-    # 일일 노트
-    python memory_manager.py daily --activity "코드 리뷰" --insight "리팩토링 필요"
+    #  
+    python memory_manager.py daily --activity " " --insight " "
     
-    # 상태 확인
+    #  
     python memory_manager.py status
         """,
     )
 
-    subparsers = parser.add_subparsers(dest="command", help="명령어")
+    subparsers = parser.add_subparsers(dest="command", help="")
 
     # search
-    search_parser = subparsers.add_parser("search", help="메모리 검색")
-    search_parser.add_argument("query", help="검색어")
-    search_parser.add_argument("--limit", type=int, default=5, help="결과 수")
+    search_parser = subparsers.add_parser("search", help=" ")
+    search_parser.add_argument("query", help="")
+    search_parser.add_argument("--limit", type=int, default=5, help=" ")
 
     # session
-    session_parser = subparsers.add_parser("session", help="세션 관리")
-    session_parser.add_argument("--start", action="store_true", help="새 세션 시작")
-    session_parser.add_argument("--save", action="store_true", help="세션 저장")
-    session_parser.add_argument("--title", help="세션 제목")
-    session_parser.add_argument("--outcomes", nargs="+", help="성과 목록")
-    session_parser.add_argument("--files", nargs="+", help="변경된 파일")
-    session_parser.add_argument("--decisions", nargs="+", help="의사결정")
-    session_parser.add_argument("--insights", nargs="+", help="인사이트")
+    session_parser = subparsers.add_parser("session", help=" ")
+    session_parser.add_argument("--start", action="store_true", help="  ")
+    session_parser.add_argument("--save", action="store_true", help=" ")
+    session_parser.add_argument("--title", help=" ")
+    session_parser.add_argument("--outcomes", nargs="+", help=" ")
+    session_parser.add_argument("--files", nargs="+", help=" ")
+    session_parser.add_argument("--decisions", nargs="+", help="")
+    session_parser.add_argument("--insights", nargs="+", help="")
 
     # fleeting
-    fleeting_parser = subparsers.add_parser("fleeting", help="일시노트 생성")
-    fleeting_parser.add_argument("content", help="노트 내용")
-    fleeting_parser.add_argument("--tags", nargs="+", help="태그")
+    fleeting_parser = subparsers.add_parser("fleeting", help=" ")
+    fleeting_parser.add_argument("content", help=" ")
+    fleeting_parser.add_argument("--tags", nargs="+", help="")
 
     # daily
-    daily_parser = subparsers.add_parser("daily", help="일일 노트 업데이트")
-    daily_parser.add_argument("--activity", required=True, help="활동 내용")
-    daily_parser.add_argument("--insight", help="인사이트")
+    daily_parser = subparsers.add_parser("daily", help="  ")
+    daily_parser.add_argument("--activity", required=True, help=" ")
+    daily_parser.add_argument("--insight", help="")
 
     # status
-    subparsers.add_parser("status", help="메모리 상태 확인")
+    subparsers.add_parser("status", help="  ")
 
     args = parser.parse_args()
 
@@ -419,18 +419,18 @@ def main() -> int:
     if args.command == "search":
         results = manager.search(args.query, args.limit)
         if results:
-            print(f"\n🔍 '{args.query}' 검색 결과:")
+            print(f"\n🔍 '{args.query}'  :")
             print("=" * 60)
             for i, r in enumerate(results, 1):
-                print(f"\n{i}. {r['file']} (관련도: {r['score']})")
+                print(f"\n{i}. {r['file']} (: {r['score']})")
                 print(f"   {r['preview']}...")
         else:
-            print(f"❌ '{args.query}'에 대한 결과 없음")
+            print(f"❌ '{args.query}'   ")
 
     elif args.command == "session":
         if args.start:
             if not args.title:
-                print("❌ --title 필수")
+                print("❌ --title ")
                 return 1
             manager.start_session(args.title)
         elif args.save:
@@ -441,15 +441,15 @@ def main() -> int:
                 insights=args.insights,
             )
         else:
-            # 최근 세션 표시
+            #   
             sessions = manager.get_recent_sessions()
-            print("\n🎯 최근 세션:")
+            print("\n🎯  :")
             for s in sessions:
                 print(f"  - [{s['date']}] {s['title']}")
 
     elif args.command == "fleeting":
         filepath = manager.create_fleeting(args.content, args.tags)
-        print(f"✅ 생성됨: {filepath}")
+        print(f"✅ : {filepath}")
 
     elif args.command == "daily":
         manager.update_daily(args.activity, args.insight)

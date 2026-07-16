@@ -228,12 +228,12 @@ jobs:
             fail=1
           fi
           # 2. Automation overclaim: auto-approve language on public surfaces
-          if grep -rEn "Auto-approve|AUTO_RUN|자동 실행 승인" $DOCS hyodo/cli/main.py commands/score.md commands/check.md 2>/dev/null; then
+          if grep -rEn "Auto-approve|AUTO_RUN|  " $DOCS hyodo/cli/main.py commands/score.md commands/check.md 2>/dev/null; then
             echo "::error::Banned: auto-approve / AUTO_RUN phrasing on public surfaces. Scores support review, not replace it."
             fail=1
           fi
           # 3. HYOGOOK/Hanja must not lead README (top 15 lines) — practical value first
-          if head -15 README.md | grep -En "HYOGOOK|五德|[仁眞善忠美永孝]"; then
+          if head -15 README.md | grep -En "HYOGOOK||[]"; then
             echo "::error::Banned: HYOGOOK/Hanja in README top-15 lines. Lead with practical value; keep philosophy below usage."
             fail=1
           fi

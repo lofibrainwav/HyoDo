@@ -1,12 +1,12 @@
 # HyoDo Pre-commit Configuration
-# 이순신 안전 게이트: 커밋 전 품질 검증
+#   :    
 
 repos:
   # ─────────────────────────────────────────
-  # 眞 (Truth) - 기술적 정확성
+  #  (Truth) -  
   # ─────────────────────────────────────────
 
-  # Markdown 린트
+  # Markdown 
   - repo: https://github.com/igorshubovych/markdownlint-cli
     rev: v0.39.0
     hooks:
@@ -14,7 +14,7 @@ repos:
         args: ["--fix"]
         files: \.(md|markdown)$
 
-  # JSON 유효성
+  # JSON 
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
@@ -24,10 +24,10 @@ repos:
       - id: trailing-whitespace
 
   # ─────────────────────────────────────────
-  # 善 (Goodness) - 안전성
+  #  (Goodness) - 
   # ─────────────────────────────────────────
 
-  # 비밀 키 감지
+  #   
   - repo: https://github.com/Yelp/detect-secrets
     rev: v1.4.0
     hooks:
@@ -35,7 +35,7 @@ repos:
         args: ["--baseline", ".secrets.baseline"]
         exclude: package-lock.json
 
-  # 대용량 파일 방지
+  #   
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.5.0
     hooks:
@@ -43,7 +43,7 @@ repos:
         args: ["--maxkb=1000"]
 
   # ─────────────────────────────────────────
-  # 美 (Beauty) - 가독성
+  #  (Beauty) - 
   # ─────────────────────────────────────────
 
   # Prettier (JSON, YAML, MD)
@@ -54,7 +54,7 @@ repos:
         types_or: [json, yaml, markdown]
 
 # ─────────────────────────────────────────
-# 세종대왕의 정신: 장영실의 정밀함으로 품질 보장
+#  :    
 # ─────────────────────────────────────────
 
 default_language_version:
@@ -62,7 +62,7 @@ default_language_version:
 
 ci:
   autofix_commit_msg: |
-    [pre-commit.ci] 자동 수정
+    [pre-commit.ci]  
 
-    Co-Authored-By: 장영실 (眞 Sword) <jang@afo.kingdom>
-  autoupdate_commit_msg: "[pre-commit.ci] pre-commit 자동 업데이트"
+    Co-Authored-By:  ( Sword) <jang@afo.kingdom>
+  autoupdate_commit_msg: "[pre-commit.ci] pre-commit  "

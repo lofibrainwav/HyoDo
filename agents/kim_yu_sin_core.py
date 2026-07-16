@@ -2,9 +2,9 @@
 """
 Kim Yu-sin Agent Core - The System Integrator
 Philosophy:
-- 眞 (Truth): System state verification.
-- 孝 (Serenity): Environment stability monitoring.
-- 永 (Eternity): Perfect archiving and history tracking.
+-  (Truth): System state verification.
+-  (Serenity): Environment stability monitoring.
+-  (Eternity): Perfect archiving and history tracking.
 """
 
 import logging

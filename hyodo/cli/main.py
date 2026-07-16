@@ -58,7 +58,7 @@ def afo_core_path() -> Optional[Path]:
 
 
 def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 1: Pyright (眞 - Truth) - Type checking."""
+    """Gate 1: Pyright ( - Truth) - Type checking."""
     # Public package is the release gate. Extended afo_core is advisory only.
     cmd = ["pyright", "hyodo"]
 
@@ -82,7 +82,7 @@ def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
 
 
 def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 2: Ruff (美 - Beauty) - Lint & Format."""
+    """Gate 2: Ruff ( - Beauty) - Lint & Format."""
     root = find_repo_root()
     cwd = root or Path.cwd()
     target = "hyodo" if root else "."
@@ -109,7 +109,7 @@ def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]
 
 
 def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 3: pytest (善 - Goodness) - Test coverage."""
+    """Gate 3: pytest ( - Goodness) - Test coverage."""
     root = find_repo_root()
 
     # Public package tests first. afo_core remains optional/advisory.
@@ -138,7 +138,7 @@ def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
 
 
 def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 4: SBOM (永 - Eternity) - Security seal."""
+    """Gate 4: SBOM ( - Eternity) - Security seal."""
     root = find_repo_root()
     if not root:
         return True, "No repository checkout found; SBOM skipped in package mode"

@@ -4,9 +4,9 @@ The Strategic Pragmatist of AFO Kingdom.
 Powered by Qwen2.5-Coder.
 
 Philosophy:
-- 眞 (Truth): Generates syntactically correct code.
-- 善 (Goodness): Validates actions against Trinity Score.
-- 美 (Beauty): Prioritizes Glassmorphism and Tailwind aesthetics.
+-  (Truth): Generates syntactically correct code.
+-  (Goodness): Validates actions against Trinity Score.
+-  (Beauty): Prioritizes Glassmorphism and Tailwind aesthetics.
 """
 
 import logging
@@ -128,18 +128,18 @@ export function SamahwiGeneratedWidget() {{
             return f"Failed to create widget: {e}"
 
     async def _tool_analyze_trinity(self, _input: Any) -> str:
-        """Trinity Score 분석 (Standalone)"""
-        # Standalone 모드: 기본 Trinity Score 계산
-        # 眞(18%) + 善(18%) + 美(12%) + 孝(40%) + 永(12%) = 100%
+        """Trinity Score  (Standalone)"""
+        # Standalone :  Trinity Score 
+        # (18%) + (18%) + (12%) + (40%) + (12%) = 100%
         default_scores = {
-            "眞": 90,  # Truth
-            "善": 85,  # Goodness
-            "美": 88,  # Beauty
-            "孝": 92,  # Serenity
-            "永": 95,  # Eternity
+            "": 90,  # Truth
+            "": 85,  # Goodness
+            "": 88,  # Beauty
+            "": 92,  # Serenity
+            "": 95,  # Eternity
         }
         weighted_score = (
-            default_scores["眞"] * 0.18 + default_scores["善"] * 0.18 + default_scores["美"] * 0.12 + default_scores["孝"] * 0.40 + default_scores["永"] * 0.12)
+            default_scores[""] * 0.18 + default_scores[""] * 0.18 + default_scores[""] * 0.12 + default_scores[""] * 0.40 + default_scores[""] * 0.12)
         return f"Trinity Score: {weighted_score:.1f} (Standalone Mode)"
 
 

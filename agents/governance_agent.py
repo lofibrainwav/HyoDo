@@ -9,9 +9,9 @@ Policy adherence monitoring and bounded autonomy enforcement.
 - Audit Trail: Automatic logging of all governance decisions
 
 Philosophy:
-- 眞 (Truth): Verify all actions against SSOT policies
-- 善 (Goodness): Prevent harmful or risky operations
-- 美 (Beauty): Transparent and explainable decision-making
+-  (Truth): Verify all actions against SSOT policies
+-  (Goodness): Prevent harmful or risky operations
+-  (Beauty): Transparent and explainable decision-making
 """
 
 import logging
@@ -69,7 +69,7 @@ class GovernanceAgent:
     """
 
     def __init__(self) -> None:
-        self.name = "Governance Agent (사마의)"
+        self.name = "Governance Agent ()"
         self.audit_log: list[GovernanceDecision] = []
 
         # Bounded autonomy limits (rate limits)

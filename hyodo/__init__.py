@@ -1,14 +1,14 @@
-"""HyoDo (孝道) - AI Code Quality Automation
+"""HyoDo - AI Code Quality Automation
 
 The Way of Devotion: Philosophy-driven code review for AI-assisted development.
 
 Built with the Six Pillars (HYOGOOK V5):
-- 仁 (Benevolence): Developer experience and user serenity
-- 眞 (Truth): Technical accuracy
-- 善 (Goodness): Security and stability
-- 忠 (Loyalty): SSOT compliance and cultural continuity
-- 美 (Beauty): Code clarity and UX
-- 永 (Eternity): Geometric mean of harmony (calculated)
+- Benevolence: Developer experience and user serenity
+- Truth: Technical accuracy
+- Goodness: Security and stability
+- Loyalty: SSOT compliance and cultural continuity
+- Beauty: Code clarity and UX
+- Eternity: Geometric mean of harmony (calculated)
 """
 
 __version__ = "3.1.0"
@@ -17,16 +17,16 @@ __license__ = "MIT"
 
 # HYOGOOK V5 Weights (Phase 127+)
 TRINITY_WEIGHTS = {
-    "benevolence": 0.25,  # 仁 - Developer/user experience
-    "truth": 0.22,  # 眞 - Technical accuracy
-    "goodness": 0.18,  # 善 - Security/stability
-    "loyalty": 0.15,  # 忠 - SSOT compliance
-    "beauty": 0.15,  # 美 - Code clarity/UX
+    "benevolence": 0.25,  #  Developer/user experience
+    "truth": 0.22,  #  Technical accuracy
+    "goodness": 0.18,  #  Security/stability
+    "loyalty": 0.15,  #  SSOT compliance
+    "beauty": 0.15,  #  Code clarity/UX
 }
 
 
 def calculate_geometric_mean(values: list[float]) -> float:
-    """Calculate geometric mean for Eternity (永) pillar.
+    """Calculate geometric mean for Eternity pillar.
 
     S = ⁵√(T × G × In × B × C)
 
@@ -61,11 +61,11 @@ def calculate_hygook_v5_score(
     S = ⁵√(T × G × In × B × C)
 
     Args:
-        benevolence: 仁 score (0-1, will be scaled to 1-10)
-        truth: 眞 score (0-1, will be scaled to 1-10)
-        goodness: 善 score (0-1, will be scaled to 1-10)
-        loyalty: 忠 score (0-1, will be scaled to 1-10)
-        beauty: 美 score (0-1, will be scaled to 1-10)
+        benevolence: Benevolence score (0-1, will be scaled to 1-10)
+        truth: Truth score (0-1, will be scaled to 1-10)
+        goodness: Goodness score (0-1, will be scaled to 1-10)
+        loyalty: Loyalty score (0-1, will be scaled to 1-10)
+        beauty: Beauty score (0-1, will be scaled to 1-10)
 
     Returns:
         Tuple of (F_score, S_eternity)
@@ -123,14 +123,14 @@ def calculate_trinity_score(
 
 
 def should_auto_approve(trinity_score: float, risk_score: float = 0) -> bool:
-    """Determine if changes can be auto-approved.
+    """Determine if changes can be eligible for strong review signal.
 
     Args:
         trinity_score: Trinity Score (0-100)
         risk_score: Risk score (0-100), lower is better
 
     Returns:
-        True if auto-approve eligible (Trinity >= 90, Risk <= 10)
+        True if strong-review-signal eligible (Trinity >= 90, Risk <= 10)
     """
     return trinity_score >= 90 and risk_score <= 10
 

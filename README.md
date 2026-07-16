@@ -8,12 +8,6 @@ cover Claude Code, Codex, Grok, Gemini CLI, Cursor, and other agent UIs so
 AI-generated changes can be inspected before they become trusted code.
 
 <p align="center">
-  <a href="./i18n/ko/README.md">한국어</a> •
-  <a href="./i18n/zh/README.md">中文</a> •
-  <a href="./i18n/ja/README.md">日本語</a>
-</p>
-
-<p align="center">
   <img src="https://img.shields.io/badge/Model-Agnostic-0A7-blue" alt="Model agnostic">
   <img src="https://img.shields.io/badge/CLI%2BCI-First-blueviolet" alt="CLI and CI first">
   <img src="https://img.shields.io/badge/Cost_Aware-Routing-green" alt="Cost-aware routing">
@@ -36,7 +30,8 @@ AI-generated changes can be inspected before they become trusted code.
 
 If you are reviewing HyoDo for a role, partnership, or technical screen, start with
 [`QUICK_START_SIMPLE.md`](./QUICK_START_SIMPLE.md),
-[`docs/PROVIDER_PROOF.md`](./docs/PROVIDER_PROOF.md), and optionally
+[`docs/PROVIDER_PROOF.md`](./docs/PROVIDER_PROOF.md),
+[`docs/EXTERNAL_CLAIM_AUDIT.md`](./docs/EXTERNAL_CLAIM_AUDIT.md), and optionally
 [`docs/ANTHROPIC_PROOF.md`](./docs/ANTHROPIC_PROOF.md) for Claude-specific mapping.
 
 ## Who is this for?
@@ -212,18 +207,18 @@ F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
 S = ⁵√(T × G × In × B × C)
 ```
 
-| Pillar | Hanja | Weight | Focus |
-|:------:|:-----:|:------:|:------|
-| **Benevolence** | 仁 | **25%** | Developer experience, user serenity |
-| **Truth** | 眞 | **22%** | Technical accuracy, architecture |
-| **Goodness** | 善 | **18%** | Security, stability, ethics |
-| **Loyalty** | 忠 | **15%** | SSOT compliance, project context |
-| **Beauty** | 美 | **15%** | Clean code, UX, documentation |
-| **Eternity** | 永 | **Geometric** | Harmony and sustainability |
+| Pillar | Weight | Focus |
+|:------:|:------:|:------|
+| **Benevolence** | **25%** | Developer experience, user serenity |
+| **Truth** | **22%** | Technical accuracy, architecture |
+| **Goodness** | **18%** | Security, stability, ethics |
+| **Loyalty** | **15%** | SSOT compliance, project context |
+| **Beauty** | **15%** | Clean code, UX, documentation |
+| **Eternity** | **Geometric** | Harmony and sustainability |
 
 **Range**: F ∈ [6, 60], S ∈ [1, 10]
 
-> Legacy note: WEIGHTED_V1 used 眞/善/美/孝/永. HyoDo v3.1.0 public docs use the HYOGOOK V5 six-pillar model.
+> Legacy note: WEIGHTED_V1 used an older five-pillar label set. HyoDo v3.1.0 public docs use the HYOGOOK V5 six-pillar model.
 
 ## Project Structure
 
@@ -242,9 +237,10 @@ afo_core/           # Extended/legacy modules (advisory, not public gate)
 | [QUICK_START_SIMPLE.md](QUICK_START_SIMPLE.md) | 3-minute quick start |
 | [docs/PROVIDER_PROOF.md](docs/PROVIDER_PROOF.md) | Model-agnostic proof map |
 | [docs/SECURITY_SURFACE.md](docs/SECURITY_SURFACE.md) | Public package vs afo_core security boundary |
+| [docs/EXTERNAL_CLAIM_AUDIT.md](docs/EXTERNAL_CLAIM_AUDIT.md) | Measured audit of external market claims |
 | [QUICK_START.md](QUICK_START.md) | Detailed guide |
-| [install_interactive.sh](install_interactive.sh) | Interactive installer |
-| [docker-compose.minimal.yml](docker-compose.minimal.yml) | Lightweight Docker setup |
+| [install_interactive.sh](install_interactive.sh) | Interactive installer (English, minimal-first) |
+| [docker-compose.minimal.yml](docker-compose.minimal.yml) | Optional extended Docker setup |
 | [SECURITY.md](SECURITY.md) | Security policy |
 | [CHANGELOG.md](CHANGELOG.md) | Release notes |
 

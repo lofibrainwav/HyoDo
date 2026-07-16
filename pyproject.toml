@@ -116,7 +116,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-# Phase 93: Kaizen 지속적 개선 - 50% 커버리지 목표
+# Phase 93: Kaizen   - 50%  
 fail_under = 50
 show_missing = true
 skip_covered = false

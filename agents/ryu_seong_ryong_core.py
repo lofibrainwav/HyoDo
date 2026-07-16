@@ -2,9 +2,9 @@
 """
 Ryu Seong-ryong Agent Core - The Strategic Reasoner
 Philosophy:
-- 眞 (Truth): Rigorous logic and security policy validation.
-- 善 (Goodness): Risks assessment and prevention.
-- 永 (Eternity): Long-term architectural stability.
+-  (Truth): Rigorous logic and security policy validation.
+-  (Goodness): Risks assessment and prevention.
+-  (Eternity): Long-term architectural stability.
 """
 
 import logging
