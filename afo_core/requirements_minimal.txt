@@ -1,7 +1,7 @@
 # Minimal afo_core web surface (not the public hyodo package)
 # Prefer poetry.lock + requirements.txt export for full stacks.
 
-fastapi>=0.123.0
+fastapi>=0.139.2
 uvicorn[standard]>=0.31.1
 python-dotenv
 python-multipart>=0.0.30

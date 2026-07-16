@@ -1,6 +1,6 @@
 # CI-lite requirements for afo_core utility checks (no CUDA/ML stack)
 
-fastapi>=0.115.0
+fastapi>=0.139.2
 uvicorn>=0.34.0
 pydantic>=2.12.5
 pydantic-settings>=2.0.0
