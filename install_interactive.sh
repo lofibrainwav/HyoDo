@@ -1,6 +1,6 @@
 #!/bin/bash
 # HyoDo interactive installer (English)
-# Version: v3.1.2
+# Version: v3.1.3
 set -e
 
 RED='\033[0;31m'
@@ -22,7 +22,7 @@ print_header() {
     echo ""
     echo -e "${BLUE}=======================================================${NC}"
     echo -e "${BLUE}     HyoDo interactive installer${NC}"
-    echo -e "${BLUE}         v3.1.2${NC}"
+    echo -e "${BLUE}         v3.1.3${NC}"
     echo -e "${BLUE}=======================================================${NC}"
     echo ""
     echo -e "${CYAN}HyoDo is a model-agnostic quality-gate kit for AI-assisted code.${NC}"
