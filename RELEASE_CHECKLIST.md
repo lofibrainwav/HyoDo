@@ -4,7 +4,7 @@ This checklist blocks a public release until the package, CLI, and workflow path
 
 ## Current target
 
-- Target version: see `VERSION` (currently `3.1.1`)
+- Target version: see `VERSION` (SSOT; do not hardcode)
 - Release issue: <https://github.com/lofibrainwav/HyoDo/issues/1>
 - Public package path only — `afo_core/` is advisory, not a release blocker
 
@@ -45,14 +45,15 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 
 1. Confirm Actions are enabled and latest main runs are green.
 
-2. Tag and push (example for 3.1.1):
+2. Tag and push the synchronized version:
 
    ```bash
-   git tag -a v3.1.1 -m "HyoDo v3.1.1"
-   git push origin v3.1.1
+   VERSION="$(tr -d '[:space:]' < VERSION)"
+   git tag -a "v$VERSION" -m "HyoDo v$VERSION"
+   git push origin "v$VERSION"
    ```
 
-3. Create GitHub Release `v3.1.1` with notes from `CHANGELOG.md` `[3.1.1]`.
+3. Create GitHub Release `v$VERSION` with notes from its `CHANGELOG.md` section.
 
 4. **PyPI publish is separate and optional.** Measure first:
 
@@ -71,6 +72,6 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 | Date | Version | Decision |
 |------|---------|----------|
 | 2026-05 | 3.1.0 | Tag/Release existed; later main advanced past that snapshot |
-| 2026-07-16 | 3.1.1 | Public readiness: security track closed, packaging hygiene, clutter removed |
+| 2026-07-16 | 3.1.4 | GitHub release published; PyPI intentionally separate |
 
 Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published. PyPI is not required for GitHub release readiness.

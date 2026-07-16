@@ -1,6 +1,6 @@
 # External Claim Audit (Measured)
 
-**Date:** 2026-07-16 (PDT)  
+**Date:** 2026-07-16 (PDT; Dependabot readback refreshed after cleanup)
 **Repo:** `lofibrainwav/HyoDo`  
 **Method:** file/CLI/CI/GitHub Dependabot readback (no estimation)  
 **Merged baseline:** PR #5 (`0eceb08`) — English-only public surface, real `hyodo safe`, claim alignment
@@ -51,7 +51,8 @@ No Docker required for public package smoke.
 
 **Residual friction:**
 
-- Repo still contains `afo_core/`, Docker files, and Dependabot noise from extended locks.
+- Repo still contains `afo_core/` and Docker files from the extended path; keep
+  them visibly secondary to the public CLI.
 - Interactive installer historically asked for Anthropic key even when CLI gates do not need it (now optional wording).
 
 ### 2.2 Philosophical overhead
@@ -86,7 +87,7 @@ External recommendation: frictionless single purpose — one terminal command th
 | Prove cost savings | Not proven publicly | Needs benchmark or drop as primary pitch |
 | Repo first impression matches single purpose | Improved (CLI-first README), but monorepo still heavy (`afo_core`, many commands) | Packaging/split or stronger "public vs extended" boundary |
 
-**Verdict:** The pivot is directionally correct and **partially already implemented** in the public package. The remaining blocker is not the CLI core — it is **repo surface weight** (extended tree, Dependabot count, optional philosophy/cost claims) that still dilutes the single-purpose story.
+**Verdict:** The pivot is directionally correct and **partially already implemented** in the public package. The remaining blocker is not the CLI core — it is **repo surface weight** (extended tree and optional philosophy/cost claims) that can still dilute the single-purpose story.
 
 ---
 
@@ -94,8 +95,8 @@ External recommendation: frictionless single purpose — one terminal command th
 
 | Metric (2026-07-16) | Value |
 |---------------------|-------|
-| Dependabot open alerts | 310 (pip) |
-| Location | 100% under `afo_core/` manifests |
+| Dependabot open alerts | 0 (live GitHub API readback, 2026-07-16) |
+| Historical context | Earlier pip alerts were concentrated under `afo_core/` manifests and were cleaned up |
 | Public package Dependabot | 0 (thin deps) |
 | Code scanning analyses | none configured |
 | Secret scanning open | 0 |
@@ -112,7 +113,7 @@ Priority order implied by measurements:
 2. Keep extended infra out of minimal install defaults — **done in installer/docs**
 3. Keep HYOGOOK optional and non-blocking — **done**
 4. Either publish a cost benchmark or demote "cost-aware" from primary badge — **demoted to tiered-routing intent badge**
-5. Reduce `afo_core` Dependabot noise (lock SSOT + patch/remove) so Security tab matches public surface truth — **open track** (see `SECURITY_SURFACE.md`)
+5. Keep monitoring `afo_core` independently so a future extended-tree alert does not get presented as a public-package defect.
 
 ---
 

@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.5] - 2026-07-16
+
+### Changed
+
+- Refreshed the demo receipt with explicit pre-commit provenance and current
+  public CLI output.
+- Made installer headers read `VERSION` when available instead of carrying a
+  stale patch number.
+- Reconciled release/demo documentation with the live zero-open Dependabot
+  alert readback while retaining the historical cleanup context.
+
 ## [3.1.4] - 2026-07-16
 
 ### Added
