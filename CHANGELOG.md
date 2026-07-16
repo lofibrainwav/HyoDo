@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Score / docs wording: "strong review signal" only — never "proceed immediately"
+  or bare "candidate for approval" without human-gate language.
+- `QUICK_START.md` rewritten as CLI-first pointer to `QUICK_START_SIMPLE.md`.
+
 ## [3.1.3] - 2026-07-16
 
 ### Fixed

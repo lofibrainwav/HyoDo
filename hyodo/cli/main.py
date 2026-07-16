@@ -348,11 +348,11 @@ def score(
     if score_value >= 90:
         console.print("\n[bold green]REVIEW_SIGNAL_STRONG (90+)[/bold green]")
         console.print(
-            "[green]Candidate for approval after tests, security checks, and human review.[/green]"
+            "[green]Strong review signal only. Still run tests/security checks; human approval required.[/green]"
         )
     elif score_value >= 70:
         console.print("\n[bold yellow]REVIEW_SIGNAL_CAUTION (70-89)[/bold yellow]")
-        console.print("[yellow]Review recommended before proceed.[/yellow]")
+        console.print("[yellow]Review recommended before proceed. Not an approval.[/yellow]")
     else:
         console.print("\n[bold red]REVIEW_SIGNAL_BLOCK (<70)[/bold red]")
         console.print(
