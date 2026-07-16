@@ -14,9 +14,11 @@ CI already treats `afo_core` lint as advisory (`continue-on-error: true` in
 `.github/workflows/ci.yml`). Public smoke tests install and run the `hyodo`
 package only.
 
-## How to read "Security and quality 310"
+## Historical security-count context
 
-As of the 2026-07-16 audit:
+Before the 2026-07-16 cleanup, the Security view showed a large Dependabot count
+because of duplicated extended-tree manifests. The current open-alert count must
+always be measured live; it is not a release-document constant.
 
 - Open Dependabot alerts were **pip-only** and concentrated under `afo_core/`
   manifests (`poetry.lock`, `requirements.txt`, `requirements-lock.txt`).

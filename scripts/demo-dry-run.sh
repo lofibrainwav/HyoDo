@@ -23,8 +23,9 @@ $PYTHON -m pip install -e ".[dev]" -q
   echo "# HyoDo demo dry-run"
   echo
   echo "Generated: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
-  echo "Branch: $(git rev-parse --abbrev-ref HEAD)"
-  echo "Commit: $(git rev-parse --short HEAD)"
+  echo "Source branch: $(git rev-parse --abbrev-ref HEAD)"
+  echo "Source commit: $(git rev-parse --short HEAD) (pre-commit worktree)"
+  echo "Working tree: $(if git diff --quiet; then echo clean; else echo dirty; fi)"
   echo "Version: $(tr -d '[:space:]' < VERSION)"
   echo
   echo '## hyodo --version'
@@ -50,7 +51,7 @@ $PYTHON -m pip install -e ".[dev]" -q
   $HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
   echo '```'
   echo
-  echo '## hyodo safe (clean tree)'
+  echo '## hyodo safe (working tree)'
   echo '```'
   $HYODO safe || true
   echo '```'
@@ -69,6 +70,9 @@ $PYTHON -m pip install -e ".[dev]" -q
   echo '```'
   bash scripts/verify-public.sh
   echo '```'
-} | tee "$OUT"
+} | sed -E \
+  -e "s|$ROOT|<repo-root>|g" \
+  -e 's/[[:space:]]+$//' \
+  | tee "$OUT"
 
 echo "Wrote $OUT"

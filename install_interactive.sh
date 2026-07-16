@@ -1,6 +1,5 @@
 #!/bin/bash
 # HyoDo interactive installer (English)
-# Version: v3.1.3
 set -e
 
 RED='\033[0;31m'
@@ -17,12 +16,18 @@ WARN="WARN"
 INSTALL_DIR="${HOME}/.hyodo"
 MINIMAL_MODE=true
 API_KEY=""
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -r "$SCRIPT_DIR/VERSION" ]; then
+    HYODO_VERSION="v$(tr -d '[:space:]' < "$SCRIPT_DIR/VERSION")"
+else
+    HYODO_VERSION="latest"
+fi
 
 print_header() {
     echo ""
     echo -e "${BLUE}=======================================================${NC}"
     echo -e "${BLUE}     HyoDo interactive installer${NC}"
-    echo -e "${BLUE}         v3.1.3${NC}"
+    echo -e "${BLUE}         ${HYODO_VERSION}${NC}"
     echo -e "${BLUE}=======================================================${NC}"
     echo ""
     echo -e "${CYAN}HyoDo is a model-agnostic quality-gate kit for AI-assisted code.${NC}"

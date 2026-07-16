@@ -11,11 +11,17 @@ NC='\033[0m'
 CHECK="OK"
 CROSS="ERR"
 WARN="WARN"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -r "$SCRIPT_DIR/VERSION" ]; then
+    HYODO_VERSION="v$(tr -d '[:space:]' < "$SCRIPT_DIR/VERSION")"
+else
+    HYODO_VERSION="latest"
+fi
 
 echo ""
 echo -e "${BLUE}=======================================================${NC}"
 echo -e "${BLUE}     HyoDo installer${NC}"
-echo -e "${BLUE}         v3.1.3${NC}"
+echo -e "${BLUE}         ${HYODO_VERSION}${NC}"
 echo -e "${BLUE}=======================================================${NC}"
 echo ""
 
