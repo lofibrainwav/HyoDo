@@ -1,32 +1,31 @@
 ---
-description: "AFO 4-Gate CI 프로토콜 실행 (眞善美永)"
+description: "Run HyoDo 4-Gate CI protocol (Truth/Beauty/Goodness/Eternity)"
 allowed-tools: Bash(hyodo:*), Bash(ruff:*), Bash(pyright:*), Bash(pytest:*), Read
 impact: CRITICAL
 tags: [ci, quality, testing, lint]
 ---
 
-# AFO 4-Gate CI Lock Protocol
+# 4-Gate CI Lock Protocol
 
-CI Lock Protocol을 실행하여 코드 품질을 검증합니다.
+Run the CI lock protocol to verify code quality.
 
-## 4-Gate 순서
+## Gate order
 
-1. **眞 (Truth) - Pyright**: 타입 체크
-2. **美 (Beauty) - Ruff**: 린트 + 포맷
-3. **善 (Goodness) - pytest**: 유닛 테스트
-4. **永 (Eternity) - SBOM**: 보안 봉인 (리포 checkout + 스크립트 있을 때만)
+1. **Truth - Pyright**: type check
+2. **Beauty - Ruff**: lint + format
+3. **Goodness - pytest**: unit tests
+4. **Eternity - SBOM**: security seal (only when repo checkout + script exist)
 
-## 실행 (권장)
+## Recommended run
 
-벤더 무관 CLI:
+Vendor-neutral CLI:
 
 ```bash
-# 패키지 설치 후
 pip install -e ".[dev]"
 hyodo check
 ```
 
-공개 패키지 게이트를 CI와 동일하게 수동 실행:
+Run public package gates the same way CI does:
 
 ```bash
 ruff check hyodo/ --output-format=concise
@@ -35,26 +34,27 @@ pyright hyodo
 pytest -q --tb=short
 ```
 
-> Makefile-based check targets are not provided in this repository. CI SSOT is `.github/workflows/ci.yml` and `hyodo check`.
+> Makefile-based check targets are not provided in this repository. CI SSOT is
+> `.github/workflows/ci.yml` and `hyodo check`.
 
-## 개별 게이트 실행
+## Individual gates
 
-- `pyright hyodo` — 타입 체크 (공개 패키지)
-- `ruff check hyodo/` — 린트
-- `ruff format --check hyodo/` — 포맷
-- `pytest -q` — 테스트
+- `pyright hyodo` — type check (public package)
+- `ruff check hyodo/` — lint
+- `ruff format --check hyodo/` — format
+- `pytest -q` — tests
 
-## 결과 해석
+## How to read results
 
-- **PASS**: 모든 게이트 통과 → 커밋/PR 후보 (사람 리뷰는 별도)
-- **FAIL**: 실패 게이트 수정 후 재실행
+- **PASS**: all gates green -> commit/PR candidate (human review still separate)
+- **FAIL**: fix the failing gate and re-run
 
-게이트 통과는 자동 merge/자동 배포 승인이 아닙니다.
+Passing gates is not automatic merge/deploy approval.
 
-## Evidence 기록
+## Evidence template
 
 ```text
 Gate: [Pyright|Ruff|pytest|SBOM]
 Status: [PASS|FAIL]
-Details: [에러 요약 또는 OK]
+Details: [error summary or OK]
 ```

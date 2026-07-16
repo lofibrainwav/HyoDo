@@ -1,5 +1,5 @@
 ---
-description: "[Simple] 코드 안전성 검사 - 보안/리스크 체크"
+description: "[Simple] Safety and risk early-warning scan"
 allowed-tools: Read, Glob, Grep, Bash(git diff:*), Bash(hyodo:*)
 impact: LOW
 tags: [simple, safety, security, beginner]
@@ -7,22 +7,23 @@ mode: simple
 alias: strategist
 ---
 
-# /safe - 안전성 검사
+# /safe - safety scan
 
-변경 내용에서 **고위험 신호**를 먼저 찾습니다. (Advanced: `/strategist`)
+Looks for **high-risk signals** in the current change first. (Advanced: `/strategist`)
 
-`/safe` 와 `hyodo safe` 는 초기 경보(early warning)입니다. 완전한 보안 스캐너·SAST·의존성 감사·사람 보안 리뷰를 대체하지 않습니다.
+`/safe` and `hyodo safe` are early-warning tools. They do not replace a full security
+scanner, SAST, dependency audit, or human security review.
 
-## 사용법
+## Usage
 
 Agent slash command:
 
 ```text
 /safe
-/safe "파일명"
+/safe "path/to/file"
 ```
 
-벤더 무관 CLI:
+Vendor-neutral CLI:
 
 ```bash
 hyodo safe
@@ -30,44 +31,44 @@ hyodo safe path/to/file_or_dir
 hyodo safe --strict
 ```
 
-## 검사 항목
+## What it checks
 
-| 항목 | 체크 내용 |
-|------|----------|
-| 비밀키 | API 키·토큰·private key 패턴 |
-| 위험 명령 | `rm -rf`, `DROP DATABASE`, force push 등 |
-| 프로덕션 영향 | migration, deploy, schema 변경 신호 |
-| 롤백 힌트 | rollback/migration 문구 존재 여부 (보증 아님) |
+| Item | Looks for |
+|------|-----------|
+| Secrets | API key / token / private key patterns |
+| Dangerous commands | `rm -rf`, `DROP DATABASE`, force push, etc. |
+| Production impact | migration, deploy, schema-change signals |
+| Rollback hint | presence of rollback/migration wording (not a guarantee) |
 
-## 기본 동작
+## Default behavior
 
-1. 경로가 있으면 해당 파일/디렉터리를 읽습니다.
-2. 경로가 없으면 `git diff HEAD` (없으면 `git status`)를 스캔합니다.
-3. 매칭 결과를 위험도 점수와 함께 출력합니다.
+1. If a path is given, read that file/directory.
+2. If no path is given, scan `git diff HEAD` (or `git status` if empty).
+3. Print matches with a risk score.
 
-## 결과 예시
+## Example output
 
 ```text
-안전성 검사 결과:
+Safety scan result:
 source: git diff HEAD
 
-✅ 비밀키 노출
-✅ 위험 명령
-⚠️ 프로덕션 영향
-✅ 롤백 가능성
+OK Secrets exposure
+OK Dangerous commands
+WARN Production impact
+OK Rollback signal
 
-위험도: 주의 (15/100)
-→ 확인 후 진행 권장
+Risk: caution (15/100)
+-> Proceed only after explicit review
 ```
 
-## 위험도 레벨
+## Risk levels
 
-| 위험도 | 의미 | 행동 |
-|--------|------|------|
-| 0-10 | 낮음 | 진행 가능 후보 — 최종 승인은 사람 |
-| 11-30 | 주의 | 확인 후 진행 |
-| 31+ | 위험 | 리뷰 필수 |
+| Score | Meaning | Action |
+|-------|---------|--------|
+| 0-10 | low | Candidate to proceed — final approval is human |
+| 11-30 | caution | Review, then proceed |
+| 31+ | high | Review required |
 
 ---
 
-*상세 분석이 필요하면 `/strategist` 또는 `SECURITY.md` 를 참고하세요.*
+*For deeper analysis use `/strategist` or `SECURITY.md`.*

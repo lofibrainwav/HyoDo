@@ -1,6 +1,6 @@
 # Changelog
 
-All notable changes to HyoDo (孝道) will be documented in this file.
+All notable changes to HyoDo will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
@@ -32,6 +32,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exclusivity.
 - Package metadata describes HyoDo as a model-agnostic quality gate kit.
 - CI regression guard bans auto-approve phrasing on public CLI/docs surfaces.
+- Public English surfaces (CLI, core commands, security/proof docs) are English-first;
+  Korean remains in `i18n/ko/` localization only.
 
 ## [3.1.0] - 2026-05-08
 

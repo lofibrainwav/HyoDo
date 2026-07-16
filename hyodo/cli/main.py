@@ -174,19 +174,19 @@ def version():
 
 @app.command()
 def check(
-    path: Optional[str] = typer.Argument(None, help="검사할 파일/디렉토리 경로"),
-    fix: bool = typer.Option(False, "--fix", "-f", help="자동 수정 적용"),
-    verbose: bool = typer.Option(False, "--verbose", "-v", help="상세 출력"),
+    path: Optional[str] = typer.Argument(None, help="Path to file or directory"),
+    fix: bool = typer.Option(False, "--fix", "-f", help="Apply auto-fixes where supported"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ):
     """
-    코드 품질 검사 (4-Gate CI)
+    Run code quality gates (4-Gate CI).
 
-    Pyright → Ruff → pytest → SBOM 순서로 검사
+    Order: Pyright -> Ruff -> pytest -> SBOM
     """
     console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
     target = path or "."
-    console.print(f"대상: {target}")
+    console.print(f"Target: {target}")
 
     all_passed = True
 
@@ -237,23 +237,21 @@ def check(
 
 @app.command()
 def score(
-    benevolence: float = typer.Option(1.0, "--benevolence", "-i", help="仁 점수 (0-1)"),
-    truth: float = typer.Option(1.0, "--truth", "-t", help="眞 점수 (0-1)"),
-    goodness: float = typer.Option(1.0, "--goodness", "-g", help="善 점수 (0-1)"),
-    loyalty: float = typer.Option(1.0, "--loyalty", "-c", help="忠 점수 (0-1)"),
-    beauty: float = typer.Option(1.0, "--beauty", "-b", help="美 점수 (0-1)"),
+    benevolence: float = typer.Option(1.0, "--benevolence", "-i", help="Benevolence score (0-1)"),
+    truth: float = typer.Option(1.0, "--truth", "-t", help="Truth score (0-1)"),
+    goodness: float = typer.Option(1.0, "--goodness", "-g", help="Goodness score (0-1)"),
+    loyalty: float = typer.Option(1.0, "--loyalty", "-c", help="Loyalty score (0-1)"),
+    beauty: float = typer.Option(1.0, "--beauty", "-b", help="Beauty score (0-1)"),
     serenity: float = typer.Option(
-        1.0, "--serenity", "-s", help="[Legacy] 孝 점수 (0-1) - maps to benevolence"
+        1.0, "--serenity", "-s", help="[Legacy] maps to benevolence (0-1)"
     ),
-    eternity: float = typer.Option(
-        1.0, "--eternity", "-e", help="[Legacy] 永 점수 (0-1) - maps to loyalty"
-    ),
+    eternity: float = typer.Option(1.0, "--eternity", "-e", help="[Legacy] maps to loyalty (0-1)"),
 ):
     """
-    Trinity Score 계산 (HYOGOOK V5)
+    Compute HYOGOOK V5 review signal.
 
-    5덕 가중치: 仁(25%) 眞(22%) 善(18%) 忠(15%) 美(15%)
-    永(Eternity) = ⁵√(仁×眞×善×忠×美) 기하평균
+    Weights: Benevolence 25%, Truth 22%, Goodness 18%, Loyalty 15%, Beauty 15%.
+    Eternity is the geometric mean of the five pillars.
 
     Output is a review signal only — not automatic approval.
     """
@@ -308,14 +306,14 @@ def score(
 
 @app.command()
 def safe(
-    path: Optional[str] = typer.Argument(None, help="검사할 경로"),
-    strict: bool = typer.Option(False, "--strict", help="엄격 모드"),
+    path: Optional[str] = typer.Argument(None, help="Path to scan"),
+    strict: bool = typer.Option(False, "--strict", help="Strict mode"),
 ):
     """
-    안전성 검사 (early warning)
+    Safety early-warning scan.
 
-    비밀키 패턴, 위험 명령, 프로덕션 영향 신호를 스캔합니다.
-    완전한 보안 스캐너를 대체하지 않습니다.
+    Scans for secret-like patterns, dangerous commands, and production-impact signals.
+    Does not replace a full security scanner.
     """
     console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
 
@@ -333,7 +331,7 @@ def safe(
                 f"  - [{finding.severity}] {finding.category}/{finding.label}: {finding.detail}"
             )
 
-    console.print(f"\n위험도: {result['level']} ({result['risk_score']}/100)\n→ {result['action']}")
+    console.print(f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}")
     console.print(
         "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit.[/dim]"
     )
@@ -341,11 +339,7 @@ def safe(
 
 @app.command()
 def start():
-    """
-    시작 가이드
-
-    HyoDo 소개와 기본 사용법
-    """
+    """Print HyoDo onboarding guide and basic usage."""
     guide = """
 [bold blue]HyoDo quick start[/bold blue]
 
@@ -372,12 +366,12 @@ Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
 
 @app.command(name="trinity")
 def trinity_analysis(
-    task: str = typer.Argument(..., help="분석할 작업 설명"),
+    task: str = typer.Argument(..., help="Task description to review"),
 ):
     """
-    상세 Trinity 분석 체크리스트 (리뷰 지원)
+    Structured Trinity review checklist.
 
-    Structured review prompts only — not an automated pass verdict.
+    Review prompts only — not an automated pass verdict.
     """
     console.print(Panel.fit(f"Trinity review checklist: {task}", style="bold magenta"))
     console.print("\nTruth - technical accuracy")
@@ -393,7 +387,7 @@ def trinity_analysis(
 @app.callback(invoke_without_command=True)
 def main(
     ctx: typer.Context,
-    version_flag: bool = typer.Option(False, "--version", "-v", help="버전 정보"),
+    version_flag: bool = typer.Option(False, "--version", "-v", help="Show version"),
 ):
     """HyoDo - model-agnostic quality gates for AI-assisted development."""
     if version_flag:

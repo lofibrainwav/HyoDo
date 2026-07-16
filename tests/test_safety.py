@@ -31,5 +31,5 @@ def test_run_safety_scan_on_inline_file(tmp_path):
     sample.write_text("kubectl apply -f deploy.yaml\n", encoding="utf-8")
     result = run_safety_scan(path=str(sample), strict=True, cwd=tmp_path)
     assert result["risk_score"] >= 15
-    assert result["level"] in {"주의", "위험"}
+    assert result["level"] in {"caution", "high"}
     assert "file:" in result["source"]

@@ -1,81 +1,78 @@
 ---
-description: "Trinity Score 계산 및 행동 결정"
+description: "Compute Trinity / HYOGOOK review signal and decision support"
 allowed-tools: Read, Bash(git diff:*), Bash(git status:*), Bash(curl:*)
 impact: CRITICAL
 tags: [trinity, score, decision, 5pillars]
 ---
 
-# Trinity Score 계산
+# Trinity score (review signal)
 
-$ARGUMENTS 작업에 대한 Trinity Score를 계산합니다.
+Compute a Trinity / HYOGOOK review signal for `$ARGUMENTS`.
 
-## MCP 통합 (자동 계산)
+This is decision support only. It is not automatic merge approval.
 
-Soul Engine이 실행 중인 경우 자동 계산:
+## Optional MCP integration
+
+If Soul Engine is running:
+
 ```bash
 curl -s http://localhost:8010/api/trinity/calculate \
   -H "Content-Type: application/json" \
   -d '{"task": "$ARGUMENTS", "context": {}}'
 ```
 
-## 5기둥 평가 (0~100 각각)
+## Five-pillar checklist (0-100 each)
 
-### 眞 (Truth) - 35%
+### Truth - 35%
 
-- [ ] 구현이 정확한가?
-- [ ] 기존 패턴을 따르는가?
-- [ ] 타입이 안전한가?
+- [ ] Is the implementation correct?
+- [ ] Does it follow existing patterns?
+- [ ] Are types safe?
 
-### 善 (Goodness) - 35%
+### Goodness - 35%
 
-- [ ] 테스트가 있는가?
-- [ ] CI가 통과하는가?
-- [ ] 부작용이 없는가?
+- [ ] Are tests present?
+- [ ] Does CI pass?
+- [ ] Are side effects controlled?
 
-### 美 (Beauty) - 20%
+### Beauty - 20%
 
-- [ ] 코드가 깔끔한가?
-- [ ] 린트를 통과하는가?
-- [ ] 중복이 없는가?
+- [ ] Is the code clean?
+- [ ] Does lint pass?
+- [ ] Is duplication avoided?
 
-### 孝 (Serenity) - 8%
+### Serenity / DX - 8%
 
-- [ ] UX 영향이 적은가?
-- [ ] 에러 메시지가 명확한가?
-- [ ] 원샷 실행 가능한가?
+- [ ] Is UX impact limited?
+- [ ] Are error messages clear?
+- [ ] Can it run one-shot?
 
-### 永 (Eternity) - 2%
+### Eternity - 2%
 
-- [ ] 문서화되었는가?
-- [ ] Evidence가 있는가?
-- [ ] 롤백 가능한가?
+- [ ] Is it documented?
+- [ ] Is evidence recorded?
+- [ ] Is rollback possible?
 
-## 계산 공식
+## Decision support
 
-```
-total = (眞 * 0.18) + (善 * 0.18) + (美 * 0.12) + (孝 * 0.40) + (永 * 0.12)
-```
-
-## 행동 결정
-
-| 조건 | 행동 |
+| Condition | Action |
 | :--- | :--- |
-| **Trinity >= 90 AND Risk <= 10** | **REVIEW_SIGNAL_STRONG** (사람 승인 후보 — 자동 merge 아님) |
-| **Trinity >= 75 AND Risk <= 25** | **ASK_COMMANDER** (사령관 확인 필요) |
-| **Trinity < 70 OR Risk > 30** | **BLOCK** (기술적/철학적 차단) |
-| **Secrets/Auth 영향 감지** | **CRITICAL_BLOCK** (이순신 방패) |
+| **Trinity >= 90 AND Risk <= 10** | **REVIEW_SIGNAL_STRONG** (human approval candidate — not auto-merge) |
+| **Trinity >= 75 AND Risk <= 25** | **ASK_HUMAN** (explicit confirmation needed) |
+| **Trinity < 70 OR Risk > 30** | **BLOCK** |
+| **Secrets/Auth impact detected** | **CRITICAL_BLOCK** |
 
-## 출력 형식
+## Output format
 
 ```yaml
 trinity_score:
-  total: [점수]/100
+  total: [score]/100
   pillars:
-    眞: [점수] # 근거
-    善: [점수] # 근거
-    美: [점수] # 근거
-    孝: [점수] # 근거
-    永: [점수] # 근거
-  risk_score: [점수]/100
+    truth: [score]
+    goodness: [score]
+    beauty: [score]
+    serenity: [score]
+    eternity: [score]
+  risk_score: [score]/100
   decision: [REVIEW_SIGNAL_STRONG | ASK_HUMAN | BLOCK]  # not auto-merge
 ```

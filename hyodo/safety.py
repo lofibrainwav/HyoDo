@@ -241,10 +241,10 @@ def summarize_checks(findings: List[Finding], strict: bool = False) -> List[Tupl
         rollback_icon, rollback_color = "⚠️", "yellow"
 
     return [
-        ("비밀키 노출", secret_icon, secret_color),
-        ("위험 명령", danger_icon, danger_color),
-        ("프로덕션 영향", prod_icon, prod_color),
-        ("롤백 가능성", rollback_icon, rollback_color),
+        ("Secrets exposure", secret_icon, secret_color),
+        ("Dangerous commands", danger_icon, danger_color),
+        ("Production impact", prod_icon, prod_color),
+        ("Rollback signal", rollback_icon, rollback_color),
     ]
 
 
@@ -259,14 +259,14 @@ def run_safety_scan(
     score = risk_score(findings)
     rows = summarize_checks(findings, strict=strict)
     if score >= 31:
-        level = "위험"
-        action = "리뷰 필수 — 사람 승인 전 진행 금지 권고"
+        level = "high"
+        action = "Review required — do not proceed without human approval"
     elif score >= 11:
-        level = "주의"
-        action = "확인 후 진행 권장"
+        level = "caution"
+        action = "Proceed only after explicit review"
     else:
-        level = "낮음"
-        action = "진행 가능 후보 — 최종 승인은 사람 판단"
+        level = "low"
+        action = "Candidate to proceed — final approval remains human"
     return {
         "source": source,
         "findings": findings,
