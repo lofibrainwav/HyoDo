@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.2] - 2026-07-16
+
+### Fixed
+
+- `hyodo check` runs pyright/ruff/pytest via `sys.executable -m ...` so PATH
+  homebrew tools cannot break the Goodness gate with a foreign interpreter.
+- `hyodo check` now exits non-zero when any gate fails (demo-safe, CI-safe).
+
+### Added
+
+- `scripts/demo-dry-run.sh` and refreshed demo docs for the v3.1.x public path.
+- Unit coverage for CLI tool invocation helpers.
+
 ## [3.1.1] - 2026-07-16
 
 ### Added

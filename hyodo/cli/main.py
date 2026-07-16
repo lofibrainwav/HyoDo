@@ -13,8 +13,9 @@ Examples:
 """
 
 import subprocess
+import sys
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import List, Optional, Tuple
 
 import typer
 from rich.console import Console
@@ -57,13 +58,20 @@ def afo_core_path() -> Optional[Path]:
     return None
 
 
+def _tool_cmd(module: str, *args: str) -> List[str]:
+    """Run tooling via the same interpreter that hosts hyodo (venv-safe)."""
+    return [sys.executable, "-m", module, *args]
+
+
 def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 1: Pyright ( - Truth) - Type checking."""
+    """Gate 1: Pyright - Truth - Type checking."""
     # Public package is the release gate. Extended afo_core is advisory only.
-    cmd = ["pyright", "hyodo"]
+    root = find_repo_root()
+    cwd = root or Path.cwd()
+    cmd = _tool_cmd("pyright", "hyodo")
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=str(cwd))
 
         if result.returncode == 0:
             return True, "0 errors, 0 warnings"
@@ -71,6 +79,9 @@ def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
         error_count = result.stdout.count("error:") + result.stderr.count("error:")
         warning_count = result.stdout.count("warning:") + result.stderr.count("warning:")
 
+        detail = (result.stdout or result.stderr or "").strip()
+        if verbose and detail:
+            return False, f"{error_count} errors, {warning_count} warnings\n{detail[:400]}"
         return False, f"{error_count} errors, {warning_count} warnings"
 
     except FileNotFoundError:
@@ -82,12 +93,12 @@ def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
 
 
 def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 2: Ruff ( - Beauty) - Lint & Format."""
+    """Gate 2: Ruff - Beauty - Lint & Format."""
     root = find_repo_root()
     cwd = root or Path.cwd()
     target = "hyodo" if root else "."
 
-    cmd = ["ruff", "check", target]
+    cmd = _tool_cmd("ruff", "check", target)
     if fix:
         cmd.append("--fix")
 
@@ -109,17 +120,18 @@ def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]
 
 
 def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 3: pytest ( - Goodness) - Test coverage."""
+    """Gate 3: pytest - Goodness - Public package tests."""
     root = find_repo_root()
 
     # Public package tests first. afo_core remains optional/advisory.
     if root and (root / "tests").exists():
-        cmd = ["pytest", str(root / "tests"), "-q", "--tb=short"]
+        cmd = _tool_cmd("pytest", str(root / "tests"), "-q", "--tb=short")
+        cwd = str(root)
     else:
         return True, "No repository test suite found; package smoke checks only"
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=cwd)
 
         if result.returncode == 0:
             for line in result.stdout.split("\n"):
@@ -127,6 +139,13 @@ def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
                     return True, line.strip()
             return True, "All tests passed!"
 
+        detail = (result.stdout or result.stderr or "").strip()
+        if verbose and detail:
+            return False, f"exit code {result.returncode}\n{detail[-500:]}"
+        # one-line summary for default mode
+        summary = detail.splitlines()[-1] if detail else ""
+        if summary:
+            return False, f"exit code {result.returncode}: {summary[:160]}"
         return False, f"exit code {result.returncode}"
 
     except FileNotFoundError:
@@ -138,7 +157,7 @@ def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
 
 
 def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 4: SBOM ( - Eternity) - Security seal."""
+    """Gate 4: SBOM - Eternity - Security seal (optional)."""
     root = find_repo_root()
     if not root:
         return True, "No repository checkout found; SBOM skipped in package mode"
@@ -147,10 +166,10 @@ def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
     if not sbom_script.exists():
         return True, "SBOM script not found; skipped"
 
-    cmd = ["python", str(sbom_script)]
+    cmd = [sys.executable, str(sbom_script)]
 
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(root))
 
         if result.returncode == 0:
             return True, "SBOM generated successfully"
@@ -230,9 +249,11 @@ def check(
         console.print(
             "[green]Gates support review readiness. Human approval still required.[/green]"
         )
-    else:
-        console.print("[bold red]Some gates failed[/bold red]")
-        console.print("[yellow]Fix failures, then re-run hyodo check[/yellow]")
+        raise typer.Exit(0)
+
+    console.print("[bold red]Some gates failed[/bold red]")
+    console.print("[yellow]Fix failures, then re-run hyodo check[/yellow]")
+    raise typer.Exit(1)
 
 
 @app.command()

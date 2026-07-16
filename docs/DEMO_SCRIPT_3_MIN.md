@@ -3,17 +3,19 @@
 Purpose: a short recorded walkthrough or live screen-share script for reviewers,
 technical enablement roles, and developer-facing interviews.
 
+**Target version:** see `VERSION` (currently `3.1.2`).
+
 ## Title
 
 HyoDo in 3 minutes: model-agnostic quality gates for AI-assisted code
 
 ## Setup
 
-- Open the HyoDo repository.
-- Keep `README.md`, `QUICK_START_SIMPLE.md`, and a terminal visible.
-- Use a disposable sample repo or harmless local fixture for live commands.
-- Do not show real `.env` contents or private production paths.
-- Prefer CLI commands so the demo is not locked to one agent vendor.
+- On `main`, clean worktree (`git status` clean).
+- Run `bash scripts/verify-public.sh` (must exit 0) before recording.
+- Keep `README.md`, terminal, and optionally `docs/PROVIDER_PROOF.md` visible.
+- Prefer CLI so the demo is not locked to one agent vendor.
+- Do **not** show real `.env` contents or private production paths.
 
 ## Script
 
@@ -25,67 +27,73 @@ trusted code — on Claude, Codex, Grok, Gemini, Cursor, or plain terminal.
 
 ### 0:20-0:50 - Public surface
 
-Start with the README. The first promise is intentionally practical: quality
-gates, safety checks, and cost-aware review. No guaranteed savings claim, no
-blind auto-approval. Public package is `hyodo/`; extended `afo_core/` is advisory.
+Start with the README top:
 
-### 0:50-1:35 - Command loop
+- model-agnostic quality gate
+- CLI + CI first
+- tiered routing is **intent only** (no guaranteed savings)
 
-Show the core loop in a terminal:
+Say: public package is `hyodo/`; extended `afo_core/` is advisory and not the
+demo path.
+
+### 0:50-1:40 - Command loop
 
 ```bash
+hyodo --version
 hyodo check
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
 hyodo safe
+# optional secret fixture
+printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-demo-safe.txt
+hyodo safe /tmp/hyodo-demo-safe.txt
 ```
 
 Explain:
 
-- `check` runs quality gates (ruff / pyright / pytest path).
-- `score` gives a review signal, not a final approval.
-- `safe` surfaces risky patterns as an early warning, not a full SAST product.
+- `check` — 4 gates (pyright / ruff / pytest / optional SBOM); exit 0 only if all pass
+- `score` — **REVIEW_SIGNAL**, not final approval
+- `safe` — early warning; secrets fixture should show high risk / human gate
 
-Optional: mention slash-command adapters under `commands/` for agent UIs.
+### 1:40-2:15 - CI and proof
 
-### 1:35-2:15 - CI and proof
-
-Open `.github/workflows/smoke.yml` or `.github/workflows/ci.yml`.
+Open `.github/workflows/smoke.yml` or CI badge/history.
 
 Point out:
 
-- package build and metadata validation;
-- CLI entrypoint smoke checks;
-- public API import checks;
-- advisory separation for extended legacy modules (`afo_core`).
+- package build + twine + wheel install
+- sdist does **not** ship `afo_core`
+- public API and version SSOT
 
-### 2:15-2:45 - Cost-aware routing
+Optional: `docs/PROVIDER_PROOF.md` for multi-vendor mapping.
+Do **not** lead with Claude-only pages unless the audience asks.
 
-Open the README cost-aware routing section.
+### 2:15-2:40 - Boundaries
 
-Say:
+State clearly:
 
-HyoDo is designed to reduce unnecessary premium-model use by routing by risk and
-complexity across FREE / STANDARD / PREMIUM tiers. I treat historic cost ranges
-as internal observations unless a public benchmark is linked.
+1. Scores are review signals; humans approve merges.
+2. `afo_core` is advisory extended tree.
+3. No public cost-savings benchmark; tiered routing is design intent.
 
-### 2:45-3:00 - Close
+### 2:40-3:00 - Close
 
-This is how I teach adoption: runnable systems, clear gates, and explicit human
-approval boundaries. HyoDo is not slideware; it is the public slice of how I
-turn AI-assisted development into a workflow teams can inspect across vendors.
+Runnable gates, explicit human authority, model-agnostic surface. HyoDo is not
+slideware — it is the public slice of an inspectable AI-assisted workflow.
 
 ## Follow-up answers
 
 ### Is this an auto-approval system?
 
-No. Scores support review. Tests, security checks, and human judgment remain
-required.
+No. Strong scores are review signals. `is_strong_review_signal` never grants
+write or merge authority.
 
-### Why does GitHub show many security alerts?
+### What about Dependabot / security?
 
-Most Dependabot volume is on the extended `afo_core` lock surface. The public
-`hyodo` package is intentionally thin. See `docs/SECURITY_SURFACE.md`.
+Public package is the release gate. Extended tree alerts are advisory. As of
+3.1.x readiness work, open Dependabot alerts were driven to zero with documented
+no-patch residual policy for afo_core-only packages.
 
-### Does it only work with Claude Code?
+### PyPI?
 
-No. CLI and CI are primary. Claude Code is one optional adapter.
+GitHub release matching `VERSION` is the demo source of truth. PyPI publish is a
+separate decision; do not claim a newer PyPI version unless measured live.
