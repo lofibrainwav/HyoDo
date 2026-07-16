@@ -3,11 +3,11 @@
 Generated: 2026-07-16T21:17:11Z
 Branch: fix/hyodo-pre-demo-clutter-purge
 Commit: b4f25c9 (pre-commit working tree)
-Version: 3.1.3
+Version: 3.1.4
 
 ## hyodo --version
 ```
-HyoDo v3.1.3 - model-agnostic quality gates
+HyoDo v3.1.4 - model-agnostic quality gates
 ```
 
 ## hyodo check

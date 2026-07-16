@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.4] - 2026-07-16
+
+### Added
+
+- `[tool.pyright] pythonVersion = "3.10"` in `pyproject.toml` so Pyright matches
+  `requires-python >=3.10` (avoids PEP 604 false-red when tools default to 3.9).
+
 ### Changed
 
 - Score / docs wording: "strong review signal" only — never "proceed immediately"
@@ -15,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `hyodo safe` action strings: low/caution use human-gate language only.
 - `LICENSE.md` points at canonical `LICENSE` (same MIT).
 - `PHILOSOPHY.md` rewritten as short HYOGOOK V5 public note.
+- Version SSOT and public badges/demo receipts aligned to `3.1.4`.
 
 ### Removed
 
