@@ -2,7 +2,8 @@
 
 **Date:** 2026-07-16 (PDT)  
 **Repo:** `lofibrainwav/HyoDo`  
-**Method:** file/CLI/CI/GitHub Dependabot readback (no estimation)
+**Method:** file/CLI/CI/GitHub Dependabot readback (no estimation)  
+**Merged baseline:** PR #5 (`0eceb08`) — English-only public surface, real `hyodo safe`, claim alignment
 
 This audit checks external market/strategy claims against repository evidence.
 
@@ -107,11 +108,11 @@ External "quality gate is contaminated" narrative is **impression-true** on GitH
 
 Priority order implied by measurements:
 
-1. Keep public path one-liner: `pip install && hyodo check && hyodo safe`
-2. Keep extended infra out of minimal install defaults
-3. Keep HYOGOOK optional and non-blocking
-4. Either publish a cost benchmark or demote "cost-aware" from primary badge
-5. Reduce `afo_core` Dependabot noise (lock SSOT + patch/remove) so Security tab matches public surface truth
+1. Keep public path one-liner: `pip install && hyodo check && hyodo safe` — **done in public package**
+2. Keep extended infra out of minimal install defaults — **done in installer/docs**
+3. Keep HYOGOOK optional and non-blocking — **done**
+4. Either publish a cost benchmark or demote "cost-aware" from primary badge — **demoted to tiered-routing intent badge**
+5. Reduce `afo_core` Dependabot noise (lock SSOT + patch/remove) so Security tab matches public surface truth — **open track** (see `SECURITY_SURFACE.md`)
 
 ---
 

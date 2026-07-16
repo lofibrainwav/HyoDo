@@ -43,6 +43,22 @@ UI alert count ≠ unique CVE count
 4. **Do not claim "all vulnerabilities patched"** in `SECURITY_PATCHES.md`
    unless a fresh Dependabot/pip-audit readback is attached.
 
+## Next patch track (afo_core, post-#5)
+
+Measured 2026-07-16 open Dependabot posture on `afo_core` locks:
+
+| Priority | Package (examples) | Notes |
+|----------|--------------------|-------|
+| P0 | litellm | Critical/high auth issues; lock was ~1.72 while patches exist at 1.83+ |
+| P0 | nltk | Critical zip-slip/path issues; pyproject asks `>=3.9.4` but lock lagged |
+| P0 | chromadb | Critical pre-auth RCE class; patched version may be unavailable in range |
+| P1 | transformers, json-repair, starlette, aiohttp | High volume High alerts |
+| P2 | lock single-source | Keep one of poetry.lock / requirements.txt / requirements-lock.txt |
+
+**Execution rule:** regenerate lock with one tool (`uv` or poetry), then export a
+single requirements surface. Do not hand-edit hashes. Public package CI must
+remain green without installing full `afo_core` runtime.
+
 ## Verification commands
 
 Public package:

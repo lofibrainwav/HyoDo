@@ -1,6 +1,6 @@
 # HyoDo
 
-> **A model-agnostic quality gate and cost-aware review kit for AI-assisted developers.**
+> **A model-agnostic quality-gate kit for AI-assisted developers.**
 
 HyoDo helps developers review, score, and ship AI-assisted code with a repeatable
 quality workflow. Primary surface is the `hyodo` CLI and CI gates. Optional adapters
@@ -10,7 +10,7 @@ AI-generated changes can be inspected before they become trusted code.
 <p align="center">
   <img src="https://img.shields.io/badge/Model-Agnostic-0A7-blue" alt="Model agnostic">
   <img src="https://img.shields.io/badge/CLI%2BCI-First-blueviolet" alt="CLI and CI first">
-  <img src="https://img.shields.io/badge/Cost_Aware-Routing-green" alt="Cost-aware routing">
+  <img src="https://img.shields.io/badge/Tiered_Routing-intent_only-lightgrey" alt="Tiered routing intent only">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
   <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/badge/Version-3.1.0-success" alt="Version">
@@ -26,7 +26,7 @@ AI-generated changes can be inspected before they become trusted code.
 | Agent adapters | `commands/` slash-command docs (Claude and compatible agents) plus plain CLI |
 | Quality gates | `.github/workflows/ci.yml` and `.github/workflows/smoke.yml` |
 | Safety posture | `SECURITY.md`, `docs/SECURITY_SURFACE.md`, `.env.example`, `.env.minimal` |
-| Cost discipline | Cost-aware routing language and public claim note below; no guaranteed savings claim |
+| Routing discipline | Tiered model routing is design intent only; no guaranteed savings claim |
 
 If you are reviewing HyoDo for a role, partnership, or technical screen, start with
 [`QUICK_START_SIMPLE.md`](./QUICK_START_SIMPLE.md),
@@ -72,7 +72,7 @@ The goal is not blind automation. The goal is to make AI-assisted work easier to
 - **Agent adapters** — `commands/` docs for slash-command UIs (Claude Code and compatible tools).
 - **Quality gates** — lint, format, type, test, and security-oriented checks.
 - **Scoring utilities** — Python package helpers for repeatable review signals.
-- **Cost-aware routing** — designed to reduce unnecessary premium-model usage by routing work by risk and complexity (vendor-neutral tiers).
+- **Tiered model routing (intent)** — optional guidance to prefer FREE/STANDARD/PREMIUM paths by risk and complexity. Not a measured savings product.
 - **Public package gates** — CI checks for the public `hyodo` package, with extended `afo_core` checks separated as advisory.
 
 ## Quick Start
@@ -184,9 +184,10 @@ Gate 3: pytest → tests
 Gate 4: SBOM / security-oriented seal
 ```
 
-## Cost-Aware Routing
+## Tiered model routing (intent only)
 
-HyoDo is designed to avoid sending every task to the most expensive model path.
+HyoDo can help teams **think in tiers** so not every task goes to a premium model.
+This is routing guidance, not a cost-savings guarantee.
 
 | Tier | Use Case | Example providers (not exclusive) | Cost Profile |
 |------|----------|-----------------------------------|--------------|
@@ -194,9 +195,8 @@ HyoDo is designed to avoid sending every task to the most expensive model path.
 | STANDARD | Simple edits, low-risk cleanup | Codex, Gemini, Grok, mid-tier APIs | Low-moderate |
 | PREMIUM | Complex refactors, high-risk decisions | Claude, GPT, Gemini pro tiers, etc. | Higher |
 
-> Public claim note: earlier internal docs referenced percentage-based cost targets.
-> Treat those as selected-workflow observations, not a guaranteed benchmark,
-> unless a public benchmark is linked.
+> **No public savings benchmark is linked.** Do not claim fixed percentage reductions.
+> If you need enterprise cost proof, measure your own workflows first.
 
 ## Philosophy Layer: HYOGOOK V5
 
