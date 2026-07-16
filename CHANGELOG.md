@@ -24,6 +24,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (poetry.lock is the only SSOT).
 - P2 medium floors: idna/requests/pytest/dotenv/pygments/pydantic-settings/torch 2.10.
 - Removed optional `mem0ai` from afo_core agents extras (not required; soft-fail paths).
+- Added `scripts/verify-public.sh` and `docs/DEMO_READY_CHECKLIST.md` for release demos.
+- Documented no-patch Dependabot dismiss policy for diskcache/torch residual.
 
 ### Added
 

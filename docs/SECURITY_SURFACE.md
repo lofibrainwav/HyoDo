@@ -133,3 +133,20 @@ patch), mem0ai (beta-only fix).
 
 Removed optional `mem0ai` (agent long-term memory experiment). Not used by
 public `hyodo` package. Runtime soft-fails without it. Clears CVE-2026-7597 low.
+
+
+### No-patch residual policy (2026-07-16)
+
+Open Dependabot alerts with **no upstream patched version** may be dismissed as
+`tolerable_risk` when:
+
+1. package is not on the public `hyodo` runtime path, and
+2. advisory is documented here, and
+3. re-check when vendor ships a fix.
+
+Dismissed examples (afo_core advisory tree only):
+
+| Package | CVE | Reason |
+|---------|-----|--------|
+| diskcache | CVE-2025-69872 | no patched version; transitive (dspy/ag2/litellm extras) |
+| torch | CVE-2025-3000 | no patched version; ml optional path only |
