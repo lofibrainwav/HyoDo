@@ -227,9 +227,9 @@ jobs:
             echo "::error::Banned: 'Saves 50-70%' cost claim (unevidenced). Use softened wording like 'designed to reduce unnecessary expensive-model usage'."
             fail=1
           fi
-          # 2. Automation overclaim: "AUTO_RUN — Auto-approve"
-          if grep -rEn "Auto-approve" $DOCS 2>/dev/null; then
-            echo "::error::Banned: 'Auto-approve' / 'AUTO_RUN — Auto-approve' phrasing (overclaims automation authority). Scores support review, not replace it."
+          # 2. Automation overclaim: auto-approve language on public surfaces
+          if grep -rEn "Auto-approve|AUTO_RUN" $DOCS hyodo/cli/main.py commands/score.md commands/check.md 2>/dev/null; then
+            echo "::error::Banned: auto-approve / AUTO_RUN phrasing on public surfaces. Scores support review, not replace it."
             fail=1
           fi
           # 3. HYOGOOK/Hanja must not lead README (top 15 lines) — practical value first

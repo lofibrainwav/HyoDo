@@ -1,13 +1,16 @@
 # HyoDo Proof Map for Claude Code Enablement
 
-This page is a reviewer-facing map for people evaluating HyoDo as public proof
-of Claude Code, agentic workflow, and technical enablement experience.
+This page is a **Claude-specific adapter map**. For the model-agnostic product
+proof, start with [`PROVIDER_PROOF.md`](./PROVIDER_PROOF.md).
+
+This page helps reviewers evaluating HyoDo as public proof of Claude Code,
+agentic workflow, and technical enablement experience.
 
 ## One-sentence positioning
 
-HyoDo is a Claude Code quality gate and cost-aware review kit that turns
-AI-assisted development into an inspectable loop: run a command, check quality,
-surface risk, and decide whether to fix, escalate, or merge.
+HyoDo is a model-agnostic quality gate kit with a Claude Code command adapter. It
+turns AI-assisted development into an inspectable loop: run a command, check
+quality, surface risk, and decide whether to fix, escalate, or merge.
 
 ## What to inspect first
 
@@ -50,10 +53,10 @@ unless a public benchmark is linked.
 ## Demo-ready narrative
 
 1. AI-assisted code is fast, but speed without review creates risk.
-2. HyoDo gives Claude Code users a small command loop: `/check`, `/score`, `/safe`.
+2. Prefer the vendor-neutral CLI (`hyodo check|score|safe`); Claude Code can wrap the same loop via `/check`, `/score`, `/safe`.
 3. CI and package smoke tests make the review trail visible outside the chat.
 4. Cost-aware routing keeps low-risk work away from unnecessary premium-model use.
-5. Human review remains the final approval boundary.
+5. Human review remains the final approval boundary — scores never auto-approve.
 
 ## Current boundary
 

@@ -1,15 +1,11 @@
-# ─────────────────────────────────────────────────────────────────
-# HyoDo Minimal Docker Compose
-# "세종대왕의 정신: 백성을 위한 실용적 혁신"
-# 
-# 이 파일은 HyoDo의 최소 실행 환경만 제공합니다.
-# 전체 기능을 사용하려면 docker-compose.yml을 사용하세요.
-# ─────────────────────────────────────────────────────────────────
+# HyoDo minimal Docker Compose (optional extended services)
+# NOT required for public CLI gates (hyodo check/score/safe).
+# Use only when you intentionally run extended afo_core services.
 
 version: '3.8'
 
 services:
-  # 心 (Heart) - Redis: 캐시 및 세션 관리
+  # Optional Redis for extended modules
   redis:
     image: redis:7-alpine
     container_name: hyodo-redis
@@ -27,7 +23,7 @@ services:
     networks:
       - hyodo-network
 
-  # 肝 (Liver) - PostgreSQL: 영구 데이터 저장
+  # Optional PostgreSQL for extended modules
   postgres:
     image: postgres:15-alpine
     container_name: hyodo-postgres

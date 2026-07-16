@@ -1,58 +1,70 @@
 ---
-description: "[Simple] 현재 코드의 품질 점수 확인"
-allowed-tools: Read, Glob, Grep
+description: "[Simple] Show a quality review score signal"
+allowed-tools: Read, Glob, Grep, Bash(hyodo:*)
 impact: LOW
 tags: [simple, score, beginner]
 mode: simple
 alias: trinity
 ---
 
-# /score - 품질 점수 확인
+# /score - quality review signal
 
-현재 코드의 품질 점수를 보여줍니다. (Advanced: `/trinity`)
+Shows a **review signal** for the current change. (Advanced: `/trinity`)
 
-## 사용법
+Scores support decisions. A high score does **not** mean automatic approval of risky changes.
 
-```bash
-/score              # 전체 점수 확인
-/score "변경사항"   # 특정 변경에 대한 점수
-```
+## Usage
 
-## 점수 구성
-
-| 항목 | 비중 | 의미 |
-| :--- | :--- | :--- |
-| 정확성 | 35% | 코드가 올바른가? |
-| 안전성 | 35% | 문제가 없는가? |
-| 가독성 | 20% | 읽기 쉬운가? |
-| 편의성 | 8% | 쓰기 편한가? |
-| 지속성 | 2% | 오래 유지되는가? |
-
-## 결과 예시 (The North Star Report)
+Agent slash command:
 
 ```text
-품질 점수: 92/100 (North Star Balance: OPTIMAL)
-
-⚔️ [眞] 정확성: 95점 - "측우기처럼 명확한 타입 설계"
-🛡️ [善] 안전성: 90점 - "거북선처럼 탄탄한 방어 코드"
-🌉 [美] 가독성: 88점 - "초충도처럼 간결한 표현력"
-孝 [평온] 편의성: 92점 - "사령관님의 마음을 지키는 편리함"
-永 [지속] 지속성: 90점 - "미래를 위한 확실한 흔적"
-
-→ 자동 실행 승인 (90점 이상)
+/score
+/score "change summary"
 ```
 
-> [!TIP]
-> **Filial Tip (孝)**: Clean code is a gift to your future self. By writing legible logic today, you save your "future self" from the burden of confusion.
+Vendor-neutral CLI:
 
-## 점수별 행동
+```bash
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+```
 
-| 점수 | 상태 | 다음 행동 |
+## Score hints (beginner table)
+
+| Item | Weight | Meaning |
 | :--- | :--- | :--- |
-| 90+ | 안전 | 바로 진행 |
-| 70-89 | 주의 | 확인 후 진행 |
-| 70 미만 | 위험 | 수정 필요 |
+| Accuracy | 35% | Is the code correct? |
+| Safety | 35% | Is it free of obvious risk? |
+| Readability | 20% | Is it easy to read? |
+| Convenience | 8% | Is it easy to use? |
+| Durability | 2% | Will it hold over time? |
+
+The public CLI HYOGOOK V5 path computes F/S from Benevolence/Truth/Goodness/Loyalty/Beauty inputs. The table above is a beginner-facing hint only.
+
+## Example output
+
+```text
+Quality score: 92/100 (North Star Balance: OPTIMAL)
+
+[Truth] Accuracy: 95
+[Goodness] Safety: 90
+[Beauty] Readability: 88
+[Serenity] Convenience: 92
+[Eternity] Durability: 90
+
+-> REVIEW_SIGNAL_STRONG (90+)
+-> Human final approval, tests, and security review still required
+```
+
+## Score -> action
+
+| Score | State | Next action |
+| :--- | :--- | :--- |
+| 90+ | Strong review signal | Candidate after tests/security/human checks |
+| 70-89 | Caution | Review, then proceed |
+| <70 | Risk | Fix before merge |
+
+**Disallowed claim:** score-only auto-run, auto-merge, or auto-deploy.
 
 ---
 
-*상세 분석이 필요하면 `/trinity` 또는 `/strategist` 명령어를 사용하세요.*
+*For deeper analysis use `/trinity` or `/strategist`.*

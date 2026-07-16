@@ -7,8 +7,8 @@ Core Components:
 - InMemoryQueue: Redis replacement for standalone operation
 - QualityScoutAgent: Fast code quality scanning
 - FastRuffAgent: Ruff linting integration
-- 4 Scholars: 허준, 정약용, 류성룡, 김유신
-- 3 Strategists: 장영실, 이순신, 신사임당
+- 4 Scholars: , , , 
+- 3 Strategists: , , 
 
 Usage:
     from agents import InMemoryQueue, QualityScoutAgent

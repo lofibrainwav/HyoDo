@@ -66,7 +66,7 @@ Run all checks before committing.
 /trinity
 ```
 
-Detailed breakdown of 眞善美孝永 scores.
+Detailed breakdown of  scores.
 
 ## Example Session
 

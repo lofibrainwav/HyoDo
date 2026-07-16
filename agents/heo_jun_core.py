@@ -2,8 +2,8 @@
 """Shin Saimdang Agent Core (Phase 16-3)
 The Esthetic Guardian of AFO Kingdom.
 Philosophy:
-- 美 (Beauty): Ensures standard Glassmorphism and Tailwind tokens.
-- 善 (Goodness): Validates verify/lint checks before approval.
+-  (Beauty): Ensures standard Glassmorphism and Tailwind tokens.
+-  (Goodness): Validates verify/lint checks before approval.
 """
 
 import logging

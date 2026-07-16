@@ -2,12 +2,6 @@
 
 > Code quality check + visible review trail = Done.
 
-<p align="center">
-  <a href="./i18n/ko/QUICK_START.md">한국어</a> •
-  <a href="./i18n/zh/QUICK_START.md">中文</a> •
-  <a href="./i18n/ja/QUICK_START.md">日本語</a>
-</p>
-
 ## 1. Installation (30 seconds)
 
 ```bash

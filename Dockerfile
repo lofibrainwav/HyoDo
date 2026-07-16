@@ -1,5 +1,5 @@
 # HyoDo v3.1.0 - Beginner-Friendly Edition
-# 眞善美孝永 - Philosophy-Driven Code Quality Tool
+#  - Philosophy-Driven Code Quality Tool
 
 FROM python:3.12-slim
 

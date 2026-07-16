@@ -1,54 +1,74 @@
 ---
-description: "[Simple] 코드 안전성 검사 - 보안/리스크 체크"
-allowed-tools: Read, Glob, Grep, Bash(git diff:*)
+description: "[Simple] Safety and risk early-warning scan"
+allowed-tools: Read, Glob, Grep, Bash(git diff:*), Bash(hyodo:*)
 impact: LOW
 tags: [simple, safety, security, beginner]
 mode: simple
 alias: strategist
 ---
 
-# /safe - 안전성 검사
+# /safe - safety scan
 
-코드의 안전성을 검사합니다. (Advanced: `/strategist`)
+Looks for **high-risk signals** in the current change first. (Advanced: `/strategist`)
 
-## 사용법
+`/safe` and `hyodo safe` are early-warning tools. They do not replace a full security
+scanner, SAST, dependency audit, or human security review.
 
-```
-/safe               # 현재 변경사항 검사
-/safe "파일명"      # 특정 파일 검사
-```
+## Usage
 
-## 검사 항목
+Agent slash command:
 
-| 항목 | 체크 내용 |
-|------|----------|
-| 비밀키 | API 키, 패스워드 노출 |
-| 위험 명령 | rm -rf, DROP TABLE 등 |
-| 프로덕션 영향 | DB 변경, 설정 수정 |
-| 롤백 가능 | 되돌릴 수 있는가? |
-
-## 결과 예시
-
-```
-안전성 검사 결과:
-
-✅ 비밀키 노출: 없음
-✅ 위험 명령: 없음
-⚠️ 프로덕션 영향: DB 스키마 변경 감지
-✅ 롤백 가능: 마이그레이션 파일 있음
-
-위험도: 낮음 (15/100)
-→ 확인 후 진행 권장
+```text
+/safe
+/safe "path/to/file"
 ```
 
-## 위험도 레벨
+Vendor-neutral CLI:
 
-| 위험도 | 의미 | 행동 |
-|--------|------|------|
-| 0-10 | 안전 | 바로 진행 |
-| 11-30 | 주의 | 확인 후 진행 |
-| 31+ | 위험 | 리뷰 필수 |
+```bash
+hyodo safe
+hyodo safe path/to/file_or_dir
+hyodo safe --strict
+```
+
+## What it checks
+
+| Item | Looks for |
+|------|-----------|
+| Secrets | API key / token / private key patterns |
+| Dangerous commands | `rm -rf`, `DROP DATABASE`, force push, etc. |
+| Production impact | migration, deploy, schema-change signals |
+| Rollback hint | presence of rollback/migration wording (not a guarantee) |
+
+## Default behavior
+
+1. If a path is given, read that file/directory.
+2. If no path is given, scan `git diff HEAD` (or `git status` if empty).
+3. Print matches with a risk score.
+
+## Example output
+
+```text
+Safety scan result:
+source: git diff HEAD
+
+OK Secrets exposure
+OK Dangerous commands
+WARN Production impact
+OK Rollback signal
+
+Risk: caution (15/100)
+-> Proceed only after explicit review
+```
+
+## Risk levels
+
+| Score | Meaning | Action |
+|-------|---------|--------|
+| 0-10 | low | Candidate to proceed — final approval is human |
+| 11-30 | caution | Review, then proceed |
+| 31+ | high | Review required |
 
 ---
 
-*상세 분석이 필요하면 `/strategist` 명령어를 사용하세요.*
+*For deeper analysis use `/strategist` or `SECURITY.md`.*

@@ -1,123 +1,93 @@
 #!/bin/bash
-
-# ─────────────────────────────────────────────────────────────────
-# HyoDo (孝道) 설치 스크립트
-# "세종대왕의 정신: 백성을 위한 실용적 혁신"
-# ─────────────────────────────────────────────────────────────────
-
+# HyoDo non-interactive installer (English)
 set -e
 
-# 색상 정의
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# 아이콘
-SWORD="⚔️"
-SHIELD="🛡️"
-BRIDGE="🌉"
-CHECK="✅"
-CROSS="❌"
-WARN="⚠️"
+CHECK="OK"
+CROSS="ERR"
+WARN="WARN"
 
 echo ""
-echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
-echo -e "${BLUE}     HyoDo (孝道) - AFO Kingdom Plugin Installer        ${NC}"
-echo -e "${BLUE}         v3.0.0-ultrawork                               ${NC}"
-echo -e "${BLUE}═══════════════════════════════════════════════════════${NC}"
+echo -e "${BLUE}=======================================================${NC}"
+echo -e "${BLUE}     HyoDo installer${NC}"
+echo -e "${BLUE}         v3.1.0${NC}"
+echo -e "${BLUE}=======================================================${NC}"
 echo ""
 
-# ─────────────────────────────────────────────────────────────────
-# 眞 (Truth) - 시스템 요구사항 확인
-# ─────────────────────────────────────────────────────────────────
+echo -e "${YELLOW}[1/3] Checking requirements...${NC}"
 
-echo -e "${SWORD} ${YELLOW}[眞] 시스템 요구사항 확인...${NC}"
-
-# Git 확인
-if command -v git &> /dev/null; then
+if command -v git &>/dev/null; then
     echo -e "  ${CHECK} Git: $(git --version)"
 else
-    echo -e "  ${CROSS} Git이 설치되어 있지 않습니다"
+    echo -e "  ${CROSS} Git is required"
     exit 1
 fi
 
-# Claude Code 확인 (선택)
-if command -v claude &> /dev/null; then
-    echo -e "  ${CHECK} Claude Code: 설치됨"
+if command -v python3 &>/dev/null; then
+    echo -e "  ${CHECK} Python: $(python3 --version 2>&1)"
 else
-    echo -e "  ${WARN} Claude Code가 설치되어 있지 않습니다 (선택)"
+    echo -e "  ${WARN} Python 3 not found (needed for hyodo CLI)"
+fi
+
+if command -v claude &>/dev/null; then
+    echo -e "  ${CHECK} Claude Code: found (optional)"
+else
+    echo -e "  ${WARN} Claude Code not found (optional adapter)"
 fi
 
 echo ""
+echo -e "${YELLOW}[2/3] Installing to ~/.hyodo ...${NC}"
 
-# ─────────────────────────────────────────────────────────────────
-# 善 (Goodness) - 안전한 설치
-# ─────────────────────────────────────────────────────────────────
-
-echo -e "${SHIELD} ${YELLOW}[善] 안전한 설치 진행...${NC}"
-
-# 설치 디렉토리
 INSTALL_DIR="${HOME}/.hyodo"
 
-# 기존 설치 확인
 if [ -d "$INSTALL_DIR" ]; then
-    echo -e "  ${WARN} 기존 설치 발견: $INSTALL_DIR"
-    read -p "  덮어쓸까요? (y/N): " confirm
+    echo -e "  ${WARN} Existing install found: $INSTALL_DIR"
+    read -r -p "  Overwrite? (y/N): " confirm
     if [ "$confirm" != "y" ] && [ "$confirm" != "Y" ]; then
-        echo -e "  ${CROSS} 설치 취소"
+        echo -e "  ${CROSS} Install cancelled"
         exit 0
     fi
     rm -rf "$INSTALL_DIR"
 fi
 
-# 클론
-echo -e "  ${CHECK} 레포지토리 클론 중..."
-git clone --depth 1 https://github.com/lofibrainwav/HyoDo.git "$INSTALL_DIR" 2>/dev/null
+echo -e "  ${CHECK} Cloning repository..."
+git clone --depth 1 https://github.com/lofibrainwav/HyoDo.git "$INSTALL_DIR"
 
 echo ""
+echo -e "${YELLOW}[3/3] Writing config...${NC}"
 
-# ─────────────────────────────────────────────────────────────────
-# 美 (Beauty) - 환경 설정
-# ─────────────────────────────────────────────────────────────────
-
-echo -e "${BRIDGE} ${YELLOW}[美] 환경 설정...${NC}"
-
-# .env 파일 생성
 if [ ! -f "$INSTALL_DIR/.env" ]; then
-    cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
-    echo -e "  ${CHECK} .env 파일 생성됨"
-    echo -e "  ${WARN} ANTHROPIC_API_KEY를 .env에 설정하세요"
+    if [ -f "$INSTALL_DIR/.env.minimal" ]; then
+        cp "$INSTALL_DIR/.env.minimal" "$INSTALL_DIR/.env"
+    elif [ -f "$INSTALL_DIR/.env.example" ]; then
+        cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
+    fi
+    echo -e "  ${CHECK} .env created"
+    echo -e "  ${WARN} Provider keys are optional for local CLI gates"
 fi
 
-# pre-commit 설정 (선택)
-if command -v pre-commit &> /dev/null; then
+if command -v pre-commit &>/dev/null; then
     cd "$INSTALL_DIR"
     pre-commit install 2>/dev/null || true
-    echo -e "  ${CHECK} pre-commit hooks 설치됨"
+    echo -e "  ${CHECK} pre-commit hooks installed"
 fi
 
 echo ""
-
-# ─────────────────────────────────────────────────────────────────
-# 설치 완료
-# ─────────────────────────────────────────────────────────────────
-
-echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}"
-echo -e "${GREEN}     설치 완료!                                         ${NC}"
-echo -e "${GREEN}═══════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}=======================================================${NC}"
+echo -e "${GREEN}     Install complete${NC}"
+echo -e "${GREEN}=======================================================${NC}"
 echo ""
-echo -e "설치 경로: ${BLUE}$INSTALL_DIR${NC}"
+echo -e "Path: ${BLUE}$INSTALL_DIR${NC}"
 echo ""
-echo -e "다음 단계:"
-echo -e "  1. ${YELLOW}cd $INSTALL_DIR${NC}"
-echo -e "  2. ${YELLOW}편집: .env 파일에 ANTHROPIC_API_KEY 설정${NC}"
-echo -e "  3. ${YELLOW}/trinity \"test\"${NC} - Trinity Score 확인"
+echo -e "Next:"
+echo -e "  1. ${YELLOW}cd $INSTALL_DIR && pip install -e \".[dev]\"${NC}"
+echo -e "  2. ${YELLOW}hyodo check${NC}"
+echo -e "  3. ${YELLOW}hyodo safe${NC}"
 echo ""
-echo -e "문서:"
-echo -e "  - QUICK_START.md: ${BLUE}$INSTALL_DIR/QUICK_START.md${NC}"
-echo -e "  - README.md: ${BLUE}$INSTALL_DIR/README.md${NC}"
-echo ""
-echo -e "${BLUE}\"전략가가 지휘하고, 무장이 실행한다\"${NC}"
+echo -e "Docs: README.md, QUICK_START_SIMPLE.md"
 echo ""

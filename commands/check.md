@@ -1,45 +1,60 @@
 ---
-description: "AFO 4-Gate CI 프로토콜 실행 (眞善美永)"
-allowed-tools: Bash(make:*), Read
+description: "Run HyoDo 4-Gate CI protocol (Truth/Beauty/Goodness/Eternity)"
+allowed-tools: Bash(hyodo:*), Bash(ruff:*), Bash(pyright:*), Bash(pytest:*), Read
 impact: CRITICAL
 tags: [ci, quality, testing, lint]
 ---
 
-# AFO 4-Gate CI Lock Protocol
+# 4-Gate CI Lock Protocol
 
-CI Lock Protocol을 실행하여 코드 품질을 검증합니다.
+Run the CI lock protocol to verify code quality.
 
-## 4-Gate 순서
+## Gate order
 
-1. **眞 (Truth) - Pyright**: 타입 체크
-2. **美 (Beauty) - Ruff**: 린트 + 포맷
-3. **善 (Goodness) - pytest**: 유닛 테스트
-4. **永 (Eternity) - SBOM**: 보안 봉인
+1. **Truth - Pyright**: type check
+2. **Beauty - Ruff**: lint + format
+3. **Goodness - pytest**: unit tests
+4. **Eternity - SBOM**: security seal (only when repo checkout + script exist)
 
-## 실행
+## Recommended run
+
+Vendor-neutral CLI:
 
 ```bash
-make check
+pip install -e ".[dev]"
+hyodo check
 ```
 
-> 워크스페이스 루트에서 실행됩니다.
+Run public package gates the same way CI does:
 
-## 개별 게이트 실행
-
-- `make type-check` - Pyright만
-- `make lint` - Ruff만
-- `make test` - pytest만
-
-## 결과 해석
-
-- **PASS**: 모든 게이트 통과 → 커밋 가능
-- **FAIL**: 실패 게이트 수정 후 재실행
-
-## Evidence 기록
-
-실행 결과를 아래 형식으로 기록:
+```bash
+ruff check hyodo/ --output-format=concise
+ruff format --check hyodo/
+pyright hyodo
+pytest -q --tb=short
 ```
+
+> Makefile-based check targets are not provided in this repository. CI SSOT is
+> `.github/workflows/ci.yml` and `hyodo check`.
+
+## Individual gates
+
+- `pyright hyodo` — type check (public package)
+- `ruff check hyodo/` — lint
+- `ruff format --check hyodo/` — format
+- `pytest -q` — tests
+
+## How to read results
+
+- **PASS**: all gates green -> commit/PR candidate (human review still separate)
+- **FAIL**: fix the failing gate and re-run
+
+Passing gates is not automatic merge/deploy approval.
+
+## Evidence template
+
+```text
 Gate: [Pyright|Ruff|pytest|SBOM]
 Status: [PASS|FAIL]
-Details: [에러 요약 또는 OK]
+Details: [error summary or OK]
 ```

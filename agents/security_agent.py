@@ -9,9 +9,9 @@ Anomaly detection and real-time security monitoring for AFO Kingdom.
 - Integration: Works with GovernanceAgent for policy enforcement
 
 Philosophy:
-- 眞 (Truth): Detect real threats, minimize false positives
-- 善 (Goodness): Protect the kingdom from malicious activity
-- 美 (Beauty): Non-intrusive monitoring with clear alerts
+-  (Truth): Detect real threats, minimize false positives
+-  (Goodness): Protect the kingdom from malicious activity
+-  (Beauty): Non-intrusive monitoring with clear alerts
 """
 
 import hashlib
@@ -94,7 +94,7 @@ class SecurityAgent:
     """
 
     def __init__(self) -> None:
-        self.name = "Security Agent (張飛)"
+        self.name = "Security Agent ()"
 
         # Event history for pattern analysis
         self._event_history: deque[SecurityEvent] = deque(maxlen=1000)
