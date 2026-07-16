@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Mako/PyJWT/banks/langsmith/lxml/mcp/orjson/protobuf/soupsieve.
 - Stop committing pinned afo_core requirements export to avoid Dependabot double-count
   (poetry.lock is the only SSOT).
+- P2 medium floors: idna/requests/pytest/dotenv/pygments/pydantic-settings/torch 2.10.
 
 ### Added
 

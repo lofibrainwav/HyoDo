@@ -122,3 +122,9 @@ Stale chromadb Dependabot alerts (package absent from lock) should auto-close on
 
 `requirements.txt` is no longer a pinned export. Dependabot SSOT for afo_core is
 `poetry.lock` only. This removes the 2x inflation (poetry.lock + requirements.txt).
+
+### P2 medium patch
+
+Raised floors for remaining patchable medium/low: idna, requests, pytest,
+python-dotenv, Pygments, pydantic-settings, torch>=2.10. Residual: diskcache (no
+patch), mem0ai (beta-only fix).
