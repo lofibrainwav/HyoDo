@@ -54,8 +54,7 @@ Gates support review readiness. Human approval still required.
 └──────────────┴───────┴─────────┴────────┘
 
 REVIEW_SIGNAL_STRONG (90+)
-Strong review signal only. Still run tests/security checks; human approval 
-required.
+Strong review signal only. Still run tests/security checks; human approval required.
 ```
 
 ## hyodo safe
