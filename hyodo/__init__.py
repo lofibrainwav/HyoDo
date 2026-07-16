@@ -11,7 +11,7 @@ Built with the Six Pillars (HYOGOOK V5):
 - Eternity: Geometric mean of harmony (calculated)
 """
 
-__version__ = "3.1.0"
+__version__ = "3.1.1"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
 
@@ -122,8 +122,11 @@ def calculate_trinity_score(
     return round(max(0, min(1, score)) * 100, 2)
 
 
-def should_auto_approve(trinity_score: float, risk_score: float = 0) -> bool:
-    """Determine if changes can be eligible for strong review signal.
+def is_strong_review_signal(trinity_score: float, risk_score: float = 0) -> bool:
+    """Return True when scores meet the strong *review signal* threshold.
+
+    This is not automatic approval and never grants write/merge authority.
+    Humans remain the final gate.
 
     Args:
         trinity_score: Trinity Score (0-100)
@@ -135,6 +138,10 @@ def should_auto_approve(trinity_score: float, risk_score: float = 0) -> bool:
     return trinity_score >= 90 and risk_score <= 10
 
 
+# Legacy alias (API compatibility). Name does not mean auto-approval.
+should_auto_approve = is_strong_review_signal
+
+
 __all__ = [
     "__version__",
     "__author__",
@@ -143,5 +150,6 @@ __all__ = [
     "calculate_geometric_mean",
     "calculate_hygook_v5_score",
     "calculate_trinity_score",
+    "is_strong_review_signal",
     "should_auto_approve",
 ]

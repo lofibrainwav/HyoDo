@@ -1,102 +1,76 @@
-# HyoDo v3.1.0 Release Checklist
+# HyoDo Release readiness checklist
 
-This checklist blocks the final public release until the package, CLI, and workflow path are verified.
+This checklist blocks a public release until the package, CLI, and workflow path are verified.
 
-## Current Release Candidate
+## Current target
 
-- Target version: `3.1.0`
-- Candidate commit: `8981d46bfa96c9482f568a24befc85997c24fa82`
-- Core runtime hardening commit: `8688a4bc0a95b3375937ec706face9edda2914a1`
-- Release governance commit: `c2b5b86cbfcd82e093db37f65943d53f6e26f440`
-- Final lint convergence commit: `61dd647cf4791f5b0ed4af457a446e0da61732c1`
-- CI PyYAML dependency fix commit: `8981d46bfa96c9482f568a24befc85997c24fa82`
+- Target version: see `VERSION` (currently `3.1.1`)
 - Release issue: <https://github.com/lofibrainwav/HyoDo/issues/1>
+- Public package path only — `afo_core/` is advisory, not a release blocker
 
-## Pre-release gates
+## Pre-release gates (local)
+
+```bash
+bash scripts/verify-public.sh
+python scripts/release/check_version_sync.py
+```
+
+Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke green.
 
 ### Documentation
 
-- [x] `README.md` identifies HyoDo as a public OSS Claude Code workflow kit
-- [x] `CHANGELOG.md` includes v3.1.0 notes
-- [x] `QUICK_START_SIMPLE.md` uses HYOGOOK V5
-- [x] `CONTRIBUTING.md` uses HYOGOOK V5
-- [x] `SECURITY.md` supports v3.1.x and avoids invalid security contact info
-- [x] `RELEASE_CHECKLIST.md` documents the v3.1.0 release gate
+- [x] `README.md` leads with model-agnostic quality gate (CLI + CI)
+- [x] `CHANGELOG.md` has a section for the target version
+- [x] `QUICK_START_SIMPLE.md` / `CONTRIBUTING.md` use HYOGOOK V5
+- [x] `SECURITY.md` + `docs/SECURITY_SURFACE.md` document public vs advisory tree
+- [x] No public claim language that implies automatic merge/write authority
+- [x] No PyPI badge until PyPI publish is confirmed live
 
-### Runtime and package safety
+### Runtime and package
 
-- [x] `hyodo safe` tuple-shape runtime bug fixed
-- [x] HYOGOOK V5 scoring APIs exported from `hyodo.__all__`
-- [x] scoring inputs are clamped for numeric safety
-- [x] CLI supports repository mode and standalone package mode
-- [x] `hyodo check` no longer assumes `packages/afo-core` always exists
-- [x] unused CLI import removed for Ruff hard gate convergence
-- [x] safe `.env.example` template added for onboarding and CI contract
+- [x] Wheel installs and imports `hyodo`
+- [x] `hyodo --version` matches `VERSION`
+- [x] `hyodo score` emits REVIEW_SIGNAL (not approval)
+- [x] `hyodo safe` flags secret fixtures
+- [x] Sdist does not ship `afo_core`
 
-### CI and smoke validation
+### CI and smoke (GitHub Actions)
 
-- [x] `.github/workflows/ci.yml` fixed for checkout behavior
-- [x] `.github/workflows/ci.yml` supports manual `workflow_dispatch`
-- [x] `.github/workflows/ci.yml` separates public package gates from extended AFO advisory checks
-- [x] `PyYAML>=6.0` added to the `dev` extra for YAML workflow validation
-- [x] `.github/workflows/smoke.yml` added
-- [x] smoke workflow validates shell syntax
-- [x] smoke workflow validates package build
-- [x] smoke workflow validates `twine check dist/*`
-- [x] smoke workflow validates wheel install
-- [x] smoke workflow validates `hyodo --help`, `hyodo --version`, `hyodo version`, `hyodo start`, `hyodo safe`, and `hyodo score`
-- [x] smoke workflow validates public HYOGOOK V5 API and formula outputs
-- [x] smoke workflow validates package-mode `hyodo check`
-- [ ] GitHub Actions run is visible for the release candidate
-- [ ] smoke workflow is green
-- [ ] CI workflow is green
+- [x] `.github/workflows/ci.yml` public gates (Truth / Goodness / Beauty)
+- [x] `.github/workflows/smoke.yml` build + twine + wheel + CLI + API
+- [ ] Latest `main` CI run is green (measure before tag)
+- [ ] Latest `main` smoke run is green (measure before tag)
 
-## Required manual release steps
+## Release steps (after green CI + smoke on main)
 
-Do not perform these until the smoke workflow is visibly green.
+1. Confirm Actions are enabled and latest main runs are green.
 
-1. Confirm GitHub Actions are enabled:
-   - `Settings → Actions → General`
-   - Allow all actions and reusable workflows
-   - Approve any pending first workflow run
-
-2. Run the smoke workflow manually if needed:
-   - `Actions → HyoDo Smoke Test → Run workflow`
-
-3. Run the CI workflow manually if needed:
-   - `Actions → HyoDo CI → Run workflow`
-
-4. After green smoke and CI, create tag:
+2. Tag and push (example for 3.1.1):
 
    ```bash
-   git tag -a v3.1.0 8981d46bfa96c9482f568a24befc85997c24fa82 -m "HyoDo v3.1.0"
-   git push origin v3.1.0
+   git tag -a v3.1.1 -m "HyoDo v3.1.1"
+   git push origin v3.1.1
    ```
 
-5. Create GitHub Release `v3.1.0` with notes from `CHANGELOG.md`.
+3. Create GitHub Release `v3.1.1` with notes from `CHANGELOG.md` `[3.1.1]`.
 
-6. Verify package build locally or in CI:
+4. **PyPI publish is separate and optional.** Measure first:
 
    ```bash
-   python -m pip install --upgrade pip build twine
-   python -m build
-   python -m twine check dist/*
-   pip install dist/*.whl
-   hyodo --help
-   hyodo --version
-   hyodo version
-   hyodo start
-   hyodo safe
-   hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
-   python -c "import hyodo; print(hyodo.__version__)"
+   # Live status (do not assume)
+   curl -s https://pypi.org/pypi/hyodo/json | python -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
    ```
 
-7. Publish to PyPI only after the package check passes.
+   Current measured status (2026-07-16): PyPI `hyodo` is **3.0.1** only.
+   Do **not** add PyPI badges until a newer version is confirmed live.
 
-8. Add PyPI badges to `README.md` only after PyPI confirms the package is live.
+5. Demo recording uses `docs/DEMO_READY_CHECKLIST.md` **after** this checklist is green.
 
-## Release decision
+## Decision log
 
-Current state: **Release Candidate, not final release**.
+| Date | Version | Decision |
+|------|---------|----------|
+| 2026-05 | 3.1.0 | Tag/Release existed; later main advanced past that snapshot |
+| 2026-07-16 | 3.1.1 | Public readiness: security track closed, packaging hygiene, clutter removed |
 
-Reason: workflow files are present, but the release candidate still needs a visible green GitHub Actions run before final tag/release.
+Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published. PyPI is not required for GitHub release readiness.
