@@ -167,7 +167,7 @@ hyodo trinity "describe change"  # Structured review checklist
 
 | F Score | S Score | Status | Suggested Action |
 |:-------:|:-------:|:-------|:-----------------|
-| **F ≥ 54** | **S ≥ 8** | Excellent | Candidate for approval after human review |
+| **F ≥ 54** | **S ≥ 8** | Excellent | Strong review signal — human approval still required |
 | **F ≥ 45** | **S ≥ 7** | Good | Review recommended |
 | **F < 45** | — | Needs Work | Improve before merge |
 

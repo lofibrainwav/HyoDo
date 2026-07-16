@@ -100,7 +100,7 @@ S = ⁵√(T × G × In × B × C)
 
 | F Score | S Score | Meaning | Suggested action |
 |--------|--------|---------|------------------|
-| F ≥ 54 | S ≥ 8 | Strong | Candidate for approval after human review |
+| F ≥ 54 | S ≥ 8 | Strong | Strong review signal — human approval still required |
 | F ≥ 45 | S ≥ 7 | Good | Review recommended |
 | F < 45 | - | Needs work | Fix before merge |
 
