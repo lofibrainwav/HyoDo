@@ -73,7 +73,7 @@ HyoDo uses the `safety_gate` hook to detect and block or escalate risky operatio
 
 Keyword checks and `hyodo safe` are not a complete security scanner. They are early warning signals that should be combined with human review, tests, CI, Dependabot/pip-audit, and secret-scanning practices.
 
-Scores never auto-approve risky changes.
+Scores never automatically approve risky changes.
 
 ## Safe Usage
 

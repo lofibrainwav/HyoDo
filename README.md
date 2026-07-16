@@ -62,7 +62,7 @@ The goal is not blind automation. The goal is to make AI-assisted work easier to
 
 - It does **not** replace human code review, tests, or security review.
 - It does **not** guarantee a fixed cost-reduction percentage.
-- It does **not** auto-approve risky changes just because a score is high.
+- It does **not** automatically approve risky changes just because a score is high.
 - It does **not** require the optional philosophy layer to use the practical gates.
 - It does **not** treat Dependabot alerts on optional/legacy `afo_core` as failures of the public `hyodo` package.
 
