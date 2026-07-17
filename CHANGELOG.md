@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Public docs aligned to v3.1.6 Truth contracts: check/safe exit codes, HyoDo-checkout
+  scope, PyPI install path, demo checklists, and dry-run receipt refresh.
+
 ## [3.1.6] - 2026-07-16
 
 ### Fixed
@@ -37,7 +42,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Notes
 
-- Official PyPI already publishes **3.1.5**; this Truth Patch is **3.1.6**.
+- Shipped as **3.1.6** because PyPI already had **3.1.5** when this patch landed.
+- GitHub tag `v3.1.6` + PyPI `hyodo==3.1.6` published after merge (measure live if citing).
 - No language-agnostic expansion, SARIF, or TruffleHog in this release.
 
 ## [3.1.5] - 2026-07-16

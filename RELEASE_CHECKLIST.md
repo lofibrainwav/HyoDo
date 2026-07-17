@@ -5,8 +5,8 @@ This checklist blocks a public release until the package, CLI, and workflow path
 ## Current target
 
 - Target version: see `VERSION` (SSOT; do not hardcode)
-- Release issue: <https://github.com/lofibrainwav/HyoDo/issues/1>
 - Public package path only — `afo_core/` is advisory, not a release blocker
+- Truth contracts (v3.1.6+): `check` zero-gates → exit 2; `safe --strict` high → exit 1
 
 ## Pre-release gates (local)
 
@@ -15,29 +15,33 @@ bash scripts/verify-public.sh
 python scripts/release/check_version_sync.py
 ```
 
-Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke green.
+Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke green
+(including empty-tree `check` exit 2 and `safe --strict` high-fixture exit 1).
 
 ### Documentation
 
-- [x] `README.md` leads with model-agnostic quality gate (CLI + CI)
-- [x] `CHANGELOG.md` has a section for the target version
-- [x] `QUICK_START_SIMPLE.md` / `CONTRIBUTING.md` use HYOGOOK V5
-- [x] `SECURITY.md` + `docs/SECURITY_SURFACE.md` document public vs advisory tree
-- [x] No public claim language that implies automatic merge/write authority
-- [x] No PyPI badge until PyPI publish is confirmed live
+- [ ] `README.md` leads with model-agnostic quality gate (CLI + CI) and honest check scope
+- [ ] `CHANGELOG.md` has a section for the target version
+- [ ] `QUICK_START_SIMPLE.md` / `CONTRIBUTING.md` use HYOGOOK V5 + review-signal language
+- [ ] `SECURITY.md` + `docs/SECURITY_SURFACE.md` document public vs advisory tree
+- [ ] No public claim language that implies automatic merge/write authority
+- [ ] Exit-code contracts for `check` / `safe` documented in README or quick start
+- [ ] PyPI badge only if live index matches the release claim
 
 ### Runtime and package
 
-- [x] Wheel installs and imports `hyodo`
-- [x] `hyodo --version` matches `VERSION`
-- [x] `hyodo score` emits REVIEW_SIGNAL (not approval)
-- [x] `hyodo safe` flags secret fixtures
-- [x] Sdist does not ship `afo_core`
+- [ ] Wheel installs and imports `hyodo`
+- [ ] `hyodo --version` matches `VERSION`
+- [ ] `hyodo score` emits REVIEW_SIGNAL (not approval)
+- [ ] `hyodo safe` flags secret fixtures; `--strict` exits 1 on high findings
+- [ ] Empty/non-HyoDo `hyodo check` exits 2 (not false green)
+- [ ] Sdist does not ship `afo_core`
 
 ### CI and smoke (GitHub Actions)
 
-- [x] `.github/workflows/ci.yml` public gates (Truth / Goodness / Beauty)
-- [x] `.github/workflows/smoke.yml` build + twine + wheel + CLI + API
+- [ ] `.github/workflows/ci.yml` public gates (Truth / Goodness / Beauty)
+- [ ] Public `tests/` pytest is a **release blocker** (not `continue-on-error`)
+- [ ] `.github/workflows/smoke.yml` build + twine + wheel + CLI + empty-check exit 2
 - [ ] Latest `main` CI run is green (measure before tag)
 - [ ] Latest `main` smoke run is green (measure before tag)
 
@@ -55,15 +59,14 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 
 3. Create GitHub Release `v$VERSION` with notes from its `CHANGELOG.md` section.
 
-4. **PyPI publish is separate and optional.** Measure first:
+4. **PyPI publish is separate.** Measure first, then upload only with credentials:
 
    ```bash
    # Live status (do not assume)
-   curl -s https://pypi.org/pypi/hyodo/json | python -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
+   curl -s https://pypi.org/pypi/hyodo/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
    ```
 
-   Current measured status (2026-07-16): PyPI `hyodo` is **3.0.1** only.
-   Do **not** add PyPI badges until a newer version is confirmed live.
+   Measured status after Truth Patch release: PyPI **`hyodo` 3.1.6** (re-measure before claiming).
 
 5. Demo recording uses `docs/DEMO_READY_CHECKLIST.md` **after** this checklist is green.
 
@@ -72,6 +75,8 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 | Date | Version | Decision |
 |------|---------|----------|
 | 2026-05 | 3.1.0 | Tag/Release existed; later main advanced past that snapshot |
-| 2026-07-16 | 3.1.4 | GitHub release published; PyPI intentionally separate |
+| 2026-07-16 | 3.1.4 | GitHub release published; PyPI intentionally separate at the time |
+| 2026-07-16 | 3.1.5 | Pre-demo surface polish; later PyPI 3.1.5 published |
+| 2026-07-16 | 3.1.6 | Truth Patch on GitHub + tag `v3.1.6` + PyPI 3.1.6 (false-green gates removed) |
 
-Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published. PyPI is not required for GitHub release readiness.
+Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published. PyPI is optional for GitHub-only readiness but required if public badges claim a pip version.

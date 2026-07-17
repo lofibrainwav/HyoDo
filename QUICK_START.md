@@ -4,6 +4,14 @@
 
 ## Install
 
+### PyPI
+
+```bash
+pip install -U 'hyodo==3.1.6'
+```
+
+### From source
+
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git
 cd HyoDo
@@ -14,9 +22,10 @@ pip install -e ".[dev]"
 
 ```bash
 hyodo --version
-hyodo check
+hyodo check          # HyoDo checkout only
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
 hyodo safe
+hyodo safe --strict  # exit 1 on high-severity findings
 ```
 
 ## Score meaning
@@ -28,6 +37,12 @@ Scores are **review signals only**. They never replace human approval.
 | REVIEW_SIGNAL_STRONG (90+) | Strong signal — still require tests, security, human gate |
 | REVIEW_SIGNAL_CAUTION (70-89) | Review before proceed |
 | REVIEW_SIGNAL_BLOCK (&lt;70) | Improve before merge |
+
+## Check / safe honesty (v3.1.6+)
+
+- `hyodo check` is a **HyoDo package checkout** gate, not a universal project scanner.
+- Zero executed gates → exit **2** (`This is not a validation pass`).
+- Prefer `is_strong_review_signal()` over deprecated `should_auto_approve()`.
 
 ## Next
 

@@ -3,7 +3,7 @@
 Purpose: a short recorded walkthrough or live screen-share script for reviewers,
 technical enablement roles, and developer-facing interviews.
 
-**Target version:** see `VERSION` (SSOT; do not hardcode).
+**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **3.1.6**.
 
 ## Title
 
@@ -11,7 +11,7 @@ HyoDo in 3 minutes: model-agnostic quality gates for AI-assisted code
 
 ## Setup
 
-- On `main`, clean worktree (`git status` clean).
+- On `main`, clean worktree (`git status` clean), tag `v3.1.6` or later if demoing a release.
 - Run `bash scripts/verify-public.sh` (must exit 0) before recording.
 - Run `bash scripts/demo-dry-run.sh`; its receipt is a pre-commit worktree
   record, so use the live terminal output—not the receipt header—as the
@@ -32,32 +32,42 @@ trusted code — on Claude, Codex, Grok, Gemini, Cursor, or plain terminal.
 
 Start with the README top:
 
-- model-agnostic quality gate
+- model-agnostic quality gate (model/UI independent — not language-agnostic)
 - CLI + CI first
 - tiered routing is **intent only** (no guaranteed savings)
+- PyPI: `pip install hyodo` (measure live version if you claim it)
 
 Say: public package is `hyodo/`; extended `afo_core/` is advisory and not the
 demo path.
 
-### 0:50-1:40 - Command loop
+### 0:50-1:50 - Command loop
 
 ```bash
 hyodo --version
 hyodo check
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
 hyodo safe
-# optional secret fixture
+# secret fixture
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-demo-safe.txt
 hyodo safe /tmp/hyodo-demo-safe.txt
+hyodo safe --strict /tmp/hyodo-demo-safe.txt   # expect non-zero
 ```
 
 Explain:
 
-- `check` — 4 gates (pyright / ruff / pytest / optional SBOM); exit 0 only if all pass
-- `score` — **REVIEW_SIGNAL**, not final approval
-- `safe` — early warning; secrets fixture should show high risk / human gate
+- `check` — HyoDo checkout gates (pyright / ruff / pytest / optional SBOM);
+  success phrase is **All executed gates passed**; empty/foreign trees exit **2**
+- `score` — **REVIEW_SIGNAL**, not final approval; emphasis % is not F-weight
+- `safe` — early warning; default exit 0; **`--strict`** exit 1 on high findings
 
-### 1:40-2:15 - CI and proof
+Optional 10s honesty beat:
+
+```bash
+mkdir -p /tmp/hyodo-empty-demo && hyodo check /tmp/hyodo-empty-demo
+# expect exit 2: No project gates were executed / not a validation pass
+```
+
+### 1:50-2:20 - CI and proof
 
 Open `.github/workflows/smoke.yml` or CI badge/history.
 
@@ -66,19 +76,21 @@ Point out:
 - package build + twine + wheel install
 - sdist does **not** ship `afo_core`
 - public API and version SSOT
+- public pytest is a release blocker (Truth Patch)
 
 Optional: `docs/PROVIDER_PROOF.md` for multi-vendor mapping.
 Do **not** lead with Claude-only pages unless the audience asks.
 
-### 2:15-2:40 - Boundaries
+### 2:20-2:45 - Boundaries
 
 State clearly:
 
 1. Scores are review signals; humans approve merges.
-2. `afo_core` is advisory extended tree.
-3. No public cost-savings benchmark; tiered routing is design intent.
+2. `check` is not a universal multi-language gate.
+3. `afo_core` is advisory extended tree.
+4. No public cost-savings benchmark; tiered routing is design intent.
 
-### 2:40-3:00 - Close
+### 2:45-3:00 - Close
 
 Runnable gates, explicit human authority, model-agnostic surface. HyoDo is not
 slideware — it is the public slice of an inspectable AI-assisted workflow.
@@ -88,15 +100,19 @@ slideware — it is the public slice of an inspectable AI-assisted workflow.
 ### Is this an auto-approval system?
 
 No. Strong scores are review signals. `is_strong_review_signal` never grants
-write or merge authority.
+write or merge authority. `should_auto_approve` is deprecated naming only.
 
 ### What about Dependabot / security?
 
-Public package is the release gate. Extended tree alerts are advisory. As of
-3.1.x readiness work, open Dependabot alerts were driven to zero with documented
-no-patch residual policy for afo_core-only packages.
+Public package is the release gate. Extended tree alerts are advisory. Measure
+open alerts live; do not quote historical inflated counts as current truth.
 
 ### PyPI?
 
-GitHub release matching `VERSION` is the demo source of truth. PyPI publish is a
-separate decision; do not claim a newer PyPI version unless measured live.
+Measure live before claiming:
+
+```bash
+curl -s https://pypi.org/pypi/hyodo/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
+```
+
+As of the v3.1.6 Truth Patch release, public PyPI ships **3.1.6** (confirm live).
