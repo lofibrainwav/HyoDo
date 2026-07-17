@@ -58,12 +58,21 @@ jobs:
           pyright hyodo
           echo "Public package type check passed"
 
-      - name: Advisory Ruff Check - Extended AFO Core
-        continue-on-error: true
+      - name: Advisory Ruff Snapshot - Extended AFO Core
+        if: matrix.python-version == '3.12'
         run: |
-          echo "Advisory lint check for extended AFO core..."
-          echo "AFO core contains legacy/experimental modules and is not a public package release blocker."
-          ruff check afo_core/ --output-format=concise
+          echo "Capturing the advisory extended AFO core lint snapshot once."
+          set +e
+          ruff check afo_core/ --output-format=concise > /tmp/afo-ruff.txt 2>&1
+          advisory_ec=$?
+          set -e
+          cat /tmp/afo-ruff.txt
+          if [ "$advisory_ec" -ne 0 ]; then
+            summary="$(grep -E 'Found [0-9]+ errors' /tmp/afo-ruff.txt | tail -1)"
+            echo "::notice title=Extended AFO advisory lint::${summary:-See job log for current findings}"
+          else
+            echo "Extended AFO advisory lint passed"
+          fi
 
       - name: Validate JSON
         run: |
@@ -197,12 +206,10 @@ jobs:
       - name: Install markdownlint
         run: npm install -g markdownlint-cli
 
-      - name: Lint Release Markdown (advisory)
-        continue-on-error: true
+      - name: Lint Public Entry Documentation
         run: |
-          echo "Advisory markdownlint on release docs (not a release blocker)."
-          markdownlint README.md QUICK_START.md CONTRIBUTING.md SECURITY.md CHANGELOG.md RELEASE_CHECKLIST.md
-          echo "Documentation check complete"
+          markdownlint README.md QUICK_START.md CONTRIBUTING.md AGENTS.md ROADMAP.md PHILOSOPHY.md docs/README.md
+          echo "Public entry documentation lint passed"
 
       - name: Check Required Files
         run: |
