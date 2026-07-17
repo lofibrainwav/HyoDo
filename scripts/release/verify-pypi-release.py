@@ -106,7 +106,20 @@ def check_provenance(meta: Dict[str, Any], urls: List[Dict[str, Any]]) -> None:
         )
 
 
-def install_smoke(version: str) -> None:
+def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) -> None:
+    """Cold install smoke.
+
+    Prefer ``pip install hyodo==VERSION`` from the public index. If the simple
+    index lags the version JSON API (common right after publish), fall back to
+    the wheel URL from the version JSON (still files.pythonhosted.org).
+    """
+    meta = version_payload(version)
+    wheel = next((u for u in meta.get("urls") or [] if u.get("packagetype") == "bdist_wheel"), None)
+    if not wheel or not wheel.get("url"):
+        raise SystemExit("no wheel URL in version JSON for install smoke")
+    wheel_url = wheel["url"]
+
+    last_err: Optional[Exception] = None
     with tempfile.TemporaryDirectory(prefix="hyodo-pypi-smoke-") as tmp:
         venv = Path(tmp) / "venv"
         subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
@@ -114,20 +127,36 @@ def install_smoke(version: str) -> None:
         hyodo = venv / "bin" / "hyodo"
         python = venv / "bin" / "python"
         subprocess.run([str(pip), "install", "-U", "pip"], check=True, capture_output=True)
-        subprocess.run(
-            [str(pip), "install", "--no-cache-dir", f"hyodo=={version}"],
-            check=True,
-        )
-        out = subprocess.check_output([str(hyodo), "--version"], text=True)
-        if version not in out:
-            raise SystemExit(f"hyodo --version mismatch: {out!r}")
-        code = subprocess.check_output(
-            [str(python), "-c", "import hyodo; print(hyodo.__version__)"],
-            text=True,
-        ).strip()
-        if code != version:
-            raise SystemExit(f"import version mismatch: {code!r}")
-        print(f"install smoke ok: {out.strip()}")
+
+        for attempt in range(1, retries + 1):
+            for target, label in (
+                (f"hyodo=={version}", "index"),
+                (wheel_url, "wheel-url"),
+            ):
+                try:
+                    subprocess.run(
+                        [str(pip), "install", "--no-cache-dir", target],
+                        check=True,
+                        capture_output=True,
+                        text=True,
+                    )
+                    out = subprocess.check_output([str(hyodo), "--version"], text=True)
+                    if version not in out:
+                        raise SystemExit(f"hyodo --version mismatch: {out!r}")
+                    code = subprocess.check_output(
+                        [str(python), "-c", "import hyodo; print(hyodo.__version__)"],
+                        text=True,
+                    ).strip()
+                    if code != version:
+                        raise SystemExit(f"import version mismatch: {code!r}")
+                    print(f"install smoke ok ({label}, attempt {attempt}): {out.strip()}")
+                    return
+                except subprocess.CalledProcessError as exc:
+                    last_err = exc
+                    err = (exc.stderr or exc.stdout or str(exc))[-300:]
+                    print(f"install attempt {attempt}/{retries} via {label} failed: {err}")
+            time.sleep(sleep_seconds)
+    raise SystemExit(f"install smoke failed after {retries} attempts: {last_err}")
 
 
 def main() -> int:
@@ -152,7 +181,7 @@ def main() -> int:
         check_provenance(meta, urls)
 
     if args.install_smoke:
-        install_smoke(args.version)
+        install_smoke(args.version, retries=args.retries, sleep_seconds=args.sleep_seconds)
 
     print("PASS: PyPI release verification")
     return 0
