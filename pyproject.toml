@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "3.1.5"
+version = "3.1.6"
 description = "Model-agnostic quality-gate kit for AI-assisted developers"
 readme = "README.md"
 license = "MIT"

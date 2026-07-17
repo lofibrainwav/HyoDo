@@ -86,11 +86,31 @@ jobs:
           print("hyodo public API ok", hyodo.__version__)
           PY
 
-      - name: Validate package-mode check command
+      - name: Validate empty-directory check is not a false green
         run: |
           mkdir -p /tmp/hyodo-smoke-empty
           cd /tmp/hyodo-smoke-empty
-          hyodo check
+          set +e
+          out="$(hyodo check 2>&1)"
+          ec=$?
+          set -e
+          echo "$out"
+          test "$ec" -eq 2
+          echo "$out" | grep -q "No project gates were executed"
+          echo "$out" | grep -q "This is not a validation pass"
+          if echo "$out" | grep -q "All gates passed"; then
+            echo "false-green phrase present"
+            exit 1
+          fi
+
+      - name: Validate safe --strict exit contract
+        run: |
+          printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-smoke-secret.txt
+          set +e
+          hyodo safe --strict /tmp/hyodo-smoke-secret.txt
+          ec=$?
+          set -e
+          test "$ec" -eq 1
 
       - name: Validate release docs
         run: |

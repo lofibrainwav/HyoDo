@@ -95,14 +95,37 @@ PY
 echo "-- CLI smoke --"
 # reinstall editable so `hyodo check` uses the working tree sources
 $PYTHON -m pip install -e ".[dev]" -q
+# HyoDo checkout: expect executed gates to pass (never the false-green "All gates passed" alone)
+set +e
 $HYODO check >/tmp/hyodo-check.out 2>&1
-grep -q "All gates passed" /tmp/hyodo-check.out
+CHECK_EC=$?
+set -e
+grep -q "All executed gates passed" /tmp/hyodo-check.out
+test "$CHECK_EC" -eq 0
+# Empty/non-HyoDo tree must not false-green
+EMPTY_DIR="$(mktemp -d)"
+set +e
+$HYODO check "$EMPTY_DIR" >/tmp/hyodo-check-empty.out 2>&1
+EMPTY_EC=$?
+set -e
+test "$EMPTY_EC" -eq 2
+grep -q "No project gates were executed" /tmp/hyodo-check-empty.out
+grep -q "This is not a validation pass" /tmp/hyodo-check-empty.out
+if grep -q "All gates passed" /tmp/hyodo-check-empty.out; then
+  echo "ERROR: false-green 'All gates passed' on empty tree"
+  exit 1
+fi
 $HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9 >/tmp/hyodo-score.out
 grep -q "REVIEW_SIGNAL" /tmp/hyodo-score.out
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' >/tmp/hyodo-safe-fixture.txt
 set +e
 $HYODO safe /tmp/hyodo-safe-fixture.txt >/tmp/hyodo-safe.out 2>&1
+SAFE_EC=$?
+$HYODO safe --strict /tmp/hyodo-safe-fixture.txt >/tmp/hyodo-safe-strict.out 2>&1
+SAFE_STRICT_EC=$?
 set -e
+test "$SAFE_EC" -eq 0
+test "$SAFE_STRICT_EC" -eq 1
 grep -Eq "secret|Risk|high|caution" /tmp/hyodo-safe.out
 
 echo "-- claim regression (public surfaces) --"

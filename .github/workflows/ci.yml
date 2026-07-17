@@ -145,11 +145,19 @@ jobs:
           print('public package smoke checks passed', hyodo.__version__)
           PY
 
-      - name: Run Optional Repository Tests
-        continue-on-error: true
+      - name: Run Public Package Tests (release blocker)
         run: |
-          echo "Running repository tests as advisory checks..."
-          python -m pytest -v --tb=short
+          echo "Running public package tests (blocking)..."
+          python -m pytest tests -q --tb=short
+
+      - name: Safe --strict high-risk fixture (release blocker)
+        run: |
+          printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-ci-secret.txt
+          set +e
+          hyodo safe --strict /tmp/hyodo-ci-secret.txt
+          ec=$?
+          set -e
+          test "$ec" -eq 1
 
       - name: Security Scan
         run: |
@@ -185,10 +193,11 @@ jobs:
       - name: Install markdownlint
         run: npm install -g markdownlint-cli
 
-      - name: Lint Release Markdown
+      - name: Lint Release Markdown (advisory)
+        continue-on-error: true
         run: |
-          echo "Release documentation quality check..."
-          markdownlint README.md QUICK_START_SIMPLE.md CONTRIBUTING.md SECURITY.md CHANGELOG.md RELEASE_CHECKLIST.md || true
+          echo "Advisory markdownlint on release docs (not a release blocker)."
+          markdownlint README.md QUICK_START_SIMPLE.md CONTRIBUTING.md SECURITY.md CHANGELOG.md RELEASE_CHECKLIST.md
           echo "Documentation check complete"
 
       - name: Check Required Files
@@ -278,7 +287,8 @@ jobs:
           echo "  - Required release files present"
           echo ""
           echo "Advisory checks:"
-          echo "  - Extended AFO core lint/tests are non-blocking until legacy cleanup"
+          echo "  - Extended AFO core lint remains non-blocking until legacy cleanup"
+          echo "  - Markdown lint remains advisory"
           echo ""
           echo "============================================"
           echo "     Status: READY_FOR_RELEASE_REVIEW"
