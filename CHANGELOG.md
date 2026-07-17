@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.8] - 2026-07-16
+
+### Added
+
+- **PyPI Trusted Publishing workflow** (`.github/workflows/publish.yml`): OIDC-only
+  publish on annotated tags `vX.Y.Z`, GitHub Environment `pypi`, build +
+  `pypa/gh-action-pypi-publish`, then post-publish provenance + install smoke.
+- `scripts/release/verify-pypi-release.py` — public API wait, provenance check,
+  cold `pip install` smoke.
+- `docs/PYPI_TRUSTED_PUBLISHING.md` — one-time PyPI publisher fields and release
+  flow SSOT.
+
+### Changed
+
+- Release checklist: PyPI path is Trusted Publishing (not long-lived API token).
+- Version SSOT aligned to **3.1.8**.
+
+### Notes
+
+- Requires one-time PyPI Trusted Publisher registration (owner account) and
+  GitHub Environment `pypi` before the first OIDC publish succeeds.
+- Manual `twine upload` with API token is no longer the documented release path.
+
 ## [3.1.7] - 2026-07-16
 
 ### Fixed

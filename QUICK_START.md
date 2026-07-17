@@ -7,7 +7,7 @@
 ### PyPI
 
 ```bash
-pip install -U 'hyodo==3.1.7'
+pip install -U 'hyodo==3.1.8'
 ```
 
 ### From source
@@ -38,7 +38,7 @@ Scores are **review signals only**. They never replace human approval.
 | REVIEW_SIGNAL_CAUTION (70-89) | Review before proceed |
 | REVIEW_SIGNAL_BLOCK (&lt;70) | Improve before merge |
 
-## Check / safe honesty (v3.1.7+)
+## Check / safe honesty (v3.1.8+)
 
 - `hyodo check` is a **HyoDo package checkout** gate, not a universal project scanner.
 - Zero executed gates → exit **2** (`This is not a validation pass`).

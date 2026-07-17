@@ -7,6 +7,7 @@ This checklist blocks a public release until the package, CLI, and workflow path
 - Target version: see `VERSION` (SSOT; do not hardcode)
 - Public package path only — `afo_core/` is advisory, not a release blocker
 - Truth contracts (v3.1.7+): `check` zero-gates → exit 2; `safe --strict` high → exit 1
+- Supply-chain (v3.1.8+): PyPI via Trusted Publishing only — see `docs/PYPI_TRUSTED_PUBLISHING.md`
 
 ## Pre-release gates (local)
 
@@ -49,7 +50,7 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 
 1. Confirm Actions are enabled and latest main runs are green.
 
-2. Tag and push the synchronized version:
+2. Tag and push the synchronized version (immutable annotated tag; do not retag):
 
    ```bash
    VERSION="$(tr -d '[:space:]' < VERSION)"
@@ -59,14 +60,21 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 
 3. Create GitHub Release `v$VERSION` with notes from its `CHANGELOG.md` section.
 
-4. **PyPI publish is separate.** Measure first, then upload only with credentials:
+4. **PyPI publish = Trusted Publishing only** (OIDC; no long-lived API token):
+
+   - One-time setup: `docs/PYPI_TRUSTED_PUBLISHING.md`
+     (PyPI publisher: `lofibrainwav` / `HyoDo` / `publish.yml` / env `pypi`)
+   - Tag push triggers `.github/workflows/publish.yml`
+   - Approve GitHub Environment **`pypi`** deployment if required
+   - Job verifies provenance + install smoke automatically
+   - Manual measure (optional):
 
    ```bash
-   # Live status (do not assume)
-   curl -s https://pypi.org/pypi/hyodo/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
+   python scripts/release/verify-pypi-release.py \
+     --version "$(tr -d '[:space:]' < VERSION)" \
+     --require-provenance \
+     --install-smoke
    ```
-
-   Measured status after Truth Patch release: PyPI **`hyodo` 3.1.6** (re-measure before claiming).
 
 5. Demo recording uses `docs/DEMO_READY_CHECKLIST.md` **after** this checklist is green.
 
@@ -78,5 +86,7 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 | 2026-07-16 | 3.1.4 | GitHub release published; PyPI intentionally separate at the time |
 | 2026-07-16 | 3.1.5 | Pre-demo surface polish; later PyPI 3.1.5 published |
 | 2026-07-16 | 3.1.6 | Truth Patch on GitHub + tag `v3.1.6` + PyPI 3.1.6 (false-green gates removed) |
+| 2026-07-16 | 3.1.7 | format gate + safe scan exit 2 + path-stable tests; tag/PyPI 3.1.7 |
+| 2026-07-16 | 3.1.8 | Supply-chain seal: Trusted Publishing workflow + provenance verify path |
 
-Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published. PyPI is optional for GitHub-only readiness but required if public badges claim a pip version.
+Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published + (if claiming pip) Trusted Publishing success with non-null provenance.

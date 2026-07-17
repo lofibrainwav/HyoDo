@@ -14,7 +14,7 @@ CLI for review and safety checks. Optional slash-command adapters live in
 ### Fastest: PyPI
 
 ```bash
-pip install -U 'hyodo==3.1.7'
+pip install -U 'hyodo==3.1.8'
 hyodo --version
 ```
 
@@ -100,7 +100,7 @@ If your agent loads `commands/`:
 | `hyodo safe --strict` | Exit 1 on high findings | `hyodo safe --strict` |
 | `/cost` | Cost estimate / routing signal | `/cost` |
 
-### Exit contracts (Truth Patch, v3.1.7+)
+### Exit contracts (Truth Patch, v3.1.8+)
 
 | Command | Exit 0 | Exit 1 | Exit 2 |
 |---------|--------|--------|--------|
@@ -136,7 +136,7 @@ Scores support review. They do not replace human judgment, tests, or security ch
 ### I only want the CLI (any model vendor)
 
 ```bash
-pip install -U 'hyodo==3.1.7'
+pip install -U 'hyodo==3.1.8'
 hyodo --version
 hyodo safe
 hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9
