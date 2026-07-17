@@ -54,24 +54,30 @@ git checkout -b feature/your-feature-name
 
 ### 4. Testing
 
-Run the quality gates before submitting:
+From a **HyoDo checkout**, run the public package gates before submitting:
 
 ```bash
-# Type checking
-pyright
+# Preferred: public verify script
+bash scripts/verify-public.sh
 
-# Linting
-ruff check .
-
-# Tests
-pytest
+# Or individually
+python -m pyright hyodo
+python -m ruff check hyodo tests
+python -m pytest tests -q --tb=short
 ```
 
-If using Claude Code:
+CLI contracts (v3.1.6+):
 
 ```bash
-/check          # Full 4-gate CI check
-/trinity        # HYOGOOK V5 analysis
+hyodo check              # expects executed gates; success: "All executed gates passed"
+hyodo safe --strict PATH # exit 1 on high-severity findings
+```
+
+If using Claude Code / agent adapters:
+
+```bash
+/check          # HyoDo checkout gates (not universal)
+/trinity        # HYOGOOK V5 checklist
 ```
 
 ### 5. Pull Request

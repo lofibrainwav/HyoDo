@@ -7,12 +7,17 @@ quality workflow. Primary surface is the `hyodo` CLI and CI gates. Optional adap
 cover Claude Code, Codex, Grok, Gemini CLI, Cursor, and other agent UIs so
 AI-generated changes can be inspected before they become trusted code.
 
+**Model-agnostic** means independent of the AI model or agent UI. It does **not**
+mean language-agnostic or a universal gate for every repository. Full `hyodo check`
+gates currently target a **HyoDo package checkout** (`pyproject.toml` + `hyodo/`).
+
 <p align="center">
   <img src="https://img.shields.io/badge/Model-Agnostic-0A7-blue" alt="Model agnostic">
   <img src="https://img.shields.io/badge/CLI%2BCI-First-blueviolet" alt="CLI and CI first">
   <img src="https://img.shields.io/badge/Tiered_Routing-intent_only-lightgrey" alt="Tiered routing intent only">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
   <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
+  <img src="https://img.shields.io/pypi/v/hyodo" alt="PyPI">
   <img src="https://img.shields.io/badge/Version-3.1.6-success" alt="Version">
 </p>
 
@@ -64,6 +69,7 @@ The goal is not blind automation. The goal is to make AI-assisted work easier to
 - It does **not** replace human code review, tests, or security review.
 - It does **not** guarantee a fixed cost-reduction percentage.
 - It does **not** automatically approve risky changes just because a score is high.
+- It does **not** paint “all gates passed” when **no gates ran** (unsupported trees exit 2).
 - It does **not** require the optional philosophy layer to use the practical gates.
 - It does **not** treat Dependabot alerts on optional/legacy `afo_core` as failures of the public `hyodo` package.
 
@@ -71,14 +77,26 @@ The goal is not blind automation. The goal is to make AI-assisted work easier to
 
 - **CLI-first quality loop** — `hyodo check`, `hyodo score`, `hyodo safe`, `hyodo trinity`.
 - **Agent adapters** — `commands/` docs for slash-command UIs (Claude Code and compatible tools).
-- **Quality gates** — lint, format, type, test, and security-oriented checks.
+- **HyoDo checkout gates** — pyright, ruff, pytest (+ optional SBOM when present).
 - **Scoring utilities** — Python package helpers for repeatable review signals.
 - **Tiered model routing (intent)** — optional guidance to prefer FREE/STANDARD/PREMIUM paths by risk and complexity. Not a measured savings product.
-- **Public package gates** — CI checks for the public `hyodo` package, with extended `afo_core` checks separated as advisory.
+- **Public package CI** — release blockers for the public `hyodo` package; extended `afo_core` checks are advisory.
 
 ## Quick Start
 
-### Recommended install: clone, inspect, then run
+### Fastest: PyPI (public package)
+
+```bash
+pip install -U 'hyodo==3.1.6'
+hyodo --version
+hyodo safe --help
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+```
+
+Full `hyodo check` release gates need a **clone of this repository** (see below),
+not an empty project directory.
+
+### Recommended for development: clone, inspect, then run
 
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git ~/.hyodo
@@ -103,9 +121,10 @@ curl -sSL https://raw.githubusercontent.com/lofibrainwav/HyoDo/main/install_inte
 cd ~/.hyodo
 pip install -e ".[dev]"
 hyodo start
-hyodo check
+hyodo check          # HyoDo checkout only; requires pyproject.toml + hyodo/
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
-hyodo safe
+hyodo safe           # early warning (exit 0 even with findings)
+hyodo safe --strict  # CI-friendly: exit 1 on high-severity findings
 ```
 
 ### Optional: agent slash-command adapter
@@ -158,9 +177,10 @@ Keep secrets out of git history. Never commit `.env` files containing real crede
 ## Basic Usage
 
 ```bash
-hyodo check     # Run quality gates
+hyodo check     # HyoDo checkout release gates (see exit contract below)
 hyodo score     # Calculate review signal (not auto-approval)
 hyodo safe      # Lightweight safety early-warning scan
+hyodo safe --strict  # Exit 1 when high-severity findings exist
 hyodo trinity "describe change"  # Structured review checklist
 ```
 
@@ -173,17 +193,34 @@ hyodo trinity "describe change"  # Structured review checklist
 | **F < 45** | — | Needs Work | Improve before merge |
 
 Scores are decision support, not a replacement for human review.
+Public API: prefer `is_strong_review_signal()`; `should_auto_approve()` is deprecated
+(removal planned for 4.0.0) and still only returns a review signal.
 
 ## Quality Gates
 
-### 4-Gate CI Protocol
+### HyoDo checkout gates (`hyodo check`)
+
+Runs only when the target path is a **HyoDo package checkout**
+(`pyproject.toml` and `hyodo/` package directory). Otherwise the CLI reports
+`UNSUPPORTED` / skip-style outcomes and exits **2** — that is **not** a validation pass.
 
 ```text
 Gate 1: Pyright → type checking
 Gate 2: Ruff → lint + format
-Gate 3: pytest → tests
-Gate 4: SBOM / security-oriented seal
+Gate 3: pytest → public tests/
+Gate 4: SBOM script (optional; SKIP when absent, never fake PASS)
 ```
+
+Exit contract:
+
+| Result | Exit | Meaning |
+|--------|-----:|---------|
+| At least one gate executed and all PASS | 0 | `All executed gates passed` |
+| Any executed gate FAIL | 1 | Fix and re-run |
+| Path missing, or zero gates executed | 2 | Not a validation pass |
+
+`hyodo safe` is separate: default mode exits 0 after printing findings; `--strict`
+exits 1 on **high** severity findings (medium alone stays 0).
 
 ## Tiered model routing (intent only)
 
