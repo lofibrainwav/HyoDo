@@ -4,6 +4,9 @@ from unittest.mock import patch
 
 import pytest
 
+# qlora_trainer_service imports torch (ml extra); without it collection must skip, not error.
+pytest.importorskip("torch")
+
 from AFO.qlora_trainer_service import QLoRATrainerService
 
 

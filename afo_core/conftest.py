@@ -8,6 +8,22 @@ import pytest
 from fastapi import APIRouter, FastAPI
 from starlette.testclient import TestClient
 
+# Collection exclusions (cwd-independent, unlike --ignore in addopts).
+collect_ignore = [
+    "tests/test_coverage_sweep.py",
+    # Dead tests: they load validate_diagram_schema / meta_ssot_health from
+    # scripts/ that commit 5c1ebc6 removed (SSOT moved to AFO Kingdom scripts/).
+    # Un-ignore only if those modules return to this repository.
+    "tests/schema/test_diagram_integration.py",
+    "tests/schema/test_diagram_models.py",
+    "tests/schema/test_diagram_naming.py",
+    "tests/schema/test_diagram_pillar.py",
+    "tests/schema/test_diagram_schema.py",
+    "tests/schema/test_validate_diagram_schema.py",
+    "tests/validation/test_schema_validation.py",
+    "tests/test_meta_ssot_health.py",
+]
+
 
 def get_health_router() -> APIRouter:
     """Health router for testing"""

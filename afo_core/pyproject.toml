@@ -20,6 +20,8 @@ dependencies = [
     "pytest>=9.0.3",
     "idna>=3.15",
     "soupsieve>=2.8.4",
+    # AFO/irs crawlers import bs4 directly; soupsieve alone does not provide it.
+    "beautifulsoup4>=4.14.2",
     "protobuf>=5.29.6",
     "orjson>=3.11.6",
     "lxml>=6.1.0",
@@ -368,7 +370,8 @@ addopts = [
     "--disable-warnings",
     "-p", "no:warnings",
     "-p", "no:web3",
-    "--ignore=tests/test_coverage_sweep.py",
+    # NOTE: --ignore here resolves against the invocation cwd, not rootdir —
+    # collection exclusions live in conftest.py collect_ignore instead.
 ]
 markers = [
     "smoke: quick tests run on every commit",

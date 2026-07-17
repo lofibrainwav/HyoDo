@@ -9,6 +9,10 @@ TICKET-150: 0% 커버리지 모듈 테스트 - rag_query.py
 from unittest.mock import AsyncMock, patch
 
 import pytest
+
+# rag_query pulls in psycopg2 (db extra); without it collection must skip, not error.
+pytest.importorskip("psycopg2")
+
 from api.routers.rag_query import (
     HybridRAGService,
     RAGPipelineContext,
