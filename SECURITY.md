@@ -15,6 +15,17 @@ install path stays thin. Details: [`docs/SECURITY_SURFACE.md`](docs/SECURITY_SUR
 Historical patch notes: [`SECURITY_PATCHES.md`](SECURITY_PATCHES.md) (may be stale;
 Dependabot is the live inventory for extended deps).
 
+## Supply chain / PyPI publish
+
+Public package upload uses **PyPI Trusted Publishing (OIDC)** only — see
+[`docs/PYPI_TRUSTED_PUBLISHING.md`](docs/PYPI_TRUSTED_PUBLISHING.md).
+
+- No long-lived PyPI API token in GitHub repository secrets for the supported path
+- Publish runs only from annotated tags matching `VERSION`, via `.github/workflows/publish.yml`
+- GitHub Environment `pypi` is the approval surface
+- Post-publish verification requires non-null provenance on wheel and sdist when
+  `--require-provenance` is used
+
 ## Core Security Question
 
 For every risky operation, HyoDo asks:

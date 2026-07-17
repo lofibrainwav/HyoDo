@@ -66,7 +66,7 @@ python -m ruff check hyodo tests
 python -m pytest tests -q --tb=short
 ```
 
-CLI contracts (v3.1.7+):
+CLI contracts (v3.1.8+):
 
 ```bash
 hyodo check              # expects executed gates; success: "All executed gates passed"

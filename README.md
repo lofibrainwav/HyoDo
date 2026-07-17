@@ -18,7 +18,7 @@ gates currently target a **HyoDo package checkout** (`pyproject.toml` + `hyodo/`
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
   <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
   <img src="https://img.shields.io/pypi/v/hyodo" alt="PyPI">
-  <img src="https://img.shields.io/badge/Version-3.1.7-success" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.1.8-success" alt="Version">
 </p>
 
 ---
@@ -87,7 +87,7 @@ The goal is not blind automation. The goal is to make AI-assisted work easier to
 ### Fastest: PyPI (public package)
 
 ```bash
-pip install -U 'hyodo==3.1.7'
+pip install -U 'hyodo==3.1.8'
 hyodo --version
 hyodo safe --help
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9

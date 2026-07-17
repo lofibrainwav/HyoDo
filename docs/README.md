@@ -2,7 +2,7 @@
 
 Public, English-first documentation. Prefer these over root historical notes.
 
-Current public line: see root `VERSION` (3.1.7 Truth Patch: honest check/safe exit
+Current public line: see root `VERSION` (3.1.8 supply-chain: honest check/safe exit
 contracts; model-agnostic ≠ language-agnostic).
 
 ## Start here

@@ -76,7 +76,11 @@ jobs:
           echo "Validating workflow files..."
           python3 - <<'PY'
           import yaml
-          for path in ['.github/workflows/ci.yml', '.github/workflows/smoke.yml']:
+          for path in [
+              '.github/workflows/ci.yml',
+              '.github/workflows/smoke.yml',
+              '.github/workflows/publish.yml',
+          ]:
               with open(path, encoding='utf-8') as f:
                   yaml.safe_load(f)
               print(f'{path} is valid')
