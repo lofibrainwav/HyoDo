@@ -93,7 +93,7 @@ jobs:
             "install_interactive.sh"
             "docker-compose.minimal.yml"
             ".env.minimal"
-            "QUICK_START_SIMPLE.md"
+            "QUICK_START.md"
             "commands/SKILL_INDEX.md"
             "commands/SKILL_TEMPLATE.md"
             "VERSION"
