@@ -1,133 +1,81 @@
 # Contributing to HyoDo
 
-> "The Spirit of King Sejong: Practical innovation for the people"
+Thank you for helping improve HyoDo. Contributions should keep the public CLI
+small, inspectable, and honest about what was actually verified.
 
-Thank you for your interest in contributing to HyoDo!
+## Before you start
 
-## HYOGOOK V5 Contribution Principles
+- Search existing [issues](https://github.com/lofibrainwav/HyoDo/issues) and
+  [pull requests](https://github.com/lofibrainwav/HyoDo/pulls).
+- Open an issue before large features or public API changes.
+- Use Python 3.10 or newer.
+- Keep `afo_core/` changes separate from the public `hyodo/` package when
+  possible.
 
-All contributions are evaluated according to the six pillars used in the public HyoDo v3.1.x documentation.
-
-| Pillar | Meaning | Focus |
-|--------|---------|-------|
-| Benevolence | Developer experience | User serenity and clear DX |
-| Truth | Technical accuracy | Architecture and evidence |
-| Goodness | Security and stability | Safe defaults, no secrets |
-| Loyalty | Continuity | SSOT and project integrity |
-| Beauty | Clarity | Readability, UX, docs |
-| Eternity | Harmony | Long-term maintainability |
-
-### Score Expectations
-
-HyoDo currently uses the HYOGOOK V5 evaluation model documented in `README.md`.
-Scores are **review signals only** — they never replace human review or merge authority.
-
-| Result | Meaning | Action |
-|--------|---------|--------|
-| F ≥ 54 and S ≥ 8 | Excellent | Strong review signal |
-| F ≥ 45 and S ≥ 7 | Good | Review recommended |
-| F < 45 | Needs work | Changes required |
-
-> Legacy WEIGHTED_V1 contribution weights are preserved only for historical reference.
-
-## Contribution Process
-
-### 1. Create an Issue
-
-Before working on new features or bug fixes, please create an Issue to discuss your proposal.
-
-### 2. Fork & Branch
+## Development setup
 
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git
 cd HyoDo
-git checkout -b feature/your-feature-name
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
 ```
 
-### 3. Development Guidelines
+## Make a focused change
 
-- Follow the existing code style (Ruff for Python)
-- Add tests for new functionality
-- Update documentation as needed
-- Keep commits focused and atomic
-- Avoid changing philosophy or scoring logic without documentation updates
+- Add or update tests for behavior changes.
+- Keep public functions typed and documented.
+- Update user-facing documentation when commands or exit codes change.
+- Do not commit secrets, populated `.env` files, or generated build artifacts.
+- Do not present a score as automatic approval.
 
-### 4. Testing
+Use conventional commit subjects where practical:
 
-From a **HyoDo checkout**, run the public package gates before submitting:
+```text
+feat: add a new check
+fix: report unreadable paths
+docs: simplify the quick start
+test: cover strict safety mode
+```
+
+## Verify
+
+Run the full public verification before opening a pull request:
 
 ```bash
-# Preferred: public verify script
 bash scripts/verify-public.sh
+```
 
-# Or individually
-python -m pyright hyodo
+The script checks version synchronization, Ruff, formatting, Pyright, pytest,
+shell syntax, package build metadata, wheel installation, and CLI behavior.
+
+For a focused test loop:
+
+```bash
 python -m ruff check hyodo tests
+python -m ruff format --check hyodo tests
+python -m pyright hyodo
 python -m pytest tests -q --tb=short
 ```
 
-CLI contracts (v3.1.8+):
+## Pull request checklist
 
-```bash
-hyodo check              # expects executed gates; success: "All executed gates passed"
-hyodo safe --strict PATH # exit 1 on high-severity findings
-```
+- Explain the problem and the smallest useful solution.
+- Link related issues when applicable.
+- List the exact verification commands and results.
+- Keep unrelated formatting or dependency updates out of the pull request.
+- Confirm documentation matches implemented behavior.
+- Wait for required CI and human review before merge.
 
-If using Claude Code / agent adapters:
+## Review principles
 
-```bash
-/check          # HyoDo checkout gates (not universal)
-/trinity        # HYOGOOK V5 checklist
-```
+HyoDo's optional HYOGOOK V5 score can help structure a review, but tests,
+security checks, maintainability, and human judgment remain authoritative. See
+[PHILOSOPHY.md](./PHILOSOPHY.md) for the short description.
 
-### 5. Pull Request
+## Security and conduct
 
-- Write a clear PR title describing the change
-- Fill out the PR template
-- Link related Issues
-- Ensure documentation matches implementation
-- Ensure HYOGOOK V5 scoring references stay consistent
-
-## Code Style
-
-### Python
-
-- Use type hints for all public functions
-- Follow PEP 8 (enforced by Ruff)
-- Line length: 100 characters
-- Docstrings for public functions
-
-### Commit Messages
-
-Follow conventional commits:
-
-```
-feat: add new feature
-fix: resolve bug
-docs: update documentation
-test: add tests
-refactor: code improvement
-```
-
-## Testing Structure
-
-The public `hyodo` package and the extended `afo_core` modules currently share validation infrastructure.
-
-```text
-hyodo/            -> public package and CLI
-afo_core/tests/   -> extended evaluation and integration tests
-```
-
-## Getting Help
-
-- Open an Issue for questions
-- Check existing Issues and PRs
-- Read the [Documentation](./docs/)
-
-## Code of Conduct
-
-Please read our [Code of Conduct](./CODE_OF_CONDUCT.md) before contributing.
-
----
-
-*"Strategists command, warriors execute"* - HyoDo OSS Philosophy
+Do not disclose vulnerabilities in public issues. Follow
+[SECURITY.md](./SECURITY.md) for private reporting and read
+[CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) before participating.

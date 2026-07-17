@@ -16,8 +16,8 @@ quality, surface risk, and decide whether to fix, escalate, or merge.
 
 | Review question | HyoDo evidence |
 |-----------------|----------------|
-| Can this person build with Claude Code-style workflows? | `commands/` slash commands and `QUICK_START_SIMPLE.md` |
-| Can this person teach adoption through runnable material? | `README.md`, `QUICK_START_SIMPLE.md`, `install_interactive.sh` |
+| Can this person build with Claude Code-style workflows? | `commands/` slash commands and `QUICK_START.md` |
+| Can this person teach adoption through runnable material? | `README.md`, `QUICK_START.md`, `install_interactive.sh` |
 | Can this person instrument success criteria? | `.github/workflows/ci.yml`, `.github/workflows/smoke.yml` |
 | Can this person discuss security and review boundaries? | `SECURITY.md`, `/safe`, safety gate docs |
 | Can this person reason about cost without overclaiming? | README cost-aware routing section and public claim note |

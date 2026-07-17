@@ -269,7 +269,7 @@ step_finish() {
     fi
 
     echo -e "${CYAN}Docs:${NC}"
-    echo -e "  - $INSTALL_DIR/QUICK_START_SIMPLE.md"
+    echo -e "  - $INSTALL_DIR/QUICK_START.md"
     echo -e "  - $INSTALL_DIR/README.md"
     echo -e "  - $INSTALL_DIR/docs/EXTERNAL_CLAIM_AUDIT.md"
     echo ""

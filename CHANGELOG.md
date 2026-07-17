@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Simplified the README, contribution guide, repository agent guidance, and
+  roadmap around the supported public CLI.
+- Consolidated onboarding into `QUICK_START.md`.
+
+### Removed
+
+- Redundant `LICENSE.md`; `LICENSE` remains the single MIT license source.
+- Redundant `QUICK_START_SIMPLE.md`.
+- Stale tracked demo receipt; `scripts/demo-dry-run.sh` now produces local
+  evidence that must be regenerated before use.
+
 ## [3.1.8] - 2026-07-16
 
 ### Added
