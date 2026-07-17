@@ -8,6 +8,7 @@ Trinity Score evaluation, and real-time dashboard updates
 import json
 import logging
 import os
+import sys
 import time
 from typing import Any
 
@@ -65,6 +66,12 @@ class QLoRATrainerService:
 
     def load_model_and_tokenizer(self) -> dict[str, Any]:
         """Load model and tokenizer with QLoRA configuration"""
+        if sys.platform != "linux" or not torch.cuda.is_available():
+            raise RuntimeError(
+                "AFO QLoRA training is supported only on Linux hosts with NVIDIA CUDA. "
+                "The macOS AFO legacy path is CPU-only."
+            )
+
         logger.info("Loading model and tokenizer for QLoRA training...")
 
         start_time = time.time()
