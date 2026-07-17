@@ -5,6 +5,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
+# hybrid_rag imports psycopg2 (db extra); without it collection must skip, not error.
+pytest.importorskip("psycopg2")
+
 from AFO.services.hybrid_rag import (
     blend_results,
     generate_answer,
