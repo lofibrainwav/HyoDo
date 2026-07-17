@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Simplified the README, contribution guide, repository agent guidance, and
   roadmap around the supported public CLI.
 - Consolidated onboarding into `QUICK_START.md`.
+- Made public entry-document lint a release blocker and reduced the extended
+  `afo_core` advisory lint to one non-blocking, visible snapshot.
 
 ### Removed
 

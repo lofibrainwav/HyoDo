@@ -6,7 +6,7 @@ is English. Scores are **review signals**, not automatic approval.
 ## HYOGOOK V5 pillars (public scoring)
 
 | Pillar | Focus |
-|--------|--------|
+| --- | --- |
 | Benevolence | Developer experience and user serenity |
 | Truth | Technical accuracy and evidence |
 | Goodness | Security and stability |
@@ -21,5 +21,6 @@ is English. Scores are **review signals**, not automatic approval.
 3. Tiered model routing is design intent only — no guaranteed cost savings.
 4. Prefer CLI + CI proof over vendor-locked demos.
 
-See also: [README.md](./README.md), [docs/PROVIDER_PROOF.md](./docs/PROVIDER_PROOF.md),
+See also [README.md](./README.md),
+[docs/PROVIDER_PROOF.md](./docs/PROVIDER_PROOF.md), and
 [docs/EXTERNAL_CLAIM_AUDIT.md](./docs/EXTERNAL_CLAIM_AUDIT.md).
