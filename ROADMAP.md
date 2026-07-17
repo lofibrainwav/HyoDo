@@ -1,102 +1,58 @@
-# HyoDo Roadmap
+# HyoDo roadmap
 
-> "The Spirit of King Sejong: Practical innovation for the people"
+This roadmap describes direction, not a delivery promise. Work is accepted only
+when implementation, tests, documentation, and release evidence agree.
 
-<p align="center">
-  <a href="./ko/ROADMAP.md"></a> •
-  <a href="./zh/ROADMAP.md"></a> •
-  <a href="./ja/ROADMAP.md"></a>
-</p>
+## Current focus
 
-## 2026 Roadmap
+### Reliable public CLI
 
-### Q1 2026 (Current)
+- Keep `check`, `safe`, and `score` exit contracts stable.
+- Preserve Python 3.10, 3.11, and 3.12 CI coverage.
+- Prevent zero-gate and unreadable-path false positives.
+- Keep the wheel and source distribution limited to the public package.
 
-#### v3.0.0-ultrawork (Complete)
-- [x] Five Tiger Generals - Ollama debugging corps
-- [x] Hook system (pre_tool, post_tool, on_error)
-- [x] ultrawork parallel execution
-- [x] Cost-aware routing and token usage optimization
+### Clear public documentation
 
-### Q2 2026
+- Maintain one short README and one Quick Start.
+- Keep provider, security, and release claims tied to inspectable evidence.
+- Separate the supported `hyodo/` package from advisory `afo_core/` modules.
 
-#### v3.1.0-lsp (Planned)
-- [ ] LSP/AST Integration
-  - Language Server Protocol integration
-  - Automated code refactoring
-  - Symbol tracking (rename/move safe)
-- [ ] Natural language ultrawork triggers
-  - "Run tests and lint simultaneously" auto-recognition
-  - Intent Parsing
-- [ ] Multi-model support
-  - OpenAI GPT-4/GPT-5 support
-  - Google Gemini support
+### Secure releases
 
-### Q3 2026
+- Publish through PyPI Trusted Publishing.
+- Verify tag, version, provenance, package contents, and cold installation.
+- Keep long-lived publishing tokens out of the normal release path.
 
-#### v3.2.0-browser (Planned)
-- [ ] Playwright browser automation
-  - Screenshot → Analyze → Action
-  - Form fill automation
-- [ ] Public API Gateway
-  - REST API release
-  - OpenAPI 3.0 documentation
-  - JWT/OAuth2 authentication
+## Next candidates
 
-### Q4 2026
+These items require an issue, an explicit scope, and acceptance tests before
+implementation:
 
-#### v4.0.0-distributed (Planned)
-- [ ] Distributed Chancellor
-  - Multi-node orchestration
-  - Horizontal scaling
-- [ ] Real-time collaboration mode
-  - Multi-user concurrent work
-- [ ] Federated Learning
-  - Strategist auto-improvement
+- Generalize `hyodo check` beyond HyoDo checkouts without weakening its exit
+  contract.
+- Define a stable adapter contract for agent UIs.
+- Improve safety rule precision and document known false positives.
+- Add machine-readable check results for CI consumers.
+- Measure routing guidance before making any cost-savings claim.
 
----
+## Later exploration
 
-## Long-term Vision (2027+)
+- Additional language and repository adapters.
+- A plugin API for custom gates.
+- Optional browser or service integrations outside the core CLI.
 
-###  (Truth) Evolution
-- AI-based automated code review
-- Automatic technical debt detection and resolution
+Exploration does not imply support or a release date. The public package should
+remain useful without optional services, model providers, or agent interfaces.
 
-###  (Goodness) Evolution
-- Zero-Trust full automation
-- Real-time security vulnerability patching
+## Proposing roadmap work
 
-###  (Beauty) Evolution
-- Automated UI/UX generation
-- Design system integration
+Open an [issue](https://github.com/lofibrainwav/HyoDo/issues) describing:
 
-###  (Serenity) Evolution
-- Voice interface
-- Full natural language support
+1. the user problem;
+2. why existing commands do not solve it;
+3. the smallest verifiable change;
+4. compatibility and security risks;
+5. measurable acceptance criteria.
 
-###  (Eternity) Evolution
-- Self-evolving system
-- Automatic version management
-
----
-
-## Community Goals
-
-| Metric | 2026 Target |
-|--------|-------------|
-| GitHub Stars | 1,000+ |
-| Contributors | 50+ |
-| Plugin Installs | 10,000+ |
-| Discord Members | 500+ |
-
----
-
-## Contributions Welcome
-
-If you'd like to add features to the roadmap:
-1. [Create an Issue](https://github.com/lofibrainwav/HyoDo/issues)
-2. See [CONTRIBUTING.md](CONTRIBUTING.md)
-
----
-
-*"Strategists command, warriors execute"*
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for the development workflow.

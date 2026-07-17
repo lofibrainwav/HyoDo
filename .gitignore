@@ -72,3 +72,5 @@ chroma_db/
 *.backup
 *.egg-info/
 *.db
+# Generated local demo evidence; regenerate before use.
+docs/DEMO_DRY_RUN_LATEST.md

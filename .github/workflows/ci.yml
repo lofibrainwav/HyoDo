@@ -93,7 +93,7 @@ jobs:
             "install_interactive.sh"
             "docker-compose.minimal.yml"
             ".env.minimal"
-            "QUICK_START_SIMPLE.md"
+            "QUICK_START.md"
             "commands/SKILL_INDEX.md"
             "commands/SKILL_TEMPLATE.md"
             "VERSION"
@@ -201,7 +201,7 @@ jobs:
         continue-on-error: true
         run: |
           echo "Advisory markdownlint on release docs (not a release blocker)."
-          markdownlint README.md QUICK_START_SIMPLE.md CONTRIBUTING.md SECURITY.md CHANGELOG.md RELEASE_CHECKLIST.md
+          markdownlint README.md QUICK_START.md CONTRIBUTING.md SECURITY.md CHANGELOG.md RELEASE_CHECKLIST.md
           echo "Documentation check complete"
 
       - name: Check Required Files
@@ -210,7 +210,6 @@ jobs:
           required_files=(
             "README.md"
             "QUICK_START.md"
-            "QUICK_START_SIMPLE.md"
             "CONTRIBUTING.md"
             "CHANGELOG.md"
             "LICENSE"
@@ -230,10 +229,9 @@ jobs:
       - name: Check documentation version consistency
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          grep -q "$VERSION" README.md
           grep -q "$VERSION" CHANGELOG.md
           grep -q "HYOGOOK V5" README.md
-          grep -q "HYOGOOK V5" QUICK_START_SIMPLE.md
+          grep -q "HYOGOOK V5" PHILOSOPHY.md
           grep -q "HYOGOOK V5" CONTRIBUTING.md
           grep -q "Release readiness" RELEASE_CHECKLIST.md
           echo "Documentation consistency verified for $VERSION"
@@ -242,7 +240,7 @@ jobs:
         run: |
           echo "Public docs external-first regression guard..."
           fail=0
-          DOCS="README.md QUICK_START_SIMPLE.md SECURITY.md"
+          DOCS="README.md QUICK_START.md SECURITY.md"
           # 1. Unevidenced cost claim: "Saves 50-70%" badge/text
           if grep -rEn "Saves[ _-]?50[-–]?70|badge/Saves.*50.*70" $DOCS 2>/dev/null; then
             echo "::error::Banned: 'Saves 50-70%' cost claim (unevidenced). Use softened wording like 'designed to reduce unnecessary expensive-model usage'."
@@ -256,6 +254,18 @@ jobs:
           # 3. HYOGOOK/Hanja must not lead README (top 15 lines) — practical value first
           if head -15 README.md | grep -En "HYOGOOK|五德|[仁眞善忠美永孝]"; then
             echo "::error::Banned: HYOGOOK/Hanja in README top-15 lines. Lead with practical value; keep philosophy below usage."
+            fail=1
+          fi
+          # 4. Keep one canonical root license. A second LICENSE-like file is
+          # rendered by GitHub as another detected license.
+          if [ -e LICENSE.md ]; then
+            echo "::error::Redundant LICENSE.md found. Keep LICENSE as the single canonical license."
+            fail=1
+          fi
+          # 5. README is a product entry point, not the full documentation set.
+          readme_lines="$(wc -l < README.md | tr -d '[:space:]')"
+          if [ "$readme_lines" -gt 180 ]; then
+            echo "::error::README.md is $readme_lines lines; keep it at or below 180 and move detail to docs/."
             fail=1
           fi
           if [ "$fail" = "1" ]; then

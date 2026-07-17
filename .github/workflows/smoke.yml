@@ -115,9 +115,8 @@ jobs:
       - name: Validate release docs
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          grep -q "$VERSION" README.md
           grep -q "$VERSION" CHANGELOG.md
           grep -q "HYOGOOK V5" README.md
-          grep -q "HYOGOOK V5" QUICK_START_SIMPLE.md
+          grep -q "HYOGOOK V5" PHILOSOPHY.md
           grep -q "HYOGOOK V5" CONTRIBUTING.md
           grep -q "Release readiness" RELEASE_CHECKLIST.md

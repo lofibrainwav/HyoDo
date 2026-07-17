@@ -10,7 +10,7 @@ contracts; model-agnostic ≠ language-agnostic).
 | Doc | Purpose |
 |-----|---------|
 | [../README.md](../README.md) | Product overview + exit contracts |
-| [../QUICK_START_SIMPLE.md](../QUICK_START_SIMPLE.md) | Short install + CLI path (PyPI + clone) |
+| [../QUICK_START.md](../QUICK_START.md) | Short install + CLI path (PyPI + clone) |
 | [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
 | [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public package vs afo_core boundary |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
@@ -22,7 +22,7 @@ contracts; model-agnostic ≠ language-agnostic).
 | [../RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) | Release readiness |
 | [DEMO_SCRIPT_3_MIN.md](./DEMO_SCRIPT_3_MIN.md) | Recording script (**record only when perfect**) |
 | [DEMO_READY_CHECKLIST.md](./DEMO_READY_CHECKLIST.md) | Pre-record gates |
-| [DEMO_DRY_RUN_LATEST.md](./DEMO_DRY_RUN_LATEST.md) | Last automated dry-run receipt (header may be pre-commit; trust live terminal) |
+| [../scripts/demo-dry-run.sh](../scripts/demo-dry-run.sh) | Generate a fresh, local demo receipt before use |
 
 ## Optional
 

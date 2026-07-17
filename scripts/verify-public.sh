@@ -130,7 +130,7 @@ grep -Eq "secret|Risk|high|caution" /tmp/hyodo-safe.out
 
 echo "-- claim regression (public surfaces) --"
 if grep -rEn "Auto-approve|AUTO_RUN|Proceed immediately|Candidate for approval" \
-  README.md QUICK_START.md QUICK_START_SIMPLE.md SECURITY.md CONTRIBUTING.md \
+  README.md QUICK_START.md SECURITY.md CONTRIBUTING.md \
   RELEASE_CHECKLIST.md hyodo/cli/main.py commands/score.md commands/check.md 2>/dev/null; then
   echo "ERROR: banned auto-approve / proceed-immediately phrasing found"
   exit 1

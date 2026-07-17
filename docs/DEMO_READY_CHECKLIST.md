@@ -54,7 +54,8 @@ After local dry-run, refresh:
 bash scripts/demo-dry-run.sh
 ```
 
-Output lands in `docs/DEMO_DRY_RUN_LATEST.md` (generated, safe to re-run).
+Output lands in ignored `docs/DEMO_DRY_RUN_LATEST.md`. Regenerate it before
+every demo; it is local evidence, not a tracked release claim.
 
 ## Script SSOT
 
