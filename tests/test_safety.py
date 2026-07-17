@@ -1,6 +1,8 @@
 """Unit tests for public HyoDo safety scan helpers."""
 
-from hyodo.safety import risk_score, run_safety_scan, scan_text
+from unittest.mock import patch
+
+from hyodo.safety import collect_scan_corpus, risk_score, run_safety_scan, scan_text
 
 
 def test_scan_detects_github_token():
@@ -38,3 +40,22 @@ def test_run_safety_scan_on_inline_file(tmp_path):
 def test_run_safety_scan_missing_path_source(tmp_path):
     result = run_safety_scan(path=str(tmp_path / "missing.txt"), cwd=tmp_path)
     assert result["source"].startswith("missing:")
+
+
+def test_collect_scan_corpus_read_error_not_silent(tmp_path):
+    """OSError while reading must yield error:read: source, not empty-corpus success."""
+    sample = tmp_path / "locked.txt"
+    sample.write_text("hello\n", encoding="utf-8")
+    with patch("hyodo.safety._read_text_file", side_effect=OSError("Permission denied")):
+        corpus, source = collect_scan_corpus(path=str(sample), cwd=tmp_path)
+    assert corpus == ""
+    assert source.startswith("error:read:")
+    assert str(sample) in source
+
+
+def test_run_safety_scan_read_error_source(tmp_path):
+    sample = tmp_path / "locked.txt"
+    sample.write_text("hello\n", encoding="utf-8")
+    with patch("hyodo.safety._read_text_file", side_effect=PermissionError("denied")):
+        result = run_safety_scan(path=str(sample), strict=True, cwd=tmp_path)
+    assert result["source"].startswith("error:read:")

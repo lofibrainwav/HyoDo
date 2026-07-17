@@ -5,7 +5,7 @@ step when everything works — not a progress ritual mid-cleanup.
 
 ## Preconditions (measured)
 
-- [ ] On `main` (or latest release tag `v3.1.6+`), clean worktree
+- [ ] On `main` (or latest release tag `v3.1.7+`), clean worktree
 - [ ] `bash scripts/verify-public.sh` exits 0
 - [ ] Inside HyoDo checkout: `hyodo check` prints **All executed gates passed** and exits 0
 - [ ] Empty dir: `hyodo check /tmp/empty` exits **2** (not a false green)
