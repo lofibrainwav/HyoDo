@@ -54,7 +54,9 @@ class KakaoBridgeService:
 
     async def _handle_command(self, msg: str) -> dict[str, Any]:
         command = (
-            msg.split(" ")[0].substring(1) if hasattr(msg, "substring") else msg.split(" ")[0][1:]
+            msg.split(" ", maxsplit=1)[0].substring(1)
+            if hasattr(msg, "substring")
+            else msg.split(" ", maxsplit=1)[0][1:]
         )
 
         # Command mapping for cleaner code (美 - Beauty principle)

@@ -145,18 +145,6 @@ def check_mcp_server(server_id: str, server_config: dict[str, Any]) -> dict[str,
 def generate_dependency_diagram(results: list[dict[str, Any]]) -> str:
     """의존성 다이어그램 생성 (Mermaid 포맷)"""
 
-    # 서버 분류
-    python_servers = [
-        r
-        for r in results
-        if r["server_id"].startswith("afo-") and r["server_id"] != "afo-obsidian-mcp"
-    ]
-    docker_servers = [r for r in results if r["server_id"] == "mcp-docker-gateway"]
-        r
-        for r in results
-        if r["server_id"] not in python_servers and r["server_id"] not in docker_servers
-    ]
-
     diagram = f"""graph TD
     A[MCP Docker Gateway] --> |B1[Docker MCP Gateway: {results[0].get("health", "unknown")}|
     

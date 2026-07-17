@@ -189,7 +189,7 @@ class LibrarianAgent(BackgroundAgent):
                 "title": f"{topic} - Example Implementation",
                 "content": f"Implementation example for {topic} with best practices",
                 "url": f"https://github.com/example/{topic.replace(' ', '-')}",
-                "tags": [topic.split()[0], "example"],
+                "tags": [topic.split(maxsplit=1)[0], "example"],
                 "confidence_score": 0.85,
             },
             {
@@ -198,7 +198,7 @@ class LibrarianAgent(BackgroundAgent):
                 "title": f"{topic} - Best Practices Guide",
                 "content": f"Comprehensive guide for {topic} implementation",
                 "url": f"https://docs.example.com/{topic.replace(' ', '-')}",
-                "tags": [topic.split()[0], "guide", "best-practice"],
+                "tags": [topic.split(maxsplit=1)[0], "guide", "best-practice"],
                 "confidence_score": 0.92,
             },
         ]

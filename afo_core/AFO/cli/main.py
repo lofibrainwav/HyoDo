@@ -170,7 +170,12 @@ def score(
 
     # Calculate weighted total
     total = (
-        scores["truth"] * 0.18 + scores["goodness"] * 0.18 + scores["beauty"] * 0.12 + scores["serenity"] * 0.40 + scores["eternity"] * 0.12)
+        scores["truth"] * 0.18
+        + scores["goodness"] * 0.18
+        + scores["beauty"] * 0.12
+        + scores["serenity"] * 0.40
+        + scores["eternity"] * 0.12
+    )
 
     typer.echo(f"\n🏆 Trinity Score: {total:.2f}/100")
 
@@ -291,12 +296,11 @@ def init(
     typer.echo("====================================\n")
 
     # Check if already initialized
-    if Path(".hyodorc").exists():
-        if not yes:
-            overwrite = typer.confirm("HyoDo already initialized. Overwrite?")
-            if not overwrite:
-                typer.echo("Aborted.")
-                return
+    if Path(".hyodorc").exists() and not yes:
+        overwrite = typer.confirm("HyoDo already initialized. Overwrite?")
+        if not overwrite:
+            typer.echo("Aborted.")
+            return
 
     # Create configuration
     config = """# HyoDo Configuration File

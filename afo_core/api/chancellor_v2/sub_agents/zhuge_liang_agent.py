@@ -22,7 +22,4 @@ warnings.warn(
     stacklevel=2,
 )
 
-# Re-export for backwards compatibility
-JangYeongSilAgent = JangYeongSilAgent
-
 __all__ = ["JangYeongSilAgent"]

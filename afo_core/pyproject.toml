@@ -10,7 +10,7 @@ name = "afo_core"
 version = "1.0.0"
 description = "AFO Ultimate General Command Post"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.12,<3.14"
 dependencies = [
     "langgraph-sdk>=0.3.15",
     "langchain>=1.3.9",
@@ -31,6 +31,7 @@ dependencies = [
     "json-repair>=0.60.1",
     "litellm>=1.84.0",
     "fastapi>=0.139.0",
+    "uvicorn>=0.34.0",
     "pydantic-settings>=2.14.2",
     "pydantic>=2.12.5",
     "psutil>=7.2.1,<8.0.0",
@@ -39,6 +40,7 @@ dependencies = [
     "opentelemetry-sdk>=1.22.0",
     "opentelemetry-exporter-otlp>=1.22.0",
     "opentelemetry-instrumentation-fastapi>=0.43b0",
+    "prometheus-client>=0.23.1,<0.24.0",
     "structlog>=24.1.0",
     "pytest-asyncio>=1.3.0",
     "httpx>=0.28.1",
@@ -99,14 +101,13 @@ agents = [
     "autogen>=0.10.4",
 ]
 ml = [
-    "torch>=2.10.0,<2.11.0",
+    "torch>=2.12.1,<2.13.0",
     "bitsandbytes>=0.49.0,<0.50.0 ; sys_platform == 'linux'",
     "peft>=0.18.0,<0.19.0",
     "transformers>=5.5.0,<6.0.0",
 ]
-monitoring = [
-    "prometheus-client>=0.23.1,<0.24.0",
-]
+# Kept for backwards-compatible installs; metrics are part of the base API server.
+monitoring = []
 db = [
     "psycopg2-binary>=2.9.11",
     "langgraph>=1.0.10,<2.0.0",
@@ -124,10 +125,9 @@ all = [
     "dspy-ai>=3.0.4",
     "autogen-agentchat>=0.7.5",
     "autogen>=0.10.4",
-    "torch>=2.10.0,<2.11.0",
+    "torch>=2.12.1,<2.13.0",
     "peft>=0.18.0,<0.19.0",
     "transformers>=5.5.0,<6.0.0",
-    "prometheus-client>=0.23.1,<0.24.0",
     "psycopg2-binary>=2.9.11",
     "langgraph>=1.0.10,<2.0.0",
     "langgraph-checkpoint-redis>=0.3.1,<0.4.0",
@@ -144,7 +144,7 @@ exclude = ["tests*", "scripts*", "legacy*", "artifacts*", "node_modules*"]
 # ============================================================================
 [tool.ruff]
 # Python 
-target-version = "py310"
+target-version = "py312"
 line-length = 100
 exclude = [
     ".git",
@@ -261,8 +261,14 @@ ignore = [
     "TRY401",  # redundant-exception-in-logging
     "ANN205",  # missing-return-type-staticmethod
     "ASYNC221", # async-process-run-blocking
+    # AFO's FastAPI handlers perform bounded local metadata checks. Converting
+    # these paths to anyio.Path is a separate runtime change, not a lint fix.
+    "ASYNC240", # async-path-blocking
     "PLC0206", # dict-index-iteration
     "UP035",   # deprecated-typing-generics (Dict, List, etc. - allow for legacy)
+    # These Python 3.12 migrations can change public enum and typing behavior.
+    "UP042",   # str-enum-class
+    "UP047",   # non-pep695-generic-function
     "RUF013",  # implicit-optional (allow for legacy)
     "E722",    # bare-except (allow for legacy error handling)
     "B007",    # loop-control-variable-not-used (allow for legacy)
