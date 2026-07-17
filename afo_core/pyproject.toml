@@ -103,7 +103,7 @@ agents = [
     "autogen>=0.10.4",
 ]
 ml = [
-    "torch>=2.12.1,<2.13.0",
+    "torch>=2.13.0,<2.14.0",
     "bitsandbytes>=0.49.0,<0.50.0 ; sys_platform == 'linux'",
     "peft>=0.18.0,<0.19.0",
     "transformers>=5.5.0,<6.0.0",
@@ -127,7 +127,7 @@ all = [
     "dspy-ai>=3.0.4",
     "autogen-agentchat>=0.7.5",
     "autogen>=0.10.4",
-    "torch>=2.12.1,<2.13.0",
+    "torch>=2.13.0,<2.14.0",
     "peft>=0.18.0,<0.19.0",
     "transformers>=5.5.0,<6.0.0",
     "psycopg2-binary>=2.9.11",
