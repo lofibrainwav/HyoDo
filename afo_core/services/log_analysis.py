@@ -12,6 +12,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+import anyio
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +43,17 @@ def _get_scripts_dir() -> Path | None:
 SCRIPTS_DIR = _get_scripts_dir()
 if SCRIPTS_DIR and str(SCRIPTS_DIR) not in sys.path:
     sys.path.append(str(SCRIPTS_DIR))
+
+
+def _read_log_summary(log_file: Path, chunk_size: int) -> tuple[int, int]:
+    """Read a log file synchronously for execution in a worker thread."""
+    line_count = 0
+    with log_file.open(encoding="utf-8", errors="ignore") as file:
+        for line_count, _line in enumerate(file, start=1):
+            if line_count % chunk_size == 0:
+                # Process chunk
+                pass
+    return log_file.stat().st_size, line_count
 
 
 class LogAnalysisService:
@@ -87,27 +100,22 @@ class LogAnalysisService:
             # BACKLOG: Celery/async worker 연동 (Phase 127+)
             # For now, process synchronously with chunked reading for large files
 
+            # File iteration can be large enough to monopolize the event loop.
+            # Keep the existing synchronous parser in a worker thread instead.
+            _chunk_size = chunk_size or 1000
+            file_size, line_count = await anyio.to_thread.run_sync(
+                _read_log_summary, log_file, _chunk_size
+            )
+
             results = {
                 "status": "success",
                 "log_path": log_path,
-                "file_size": log_file.stat().st_size,
-                "lines_processed": 0,
+                "file_size": file_size,
+                "lines_processed": line_count,
                 "analysis": {},
                 "trinity_score": 85.0,  # Placeholder
             }
 
-            # Chunked reading for memory efficiency
-            _chunk_size = chunk_size or 1000
-            line_count = 0
-
-            with open(log_file, encoding="utf-8", errors="ignore") as f:
-                for line in f:
-                    line_count += 1
-                    if line_count % _chunk_size == 0:
-                        # Process chunk
-                        pass
-
-            results["lines_processed"] = line_count
             self.logger.info(f"Processed {line_count} lines from {log_path}")
 
             return results

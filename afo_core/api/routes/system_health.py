@@ -7,6 +7,7 @@ import os
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any, cast
 
+import anyio
 import psutil
 import redis
 from fastapi import APIRouter, Request
@@ -404,6 +405,17 @@ async def get_notebooks_alias(limit: int = 5) -> dict[str, Any]:
     return {"results": sample_notebooks[:limit]}
 
 
+def _initialize_log_file(log_file: str, message: str) -> None:
+    with open(log_file, "a") as file:
+        file.write(message)
+
+
+def _open_log_tail(log_file: str):
+    file = open(log_file)
+    file.seek(0, 2)
+    return file
+
+
 async def _sse_log_generator(request: Request):
     """
     Generate SSE events from Redis Pub/Sub messages with File Fallback.
@@ -463,37 +475,39 @@ async def _sse_log_generator(request: Request):
     log_file = "backend.log"
     if not os.path.exists(log_file):
         try:
-            with open(log_file, "a") as f:
-                f.write(f"[{datetime.now().isoformat()}] Log file initialized.\n")
+            await anyio.to_thread.run_sync(
+                _initialize_log_file,
+                log_file,
+                f"[{datetime.now().isoformat()}] Log file initialized.\n",
+            )
         except Exception:
             pass
 
     try:
-        # Note: We use traditional open here for tailing, which is okay in this async generator
-        # as it sleeps between reads.
-        with open(log_file) as f:
-            f.seek(0, 2)  # Go to end
-            while True:
-                if await request.is_disconnected():
-                    logger.info("[SSE] Client disconnected (File mode)")
-                    break
+        log_handle = await anyio.to_thread.run_sync(_open_log_tail, log_file)
+        while True:
+            if await request.is_disconnected():
+                logger.info("[SSE] Client disconnected (File mode)")
+                break
 
-                line = f.readline()
-                if line:
-                    msg = {
-                        "message": line.strip(),
-                        "level": "INFO",
-                        "source": "backend.log",
-                        "timestamp": datetime.now().isoformat(),
-                    }
-                    yield f"data: {json.dumps(msg)}\n\n"
-                else:
-                    await asyncio.sleep(0.5)
+            line = await anyio.to_thread.run_sync(log_handle.readline)
+            if line:
+                msg = {
+                    "message": line.strip(),
+                    "level": "INFO",
+                    "source": "backend.log",
+                    "timestamp": datetime.now().isoformat(),
+                }
+                yield f"data: {json.dumps(msg)}\n\n"
+            else:
+                await asyncio.sleep(0.5)
     except Exception as e:
         logger.error(f"[SSE] File Fallback failed: {e}")
         error_msg = {"message": f"Critical Stream Failure: {e}", "level": "ERROR"}
         yield f"data: {json.dumps(error_msg)}\n\n"
     finally:
+        if "log_handle" in locals():
+            await anyio.to_thread.run_sync(log_handle.close)
         if METRICS_AVAILABLE:
             sse_open_connections.dec()
 

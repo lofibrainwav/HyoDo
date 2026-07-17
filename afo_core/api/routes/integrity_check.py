@@ -1,5 +1,6 @@
 # from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -72,6 +73,23 @@ def _find_workspace_root(anchor: Path) -> Path:
 
 
 WORKSPACE_ROOT = _find_workspace_root(Path(__file__).resolve())
+
+
+async def _run_verification_command(command: list[str], timeout: float) -> tuple[int, str, str]:
+    """Run a verification command without blocking the event loop."""
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+    except TimeoutError:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
+        raise
+    return process.returncode or 0, stdout.decode(), stderr.decode()
 
 
 class IntegrityCheckRequest(BaseModel):
@@ -169,7 +187,7 @@ async def _check_truth_pillar() -> dict[str, object]:
             "E501",
             "--exit-non-zero-on-fix",
         ]
-        ruff_proc = subprocess.run(ruff_cmd, capture_output=True, text=True, timeout=10)
+        ruff_returncode, _, ruff_stderr = await _run_verification_command(ruff_cmd, timeout=10)
         # 1-2. MyPy Check (Type Safety) - Targeted
         # Strategy: "Self-Reflection via Clone"
         # Copy file to /tmp to bypass 'afo-core' invalid package name issue in MyPy
@@ -191,20 +209,20 @@ async def _check_truth_pillar() -> dict[str, object]:
                 "--config-file",
                 "scripts/strict_mypy.ini",
             ]
-            mypy_proc = subprocess.run(mypy_cmd, capture_output=True, text=True, timeout=15)
+            mypy_returncode, mypy_stdout, _ = await _run_verification_command(mypy_cmd, timeout=15)
         finally:
             if tmp_path.exists():
                 os.unlink(tmp_path)
 
-        checks["ci_cd_lock"] = ruff_proc.returncode == 0 and mypy_proc.returncode == 0
+        checks["ci_cd_lock"] = ruff_returncode == 0 and mypy_returncode == 0
 
         if not checks["ci_cd_lock"]:
-            if ruff_proc.returncode != 0:
-                logger.warning(f"Real-time Ruff failed: {ruff_proc.stderr[:100]}")
-            if mypy_proc.returncode != 0:
-                logger.warning(f"Real-time MyPy failed: {mypy_proc.stdout[:100]}")
+            if ruff_returncode != 0:
+                logger.warning(f"Real-time Ruff failed: {ruff_stderr[:100]}")
+            if mypy_returncode != 0:
+                logger.warning(f"Real-time MyPy failed: {mypy_stdout[:100]}")
 
-    except subprocess.TimeoutExpired:
+    except TimeoutError:
         logger.warning("Real-time verification timed out (System too slow)")
         checks["ci_cd_lock"] = False
     except Exception as e:
