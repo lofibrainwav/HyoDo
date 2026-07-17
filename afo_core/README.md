@@ -14,10 +14,16 @@ package and is not included in HyoDo wheels or source distributions.
 From the repository root:
 
 ```bash
-python3.12 -m venv .venv
-source .venv/bin/activate
-pip install -e "./afo_core[agents,browser]"
+bash afo_core/scripts/dev_env.sh
+source afo_core/.venv/bin/activate
 ```
+
+The script is the single source of truth for the install contract — CI's
+`afo-core-contract` job runs the same script with `--system`. It pins
+Python to the supported `>=3.12,<3.14` range, creates an isolated
+`afo_core/.venv` (which also shields test collection from pytest plugins
+installed elsewhere on the machine), and installs
+`-e "./afo_core[agents,browser]"`.
 
 The `agents` and `browser` extras are required by the full API server import
 graph. Playwright browser binaries are needed only for browser-backed flows.
