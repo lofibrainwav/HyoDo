@@ -22,7 +22,7 @@ T = TypeVar("T")
 
 
 @overload
-async def exponential_backoff(  # noqa: UP047 - TypeVar used for @overload compatibility
+async def exponential_backoff(
     func: Callable[..., Awaitable[T]],
     max_retries: int = ...,
     base_delay: float = ...,
@@ -36,7 +36,7 @@ async def exponential_backoff(  # noqa: UP047 - TypeVar used for @overload compa
 
 
 @overload
-async def exponential_backoff(  # noqa: UP047 - TypeVar used for @overload compatibility
+async def exponential_backoff(
     func: Callable[..., T],
     max_retries: int = ...,
     base_delay: float = ...,

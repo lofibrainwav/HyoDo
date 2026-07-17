@@ -132,9 +132,7 @@ class RedisCacheService:
             # Phase 1.2: 연결 테스트
             if self.redis_client is not None:
                 redis_client = self.redis_client  # 타입 가드
-                await exponential_backoff(
-                    lambda: redis_client.ping(), max_retries=3, base_delay=1.0
-                )
+                await exponential_backoff(redis_client.ping, max_retries=3, base_delay=1.0)
 
             # Phase 1.3: 메모리 제한 설정
             max_memory_mb_val = CACHE_CONFIG["max_memory_mb"]

@@ -385,21 +385,26 @@ def create_financial_ratio_calculator(required_ratios: list[str]) -> None:
     Rule 7.1 적용: Map/Set으로 빈번한 조회 최적화
     """
     ratio_calculators = {
-        "current_ratio": lambda bs, _: bs.get("current_assets", 0)
-        / bs.get("current_liabilities", 0)
-        if bs.get("current_liabilities", 0) > 0
-        else 0,
-        "debt_ratio": lambda bs, _: bs.get("total_liabilities", 0) / bs.get("total_assets", 0)
-        if bs.get("total_assets", 0) > 0
-        else 0,
-        "profit_margin": lambda bs, income: income.get("net_income", 0)
-        / income.get("total_revenue", 0)
-        if income.get("total_revenue", 0) > 0
-        else 0,
-        "return_on_equity": lambda bs, income: income.get("net_income", 0)
-        / bs.get("shareholders_equity", 0)
-        if bs.get("shareholders_equity", 0) > 0
-        else 0,
+        "current_ratio": lambda bs, _: (
+            bs.get("current_assets", 0) / bs.get("current_liabilities", 0)
+            if bs.get("current_liabilities", 0) > 0
+            else 0
+        ),
+        "debt_ratio": lambda bs, _: (
+            bs.get("total_liabilities", 0) / bs.get("total_assets", 0)
+            if bs.get("total_assets", 0) > 0
+            else 0
+        ),
+        "profit_margin": lambda bs, income: (
+            income.get("net_income", 0) / income.get("total_revenue", 0)
+            if income.get("total_revenue", 0) > 0
+            else 0
+        ),
+        "return_on_equity": lambda bs, income: (
+            income.get("net_income", 0) / bs.get("shareholders_equity", 0)
+            if bs.get("shareholders_equity", 0) > 0
+            else 0
+        ),
     }
 
     def calculate_ratios(

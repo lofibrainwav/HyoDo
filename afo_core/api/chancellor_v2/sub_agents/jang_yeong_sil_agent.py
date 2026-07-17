@@ -119,7 +119,3 @@ Focus on objective, verifiable technical facts.
     def _get_provider(self) -> str:
         """TRUTH는 정확성이 중요하므로 고품질 모델 사용."""
         return "anthropic"  # Claude for technical accuracy
-
-
-# Backwards compatibility alias
-JangYeongSilAgent = JangYeongSilAgent

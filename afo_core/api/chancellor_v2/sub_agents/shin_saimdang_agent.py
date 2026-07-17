@@ -130,7 +130,3 @@ Beauty is in clarity, elegance, and user delight.
     def _get_provider(self) -> str:
         """BEAUTY는 창의적 평가를 위해 다양한 모델 가능."""
         return "ollama"  # Local model for speed
-
-
-# Backwards compatibility alias
-ShinSaimdangAgent = ShinSaimdangAgent

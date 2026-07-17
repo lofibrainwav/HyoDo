@@ -102,11 +102,11 @@ class GenUIOrchestrator:
     def _clean_code(self, raw: str) -> str:
         """Strip markdown code blocks"""
         if "```tsx" in raw:
-            return raw.split("```tsx")[1].split("```")[0].strip()
+            return raw.split("```tsx")[1].split("```", maxsplit=1)[0].strip()
         if "```typescript" in raw:
-            return raw.split("```typescript")[1].split("```")[0].strip()
+            return raw.split("```typescript")[1].split("```", maxsplit=1)[0].strip()
         if "```" in raw:
-            return raw.split("```")[1].split("```")[0].strip()
+            return raw.split("```")[1].split("```", maxsplit=1)[0].strip()
         return raw
 
 

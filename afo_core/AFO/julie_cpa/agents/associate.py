@@ -162,7 +162,12 @@ class JulieAssociateAgent:
 
         # AFO Kingdom Trinity Score formula
         trinity_score = (
-            truth_score * 0.18 + goodness_score * 0.18 + beauty_score * 0.12 + serenity_score * 0.40 + eternity_score * 0.12)
+            truth_score * 0.18
+            + goodness_score * 0.18
+            + beauty_score * 0.12
+            + serenity_score * 0.40
+            + eternity_score * 0.12
+        )
 
         return trinity_score
 

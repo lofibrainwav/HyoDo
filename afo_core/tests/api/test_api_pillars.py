@@ -81,7 +81,13 @@ class TestTrinityScoreCalculation:
         serenity = 1.0
         eternity = 1.0
 
-        score = 0.18×Truth + 0.18×Goodness + 0.12×Beauty + 0.40×Serenity + 0.12×Eternity
+        score = (
+            0.18 * truth
+            + 0.18 * goodness
+            + 0.12 * beauty
+            + 0.40 * serenity
+            + 0.12 * eternity
+        )
 
         assert score == pytest.approx(1.0)
 

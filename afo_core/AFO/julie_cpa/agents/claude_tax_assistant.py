@@ -376,7 +376,12 @@ class ClaudeTaxAssistant:
 
         # AFO Kingdom Trinity Score 공식
         trinity_score = (
-            truth_score * 0.18 + goodness_score * 0.18 + beauty_score * 0.12 + serenity_score * 0.40 + eternity_score * 0.12)
+            truth_score * 0.18
+            + goodness_score * 0.18
+            + beauty_score * 0.12
+            + serenity_score * 0.40
+            + eternity_score * 0.12
+        )
 
         return round(trinity_score, 3)
 

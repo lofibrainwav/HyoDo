@@ -121,7 +121,12 @@ async def check_integrity(request: IntegrityCheckRequest) -> dict[str, object]:
             s_eternity = float(str(results["eternity"].get("score", 0)))
 
             total_score = (
-                s_truth * 0.18 + s_goodness * 0.18 + s_beauty * 0.12 + s_serenity * 0.40 + s_eternity * 0.12)
+                s_truth * 0.18
+                + s_goodness * 0.18
+                + s_beauty * 0.12
+                + s_serenity * 0.40
+                + s_eternity * 0.12
+            )
         else:
             scores = [float(str(r.get("score", 0))) for r in results.values()]
             if scores:

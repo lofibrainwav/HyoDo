@@ -1,41 +1,62 @@
-# 🏰 AFO Kingdom: The LangGraph Chancellor Era
+# AFO Core
 
-> **"지피지기 승리, 천하태평 (Know yourself, know the enemy, and peace will reign.)"**
+AFO Core is the experimental FastAPI and agent-runtime tree bundled with the
+HyoDo repository. It is maintained separately from the published `hyodo`
+package and is not included in HyoDo wheels or source distributions.
 
-AFO(All-Father-One) Kingdom is a sovereign AI agent ecosystem governed by the **LangGraph Chancellor (승상)** system, adhering to the absolute philosophy of **Serenity (孝)**.
+## Requirements
 
-## 👑 The Chancellor System (승상 체제)
-The system is orchestrated by a **LangGraph StateGraph** that manages state, routing, and execution with zero friction.
+- Python 3.12 or 3.13
+- External services such as Redis only for the features that use them
 
-### 1. The Brain (승상 / Chancellor)
-- **Role**: State Management & Routing.
-- **Technology**: `LangGraph` + `Redis Checkpoint`.
-- **Constraint**: Enforces **AUTO_RUN** when `Trinity Score ≥ 90` & `Risk ≤ 10`.
+## Install
 
-### 2. The Strategists (3책사)
-| Name | Persona | Role | Technology |
-|------|---------|------|------------|
-| **Jang Yeong-sil** (제갈량) | **眞 (Truth)** | Architecture & Strategy | LangChain / CrewAI |
-| **Yi Sun-sin** (사마의) | **善 (Goodness)** | Risk & Ethics | NeMo Guardrails / AutoGen |
-| **Shin Saimdang** (주유) | **美 (Beauty)** | Narrative & UX | Prompt Engineering |
+From the repository root:
 
-### 3. The Pillars (5기둥)
-- **眞 (Truth)**: Technical Certainty.
-- **善 (Goodness)**: Operational Safety.
-- **美 (Beauty)**: Aesthetic Experience.
-- **孝 (Serenity)**: Frictionless Autonomy (Ultimate Goal).
-- **永 (Eternity)**: Persistence & Recovery.
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -e "./afo_core[agents,browser]"
+```
 
-## 📜 Constitution (왕실 헌법)
-See [AFO_LANGGRAPH_CONSTITUTION.md](docs/AFO_LANGGRAPH_CONSTITUTION.md) for the "Royal Library" governing principles.
+The `agents` and `browser` extras are required by the full API server import
+graph. Playwright browser binaries are needed only for browser-backed flows.
+Install them separately when required:
 
-## 🛠️ Operational Status
-- **API Endpoint**: `POST /chancellor/invoke`
-- **Verification**: `scripts/verify_chancellor_graph.py`
-- **Architecture**: `docs/AFO_FINAL_ARCHITECTURE.md`
-- **Test Coverage**: ~57% (Core Modules > 90%)
-  - Cleaned up Legacy/Experimental code to `/legacy`
-  - Fully Dockerized & Health Check Verified (Balanced)
+```bash
+playwright install chromium
+```
 
----
-*Maintained by the Royal Secretariat (Antigravity)*
+Machine-learning dependencies are intentionally separate because they are
+large and platform-sensitive:
+
+```bash
+pip install -e "./afo_core[ml]"
+```
+
+## Run
+
+```bash
+PYTHONPATH=afo_core uvicorn AFO.api_server:app --host 127.0.0.1 --port 8010
+```
+
+Do not expose the development server publicly without configuring secrets,
+authentication, and backing services.
+
+## Verify
+
+```bash
+ruff check afo_core/
+ruff format --check afo_core/
+python -m compileall -q afo_core
+PYTHONPATH=afo_core pytest -q \
+  afo_core/tests/test_librarian_agent.py \
+  afo_core/tests/test_chancellor_v3_routers.py \
+  afo_core/tests/test_v3_routing_verification.py \
+  afo_core/tests/api/chancellor_v2/test_orchestrator.py \
+  afo_core/tests/api/test_api_pillars.py
+```
+
+Architecture notes under `afo_core/docs/` describe experiments and historical
+designs. Treat executable code, `pyproject.toml`, and current CI as the runtime
+contract.

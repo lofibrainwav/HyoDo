@@ -6,31 +6,32 @@ IRS 문서 자동 수집 및 인덱싱 시스템
 
 from typing import Any
 
-# Legacy modules (existing)
-from .crawler import IRSCrawler
-from .integrations import IRSIntegrations
-from .models import CollectionStats, IRSConfig
-from .registry import IRSSourceRegistry
-
-# New monitoring modules (TICKET-114)
-from .document_crawler import DownloadResult, IRSDocumentCrawler, IRS_BASE_URL
-from .hash_verifier import HashAlgorithm, HashResult, HashVerifier
 from .change_detector import (
+    ChangeDetector,
     ChangeImpact,
     ChangeSummary,
-    ChangeDetector,
-    detect_change,
     batch_detect_changes,
+    detect_change,
 )
-from .notification_service import NotificationChannel, Notification, NotificationService
+
+# Legacy modules (existing)
+from .crawler import IRSCrawler
+
+# New monitoring modules (TICKET-114)
+from .document_crawler import IRS_BASE_URL, DownloadResult, IRSDocumentCrawler
+from .hash_verifier import HashAlgorithm, HashResult, HashVerifier
+from .integrations import IRSIntegrations
 from .irs_monitor_agent import (
-    MonitorConfig,
-    DocumentHash,
     ChangeDetection,
+    DocumentHash,
     IRSMonitorAgent,
+    MonitorConfig,
     check_irs_documents,
     start_irs_monitoring,
 )
+from .models import CollectionStats, IRSConfig
+from .notification_service import Notification, NotificationChannel, NotificationService
+from .registry import IRSSourceRegistry
 
 __all__ = [
     # Legacy

@@ -135,7 +135,3 @@ Be conservative. When in doubt, flag as a concern.
     def _get_provider(self) -> str:
         """GOODNESS는 보수적 평가를 위해 신뢰할 수 있는 모델."""
         return "anthropic"
-
-
-# Backwards compatibility alias
-YiSunSinAgent = YiSunSinAgent

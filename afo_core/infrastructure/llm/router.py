@@ -257,7 +257,7 @@ class LLMRouter:
         if not candidates:
             candidates = list(self.llm_configs.values())
 
-        best = max(candidates, key=lambda c: self._calculate_llm_score(c))
+        best = max(candidates, key=self._calculate_llm_score)
         return RoutingDecision(
             selected_provider=best.provider,
             selected_model=best.model,

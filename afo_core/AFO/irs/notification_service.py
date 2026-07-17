@@ -75,9 +75,9 @@ Document: {change_summary.document_id}
 Impact Score: {change_summary.impact.score:.2f}
 
 Details:
-{chr(10).join(change_details) if change_details else 'No detailed changes available'}
+{chr(10).join(change_details) if change_details else "No detailed changes available"}
 
-Description: {change_summary.impact.description or 'N/A'}
+Description: {change_summary.impact.description or "N/A"}
 Detected At: {change_summary.detected_at}
 """
 
@@ -89,7 +89,9 @@ Detected At: {change_summary.detected_at}
             channel=NotificationChannel.LOG,
         )
 
-    async def _send_to_channel(self, notification: Notification, channel: NotificationChannel) -> None:
+    async def _send_to_channel(
+        self, notification: Notification, channel: NotificationChannel
+    ) -> None:
         """Send notification to specific channel."""
         if channel == NotificationChannel.LOG:
             await self._send_to_log(notification)

@@ -66,7 +66,7 @@ class CostAwareRouter:
         model = router.select_model(command, plan)
     """
 
-    models: dict[CostTier, ModelConfig] = field(default_factory=lambda: DEFAULT_MODELS.copy())
+    models: dict[CostTier, ModelConfig] = field(default_factory=DEFAULT_MODELS.copy)
     force_tier: CostTier | None = None  # 강제 티어 지정 (테스트용)
 
     # 복잡도 판단 키워드
