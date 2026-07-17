@@ -9,20 +9,31 @@ Built with the Six Pillars (HYOGOOK V5):
 - Loyalty: SSOT compliance and cultural continuity
 - Beauty: Code clarity and UX
 - Eternity: Geometric mean of harmony (calculated)
+
+HYOGOOK V5 F-score formula (SSOT):
+  F = sum(five pillars on 1–10 scale) + geometric_mean
+  S = geometric_mean
+Review-emphasis percentages are philosophical labels only — not F weights.
 """
 
-__version__ = "3.1.5"
+from __future__ import annotations
+
+import warnings
+
+__version__ = "3.1.6"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
 
-# HYOGOOK V5 Weights (Phase 127+)
+# Legacy compatibility weights (WEIGHTED_V1 / calculate_trinity_score legacy path).
+# Not used by HYOGOOK V5 F-score. Sum is normalized at use site.
 TRINITY_WEIGHTS = {
-    "benevolence": 0.25,  #  Developer/user experience
-    "truth": 0.22,  #  Technical accuracy
-    "goodness": 0.18,  #  Security/stability
-    "loyalty": 0.15,  #  SSOT compliance
-    "beauty": 0.15,  #  Code clarity/UX
+    "benevolence": 0.25,  # Developer/user experience (legacy)
+    "truth": 0.22,  # Technical accuracy (legacy)
+    "goodness": 0.18,  # Security/stability (legacy)
+    "loyalty": 0.15,  # SSOT compliance (legacy)
+    "beauty": 0.15,  # Code clarity/UX (legacy)
 }
+LEGACY_TRINITY_WEIGHTS = TRINITY_WEIGHTS
 
 
 def calculate_geometric_mean(values: list[float]) -> float:
@@ -112,13 +123,17 @@ def calculate_trinity_score(
         score = ((f_score - 6) / (60 - 6)) * 100
         return round(max(0, min(100, score)), 2)
 
-    score = (
-        TRINITY_WEIGHTS["truth"] * truth
-        + TRINITY_WEIGHTS["goodness"] * goodness
-        + TRINITY_WEIGHTS["beauty"] * beauty
-        + (TRINITY_WEIGHTS["benevolence"] * serenity)
-        + (TRINITY_WEIGHTS["loyalty"] * eternity)
+    weights = LEGACY_TRINITY_WEIGHTS
+    weight_sum = sum(weights.values())
+    weighted = (
+        weights["truth"] * truth
+        + weights["goodness"] * goodness
+        + weights["beauty"] * beauty
+        + weights["benevolence"] * serenity
+        + weights["loyalty"] * eternity
     )
+    # Normalize so all-ones inputs yield 100 (legacy sum was 0.95 without this).
+    score = weighted / weight_sum if weight_sum else 0.0
     return round(max(0, min(1, score)) * 100, 2)
 
 
@@ -138,8 +153,20 @@ def is_strong_review_signal(trinity_score: float, risk_score: float = 0) -> bool
     return trinity_score >= 90 and risk_score <= 10
 
 
-# Legacy alias (API compatibility). Name does not mean auto-approval.
-should_auto_approve = is_strong_review_signal
+def should_auto_approve(trinity_score: float, risk_score: float = 0) -> bool:
+    """Deprecated alias of is_strong_review_signal.
+
+    Kept for API compatibility through 3.2.x. Does not grant merge/write authority.
+    Removal planned for 4.0.0.
+    """
+    warnings.warn(
+        "should_auto_approve() is deprecated; use is_strong_review_signal(). "
+        "The result is a review signal, not merge or write authorization. "
+        "Scheduled for removal in 4.0.0.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return is_strong_review_signal(trinity_score, risk_score)
 
 
 __all__ = [
@@ -147,6 +174,7 @@ __all__ = [
     "__author__",
     "__license__",
     "TRINITY_WEIGHTS",
+    "LEGACY_TRINITY_WEIGHTS",
     "calculate_geometric_mean",
     "calculate_hygook_v5_score",
     "calculate_trinity_score",

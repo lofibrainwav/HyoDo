@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.6] - 2026-07-16
+
+### Fixed
+
+- **Truth contract for `hyodo check`**: no longer reports `All gates passed` when
+  zero gates ran. Unsupported trees exit 2 with `No project gates were executed`
+  / `This is not a validation pass`. PASS / FAIL / SKIP / UNSUPPORTED are
+  separated (SKIP is not painted as PASS).
+- **`hyodo check PATH`**: gates resolve and run against the given path's HyoDo
+  checkout root instead of re-probing only `Path.cwd()`.
+- **`hyodo safe --strict`**: exits 1 when any high-severity finding is present
+  (CI-usable). Default mode remains early-warning exit 0. Missing path exits 2.
+- **Legacy `calculate_trinity_score`**: weight sum is normalized so all-ones
+  inputs yield 100 (was 95 because weights summed to 0.95).
+- **CI false-green**: public `tests/` pytest is a release blocker
+  (`continue-on-error` removed). Markdown lint is explicitly advisory.
+  Smoke expects empty-directory `hyodo check` exit 2 and `safe --strict`
+  high-risk fixture exit 1.
+
+### Changed
+
+- Score CLI/README: review-emphasis percentages are labeled as not used in the
+  F formula (`F = sum(1–10 pillars) + geometric mean`).
+- `should_auto_approve()` is a deprecation warning wrapper around
+  `is_strong_review_signal()` (removal planned for 4.0.0).
+- Documented scan limits: directory cap 40 files; default corpus is git
+  diff/status when no path is given.
+
+### Notes
+
+- Official PyPI already publishes **3.1.5**; this Truth Patch is **3.1.6**.
+- No language-agnostic expansion, SARIF, or TruffleHog in this release.
+
 ## [3.1.5] - 2026-07-16
 
 ### Changed

@@ -33,3 +33,8 @@ def test_run_safety_scan_on_inline_file(tmp_path):
     assert result["risk_score"] >= 15
     assert result["level"] in {"caution", "high"}
     assert "file:" in result["source"]
+
+
+def test_run_safety_scan_missing_path_source(tmp_path):
+    result = run_safety_scan(path=str(tmp_path / "missing.txt"), cwd=tmp_path)
+    assert result["source"].startswith("missing:")

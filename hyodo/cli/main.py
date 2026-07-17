@@ -3,19 +3,27 @@
 HyoDo CLI Main Entry Point
 
 Model-agnostic quality-gate CLI. Works with or without any specific agent UI.
+"Model-agnostic" means independent of the AI model or agent UI.
+It does not currently mean language-agnostic.
+
 Usage: hyodo [COMMAND] [OPTIONS]
 
 Examples:
-    hyodo check              # code quality gates
+    hyodo check              # HyoDo checkout release gates
     hyodo score              # HYOGOOK V5 review signal
     hyodo safe               # lightweight safety scan
+    hyodo safe --strict      # block on high-severity findings
     hyodo trinity "task"     # detailed review checklist
 """
 
+from __future__ import annotations
+
 import subprocess
 import sys
+from dataclasses import dataclass
+from enum import Enum
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -33,24 +41,52 @@ app = typer.Typer(
 console = Console()
 
 
+class GateStatus(str, Enum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    SKIP = "SKIP"
+    UNSUPPORTED = "UNSUPPORTED"
+
+
+@dataclass(frozen=True)
+class GateResult:
+    status: GateStatus
+    message: str
+
+
 def find_repo_root(start: Optional[Path] = None) -> Optional[Path]:
-    """Find a HyoDo repository checkout root, if the CLI is running inside one."""
+    """Find a HyoDo repository checkout root from *start* (not always cwd)."""
     current = (start or Path.cwd()).resolve()
+    if current.is_file():
+        current = current.parent
     for candidate in [current, *current.parents]:
         if (candidate / "pyproject.toml").exists() and (candidate / "hyodo").exists():
             return candidate
     return None
 
 
-def afo_core_path() -> Optional[Path]:
+def resolve_check_target(path: Optional[str]) -> Path:
+    """Resolve check target path. Raises FileNotFoundError if missing."""
+    raw = path or "."
+    target = Path(raw)
+    if not target.is_absolute():
+        target = (Path.cwd() / target).resolve()
+    else:
+        target = target.resolve()
+    if not target.exists():
+        raise FileNotFoundError(str(target))
+    return target
+
+
+def afo_core_path(root: Optional[Path] = None) -> Optional[Path]:
     """Return the extended AFO core path when available in a repository checkout."""
-    root = find_repo_root()
-    if not root:
+    repo = root if root is not None else find_repo_root()
+    if not repo:
         return None
 
     candidates = [
-        root / "packages" / "afo-core",
-        root / "afo_core",
+        repo / "packages" / "afo-core",
+        repo / "afo_core",
     ]
     for candidate in candidates:
         if candidate.exists():
@@ -78,146 +114,138 @@ def _module_importable(module: str) -> bool:
     return probe.returncode == 0
 
 
-def _missing_tool_result(tool: str, root: Optional[Path]) -> Tuple[bool, str]:
-    """In package mode, missing dev tools are soft-skips; in repo mode they fail."""
+def _missing_tool_result(tool: str, root: Optional[Path]) -> GateResult:
+    """Missing tools: FAIL inside HyoDo checkout; SKIP outside (should not reach)."""
     if root is None:
-        return True, f"{tool} not installed; skipped in package mode"
-    return False, f"{tool} not found (install: pip install {tool} or hyodo[dev])"
+        return GateResult(GateStatus.SKIP, f"{tool} not installed; skipped (no HyoDo checkout)")
+    return GateResult(
+        GateStatus.FAIL,
+        f"{tool} not found (install: pip install {tool} or hyodo[dev])",
+    )
 
 
-def run_pyright_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 1: Pyright - Truth - Type checking."""
-    # Public package is the release gate. Extended afo_core is advisory only.
-    root = find_repo_root()
-    # Wheel/package mode has no checkout tree; typecheck belongs to repo gates.
+def run_pyright_check(root: Optional[Path], verbose: bool = False) -> GateResult:
+    """Gate 1: Pyright - Truth - Type checking (HyoDo checkout only)."""
     if root is None:
-        return True, "package mode; typecheck skipped"
+        return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; typecheck not executed")
     if not _module_importable("pyright"):
         return _missing_tool_result("pyright", root)
 
-    cwd = root
     cmd = _tool_cmd("pyright", "hyodo")
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=str(cwd))
-
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=str(root))
         if result.returncode == 0:
-            return True, "0 errors, 0 warnings"
+            return GateResult(GateStatus.PASS, "0 errors, 0 warnings")
 
         error_count = result.stdout.count("error:") + result.stderr.count("error:")
         warning_count = result.stdout.count("warning:") + result.stderr.count("warning:")
-
         detail = (result.stdout or result.stderr or "").strip()
         if verbose and detail:
-            return False, f"{error_count} errors, {warning_count} warnings\n{detail[:400]}"
-        return False, f"{error_count} errors, {warning_count} warnings"
-
+            return GateResult(
+                GateStatus.FAIL,
+                f"{error_count} errors, {warning_count} warnings\n{detail[:400]}",
+            )
+        return GateResult(GateStatus.FAIL, f"{error_count} errors, {warning_count} warnings")
     except FileNotFoundError:
         return _missing_tool_result("pyright", root)
     except subprocess.TimeoutExpired:
-        return False, "timeout (>120s)"
+        return GateResult(GateStatus.FAIL, "timeout (>120s)")
     except Exception as e:
-        return False, f"exception: {e}"
+        return GateResult(GateStatus.FAIL, f"exception: {e}")
 
 
-def run_ruff_check(fix: bool = False, verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 2: Ruff - Beauty - Lint & Format."""
-    root = find_repo_root()
+def run_ruff_check(root: Optional[Path], fix: bool = False, verbose: bool = False) -> GateResult:
+    """Gate 2: Ruff - Beauty - Lint & Format (HyoDo checkout only)."""
     if root is None:
-        return True, "package mode; lint skipped"
+        return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; lint not executed")
     if not _module_importable("ruff"):
         return _missing_tool_result("ruff", root)
 
-    cwd = root
-    target = "hyodo"
-    cmd = _tool_cmd("ruff", "check", target)
+    cmd = _tool_cmd("ruff", "check", "hyodo")
     if fix:
         cmd.append("--fix")
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(cwd))
-
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(root))
         if result.returncode == 0:
-            return True, "All checks passed!"
-
+            return GateResult(GateStatus.PASS, "All checks passed!")
         violations = result.stdout.strip() if result.stdout else result.stderr.strip()
-        return False, violations[:200] + "..." if len(violations) > 200 else violations
-
+        msg = violations[:200] + "..." if len(violations) > 200 else violations
+        return GateResult(GateStatus.FAIL, msg or "ruff failed")
     except FileNotFoundError:
         return _missing_tool_result("ruff", root)
     except subprocess.TimeoutExpired:
-        return False, "timeout (>60s)"
+        return GateResult(GateStatus.FAIL, "timeout (>60s)")
     except Exception as e:
-        return False, f"exception: {e}"
+        return GateResult(GateStatus.FAIL, f"exception: {e}")
 
 
-def run_pytest_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 3: pytest - Goodness - Public package tests."""
-    root = find_repo_root()
-
-    # Public package tests first. afo_core remains optional/advisory.
-    if not (root and (root / "tests").exists()):
-        return True, "No repository test suite found; package smoke checks only"
-
+def run_pytest_check(root: Optional[Path], verbose: bool = False) -> GateResult:
+    """Gate 3: pytest - Goodness - Public package tests (HyoDo checkout only)."""
+    if root is None:
+        return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; tests not executed")
+    if not (root / "tests").exists():
+        return GateResult(GateStatus.SKIP, "No tests/ directory in HyoDo checkout")
     if not _module_importable("pytest"):
         return _missing_tool_result("pytest", root)
 
     cmd = _tool_cmd("pytest", str(root / "tests"), "-q", "--tb=short")
-    cwd = str(root)
-
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=cwd)
-
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(root))
         if result.returncode == 0:
             for line in result.stdout.split("\n"):
                 if "passed" in line.lower():
-                    return True, line.strip()
-            return True, "All tests passed!"
+                    return GateResult(GateStatus.PASS, line.strip())
+            return GateResult(GateStatus.PASS, "All tests passed!")
 
         detail = (result.stdout or result.stderr or "").strip()
         if verbose and detail:
-            return False, f"exit code {result.returncode}\n{detail[-500:]}"
-        # one-line summary for default mode
+            return GateResult(GateStatus.FAIL, f"exit code {result.returncode}\n{detail[-500:]}")
         summary = detail.splitlines()[-1] if detail else ""
         if summary:
-            return False, f"exit code {result.returncode}: {summary[:160]}"
-        return False, f"exit code {result.returncode}"
-
+            return GateResult(GateStatus.FAIL, f"exit code {result.returncode}: {summary[:160]}")
+        return GateResult(GateStatus.FAIL, f"exit code {result.returncode}")
     except FileNotFoundError:
         return _missing_tool_result("pytest", root)
     except subprocess.TimeoutExpired:
-        return False, "timeout (>300s)"
+        return GateResult(GateStatus.FAIL, "timeout (>300s)")
     except Exception as e:
-        return False, f"exception: {e}"
+        return GateResult(GateStatus.FAIL, f"exception: {e}")
 
 
-def run_sbom_check(verbose: bool = False) -> Tuple[bool, str]:
-    """Gate 4: SBOM - Eternity - Security seal (optional)."""
-    root = find_repo_root()
-    if not root:
-        return True, "No repository checkout found; SBOM skipped in package mode"
+def run_sbom_check(root: Optional[Path], verbose: bool = False) -> GateResult:
+    """Gate 4: SBOM - optional seal (SKIP when script absent, never fake PASS)."""
+    if root is None:
+        return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; SBOM not executed")
 
     sbom_script = root / "scripts" / "generate_sbom.py"
     if not sbom_script.exists():
-        return True, "SBOM script not found; skipped"
+        return GateResult(GateStatus.SKIP, "SBOM script not found; not executed")
 
     cmd = [sys.executable, str(sbom_script)]
-
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(root))
-
         if result.returncode == 0:
-            return True, "SBOM generated successfully"
-
+            return GateResult(GateStatus.PASS, "SBOM generated successfully")
         error_msg = result.stderr.strip() or result.stdout.strip()
-        return False, error_msg[:200] if len(error_msg) > 200 else error_msg
-
+        msg = error_msg[:200] if len(error_msg) > 200 else error_msg
+        return GateResult(GateStatus.FAIL, msg or "SBOM failed")
     except FileNotFoundError:
-        return False, "python executable not found"
+        return GateResult(GateStatus.FAIL, "python executable not found")
     except subprocess.TimeoutExpired:
-        return False, "timeout (>60s)"
+        return GateResult(GateStatus.FAIL, "timeout (>60s)")
     except Exception as e:
-        return False, f"exception: {e}"
+        return GateResult(GateStatus.FAIL, f"exception: {e}")
+
+
+def _print_gate_result(result: GateResult) -> None:
+    if result.status is GateStatus.PASS:
+        console.print(f"  [green]PASS {result.message}[/green]")
+    elif result.status is GateStatus.FAIL:
+        console.print(f"  [red]FAIL {result.message}[/red]")
+    elif result.status is GateStatus.SKIP:
+        console.print(f"  [yellow]SKIP {result.message}[/yellow]")
+    else:
+        console.print(f"  [yellow]UNSUPPORTED {result.message}[/yellow]")
 
 
 @app.command()
@@ -233,62 +261,77 @@ def check(
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ):
     """
-    Run code quality gates (4-Gate CI).
+    Run HyoDo checkout release gates (4-Gate CI).
+
+    Model-agnostic means independent of the AI model or agent UI.
+    It does not currently mean language-agnostic or any-repo universal.
 
     Order: Pyright -> Ruff -> pytest -> SBOM
     """
     console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
-    target = path or "."
-    console.print(f"Target: {target}")
+    try:
+        target = resolve_check_target(path)
+    except FileNotFoundError as exc:
+        console.print(f"[red]Path not found: {exc}[/red]")
+        console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2) from exc
 
-    all_passed = True
+    console.print(f"Target: {target}")
+    root = find_repo_root(target)
+    if root is None:
+        console.print(
+            "[yellow]Not a HyoDo package checkout "
+            "(requires pyproject.toml + hyodo/ at project root).[/yellow]"
+        )
+        console.print(
+            "[dim]Model-agnostic ≠ language-agnostic. "
+            "General Python project gates are not claimed in this version.[/dim]"
+        )
+    else:
+        console.print(f"HyoDo checkout: {root}")
+
+    results: List[GateResult] = []
 
     console.print("\n[1/4] Truth - Type checking...")
-    pyright_ok, pyright_msg = run_pyright_check(verbose)
-    if pyright_ok:
-        console.print(f"  [green]PASS {pyright_msg}[/green]")
-    else:
-        console.print(f"  [red]FAIL {pyright_msg}[/red]")
-        all_passed = False
+    pyright_result = run_pyright_check(root, verbose)
+    _print_gate_result(pyright_result)
+    results.append(pyright_result)
 
     console.print("\n[2/4] Beauty - Lint & Format...")
-    ruff_ok, ruff_msg = run_ruff_check(fix, verbose)
-    if ruff_ok:
-        console.print(f"  [green]PASS {ruff_msg}[/green]")
-    else:
-        console.print(f"  [red]FAIL {ruff_msg}[/red]")
-        if "not found" not in ruff_msg and fix:
-            console.print("  [yellow]   Try running with --fix to auto-fix issues[/yellow]")
-        all_passed = False
+    ruff_result = run_ruff_check(root, fix, verbose)
+    _print_gate_result(ruff_result)
+    if ruff_result.status is GateStatus.FAIL and "not found" not in ruff_result.message and fix:
+        console.print("  [yellow]   Try running with --fix to auto-fix issues[/yellow]")
+    results.append(ruff_result)
 
     console.print("\n[3/4] Goodness - Tests...")
-    pytest_ok, pytest_msg = run_pytest_check(verbose)
-    if pytest_ok:
-        console.print(f"  [green]PASS {pytest_msg}[/green]")
-    else:
-        console.print(f"  [red]FAIL {pytest_msg}[/red]")
-        all_passed = False
+    pytest_result = run_pytest_check(root, verbose)
+    _print_gate_result(pytest_result)
+    results.append(pytest_result)
 
     console.print("\n[4/4] Eternity - Security seal...")
-    sbom_ok, sbom_msg = run_sbom_check(verbose)
-    if sbom_ok:
-        console.print(f"  [green]PASS {sbom_msg}[/green]")
-    else:
-        console.print(f"  [red]FAIL {sbom_msg}[/red]")
-        all_passed = False
+    sbom_result = run_sbom_check(root, verbose)
+    _print_gate_result(sbom_result)
+    results.append(sbom_result)
+
+    executed = [r for r in results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
+    failed = [r for r in results if r.status is GateStatus.FAIL]
 
     console.print("\n" + "=" * 50)
-    if all_passed:
-        console.print("[bold green]All gates passed[/bold green]")
-        console.print(
-            "[green]Gates support review readiness. Human approval still required.[/green]"
-        )
-        raise typer.Exit(0)
+    if not executed:
+        console.print("[bold yellow]No project gates were executed[/bold yellow]")
+        console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2)
 
-    console.print("[bold red]Some gates failed[/bold red]")
-    console.print("[yellow]Fix failures, then re-run hyodo check[/yellow]")
-    raise typer.Exit(1)
+    if failed:
+        console.print("[bold red]Some gates failed[/bold red]")
+        console.print("[yellow]Fix failures, then re-run hyodo check[/yellow]")
+        raise typer.Exit(1)
+
+    console.print("[bold green]All executed gates passed[/bold green]")
+    console.print("[green]Gates support review readiness. Human approval still required.[/green]")
+    raise typer.Exit(0)
 
 
 @app.command()
@@ -306,9 +349,10 @@ def score(
     """
     Compute HYOGOOK V5 review signal.
 
-    Weights: Benevolence 25%, Truth 22%, Goodness 18%, Loyalty 15%, Beauty 15%.
-    Eternity is the geometric mean of the five pillars.
+    F = sum(five pillars on 1–10 scale) + geometric_mean
+    S = geometric_mean
 
+    Review emphasis labels are philosophical emphasis only — not F-score weights.
     Output is a review signal only — not automatic approval.
     """
     from hyodo import calculate_hygook_v5_score
@@ -324,31 +368,41 @@ def score(
     table = Table(title="HYOGOOK V5 Review Signal", show_header=True)
     table.add_column("Pillar", style="cyan")
     table.add_column("Score", justify="right")
-    table.add_column("Weight", justify="right")
+    table.add_column("Review emphasis", justify="right")
     table.add_column("Value", justify="right")
 
     table.add_row(
         "Benevolence",
         f"{effective_benevolence * 100:.0f}",
-        "25%",
+        "25% (not in F)",
         f"{effective_benevolence:.2f}",
     )
-    table.add_row("Truth", f"{truth * 100:.0f}", "22%", f"{truth:.2f}")
-    table.add_row("Goodness", f"{goodness * 100:.0f}", "18%", f"{goodness:.2f}")
-    table.add_row("Loyalty", f"{effective_loyalty * 100:.0f}", "15%", f"{effective_loyalty:.2f}")
-    table.add_row("Beauty", f"{beauty * 100:.0f}", "15%", f"{beauty:.2f}")
+    table.add_row("Truth", f"{truth * 100:.0f}", "22% (not in F)", f"{truth:.2f}")
+    table.add_row("Goodness", f"{goodness * 100:.0f}", "18% (not in F)", f"{goodness:.2f}")
+    table.add_row(
+        "Loyalty",
+        f"{effective_loyalty * 100:.0f}",
+        "15% (not in F)",
+        f"{effective_loyalty:.2f}",
+    )
+    table.add_row("Beauty", f"{beauty * 100:.0f}", "15% (not in F)", f"{beauty:.2f}")
     table.add_row("", "", "", "")
-    table.add_row("Eternity (S)", "", "derived", f"{S:.4f}")
-    table.add_row("F Score", "", "", f"{F:.2f}")
+    table.add_row("Eternity (S)", "", "geometric mean", f"{S:.4f}")
+    table.add_row("F Score", "", "sum + S", f"{F:.2f}")
     table.add_row("", "", "", "")
     table.add_row("[bold]TOTAL", "", "", f"[bold]{score_value:.1f}%[/bold]")
 
     console.print(table)
+    console.print(
+        "[dim]Review emphasis is not used in the F formula "
+        "(F = sum(1–10 pillars) + geometric mean).[/dim]"
+    )
 
     if score_value >= 90:
         console.print("\n[bold green]REVIEW_SIGNAL_STRONG (90+)[/bold green]")
         console.print(
-            "[green]Strong review signal only. Still run tests/security checks; human approval required.[/green]"
+            "[green]Strong review signal only. Still run tests/security checks; "
+            "human approval required.[/green]"
         )
     elif score_value >= 70:
         console.print("\n[bold yellow]REVIEW_SIGNAL_CAUTION (70-89)[/bold yellow]")
@@ -363,18 +417,32 @@ def score(
 @app.command()
 def safe(
     path: Optional[str] = typer.Argument(None, help="Path to scan"),
-    strict: bool = typer.Option(False, "--strict", help="Strict mode"),
+    strict: bool = typer.Option(
+        False,
+        "--strict",
+        help="Exit 1 when any high-severity finding is present (CI gate)",
+    ),
 ):
     """
     Safety early-warning scan.
 
-    Scans for secret-like patterns, dangerous commands, and production-impact signals.
-    Does not replace a full security scanner.
+    Default mode always exits 0 after printing findings (early warning).
+    --strict exits 1 on high-severity findings; medium/caution alone stays 0.
+    Missing path / scan failure exits 2.
+
+    Limits: directory scans read at most 40 files; default mode prefers git diff
+    HEAD, else git status text (not full working tree contents).
+    Not a full SAST / secret-scan / dependency audit.
     """
     console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
 
     result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd())
     console.print(f"source: {result['source']}")
+
+    if str(result["source"]).startswith("missing:"):
+        console.print("[red]Scan target not found.[/red]")
+        console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2)
 
     for check_name, status, color in result["rows"]:
         console.print(f"  [{color}]{status}[/{color}] {check_name}")
@@ -389,8 +457,14 @@ def safe(
 
     console.print(f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}")
     console.print(
-        "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit.[/dim]"
+        "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit. "
+        "Directory scan cap: 40 files; default corpus is git diff/status when no path.[/dim]"
     )
+
+    high_only = [f for f in result["findings"] if f.severity == "high"]
+    if strict and high_only:
+        raise typer.Exit(1)
+    raise typer.Exit(0)
 
 
 @app.command()
@@ -400,13 +474,15 @@ def start():
 [bold blue]HyoDo quick start[/bold blue]
 
 [b]HyoDo is a model-agnostic quality-gate kit for AI-assisted development.[/b]
+Model-agnostic means independent of the AI model or agent UI — not language-agnostic.
 
 Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
 
 [bold cyan]Core commands:[/bold cyan]
-  • [bold]check[/bold]  - quality gates (ruff/pyright/pytest)
+  • [bold]check[/bold]  - HyoDo checkout release gates (ruff/pyright/pytest)
   • [bold]score[/bold]  - HYOGOOK V5 review signal (not auto-approval)
   • [bold]safe[/bold]   - lightweight safety early-warning scan
+  • [bold]safe --strict[/bold] - exit 1 on high-severity findings
   • [bold]trinity[/bold] - structured review checklist
 
 [bold cyan]Examples:[/bold cyan]

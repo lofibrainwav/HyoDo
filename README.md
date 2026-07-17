@@ -13,7 +13,7 @@ AI-generated changes can be inspected before they become trusted code.
   <img src="https://img.shields.io/badge/Tiered_Routing-intent_only-lightgrey" alt="Tiered routing intent only">
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="License">
   <img src="https://img.shields.io/badge/Python-3.10+-blue" alt="Python">
-  <img src="https://img.shields.io/badge/Version-3.1.5-success" alt="Version">
+  <img src="https://img.shields.io/badge/Version-3.1.6-success" alt="Version">
 </p>
 
 ---
@@ -208,7 +208,10 @@ F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
 S = ⁵√(T × G × In × B × C)
 ```
 
-| Pillar | Weight | Focus |
+Percent labels below are **review emphasis only** — they are **not** used as
+weights in the F formula above.
+
+| Pillar | Review emphasis | Focus |
 |:------:|:------:|:------|
 | **Benevolence** | **25%** | Developer experience, user serenity |
 | **Truth** | **22%** | Technical accuracy, architecture |
@@ -218,6 +221,9 @@ S = ⁵√(T × G × In × B × C)
 | **Eternity** | **Geometric** | Harmony and sustainability |
 
 **Range**: F ∈ [6, 60], S ∈ [1, 10]
+
+Model-agnostic means independent of the AI model or agent UI. It does **not**
+currently mean language-agnostic or a universal gate for every repository.
 
 > Legacy note: WEIGHTED_V1 used an older five-pillar label set. HyoDo v3.1.0 public docs use the HYOGOOK V5 six-pillar model.
 
