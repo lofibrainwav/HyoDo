@@ -34,6 +34,14 @@ large and platform-sensitive:
 pip install -e "./afo_core[ml]"
 ```
 
+## Platform support boundary
+
+On macOS, AFO is a CPU-only internal legacy tree. Its supported role is
+development, inspection, and non-QLoRA legacy workflows; it is not a GPU
+training surface. The QLoRA trainer requires a Linux host with an NVIDIA CUDA
+GPU and stops before model loading on unsupported hosts. This repository does
+not provide Docker or Kubernetes GPU setup for that legacy path.
+
 ## Run
 
 ```bash

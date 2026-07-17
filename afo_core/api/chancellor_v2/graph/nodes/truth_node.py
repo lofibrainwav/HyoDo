@@ -16,6 +16,23 @@ logger = logging.getLogger(__name__)
 """TRUTH Node - Technical truth evaluation (眞: Truth)."""
 
 
+async def _run_verification_command(command: list[str], timeout: float) -> tuple[int, str, str]:
+    """Run a verification command without blocking the event loop."""
+    process = await asyncio.create_subprocess_exec(
+        *command,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+    try:
+        stdout, stderr = await asyncio.wait_for(process.communicate(), timeout=timeout)
+    except TimeoutError:
+        if process.returncode is None:
+            process.kill()
+            await process.wait()
+        raise
+    return process.returncode or 0, stdout.decode(), stderr.decode()
+
+
 async def truth_node(state: GraphState) -> GraphState:
     """Evaluate technical aspects of the planned execution.
 
@@ -28,7 +45,6 @@ async def truth_node(state: GraphState) -> GraphState:
     # 1. Real-Time Physical Verification (Self-Reflection)
     # The system audits its own truth based on actual code health
     import shutil
-    import subprocess
     import tempfile
     from pathlib import Path
 
@@ -38,8 +54,8 @@ async def truth_node(state: GraphState) -> GraphState:
     try:
         # 1-1. Ruff Check
         ruff_cmd = ["ruff", "check", "packages/afo-core/AFO", "--select", "E,F", "--ignore", "E501"]
-        ruff_proc = subprocess.run(ruff_cmd, capture_output=True, text=True, timeout=10)
-        if ruff_proc.returncode != 0:
+        ruff_returncode, _, _ = await _run_verification_command(ruff_cmd, timeout=10)
+        if ruff_returncode != 0:
             v_score = 0.0
             v_issues.append("Lint/Logic errors detected in core (Ruff)")
 
@@ -58,8 +74,8 @@ async def truth_node(state: GraphState) -> GraphState:
                 "--config-file",
                 "scripts/strict_mypy.ini",
             ]
-            mypy_proc = subprocess.run(mypy_cmd, capture_output=True, text=True, timeout=15)
-            if mypy_proc.returncode != 0:
+            mypy_returncode, _, _ = await _run_verification_command(mypy_cmd, timeout=15)
+            if mypy_returncode != 0:
                 v_score = 0.0
                 v_issues.append("Type safety violations detected in Truth node")
         finally:

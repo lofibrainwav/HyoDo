@@ -7,12 +7,50 @@ Utilizes pypdf for local extraction and handles common PDF edge cases.
 from pathlib import Path
 from typing import Any
 
+import anyio
+
 try:
     from pypdf import PdfReader
 
     PYPDF_AVAILABLE = True
 except ImportError:
     PYPDF_AVAILABLE = False
+
+
+def _extract_pdf_text_sync(file_path: str) -> dict[str, Any]:
+    """Extract PDF contents synchronously for execution in a worker thread."""
+    reader = PdfReader(file_path)
+
+    if reader.is_encrypted:
+        try:
+            reader.decrypt("")
+        except Exception:
+            return {
+                "success": False,
+                "error": "PDF is encrypted/password protected.",
+                "text": "",
+                "is_scanned": False,
+            }
+
+    full_text = []
+    page_count = len(reader.pages)
+    for page in reader.pages:
+        try:
+            page_text = page.extract_text()
+            if page_text:
+                full_text.append(page_text)
+        except Exception:
+            continue
+
+    combined_text = "\n".join(full_text)
+    is_scanned = page_count > 0 and len(combined_text.strip()) < (page_count * 20)
+    return {
+        "success": True,
+        "text": combined_text,
+        "meta": {"pages": page_count, "info": reader.metadata},
+        "is_scanned": is_scanned,
+        "error": None,
+    }
 
 
 class PDFParsingService:
@@ -51,50 +89,7 @@ class PDFParsingService:
             }
 
         try:
-            reader = PdfReader(file_path)
-
-            # check encryption
-            if reader.is_encrypted:
-                try:
-                    reader.decrypt("")  # Try empty password
-                except Exception:
-                    # If still encrypted, we can't do much without password management
-                    return {
-                        "success": False,
-                        "error": "PDF is encrypted/password protected.",
-                        "text": "",
-                        "is_scanned": False,
-                    }
-
-            full_text = []
-            page_count = len(reader.pages)
-
-            for i, page in enumerate(reader.pages):
-                try:
-                    page_text = page.extract_text()
-                    if page_text:
-                        full_text.append(page_text)
-                except Exception:
-                    # Individual page failure shouldn't kill whole process
-                    continue
-
-            combined_text = "\n".join(full_text)
-
-            # Simple heuristic for scanned documents:
-            # If we have many pages but very little text, it's likely an image scan
-            is_scanned = False
-            if page_count > 0 and len(combined_text.strip()) < (page_count * 20):
-                # Less than 20 chars per page on average? Suspicious.
-                is_scanned = True
-
-            return {
-                "success": True,
-                "text": combined_text,
-                "meta": {"pages": page_count, "info": reader.metadata},
-                "is_scanned": is_scanned,
-                "error": None,
-            }
-
+            return await anyio.to_thread.run_sync(_extract_pdf_text_sync, file_path)
         except Exception as e:
             return {"success": False, "error": str(e), "text": "", "is_scanned": False}
 
