@@ -7,10 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.1.7] - 2026-07-16
+
+### Fixed
+
+- **Ruff gate runs format**: `hyodo check` Gate 2 now executes both `ruff check`
+  and `ruff format --check` (with `--fix`, format write). Format-only failures
+  no longer false-green.
+- **`hyodo safe` scan read failure**: unreadable paths report `error:read:` and
+  exit **2** (same class as missing path). OSError is no longer swallowed into
+  empty corpus + exit 0.
+- **Path-length-stable CLI test**: checkout path assertion tolerates Rich
+  line-wrapping of long absolute paths.
+
 ### Changed
 
-- Public docs aligned to v3.1.6 Truth contracts: check/safe exit codes, HyoDo-checkout
-  scope, PyPI install path, demo checklists, and dry-run receipt refresh.
+- Public regression tests cover format-fail gate and scan-error exit 2.
+- Coverage floor raised from `fail_under = 0` to `fail_under = 50` for the public
+  `hyodo` package.
+- Version SSOT and install pins aligned to **3.1.7**.
+
+### Notes
+
+- Follow-up Truth Patch after 3.1.6 cross-audit (P1 only). No language-agnostic
+  expansion, Trusted Publishing, or `afo_core` split in this release.
 
 ## [3.1.6] - 2026-07-16
 

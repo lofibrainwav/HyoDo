@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "3.1.6"
+version = "3.1.7"
 description = "Model-agnostic quality-gate kit for AI-assisted developers"
 readme = "README.md"
 license = "MIT"
@@ -131,7 +131,7 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 0
+fail_under = 50
 show_missing = true
 skip_covered = false
 exclude_lines = [

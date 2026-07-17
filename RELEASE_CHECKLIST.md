@@ -6,7 +6,7 @@ This checklist blocks a public release until the package, CLI, and workflow path
 
 - Target version: see `VERSION` (SSOT; do not hardcode)
 - Public package path only — `afo_core/` is advisory, not a release blocker
-- Truth contracts (v3.1.6+): `check` zero-gates → exit 2; `safe --strict` high → exit 1
+- Truth contracts (v3.1.7+): `check` zero-gates → exit 2; `safe --strict` high → exit 1
 
 ## Pre-release gates (local)
 

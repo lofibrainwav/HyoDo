@@ -62,15 +62,19 @@ class Finding:
 
 
 def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
-    try:
-        data = path.read_bytes()[:max_bytes]
-        return data.decode("utf-8", errors="replace")
-    except OSError:
-        return ""
+    """Read file text. Propagates OSError so scan failures are not silent."""
+    data = path.read_bytes()[:max_bytes]
+    return data.decode("utf-8", errors="replace")
 
 
 def collect_scan_corpus(path: Optional[str] = None, cwd: Optional[Path] = None) -> Tuple[str, str]:
-    """Return (corpus_text, source_description)."""
+    """Return (corpus_text, source_description).
+
+    source prefixes:
+      - ``file:`` / ``dir:`` / ``git ...`` / ``empty-corpus`` — success paths
+      - ``missing:`` — path does not exist
+      - ``error:read:`` — path exists but could not be read (permission/IO)
+    """
     root = (cwd or Path.cwd()).resolve()
 
     if path:
@@ -78,7 +82,10 @@ def collect_scan_corpus(path: Optional[str] = None, cwd: Optional[Path] = None) 
         if not target.is_absolute():
             target = (root / target).resolve()
         if target.is_file():
-            return _read_text_file(target), f"file:{target}"
+            try:
+                return _read_text_file(target), f"file:{target}"
+            except OSError:
+                return "", f"error:read:{target}"
         if target.is_dir():
             chunks: List[str] = []
             count = 0
@@ -101,7 +108,10 @@ def collect_scan_corpus(path: Optional[str] = None, cwd: Optional[Path] = None) 
                     ".dylib",
                 }:
                     continue
-                chunks.append(_read_text_file(file_path))
+                try:
+                    chunks.append(_read_text_file(file_path))
+                except OSError:
+                    return "", f"error:read:{file_path}"
                 count += 1
                 if count >= 40:
                     break

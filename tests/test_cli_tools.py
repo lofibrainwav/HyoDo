@@ -61,6 +61,41 @@ def test_ruff_unsupported_outside_hyodo_checkout():
     assert "not executed" in result.message
 
 
+def test_ruff_runs_lint_and_format_check(tmp_path):
+    """Gate 2 must invoke both ruff check and ruff format --check."""
+    ok = MagicMock(returncode=0, stdout="All checks passed!\n", stderr="")
+    with (
+        patch("hyodo.cli.main._module_importable", return_value=True),
+        patch("hyodo.cli.main.subprocess.run", return_value=ok) as run,
+    ):
+        result = run_ruff_check(tmp_path, fix=False, verbose=False)
+    assert result.status is GateStatus.PASS
+    assert "format" in result.message.lower() or "lint" in result.message.lower()
+    assert run.call_count == 2
+    cmds = [c.args[0] for c in run.call_args_list]
+    assert any(cmd[1:4] == ["-m", "ruff", "check"] for cmd in cmds)
+    assert any(cmd[1:4] == ["-m", "ruff", "format"] and "--check" in cmd for cmd in cmds)
+
+
+def test_ruff_format_failure_fails_gate(tmp_path):
+    """Lint pass + format fail must not green the ruff gate."""
+    lint_ok = MagicMock(returncode=0, stdout="All checks passed!\n", stderr="")
+    fmt_fail = MagicMock(returncode=1, stdout="Would reformat: hyodo/cli/main.py\n", stderr="")
+
+    def side_effect(cmd, **_kwargs):
+        if "format" in cmd:
+            return fmt_fail
+        return lint_ok
+
+    with (
+        patch("hyodo.cli.main._module_importable", return_value=True),
+        patch("hyodo.cli.main.subprocess.run", side_effect=side_effect),
+    ):
+        result = run_ruff_check(tmp_path, fix=False, verbose=False)
+    assert result.status is GateStatus.FAIL
+    assert "format" in result.message.lower()
+
+
 def test_resolve_check_target_missing(tmp_path):
     missing = tmp_path / "nope"
     try:
@@ -120,7 +155,8 @@ def test_check_path_targets_hyodo_checkout_from_other_cwd(tmp_path):
         result = runner.invoke(app, ["check", str(hyodo_root)])
     assert result.exit_code == 0
     assert "HyoDo checkout:" in result.output
-    assert str(hyodo_root) in result.output
+    # Rich may wrap long absolute paths across lines; strip newlines before match.
+    assert str(hyodo_root) in result.output.replace("\n", "")
     assert "All executed gates passed" in result.output
     assert "All gates passed" not in result.output
     # Gates must receive the resolved HyoDo root, not an empty/foreign cwd.
@@ -195,3 +231,27 @@ def test_safe_strict_clean_exit_0(tmp_path):
 def test_safe_missing_path_exit_2():
     result = runner.invoke(app, ["safe", "/tmp/hyodo-safe-missing-path-xyz"])
     assert result.exit_code == 2
+
+
+def test_safe_unreadable_file_exit_2(tmp_path):
+    """Read/permission failure must exit 2 (scan failure), not silent exit 0."""
+    sample = tmp_path / "unreadable.txt"
+    sample.write_text("plain notes\n", encoding="utf-8")
+    scan_result = {
+        "source": f"error:read:{sample}",
+        "findings": [],
+        "rows": [
+            ("Secrets exposure", "✅", "green"),
+            ("Dangerous commands", "✅", "green"),
+            ("Production impact", "✅", "green"),
+            ("Rollback signal", "✅", "green"),
+        ],
+        "risk_score": 0,
+        "level": "low",
+        "action": "Low early-warning risk — final approval remains human",
+    }
+    with patch("hyodo.cli.main.run_safety_scan", return_value=scan_result):
+        result = runner.invoke(app, ["safe", str(sample)])
+    assert result.exit_code == 2
+    assert "not a validation pass" in result.output.lower()
+    assert "Scan failed" in result.output or "error:read:" in result.output

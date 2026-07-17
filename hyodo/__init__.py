@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import warnings
 
-__version__ = "3.1.6"
+__version__ = "3.1.7"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
 

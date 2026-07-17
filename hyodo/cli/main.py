@@ -155,21 +155,42 @@ def run_pyright_check(root: Optional[Path], verbose: bool = False) -> GateResult
 
 
 def run_ruff_check(root: Optional[Path], fix: bool = False, verbose: bool = False) -> GateResult:
-    """Gate 2: Ruff - Beauty - Lint & Format (HyoDo checkout only)."""
+    """Gate 2: Ruff - Beauty - Lint & Format (HyoDo checkout only).
+
+    Runs both ``ruff check`` and ``ruff format --check`` (or format write when
+    ``fix=True``). Lint-only success is not a green gate.
+    """
     if root is None:
         return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; lint not executed")
     if not _module_importable("ruff"):
         return _missing_tool_result("ruff", root)
 
-    cmd = _tool_cmd("ruff", "check", "hyodo")
+    lint_cmd = _tool_cmd("ruff", "check", "hyodo")
     if fix:
-        cmd.append("--fix")
+        lint_cmd.append("--fix")
+    fmt_cmd = (
+        _tool_cmd("ruff", "format", "hyodo")
+        if fix
+        else _tool_cmd("ruff", "format", "--check", "hyodo")
+    )
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(root))
-        if result.returncode == 0:
-            return GateResult(GateStatus.PASS, "All checks passed!")
-        violations = result.stdout.strip() if result.stdout else result.stderr.strip()
-        msg = violations[:200] + "..." if len(violations) > 200 else violations
+        lint = subprocess.run(lint_cmd, capture_output=True, text=True, timeout=60, cwd=str(root))
+        fmt = subprocess.run(fmt_cmd, capture_output=True, text=True, timeout=60, cwd=str(root))
+        lint_ok = lint.returncode == 0
+        fmt_ok = fmt.returncode == 0
+        if lint_ok and fmt_ok:
+            return GateResult(GateStatus.PASS, "lint + format passed")
+
+        parts: List[str] = []
+        if not lint_ok:
+            lint_msg = (lint.stdout or lint.stderr or "ruff check failed").strip()
+            parts.append(f"lint: {lint_msg[:140]}")
+        if not fmt_ok:
+            fmt_msg = (fmt.stdout or fmt.stderr or "ruff format failed").strip()
+            parts.append(f"format: {fmt_msg[:140]}")
+        msg = "; ".join(parts)
+        if len(msg) > 200:
+            msg = msg[:200] + "..."
         return GateResult(GateStatus.FAIL, msg or "ruff failed")
     except FileNotFoundError:
         return _missing_tool_result("ruff", root)
@@ -437,10 +458,16 @@ def safe(
     console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
 
     result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd())
-    console.print(f"source: {result['source']}")
+    source = str(result["source"])
+    console.print(f"source: {source}")
 
-    if str(result["source"]).startswith("missing:"):
+    # missing path OR unreadable/scan IO failure — not a validation pass
+    if source.startswith("missing:"):
         console.print("[red]Scan target not found.[/red]")
+        console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2)
+    if source.startswith("error:"):
+        console.print("[red]Scan failed (read error).[/red]")
         console.print("[yellow]This is not a validation pass.[/yellow]")
         raise typer.Exit(2)
 
