@@ -21,11 +21,11 @@ dependencies = [
     "idna>=3.15",
     "soupsieve>=2.8.4",
     # AFO/irs crawlers import bs4 directly; soupsieve alone does not provide it.
-    "beautifulsoup4>=4.14.2",
+    "beautifulsoup4>=4.15.0",
     "protobuf>=5.29.6",
     "orjson>=3.11.6",
     "lxml>=6.1.0",
-    "langsmith>=0.8.18",
+    "langsmith>=0.10.6",
     "banks>=2.4.2",
     "PyJWT>=2.13.0",
     "Mako>=1.3.12",
@@ -33,26 +33,26 @@ dependencies = [
     "json-repair>=0.60.1",
     "litellm>=1.84.0",
     "fastapi>=0.139.0",
-    "uvicorn>=0.34.0",
+    "uvicorn>=0.51.0",
     "pydantic-settings>=2.14.2",
-    "pydantic>=2.12.5",
-    "psutil>=7.2.1,<8.0.0",
-    "slowapi>=0.1.9",
+    "pydantic>=2.13.4",
+    "psutil>=7.2.2,<8.0.0",
+    "slowapi>=0.1.10",
     "opentelemetry-api>=1.22.0",
     "opentelemetry-sdk>=1.22.0",
     "opentelemetry-exporter-otlp>=1.22.0",
     "opentelemetry-instrumentation-fastapi>=0.43b0",
     "prometheus-client>=0.23.1,<0.24.0",
     "structlog>=24.1.0",
-    "pytest-asyncio>=1.3.0",
+    "pytest-asyncio>=1.4.0",
     "httpx>=0.28.1",
     "redis>=7.1.0",
-    "numpy>=1.24.0",
-    "scipy>=1.10.0",
+    "numpy>=2.5.1",
+    "scipy>=1.18.0",
     "cryptography>=48.0.1",
     "aiohttp>=3.14.1",
-    "sse-starlette>=3.1.2,<5.0.0",
-    "certifi>=2026.1.4,<2027.0.0",
+    "sse-starlette>=3.4.5,<5.0.0",
+    "certifi>=2026.6.17,<2027.0.0",
     "pillow>=12.2.0,<13.0",
     "werkzeug>=3.1.6",
     "urllib3>=2.7.0",
@@ -60,22 +60,22 @@ dependencies = [
     "pypdf>=6.12.1,<7.0.0",
     "mcp>=1.27.2",
     "marshmallow>=3.18.0,<4.0.0",
-    "fonttools>=4.60.2",
-    "filelock>=3.20.1",
+    "fonttools>=4.63.0",
+    "filelock>=3.31.0",
     "langchain-core>=1.3.3,<2.0.0",
     "langchain-community>=0.3.0,<0.4.0",
-    "pyright>=1.1.408",
+    "pyright>=1.1.411",
     "python-docx>=1.2.0",
     "loguru>=0.7.3,<0.8.0",
     "sqlmodel>=0.0.31,<0.0.32",
-    "neo4j>=6.1.0,<7.0.0",
+    "neo4j>=6.2.0,<7.0.0",
     "pgvector>=0.4.2,<0.5.0",
     "asyncpg>=0.31.0,<0.32.0",
     "ujson>=5.12.0",
     "astropy>=6.0.0",
     "sympy>=1.13.0",
-    "upstash-redis>=1.5.0,<2.0.0",
-    "openai>=2.15.0,<3.0.0",
+    "upstash-redis>=1.7.0,<2.0.0",
+    "openai>=2.46.0,<3.0.0",
     "nltk>=3.9.4",
     "python-multipart>=0.0.30",
 ]
@@ -85,12 +85,12 @@ core = []
 rag = [
     # chromadb removed: deprecated in favor of Qdrant; residual critical advisory.
     # Vector store SSOT is Qdrant (see afo_core/docker-compose.yml Phase 8 notes).
-    "llama-index>=0.14.12,<0.15.0",
+    "llama-index>=0.14.23,<0.15.0",
     "llama-index-llms-ollama>=0.9.1,<0.10.0",
     "llama-index-embeddings-ollama>=0.8.5,<0.9.0",
 ]
 browser = [
-    "playwright>=1.57.0",
+    "playwright>=1.61.0",
 ]
 agents = [
     # mem0ai removed: optional long-term memory experiment only;
@@ -98,43 +98,43 @@ agents = [
     # Code paths soft-fail when mem0 is absent.
     # crewai removed: its dependency pins force vulnerable litellm/json-repair ranges.
     # Re-add only when upstream accepts litellm>=1.84 and json-repair>=0.60.1.
-    "dspy-ai>=3.0.4",
+    "dspy-ai>=3.2.1",
     "autogen-agentchat>=0.7.5",
-    "autogen>=0.10.4",
+    "autogen>=0.14.1",
 ]
 ml = [
     "torch>=2.12.1,<2.13.0",
     "bitsandbytes>=0.49.0,<0.50.0 ; sys_platform == 'linux'",
     "peft>=0.18.0,<0.19.0",
-    "transformers>=5.5.0,<6.0.0",
+    "transformers>=5.14.1,<6.0.0",
 ]
 # Kept for backwards-compatible installs; metrics are part of the base API server.
 monitoring = []
 db = [
-    "psycopg2-binary>=2.9.11",
+    "psycopg2-binary>=2.9.12",
     "langgraph>=1.0.10,<2.0.0",
     "langgraph-checkpoint-redis>=0.3.1,<0.4.0",
-    "psycopg[binary,pool]>=3.3.2,<4.0.0",
-    "langgraph-checkpoint-postgres>=3.0.2,<4.0.0",
+    "psycopg[binary,pool]>=3.3.4,<4.0.0",
+    "langgraph-checkpoint-postgres>=3.1.0,<4.0.0",
 ]
 all = [
     # Expanded optional stack without self-reference (poetry lock compatibility).
     # Install with: pip install -e ".[rag,browser,agents,ml,monitoring,db]"
-    "llama-index>=0.14.12,<0.15.0",
+    "llama-index>=0.14.23,<0.15.0",
     "llama-index-llms-ollama>=0.9.1,<0.10.0",
     "llama-index-embeddings-ollama>=0.8.5,<0.9.0",
-    "playwright>=1.57.0",
-    "dspy-ai>=3.0.4",
+    "playwright>=1.61.0",
+    "dspy-ai>=3.2.1",
     "autogen-agentchat>=0.7.5",
-    "autogen>=0.10.4",
+    "autogen>=0.14.1",
     "torch>=2.12.1,<2.13.0",
     "peft>=0.18.0,<0.19.0",
-    "transformers>=5.5.0,<6.0.0",
-    "psycopg2-binary>=2.9.11",
+    "transformers>=5.14.1,<6.0.0",
+    "psycopg2-binary>=2.9.12",
     "langgraph>=1.0.10,<2.0.0",
     "langgraph-checkpoint-redis>=0.3.1,<0.4.0",
-    "psycopg[binary,pool]>=3.3.2,<4.0.0",
-    "langgraph-checkpoint-postgres>=3.0.2,<4.0.0",
+    "psycopg[binary,pool]>=3.3.4,<4.0.0",
+    "langgraph-checkpoint-postgres>=3.1.0,<4.0.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -633,7 +633,7 @@ stubPath = "typings"
 
 [dependency-groups]
 dev = [
-    "cyclonedx-bom>=7.2.1,<8.0.0",
+    "cyclonedx-bom>=7.3.0,<8.0.0",
     "pytest-xdist>=3.8.0,<4.0.0",
     "pyright>=1.1.391,<2.0.0"
 ]
