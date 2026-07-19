@@ -129,7 +129,10 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 50
+# Measured baseline is ~90% after the Sprint 1 contract tests; gate at 80% to
+# leave headroom while still catching regressions. The gate is only meaningful
+# because CI now passes --cov (goodness-gate), not the pyproject value alone.
+fail_under = 80
 show_missing = true
 skip_covered = false
 exclude_lines = [

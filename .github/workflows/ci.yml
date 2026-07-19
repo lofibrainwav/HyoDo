@@ -156,7 +156,7 @@ jobs:
       - name: Run Public Package Tests (release blocker)
         run: |
           echo "Running public package tests (blocking)..."
-          python -m pytest tests -q --tb=short
+          python -m pytest tests -q --tb=short --cov=hyodo --cov-fail-under=80
 
       - name: Safe --strict high-risk fixture (release blocker)
         run: |
