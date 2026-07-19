@@ -13,5 +13,5 @@ mypy>=1.13.0
 pytest>=8.0.0
 pytest-asyncio>=0.24.0
 urllib3>=2.7.0
-cryptography>=48.0.1
+cryptography>=49.0.0
 python-multipart>=0.0.30
