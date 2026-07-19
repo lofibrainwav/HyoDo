@@ -1,6 +1,6 @@
 # HyoDo minimal Docker Compose (optional extended services)
 # NOT required for public CLI gates (hyodo check/score/safe).
-# Use only when you intentionally run extended afo_core services.
+# Use only when you intentionally run optional extended services.
 
 version: '3.8'
 

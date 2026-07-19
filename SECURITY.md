@@ -38,6 +38,7 @@ This keeps destructive actions, credential exposure, deployment risk, and unsafe
 
 | Version | Supported |
 |---------|-----------|
+| 3.2.x   | ✅ |
 | 3.1.x   | ✅ |
 | 3.0.x   | ✅ |
 | 2.0.x   | ⚠️ Limited support |

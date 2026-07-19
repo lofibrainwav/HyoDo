@@ -1,6 +1,5 @@
 # HyoDo CI/CD Pipeline
-# Public package release gates. Advisory extended AFO checks live in afo-core.yml
-# (decoupled: they run only on afo_core changes, on a weekly schedule, or manually).
+# Public package release gates for the hyodo package and CLI.
 
 name: HyoDo CI
 
@@ -79,7 +78,6 @@ jobs:
           import yaml
           for path in [
               '.github/workflows/ci.yml',
-              '.github/workflows/afo-core.yml',
               '.github/workflows/smoke.yml',
               '.github/workflows/publish.yml',
           ]:
@@ -96,8 +94,6 @@ jobs:
             "docker-compose.minimal.yml"
             ".env.minimal"
             "QUICK_START.md"
-            "commands/SKILL_INDEX.md"
-            "commands/SKILL_TEMPLATE.md"
             "VERSION"
             "scripts/verify-public.sh"
             "scripts/release/check_version_sync.py"
@@ -264,7 +260,7 @@ jobs:
             fail=1
           fi
           # 2. Automation overclaim: auto-approve language on public surfaces
-          if grep -rEn "Auto-approve|AUTO_RUN" $DOCS CONTRIBUTING.md RELEASE_CHECKLIST.md hyodo/cli/main.py commands/score.md commands/check.md 2>/dev/null; then
+          if grep -rEn "Auto-approve|AUTO_RUN" $DOCS CONTRIBUTING.md RELEASE_CHECKLIST.md hyodo/cli/main.py 2>/dev/null; then
             echo "::error::Banned: auto-approve / AUTO_RUN phrasing on public surfaces. Scores support review, not replace it."
             fail=1
           fi
@@ -360,7 +356,6 @@ jobs:
           echo "  - Required release files present"
           echo ""
           echo "Advisory checks:"
-          echo "  - Extended AFO core checks decoupled to afo-core.yml"
           echo "  - Markdown lint remains advisory"
           echo ""
           echo "============================================"

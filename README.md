@@ -95,8 +95,6 @@ The supported release surface is intentionally narrow:
 | --- | --- |
 | `hyodo/` Python package and CLI | Public release surface |
 | `tests/` and `.github/workflows/` | Release verification |
-| `commands/` | Optional agent UI adapters |
-| `afo_core/` | Extended legacy modules; advisory, not packaged |
 
 Model-agnostic means the core CLI does not require a specific AI provider or
 agent UI. It does not mean language-agnostic or universal repository support.
@@ -109,19 +107,6 @@ security checks, or human approval.
 
 The practical CLI works without this optional philosophy layer. See
 [HyoDo philosophy](./PHILOSOPHY.md) for the short model description.
-
-## Agent adapters
-
-The `commands/` directory contains optional slash-command documentation for
-agent interfaces that can load repository commands. The CLI remains the
-canonical path:
-
-```text
-/start
-/check
-/score
-/safe
-```
 
 ## Documentation
 

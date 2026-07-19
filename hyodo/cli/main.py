@@ -75,22 +75,6 @@ def resolve_check_target(path: str | None) -> Path:
     return target
 
 
-def afo_core_path(root: Path | None = None) -> Path | None:
-    """Return the extended AFO core path when available in a repository checkout."""
-    repo = root if root is not None else find_repo_root()
-    if not repo:
-        return None
-
-    candidates = [
-        repo / "packages" / "afo-core",
-        repo / "afo_core",
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            return candidate
-    return None
-
-
 def _tool_cmd(module: str, *args: str) -> list[str]:
     """Run tooling via the same interpreter that hosts hyodo (venv-safe)."""
     return [sys.executable, "-m", module, *args]
