@@ -23,7 +23,6 @@ import sys
 from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
 
 import typer
 from rich.console import Console
@@ -54,7 +53,7 @@ class GateResult:
     message: str
 
 
-def find_repo_root(start: Optional[Path] = None) -> Optional[Path]:
+def find_repo_root(start: Path | None = None) -> Path | None:
     """Find a HyoDo repository checkout root from *start* (not always cwd)."""
     current = (start or Path.cwd()).resolve()
     if current.is_file():
@@ -65,20 +64,17 @@ def find_repo_root(start: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
-def resolve_check_target(path: Optional[str]) -> Path:
+def resolve_check_target(path: str | None) -> Path:
     """Resolve check target path. Raises FileNotFoundError if missing."""
     raw = path or "."
     target = Path(raw)
-    if not target.is_absolute():
-        target = (Path.cwd() / target).resolve()
-    else:
-        target = target.resolve()
+    target = target.resolve() if target.is_absolute() else (Path.cwd() / target).resolve()
     if not target.exists():
         raise FileNotFoundError(str(target))
     return target
 
 
-def afo_core_path(root: Optional[Path] = None) -> Optional[Path]:
+def afo_core_path(root: Path | None = None) -> Path | None:
     """Return the extended AFO core path when available in a repository checkout."""
     repo = root if root is not None else find_repo_root()
     if not repo:
@@ -94,7 +90,7 @@ def afo_core_path(root: Optional[Path] = None) -> Optional[Path]:
     return None
 
 
-def _tool_cmd(module: str, *args: str) -> List[str]:
+def _tool_cmd(module: str, *args: str) -> list[str]:
     """Run tooling via the same interpreter that hosts hyodo (venv-safe)."""
     return [sys.executable, "-m", module, *args]
 
@@ -114,7 +110,7 @@ def _module_importable(module: str) -> bool:
     return probe.returncode == 0
 
 
-def _missing_tool_result(tool: str, root: Optional[Path]) -> GateResult:
+def _missing_tool_result(tool: str, root: Path | None) -> GateResult:
     """Missing tools: FAIL inside HyoDo checkout; SKIP outside (should not reach)."""
     if root is None:
         return GateResult(GateStatus.SKIP, f"{tool} not installed; skipped (no HyoDo checkout)")
@@ -124,7 +120,7 @@ def _missing_tool_result(tool: str, root: Optional[Path]) -> GateResult:
     )
 
 
-def run_pyright_check(root: Optional[Path], verbose: bool = False) -> GateResult:
+def run_pyright_check(root: Path | None, verbose: bool = False) -> GateResult:
     """Gate 1: Pyright - Truth - Type checking (HyoDo checkout only)."""
     if root is None:
         return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; typecheck not executed")
@@ -154,7 +150,7 @@ def run_pyright_check(root: Optional[Path], verbose: bool = False) -> GateResult
         return GateResult(GateStatus.FAIL, f"exception: {e}")
 
 
-def run_ruff_check(root: Optional[Path], fix: bool = False, verbose: bool = False) -> GateResult:
+def run_ruff_check(root: Path | None, fix: bool = False, verbose: bool = False) -> GateResult:
     """Gate 2: Ruff - Beauty - Lint & Format (HyoDo checkout only).
 
     Runs both ``ruff check`` and ``ruff format --check`` (or format write when
@@ -181,7 +177,7 @@ def run_ruff_check(root: Optional[Path], fix: bool = False, verbose: bool = Fals
         if lint_ok and fmt_ok:
             return GateResult(GateStatus.PASS, "lint + format passed")
 
-        parts: List[str] = []
+        parts: list[str] = []
         if not lint_ok:
             lint_msg = (lint.stdout or lint.stderr or "ruff check failed").strip()
             parts.append(f"lint: {lint_msg[:140]}")
@@ -200,7 +196,7 @@ def run_ruff_check(root: Optional[Path], fix: bool = False, verbose: bool = Fals
         return GateResult(GateStatus.FAIL, f"exception: {e}")
 
 
-def run_pytest_check(root: Optional[Path], verbose: bool = False) -> GateResult:
+def run_pytest_check(root: Path | None, verbose: bool = False) -> GateResult:
     """Gate 3: pytest - Goodness - Public package tests (HyoDo checkout only)."""
     if root is None:
         return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; tests not executed")
@@ -233,7 +229,7 @@ def run_pytest_check(root: Optional[Path], verbose: bool = False) -> GateResult:
         return GateResult(GateStatus.FAIL, f"exception: {e}")
 
 
-def run_sbom_check(root: Optional[Path], verbose: bool = False) -> GateResult:
+def run_sbom_check(root: Path | None, verbose: bool = False) -> GateResult:
     """Gate 4: SBOM - optional seal (SKIP when script absent, never fake PASS)."""
     if root is None:
         return GateResult(GateStatus.UNSUPPORTED, "not a HyoDo checkout; SBOM not executed")
@@ -277,7 +273,7 @@ def version():
 
 @app.command()
 def check(
-    path: Optional[str] = typer.Argument(None, help="Path to file or directory"),
+    path: str | None = typer.Argument(None, help="Path to file or directory"),
     fix: bool = typer.Option(False, "--fix", "-f", help="Apply auto-fixes where supported"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
 ):
@@ -312,7 +308,7 @@ def check(
     else:
         console.print(f"HyoDo checkout: {root}")
 
-    results: List[GateResult] = []
+    results: list[GateResult] = []
 
     console.print("\n[1/4] Truth - Type checking...")
     pyright_result = run_pyright_check(root, verbose)
@@ -437,7 +433,7 @@ def score(
 
 @app.command()
 def safe(
-    path: Optional[str] = typer.Argument(None, help="Path to scan"),
+    path: str | None = typer.Argument(None, help="Path to scan"),
     strict: bool = typer.Option(
         False,
         "--strict",

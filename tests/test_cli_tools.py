@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import (
@@ -98,11 +99,8 @@ def test_ruff_format_failure_fails_gate(tmp_path):
 
 def test_resolve_check_target_missing(tmp_path):
     missing = tmp_path / "nope"
-    try:
+    with pytest.raises(FileNotFoundError):
         resolve_check_target(str(missing))
-        assert False, "expected FileNotFoundError"
-    except FileNotFoundError:
-        pass
 
 
 def test_find_repo_root_from_nested_path():
@@ -203,6 +201,18 @@ def test_safe_strict_high_finding_exit_1(tmp_path):
 def test_safe_strict_dangerous_command_exit_1(tmp_path):
     sample = tmp_path / "danger.txt"
     sample.write_text("please DROP DATABASE production;\n", encoding="utf-8")
+    result = runner.invoke(app, ["safe", "--strict", str(sample)])
+    assert result.exit_code == 1
+
+
+def test_safe_strict_bare_rm_rf_root_exit_1(tmp_path):
+    """Regression: bare `rm -rf /` (root) must be a high-severity strict blocker.
+
+    Previously the rm_rf_root regex missed a root target at end of line, so this
+    catastrophic command scanned clean. It must now exit 1 under --strict.
+    """
+    sample = tmp_path / "danger.txt"
+    sample.write_text("sudo rm -rf /\n", encoding="utf-8")
     result = runner.invoke(app, ["safe", "--strict", str(sample)])
     assert result.exit_code == 1
 

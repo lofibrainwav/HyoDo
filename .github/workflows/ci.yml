@@ -1,5 +1,6 @@
 # HyoDo CI/CD Pipeline
-# Public package release gates + advisory extended AFO checks
+# Public package release gates. Advisory extended AFO checks live in afo-core.yml
+# (decoupled: they run only on afo_core changes, on a weekly schedule, or manually).
 
 name: HyoDo CI
 
@@ -9,6 +10,16 @@ name: HyoDo CI
   pull_request:
     branches: [main]
   workflow_dispatch:
+
+# Least-privilege default token: this workflow only reads the repo.
+permissions:
+  contents: read
+
+# Cancel superseded runs on feature branches / PRs, but never cancel main
+# (main runs are release-gate signal and must complete).
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
   # -------------------------------------------------------------------------
@@ -23,17 +34,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Setup Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: ${{ matrix.python-version }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v7
-        with:
-          node-version: "20"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install Python Dependencies
         run: |
@@ -58,13 +66,6 @@ jobs:
           pyright hyodo
           echo "Public package type check passed"
 
-      - name: Extended AFO Core Quality
-        if: matrix.python-version == '3.12'
-        run: |
-          ruff check afo_core/ --output-format=concise
-          ruff format --check afo_core/
-          python -m compileall -q afo_core
-
       - name: Validate JSON
         run: |
           echo "Validating plugin.json..."
@@ -78,6 +79,7 @@ jobs:
           import yaml
           for path in [
               '.github/workflows/ci.yml',
+              '.github/workflows/afo-core.yml',
               '.github/workflows/smoke.yml',
               '.github/workflows/publish.yml',
           ]:
@@ -112,42 +114,6 @@ jobs:
           python scripts/release/check_version_sync.py
 
   # -------------------------------------------------------------------------
-  # Extended AFO Core - executable contract
-  # -------------------------------------------------------------------------
-  afo-core-contract:
-    name: "Extended AFO Core Contract"
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Setup Python
-        uses: actions/setup-python@v6
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: afo_core/pyproject.toml
-
-      - name: Install AFO server dependencies
-        # Install contract SSOT: afo_core/scripts/dev_env.sh (same path as local dev)
-        run: bash afo_core/scripts/dev_env.sh --system
-
-      - name: Resolve AFO ML dependencies
-        run: pip install --dry-run -e "./afo_core[ml]"
-
-      - name: Run AFO contract tests
-        env:
-          PYTHONPATH: afo_core
-        run: |
-          python -m pytest -q \
-            afo_core/tests/test_librarian_agent.py \
-            afo_core/tests/test_chancellor_v3_routers.py \
-            afo_core/tests/test_v3_routing_verification.py \
-            afo_core/tests/api/chancellor_v2/test_orchestrator.py \
-            afo_core/tests/api/test_api_pillars.py
-
-  # -------------------------------------------------------------------------
   # Goodness Gate - Safety and package smoke tests
   # -------------------------------------------------------------------------
   goodness-gate:
@@ -156,12 +122,14 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Setup Python
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
 
       - name: Install Dependencies
         run: |
@@ -188,7 +156,7 @@ jobs:
       - name: Run Public Package Tests (release blocker)
         run: |
           echo "Running public package tests (blocking)..."
-          python -m pytest tests -q --tb=short
+          python -m pytest tests -q --tb=short --cov=hyodo --cov-fail-under=80
 
       - name: Safe --strict high-risk fixture (release blocker)
         run: |
@@ -223,10 +191,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: "20"
 
@@ -317,9 +285,6 @@ jobs:
     needs: [truth-gate, goodness-gate, beauty-gate]
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
       - name: Calculate HYOGOOK V5 Score
         run: |
           echo "============================================"
@@ -335,7 +300,7 @@ jobs:
           echo "  - Required release files present"
           echo ""
           echo "Advisory checks:"
-          echo "  - Extended AFO core lint remains non-blocking until legacy cleanup"
+          echo "  - Extended AFO core checks decoupled to afo-core.yml"
           echo "  - Markdown lint remains advisory"
           echo ""
           echo "============================================"

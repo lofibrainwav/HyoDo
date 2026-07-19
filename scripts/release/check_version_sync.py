@@ -16,7 +16,6 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 VERSION_FILE = ROOT / "VERSION"
 PYPROJECT_FILE = ROOT / "pyproject.toml"
 INIT_FILE = ROOT / "hyodo" / "__init__.py"
-CLI_INIT_FILE = ROOT / "hyodo" / "cli" / "__init__.py"
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$")
 
@@ -57,7 +56,6 @@ def main() -> None:
         "VERSION": read_version_file(),
         "pyproject.toml": read_pyproject_version(),
         "hyodo/__init__.py": read_init_version(INIT_FILE, "hyodo/__init__.py"),
-        "hyodo/cli/__init__.py": read_init_version(CLI_INIT_FILE, "hyodo/cli/__init__.py"),
     }
 
     ok = True

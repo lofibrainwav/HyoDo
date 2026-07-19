@@ -52,17 +52,12 @@ dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-cov>=4.0",
+    "hypothesis>=6.0",
     "ruff>=0.4",
     "pyright>=1.1",
     "build>=1.2",
     "twine>=5.0",
-    "fastapi>=0.115",
-    "httpx>=0.27",
     "PyYAML>=6.0",
-]
-cli = [
-    "typer>=0.9.0",
-    "rich>=13.0.0",
 ]
 
 [project.scripts]
@@ -99,11 +94,15 @@ line-length = 100
 target-version = "py310"
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W"]
-ignore = ["E501"]
+select = ["E", "F", "I", "W", "UP", "B", "C4", "SIM", "PT", "RUF"]
+# RUF001/RUF002: intentional typography (× multiplication sign, – en dash) in
+# docstrings and user-facing strings; converting them would change output.
+# E501: line length is governed by the formatter.
+ignore = ["E501", "RUF001", "RUF002"]
 
 [tool.pyright]
 pythonVersion = "3.10"
+typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
@@ -130,7 +129,10 @@ omit = [
 ]
 
 [tool.coverage.report]
-fail_under = 50
+# Measured baseline is ~90% after the Sprint 1 contract tests; gate at 80% to
+# leave headroom while still catching regressions. The gate is only meaningful
+# because CI now passes --cov (goodness-gate), not the pyproject value alone.
+fail_under = 80
 show_missing = true
 skip_covered = false
 exclude_lines = [
