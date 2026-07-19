@@ -247,8 +247,10 @@ def run_sbom_check(root: Path | None, verbose: bool = False) -> GateResult:
         return GateResult(GateStatus.SKIP, "python executable not found; SBOM not generated")
     except subprocess.TimeoutExpired:
         return GateResult(GateStatus.SKIP, "SBOM generation timed out (>180s); not generated")
-    except Exception as e:  # environment failures must never hard-fail the gate
-        return GateResult(GateStatus.SKIP, f"SBOM not generated: {e}")
+    except OSError as e:  # genuine OS/environment failure — honest SKIP, never a false FAIL
+        return GateResult(GateStatus.SKIP, f"SBOM not generated (environment): {e}")
+    except Exception as e:  # unexpected error in HyoDo's own invocation path — a real defect
+        return GateResult(GateStatus.FAIL, f"SBOM invocation error (unexpected): {e}")
 
     if result.returncode == 0:
         return GateResult(GateStatus.PASS, "SBOM generated (public surface)")
@@ -352,6 +354,7 @@ def check(
 
     executed = [r for r in results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
     failed = [r for r in results if r.status is GateStatus.FAIL]
+    ran, total = len(executed), len(results)
 
     console.print("\n" + "=" * 50)
     if not executed:
@@ -360,11 +363,11 @@ def check(
         raise typer.Exit(2)
 
     if failed:
-        console.print("[bold red]Some gates failed[/bold red]")
+        console.print(f"[bold red]Some gates failed[/bold red] ({ran}/{total} gates ran)")
         console.print("[yellow]Fix failures, then re-run hyodo check[/yellow]")
         raise typer.Exit(1)
 
-    console.print("[bold green]All executed gates passed[/bold green]")
+    console.print(f"[bold green]All executed gates passed ({ran}/{total} gates ran)[/bold green]")
     console.print("[green]Gates support review readiness. Human approval still required.[/green]")
     raise typer.Exit(0)
 

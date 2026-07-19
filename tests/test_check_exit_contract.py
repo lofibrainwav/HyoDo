@@ -65,6 +65,25 @@ def test_check_all_pass_exits_0():
     assert "Some gates failed" not in result.output
 
 
+def test_check_partial_execution_surfaces_count():
+    """2 gates run + 2 SKIP still exits 0 but the banner shows the partial count."""
+    hyodo_root = _hyodo_root()
+    ok = GateResult(GateStatus.PASS, "ok")
+    skip = GateResult(GateStatus.SKIP, "skipped")
+
+    with (
+        patch("hyodo.cli.main.run_pyright_check", return_value=ok),
+        patch("hyodo.cli.main.run_ruff_check", return_value=ok),
+        patch("hyodo.cli.main.run_pytest_check", return_value=skip),
+        patch("hyodo.cli.main.run_sbom_check", return_value=skip),
+    ):
+        result = runner.invoke(app, ["check", str(hyodo_root)])
+
+    assert result.exit_code == 0
+    assert "2/4 gates ran" in result.output
+    assert "All executed gates passed" in result.output
+
+
 @pytest.mark.parametrize("failing_gate", ["pyright", "ruff", "pytest"])
 def test_check_exits_1_regardless_of_which_gate_fails(failing_gate):
     """`check` exits 1 whenever any single executed gate returns FAIL."""
