@@ -6,7 +6,7 @@ uvicorn[standard]>=0.31.1
 python-dotenv
 python-multipart>=0.0.30
 pydantic>=2.12.5
-pydantic-settings>=2.5.2
+pydantic-settings>=2.14.2
 urllib3>=2.7.0
 cryptography>=48.0.1
 setuptools>=78.1.1
