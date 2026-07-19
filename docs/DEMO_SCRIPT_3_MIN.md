@@ -3,7 +3,7 @@
 Purpose: a short recorded walkthrough or live screen-share script for reviewers,
 technical enablement roles, and developer-facing interviews.
 
-**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **3.1.8**.
+**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **3.2.0**.
 
 ## Title
 
