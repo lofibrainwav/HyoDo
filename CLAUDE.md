@@ -5,9 +5,7 @@ Guidance for AI coding agents working in this repository.
 ## Project Overview
 
 HyoDo is a model-agnostic quality-gate kit for AI-assisted development. Primary
-surface is the public `hyodo` CLI and CI gates. Optional agent adapters live in
-`commands/`. Extended backend modules live in `afo_core/` and are advisory for
-public release.
+surface is the public `hyodo` CLI and CI gates.
 
 **Version**: see `VERSION`
 **Python**: 3.10+  
@@ -37,13 +35,9 @@ hyodo safe
 
 ## Architecture
 
-### Public package vs extended tree
+### Public package
 
-| Surface | Path | Release gate |
-|---------|------|--------------|
-| Public product | `hyodo/`, root `pyproject.toml` | Yes |
-| Agent adapters | `commands/`, `agents/` | Docs only |
-| Extended / legacy | `afo_core/` | Advisory |
+The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`.
 
 ### Optional HYOGOOK V5 review signal
 
@@ -64,22 +58,13 @@ Scores are decision support only. They do not authorize merge/deploy.
 HyoDo/
 ├── hyodo/               # Public Python package (CLI + scoring)
 ├── tests/               # Public package tests
-├── commands/            # Optional agent slash-command docs
-├── agents/              # Optional agent helpers
-├── docs/                # Proof maps, security surface, audits
-├── .github/workflows/   # CI + smoke
-└── afo_core/            # Extended/legacy backend (advisory)
+├── docs/                # Proof maps and audits
+├── scripts/             # Release + verification tooling
+└── .github/workflows/   # CI + smoke
 ```
-
-### afo_core backend
-
-For backend-specific work in `afo_core/`, see `afo_core/CLAUDE.md` when present.
-Extended services may involve Redis/Postgres/Docker; they are **not** required
-for the public CLI path.
 
 ## Security notes
 
 - Do not commit secrets.
 - `hyodo safe` is early warning only.
-- Dependabot volume on `afo_core` lockfiles is not the public package surface.
 - See `docs/SECURITY_SURFACE.md` and `docs/EXTERNAL_CLAIM_AUDIT.md`.

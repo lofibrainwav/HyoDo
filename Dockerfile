@@ -1,10 +1,9 @@
-# HyoDo v3.1.0 - Beginner-Friendly Edition
-#  - Philosophy-Driven Code Quality Tool
+# HyoDo - model-agnostic quality gates for AI-assisted development
 
 FROM python:3.12-slim
 
 LABEL maintainer="AFO Kingdom <afokingdom@example.com>"
-LABEL version="3.1.0"
+LABEL version="3.2.0"
 LABEL description="HyoDo - AI Code Quality Automation"
 
 # Install system dependencies
@@ -29,13 +28,8 @@ RUN pip install --no-cache-dir \
     typer \
     rich
 
-# Copy application code
-COPY afo_core/ ./afo_core/
-COPY commands/ ./commands/
-COPY skills/ ./skills/
-COPY agents/ ./agents/
+# Copy application code (public surface only)
 COPY scripts/ ./scripts/
-COPY hooks/ ./hooks/
 COPY hyodo/ ./hyodo/
 
 # Install the package

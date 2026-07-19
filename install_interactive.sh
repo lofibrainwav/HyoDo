@@ -72,7 +72,7 @@ step_welcome() {
     echo ""
     echo -e "  ${YELLOW}2) Extended (optional)${NC}"
     echo "     - Docker + optional local services"
-    echo "     - For afo_core extended modules only"
+    echo "     - For optional extended services only"
     echo ""
 
     read -r -p "Choice (1 or 2): " mode_choice
@@ -259,11 +259,9 @@ step_finish() {
     echo -e "  ${GREEN}hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9${NC}"
     echo -e "  ${GREEN}hyodo safe${NC}"
     echo ""
-    echo -e "${CYAN}Optional agent adapters:${NC} load commands/ in your agent UI"
-    echo ""
 
     if [ "$MINIMAL_MODE" = false ]; then
-        echo -e "${YELLOW}Extended infra (only if you need afo_core services):${NC}"
+        echo -e "${YELLOW}Extended infra (only if you need optional services):${NC}"
         echo -e "  ${GREEN}cd $INSTALL_DIR && docker compose -f docker-compose.minimal.yml up -d${NC}"
         echo ""
     fi

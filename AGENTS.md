@@ -6,9 +6,6 @@ Instructions for coding agents working in this repository.
 
 - `hyodo/` is the public Python package and primary release surface.
 - `tests/` contains the public package tests.
-- `commands/` contains optional agent UI adapters.
-- `afo_core/` is an extended legacy tree and is not included in the public
-  package. Treat its checks as advisory unless a task explicitly targets it.
 
 Do not describe HyoDo as a universal project scanner. Full `hyodo check` gates
 currently require a HyoDo checkout containing `pyproject.toml` and `hyodo/`.

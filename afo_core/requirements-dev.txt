@@ -1,5 +1,0 @@
-# Dev helper only. Environment SSOT: scripts/dev_env.sh
-#   bash afo_core/scripts/dev_env.sh   (from the repository root)
-setuptools>=78.1.1
-pytest>=8.0.0
-ruff>=0.8.0
