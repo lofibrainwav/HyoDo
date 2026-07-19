@@ -4,6 +4,7 @@ import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import (
@@ -98,11 +99,8 @@ def test_ruff_format_failure_fails_gate(tmp_path):
 
 def test_resolve_check_target_missing(tmp_path):
     missing = tmp_path / "nope"
-    try:
+    with pytest.raises(FileNotFoundError):
         resolve_check_target(str(missing))
-        assert False, "expected FileNotFoundError"
-    except FileNotFoundError:
-        pass
 
 
 def test_find_repo_root_from_nested_path():

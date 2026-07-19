@@ -8,12 +8,12 @@ from __future__ import annotations
 
 import re
 import subprocess
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, List, Optional, Sequence, Tuple
 
 # Secret-like patterns (high signal, intentionally narrow to limit false positives).
-SECRET_PATTERNS: Sequence[Tuple[str, re.Pattern[str]]] = (
+SECRET_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
     ("aws_access_key", re.compile(r"AKIA[0-9A-Z]{16}")),
     ("github_token", re.compile(r"gh[pousr]_[A-Za-z0-9_]{20,}")),
     ("slack_token", re.compile(r"xox[baprs]-[A-Za-z0-9-]{10,}")),
@@ -26,7 +26,7 @@ SECRET_PATTERNS: Sequence[Tuple[str, re.Pattern[str]]] = (
     ),
 )
 
-DANGEROUS_COMMAND_PATTERNS: Sequence[Tuple[str, re.Pattern[str]]] = (
+DANGEROUS_COMMAND_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
     ("rm_rf_root", re.compile(r"\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)*(/|/\*|~|/home)\b")),
     ("git_reset_hard", re.compile(r"\bgit\s+reset\s+--hard\b")),
     ("git_push_force", re.compile(r"\bgit\s+push\b[^\n]*\s--force\b")),
@@ -35,7 +35,7 @@ DANGEROUS_COMMAND_PATTERNS: Sequence[Tuple[str, re.Pattern[str]]] = (
     ("chmod_777", re.compile(r"\bchmod\s+(-R\s+)?777\b")),
 )
 
-PRODUCTION_IMPACT_PATTERNS: Sequence[Tuple[str, re.Pattern[str]]] = (
+PRODUCTION_IMPACT_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
     ("migration", re.compile(r"(?i)\b(alembic|django\.db\.migrations|flyway|liquibase)\b")),
     (
         "production_env",
@@ -67,7 +67,7 @@ def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
     return data.decode("utf-8", errors="replace")
 
 
-def collect_scan_corpus(path: Optional[str] = None, cwd: Optional[Path] = None) -> Tuple[str, str]:
+def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tuple[str, str]:
     """Return (corpus_text, source_description).
 
     source prefixes:
@@ -87,7 +87,7 @@ def collect_scan_corpus(path: Optional[str] = None, cwd: Optional[Path] = None) 
             except OSError:
                 return "", f"error:read:{target}"
         if target.is_dir():
-            chunks: List[str] = []
+            chunks: list[str] = []
             count = 0
             for file_path in sorted(target.rglob("*")):
                 if not file_path.is_file():
@@ -146,8 +146,8 @@ def collect_scan_corpus(path: Optional[str] = None, cwd: Optional[Path] = None) 
     return "", "empty-corpus"
 
 
-def scan_text(text: str) -> List[Finding]:
-    findings: List[Finding] = []
+def scan_text(text: str) -> list[Finding]:
+    findings: list[Finding] = []
     if not text:
         findings.append(
             Finding(
@@ -223,14 +223,14 @@ def risk_score(findings: Iterable[Finding]) -> int:
     return min(score, 100)
 
 
-def summarize_checks(findings: List[Finding], strict: bool = False) -> List[Tuple[str, str, str]]:
+def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tuple[str, str, str]]:
     """Return display rows: (name, status_icon, color)."""
     secrets = [f for f in findings if f.category == "secret"]
     dangerous = [f for f in findings if f.category == "dangerous_command"]
     production = [f for f in findings if f.category == "production_impact"]
     rollback = [f for f in findings if f.category == "rollback"]
 
-    def status(items: List[Finding], empty_ok: str = "✅") -> Tuple[str, str]:
+    def status(items: list[Finding], empty_ok: str = "✅") -> tuple[str, str]:
         if not items:
             return empty_ok, "green"
         worst = max(items, key=lambda f: {"high": 3, "medium": 2, "low": 1, "info": 0}[f.severity])
@@ -259,9 +259,9 @@ def summarize_checks(findings: List[Finding], strict: bool = False) -> List[Tupl
 
 
 def run_safety_scan(
-    path: Optional[str] = None,
+    path: str | None = None,
     strict: bool = False,
-    cwd: Optional[Path] = None,
+    cwd: Path | None = None,
 ) -> dict:
     corpus, source = collect_scan_corpus(path=path, cwd=cwd)
     findings = scan_text(corpus)

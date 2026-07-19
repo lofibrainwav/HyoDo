@@ -13,7 +13,6 @@ ROOT = Path(__file__).resolve().parent.parent.parent
 VERSION_FILE = ROOT / "VERSION"
 PYPROJECT_FILE = ROOT / "pyproject.toml"
 INIT_FILE = ROOT / "hyodo" / "__init__.py"
-CLI_INIT_FILE = ROOT / "hyodo" / "cli" / "__init__.py"
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$")
 
@@ -57,7 +56,6 @@ def main() -> None:
     write_version_file(version)
     write_pyproject_version(version)
     write_init_version(INIT_FILE, version)
-    write_init_version(CLI_INIT_FILE, version)
 
     result = subprocess.run(
         [sys.executable, str(ROOT / "scripts" / "release" / "check_version_sync.py"), version],

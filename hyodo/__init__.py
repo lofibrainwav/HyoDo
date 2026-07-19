@@ -170,11 +170,11 @@ def should_auto_approve(trinity_score: float, risk_score: float = 0) -> bool:
 
 
 __all__ = [
-    "__version__",
+    "LEGACY_TRINITY_WEIGHTS",
+    "TRINITY_WEIGHTS",
     "__author__",
     "__license__",
-    "TRINITY_WEIGHTS",
-    "LEGACY_TRINITY_WEIGHTS",
+    "__version__",
     "calculate_geometric_mean",
     "calculate_hygook_v5_score",
     "calculate_trinity_score",
