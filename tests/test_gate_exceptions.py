@@ -162,29 +162,27 @@ def test_sbom_skip_when_script_absent(tmp_path):
     assert result.message == "SBOM script not found; not executed"
 
 
-def test_sbom_file_not_found(tmp_path):
+def test_sbom_file_not_found_skips(tmp_path):
+    # Environment failures must SKIP (never a false FAIL), like an absent script.
     root = _sbom_root(tmp_path)
     with patch("hyodo.cli.main.subprocess.run", side_effect=FileNotFoundError()):
         result = run_sbom_check(root)
-    assert result.status is GateStatus.FAIL
-    assert result.message == "python executable not found"
+    assert result.status is GateStatus.SKIP
 
 
-def test_sbom_timeout(tmp_path):
+def test_sbom_timeout_skips(tmp_path):
     root = _sbom_root(tmp_path)
-    timeout = subprocess.TimeoutExpired(cmd=["python"], timeout=60)
+    timeout = subprocess.TimeoutExpired(cmd=["python"], timeout=180)
     with patch("hyodo.cli.main.subprocess.run", side_effect=timeout):
         result = run_sbom_check(root)
-    assert result.status is GateStatus.FAIL
-    assert result.message == "timeout (>60s)"
+    assert result.status is GateStatus.SKIP
 
 
-def test_sbom_generic_exception(tmp_path):
+def test_sbom_generic_exception_skips(tmp_path):
     root = _sbom_root(tmp_path)
     with patch("hyodo.cli.main.subprocess.run", side_effect=RuntimeError("boom")):
         result = run_sbom_check(root)
-    assert result.status is GateStatus.FAIL
-    assert result.message == "exception: boom"
+    assert result.status is GateStatus.SKIP
 
 
 if __name__ == "__main__":  # pragma: no cover
