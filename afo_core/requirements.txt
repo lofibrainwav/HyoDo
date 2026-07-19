@@ -15,4 +15,4 @@
 #   pip install -e ".[dev]"   # repo root
 #
 # Placeholder requirement so some tooling that expects a file still works:
-setuptools>=78.1.1
+setuptools>=83.0.0
