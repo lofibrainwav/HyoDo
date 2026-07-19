@@ -18,9 +18,10 @@ Examples:
 
 from __future__ import annotations
 
+import json
 import subprocess
 import sys
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from enum import Enum
 from pathlib import Path
 
@@ -457,6 +458,11 @@ def safe(
         "--strict",
         help="Exit 1 when any high-severity finding is present (CI gate)",
     ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON instead of formatted text",
+    ),
 ):
     """
     Safety early-warning scan.
@@ -464,15 +470,34 @@ def safe(
     Default mode always exits 0 after printing findings (early warning).
     --strict exits 1 on high-severity findings; medium/caution alone stays 0.
     Missing path / scan failure exits 2.
+    --json emits a single JSON document instead of formatted text; exit codes
+    are identical between the two modes.
 
     Limits: directory scans read at most 40 files; default mode prefers git diff
     HEAD, else git status text (not full working tree contents).
     Not a full SAST / secret-scan / dependency audit.
     """
-    console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
-
     result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd())
     source = str(result["source"])
+    high_only = [f for f in result["findings"] if f.severity == "high"]
+
+    if json_output:
+        exit_code = (
+            2 if source.startswith(("missing:", "error:")) else (1 if strict and high_only else 0)
+        )
+        payload = {
+            "source": source,
+            "risk_score": result["risk_score"],
+            "level": result["level"],
+            "action": result["action"],
+            "strict": strict,
+            "exit_code": exit_code,
+            "findings": [asdict(f) for f in result["findings"]],
+        }
+        console.print_json(json.dumps(payload))
+        raise typer.Exit(exit_code)
+
+    console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
     console.print(f"source: {source}")
 
     # missing path OR unreadable/scan IO failure — not a validation pass
@@ -502,7 +527,6 @@ def safe(
         "Directory scan cap: 40 files; default corpus is git diff/status when no path.[/dim]"
     )
 
-    high_only = [f for f in result["findings"] if f.severity == "high"]
     if strict and high_only:
         raise typer.Exit(1)
     raise typer.Exit(0)

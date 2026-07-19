@@ -51,6 +51,7 @@ See [Quick Start](./QUICK_START.md) for the complete first-run path.
 | `hyodo score ...` | Produce a review signal |
 | `hyodo safe [PATH]` | Print safety findings without blocking |
 | `hyodo safe --strict [PATH]` | Exit 1 when high-severity findings exist |
+| `hyodo safe --json [PATH]` | Emit machine-readable JSON findings for CI |
 | `hyodo trinity "CHANGE"` | Produce a structured review checklist |
 
 ### `hyodo check` exit contract
