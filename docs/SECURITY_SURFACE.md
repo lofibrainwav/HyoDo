@@ -103,9 +103,12 @@ surface only** via `scripts/generate_sbom.py`.
   environment directly would be wrong — it would pull the whole dev toolchain in.
 - **Gate behavior.** The Eternity gate is offline-safe and does not regress
   `hyodo check`: a **scope violation** (SBOM produced but mis-scoped) is a real
-  defect and **FAILs** (exit 2); an **environment failure** (offline, build/venv
-  cannot be provisioned) **SKIPs** (exit 3) rather than hard-failing — the same
-  honest "not executed" posture as when the script is absent.
+  defect and **FAILs** (exit 2); only the generator's *defined* **environment
+  failure** (offline, build/venv cannot be provisioned) **SKIPs** (exit 3) — the
+  same honest "not executed" posture as when the script is absent. Any other,
+  **unexpected** generator failure (a bug, corrupt output, an unhandled exception
+  → exit 1) **FAILs** rather than being masked as a SKIP, so the gate can never
+  silently pretend it ran.
 - **Offline.** "Offline" means the *generation* step (rendering the SBOM from
   installed metadata) makes no network calls. Provisioning the clean venv
   (installing the wheel + `typer`/`rich`) may use the network; when that is not

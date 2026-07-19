@@ -258,10 +258,18 @@ def run_sbom_check(root: Path | None, verbose: bool = False) -> GateResult:
         # A scope violation means the SBOM was generated but is not the public
         # closure — a real defect, so it blocks.
         return GateResult(GateStatus.FAIL, detail or "SBOM scope violation")
-    # Any other exit (e.g. environment/offline, exit 3) is non-blocking, matching
-    # the honest absent-script SKIP: never a false FAIL when the SBOM simply
-    # could not be produced.
-    return GateResult(GateStatus.SKIP, detail or "SBOM not generated (environment)")
+    if result.returncode == 3:
+        # Exit 3 is the generator's *defined* environment/offline failure: it
+        # could not build/install/inventory. Non-blocking, matching the honest
+        # absent-script SKIP — never a false FAIL when the SBOM simply could not
+        # be produced.
+        return GateResult(GateStatus.SKIP, detail or "SBOM not generated (environment)")
+    # Any other exit code is an UNEXPECTED generator failure (bug, corrupt output,
+    # unhandled exception → exit 1). Surfacing it as FAIL — not a silent SKIP —
+    # keeps sec-1's anti-ghost-gate honesty contract.
+    return GateResult(
+        GateStatus.FAIL, detail or f"SBOM generator failed (exit {result.returncode})"
+    )
 
 
 def _print_gate_result(result: GateResult) -> None:

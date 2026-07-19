@@ -114,6 +114,22 @@ def test_run_sbom_check_skip_on_environment_failure_exit_3(tmp_path):
     assert run_sbom_check(_root_with_stub(tmp_path, 3), verbose=False).status is GateStatus.SKIP
 
 
+def test_run_sbom_check_fail_on_unexpected_exit_1(tmp_path):
+    # An unexpected generator failure (exit 1: bug, corrupt output, unhandled
+    # exception) must FAIL — never be masked as an environment SKIP. This is the
+    # anti-ghost-gate honesty contract for sec-1.
+    assert run_sbom_check(_root_with_stub(tmp_path, 1), verbose=False).status is GateStatus.FAIL
+
+
+@pytest.mark.parametrize("exit_code", [1, 4, 42, 137])
+def test_run_sbom_check_fail_on_any_unexpected_exit(tmp_path, exit_code):
+    # Only 0/2/3 are defined; every other code is an unexpected failure -> FAIL.
+    assert (
+        run_sbom_check(_root_with_stub(tmp_path, exit_code), verbose=False).status
+        is GateStatus.FAIL
+    )
+
+
 def test_run_sbom_check_skip_when_script_absent(tmp_path):
     assert run_sbom_check(tmp_path, verbose=False).status is GateStatus.SKIP
 
