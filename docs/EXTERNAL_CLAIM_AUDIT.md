@@ -1,142 +1,230 @@
 # External Claim Audit (Measured)
 
-**Date:** 2026-07-16 (PDT; Dependabot readback refreshed after cleanup)
-**Repo:** `lofibrainwav/HyoDo`  
-**Method:** file/CLI/CI/GitHub Dependabot readback (no estimation)  
-**Merged baseline:** PR #5 (`0eceb08`) — English-only public surface, real `hyodo safe`, claim alignment
+**Date:** 2026-07-19
+**Repo:** `lofibrainwav/HyoDo`
+**Surface under audit:** public package only (`hyodo/`, root
+`pyproject.toml`, `tests/`, `scripts/`, `.github/workflows/`)
+**Method:** file/CLI/CI/GitHub Dependabot readback (no estimation)
 
-This audit checks external market/strategy claims against repository evidence.
+This audit checks external market/strategy claims against the current
+repository state. HyoDo publishes a single public surface — there is no
+separate extended or advisory tree in this repo.
 
 ---
 
 ## Claim set under review
 
-1. **Market need:** AI speed outruns human review; "speed without review creates risk"; creators need time back from repetitive gates.
-2. **Reality check:** high infra friction (Docker/Redis/Postgres); philosophical overhead (HYOGOOK); unproven cost savings.
-3. **Strategic pivot:** become a frictionless single-purpose one-command risk gate.
+1. **Market need:** AI speed outruns human review; "speed without review
+   creates risk"; developers need a fast, honest gate.
+2. **Reality check:** claimed minimal dependencies, no required heavy
+   infrastructure, and a bounded scope for `hyodo check`.
+3. **Positioning:** two-track design — `safe` for any repository, `check`
+   scoped to a HyoDo checkout only.
 
 ---
 
 ## 1) Market need — measured verdict
 
-| External claim | Verdict | Evidence |
-|----------------|---------|----------|
-| AI generation speed creates review bottleneck | **Supported (product thesis, not market survey)** | README problem statement: "speed without review creates risk"; loop is check/score/safe before trust |
-| Need for automated lint/test/safety gates | **Supported by product design** | Public package implements `hyodo check` (pyright/ruff/pytest/SBOM path) + CI workflows |
-| Need to free producers from repetitive verification | **Partially supported** | Gates automate checks; human approval still required by design (`does not auto-approve`) |
+- AI generation speed creates a review bottleneck
+  - Verdict: Supported (product thesis, not market survey)
+  - Evidence: README: "HyoDo provides a small CLI and CI workflow for
+    reviewing AI-assisted changes"
+- Need for automated lint/test/safety gates
+  - Verdict: Supported by product design
+  - Evidence: `hyodo check` runs Pyright, Ruff, pytest, and an SBOM
+    check (`hyodo/cli/main.py`)
+- Gates should not replace human approval
+  - Verdict: Supported by explicit disclaimer
+  - Evidence: README: "without granting automatic approval"; HYOGOOK
+    section: "Scores support review; they never replace tests,
+    security checks, or human approval"
 
-**Caveat:** This audit does **not** include external user interviews or TAM data. It only verifies that HyoDo's stated problem matches its implemented loop.
+**Caveat:** this audit does not include external user interviews or
+market-size data. It only verifies that HyoDo's stated problem matches
+its implemented CLI behavior.
 
 ---
 
 ## 2) Reality check — measured verdict
 
-### 2.1 High infra friction
+### 2.1 Dependency weight
 
-| External claim | Verdict | Evidence |
-|----------------|---------|----------|
-| World wants light tools | **Aligned with current public package** | Root deps are only `typer`, `rich` (`pyproject.toml`) |
-| Docker/Redis/Postgres required for AI code verification | **Overstated for public path; true for extended path** | README Full setup lists Docker/Redis/Postgres as **optional extended** services; CI installs `pip install -e ".[dev]"` only; smoke installs wheel and runs CLI |
-| Installer still surfaces heavy path | **Supported historically; mitigated in this branch** | Old installer UI offered full mode with Redis+Postgres; rewritten installer defaults to **minimal**, labels extended infra optional |
+- Public runtime deps are minimal
+  - Verdict: Confirmed
+  - Evidence: `pyproject.toml` `dependencies = ["typer>=0.9.0",
+    "rich>=13.0.0"]`
+- No required container/database services
+  - Verdict: Confirmed for the surface in this repo
+  - Evidence: Neither README nor `docs/` reference a required
+    Docker, Redis, or Postgres step for `pip install`, `hyodo check`,
+    or `hyodo safe`
+- sdist ships only the public surface
+  - Verdict: Confirmed
+  - Evidence: `pyproject.toml`
+    `[tool.hatch.build.targets.sdist] only-include` lists `hyodo`,
+    `tests`, `README.md`, `LICENSE`, `CHANGELOG.md`, `VERSION`,
+    `pyproject.toml`, `SECURITY.md`, `CONTRIBUTING.md`,
+    `CODE_OF_CONDUCT.md`
 
-**Measured friction (public path):**
+**Measured install path:**
 
-```text
-pip install -e ".[dev]"
-hyodo check
-hyodo safe
+```bash
+pip install -U hyodo
+hyodo --version
+hyodo safe path/to/file_or_diff_context
 ```
 
-No Docker required for public package smoke.
+**Measured checkout path (for `hyodo check` itself):**
 
-**Residual friction:**
+```bash
+git clone https://github.com/lofibrainwav/HyoDo.git
+cd HyoDo
+python -m pip install -e ".[dev]"
+hyodo check
+```
 
-- Repo still contains `afo_core/` and Docker files from the extended path; keep
-  them visibly secondary to the public CLI.
-- Interactive installer historically asked for Anthropic key even when CLI gates do not need it (now optional wording).
+Neither path requires a container runtime or an external database in
+this repository.
 
-### 2.2 Philosophical overhead
+### 2.2 Scope claim — `check` vs `safe`
 
-| External claim | Verdict | Evidence |
-|----------------|---------|----------|
-| HYOGOOK V5 is unique but optional learning cost | **Supported** | README presents HYOGOOK under optional philosophy layer; practical gates first |
-| Everyday merge users may treat it as luxury | **Plausible; docs partially mitigate** | Score CLI outputs `REVIEW_SIGNAL_*` not auto-approval; still visible as product vocabulary |
-| Philosophy leads product face | **Mostly false after public-readiness docs** | README top leads with model-agnostic quality gate; HYOGOOK is below usage |
+- `hyodo safe` works on any repository
+  - Verdict: Supported by design and docs
+  - Evidence: README: "`safe` — outward, any repository"
+- `hyodo check` is scoped to a HyoDo checkout, not arbitrary
+  projects
+  - Verdict: Supported by design, docs, and code
+  - Evidence: README: "`check` — reference, a HyoDo checkout only";
+    `hyodo check` exit contract table (`0`/`1`/`2`) documents a
+    bounded, self-referential gate
+- A zero-gate run is never reported as success
+  - Verdict: Supported
+  - Evidence: README: "A zero-gate run is never reported as
+    success"; `hyodo check` exit `2` = "path is missing or no
+    applicable gate ran"
 
-### 2.3 Unproven cost efficiency
+### 2.3 Optional review score (HYOGOOK V5)
 
-| External claim | Verdict | Evidence |
-|----------------|---------|----------|
-| Cost-aware routing claimed without guaranteed benchmark | **Supported** | README badge + section exist; explicit "does not guarantee fixed cost-reduction percentage" |
-| No public math benchmark | **Supported** | No linked public benchmark file/results found in public docs (search of README/docs) |
-| Enterprises lack objective adoption proof for savings | **Supported as gap** | Docs intentionally forbid percentage savings claims without benchmark |
+- HYOGOOK is optional, not required for the practical CLI path
+  - Verdict: Supported
+  - Evidence: README: "The practical CLI works without this
+    optional philosophy layer"
+- HYOGOOK output is advisory, not an approval gate
+  - Verdict: Supported
+  - Evidence: README: "Scores support review; they never replace
+    tests, security checks, or human approval"
 
 ---
 
-## 3) Strategic pivot — measured fit
+## 3) Positioning fit — measured state
 
-External recommendation: frictionless single purpose — one terminal command that scores risk of AI-generated code.
+External expectation: a fast, low-friction, honestly-scoped gate rather
+than a broad or philosophy-first product.
 
-| Required attribute | Current measured state | Gap |
-|--------------------|------------------------|-----|
-| One-command local gate | `hyodo check` works | Good |
-| Immediate risk signal | `hyodo safe` now scans patterns (not fixed green) | Good early-warning; not full SAST |
-| Minimal deps | `typer`+`rich` public runtime | Good |
-| No Docker required | True for public path | Docs must keep extended path clearly secondary |
-| No philosophy required | Practical path works without HYOGOOK understanding | Keep philosophy optional |
-| Prove cost savings | Not proven publicly | Needs benchmark or drop as primary pitch |
-| Repo first impression matches single purpose | Improved (CLI-first README), but monorepo still heavy (`afo_core`, many commands) | Packaging/split or stronger "public vs extended" boundary |
+Required attribute vs. current measured state:
 
-**Verdict:** The pivot is directionally correct and **partially already implemented** in the public package. The remaining blocker is not the CLI core — it is **repo surface weight** (extended tree and optional philosophy/cost claims) that can still dilute the single-purpose story.
+- One-command outward gate
+  - `hyodo safe` runs against any repository/diff, default exit
+    `0`, `--strict` exits `1` on high-severity findings
+- Bounded, non-misleading `check` scope
+  - `hyodo check` is explicitly documented and coded as
+    HyoDo-checkout-only, with a three-way exit contract
+- Minimal runtime deps
+  - `typer` + `rich` only, per `pyproject.toml`
+- Philosophy layer optional
+  - HYOGOOK documented as optional and non-blocking
+- Release surface stated narrowly
+  - README "Scope" table lists only `hyodo/` and `tests/` +
+    `.github/workflows/` as the release surface
+
+**Verdict:** the two-track (`safe` outward / `check` reference-only)
+positioning matches what is implemented and documented in this repo. No
+gap was found between the stated scope and the measured CLI behavior.
 
 ---
 
 ## 4) Security number context (related credibility)
 
-| Metric (2026-07-16) | Value |
-|---------------------|-------|
-| Dependabot open alerts | 0 (live GitHub API readback, 2026-07-16) |
-| Historical context | Earlier pip alerts were concentrated under `afo_core/` manifests and were cleaned up |
-| Public package Dependabot | 0 (thin deps) |
-| Code scanning analyses | none configured |
-| Secret scanning open | 0 |
+Metric (2026-07-19), value, and source:
 
-External "quality gate is contaminated" narrative is **impression-true** on GitHub Security tab, **technically overstated** for the public install path.
+- Dependabot open alerts (live GitHub API)
+  - Value: 1
+  - Source: `gh api graphql`
+    `vulnerabilityAlerts(states: OPEN) { totalCount }`
+- Public runtime dependency count
+  - Value: 2 (`typer`, `rich`)
+  - Source: `pyproject.toml`
+- Code scanning (CodeQL)
+  - Value: not configured
+  - Source: no workflow present in `.github/workflows/`
+
+A live Dependabot readback is required before any "N alerts" figure is
+cited elsewhere in the repo; this count is a point-in-time measurement
+and will change.
 
 ---
 
-## 5) Action implications (product)
+## 5) Release-gate mechanics (related to "quality gate" claim)
+
+- `hyodo check` runs real static/type/test gates, not a stub
+  - Verdict: Supported
+  - Evidence: `hyodo/cli/main.py` invokes Pyright, Ruff, pytest,
+    and `run_sbom_check`, which shells out to
+    `scripts/generate_sbom.py`
+- Publishing uses Trusted Publishing (OIDC), not a long-lived
+  token
+  - Verdict: Supported
+  - Evidence: `.github/workflows/publish.yml` header: "Publish
+    HyoDo to PyPI via Trusted Publishing (OIDC) only. No
+    long-lived API token."
+- Version consistency is checked in CI
+  - Verdict: Supported
+  - Evidence: `.github/workflows/smoke.yml` runs
+    `python scripts/release/check_version_sync.py`
+
+---
+
+## 6) Action implications (product)
 
 Priority order implied by measurements:
 
-1. Keep public path one-liner: `pip install && hyodo check && hyodo safe` — **done in public package**
-2. Keep extended infra out of minimal install defaults — **done in installer/docs**
-3. Keep HYOGOOK optional and non-blocking — **done**
-4. Either publish a cost benchmark or demote "cost-aware" from primary badge — **demoted to tiered-routing intent badge**
-5. Keep monitoring `afo_core` independently so a future extended-tree alert does not get presented as a public-package defect.
+1. Keep the outward path minimal: `pip install -U hyodo && hyodo safe`
+   — **measured true today**.
+2. Keep `hyodo check` explicitly scoped to a HyoDo checkout in both
+   README and CLI exit contract — **measured true today**.
+3. Keep HYOGOOK optional and non-blocking — **measured true today**.
+4. Re-run the Dependabot readback before restating any alert count in
+   product docs — counts drift and must not be hardcoded as constants.
 
 ---
 
-## 6) Language policy (this branch)
+## 7) Language policy (this repo)
 
-- Public product language: **English only**
-- Removed: `i18n/ko`, `i18n/zh`, `i18n/ja`
-- Non-English legacy notes replaced or stripped outside `afo_core/`
+- Public product language: **English only**, per `CLAUDE.md`.
 
 ---
 
 ## Source commands used
 
 ```bash
-# deps
-rg -n "dependencies|typer|rich" pyproject.toml
-# CI install path
-rg -n "pip install|docker|redis" .github/workflows/*.yml
+# deps and sdist scope
+rg -n "dependencies|typer|rich|only-include" pyproject.toml
+
+# CI/publish/smoke mechanics
+rg -n "pip install|Trusted Publishing|check_version_sync" \
+  .github/workflows/*.yml
+
 # claims
-rg -n "does not|guarantee|Docker|HYOGOOK|Cost" README.md
-# CLI
+rg -n "does not|guarantee|Scope|HYOGOOK" README.md
+
+# CLI gate wiring
+rg -n "run_sbom_check|Pyright|Ruff|pytest" hyodo/cli/main.py
+
+# CLI behavior
 hyodo check
 hyodo safe
-# Dependabot
-gh api graphql -f query='... vulnerabilityAlerts totalCount ...'
+
+# Dependabot (live)
+gh api graphql -f query='{repository(owner:"lofibrainwav",name:"HyoDo"){
+  vulnerabilityAlerts(states: OPEN){ totalCount } } }'
 ```
