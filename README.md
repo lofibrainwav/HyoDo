@@ -1,6 +1,6 @@
 # HyoDo
 
-**Honest quality gates for AI-assisted Python work — a safety scanner you can run anywhere, and a self-proving CI reference.**
+**Honest quality gates for AI-assisted Python work.**
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
@@ -15,10 +15,12 @@ review score without granting automatic approval.
 
 HyoDo has two surfaces with deliberately different scopes:
 
-| Track | Command | Works on | What it is |
-| --- | --- | --- | --- |
-| Outward | `hyodo safe` / `hyodo safe --json` | **any** repository | A dependency-light safety early-warning scanner (secrets, dangerous commands, production-impact). Install it and point it at your diff. |
-| Reference | `hyodo check` | a **HyoDo checkout** only | HyoDo's own release gates (Pyright/Ruff/pytest/SBOM). It exists to prove HyoDo's honesty contract, not to gate arbitrary projects. |
+- **`safe` — outward, any repository.** A dependency-light safety
+  early-warning scanner (secrets, dangerous commands, production
+  impact). Run `hyodo safe` or `hyodo safe --json` on your diff.
+- **`check` — reference, a HyoDo checkout only.** HyoDo's own
+  release gates (Pyright/Ruff/pytest/SBOM). It proves HyoDo's
+  honesty contract; it does not gate arbitrary projects.
 
 If you want a gate for *your* repo today, use `safe`. `check` is intentionally
 scoped to HyoDo itself.
