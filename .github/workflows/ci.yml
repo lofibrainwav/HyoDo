@@ -158,6 +158,21 @@ jobs:
           echo "Running public package tests (blocking)..."
           python -m pytest tests -q --tb=short --cov=hyodo --cov-fail-under=80
 
+      - name: Full `hyodo check` orchestration (release blocker)
+        # Prove the advertised CLI integration contract end-to-end at the repo
+        # root: all four gates orchestrate to exit 0 with Eternity actually
+        # PASSing (not SKIP). The individual tools are checked elsewhere; this is
+        # the one-shot orchestration proof the other jobs do not cover.
+        run: |
+          set +e
+          out="$(hyodo check 2>&1)"
+          ec=$?
+          set -e
+          echo "$out"
+          test "$ec" -eq 0
+          echo "$out" | grep -q "All executed gates passed"
+          echo "$out" | grep -q "SBOM generated (public surface)"
+
       - name: Safe --strict high-risk fixture (release blocker)
         run: |
           printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-ci-secret.txt
