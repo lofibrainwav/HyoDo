@@ -88,5 +88,6 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 | 2026-07-16 | 3.1.6 | Truth Patch on GitHub + tag `v3.1.6` + PyPI 3.1.6 (false-green gates removed) |
 | 2026-07-16 | 3.1.7 | format gate + safe scan exit 2 + path-stable tests; tag/PyPI 3.1.7 |
 | 2026-07-16 | 3.1.8 | Supply-chain seal: Trusted Publishing workflow + provenance verify path |
+| 2026-07-19 | 3.2.0 | safe --json (outward CI) + check honesty hardening (SBOM exception split, N/M gates ran) |
 
 Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published + (if claiming pip) Trusted Publishing success with non-null provenance.
