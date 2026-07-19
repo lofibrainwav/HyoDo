@@ -205,6 +205,18 @@ def test_safe_strict_dangerous_command_exit_1(tmp_path):
     assert result.exit_code == 1
 
 
+def test_safe_strict_bare_rm_rf_root_exit_1(tmp_path):
+    """Regression: bare `rm -rf /` (root) must be a high-severity strict blocker.
+
+    Previously the rm_rf_root regex missed a root target at end of line, so this
+    catastrophic command scanned clean. It must now exit 1 under --strict.
+    """
+    sample = tmp_path / "danger.txt"
+    sample.write_text("sudo rm -rf /\n", encoding="utf-8")
+    result = runner.invoke(app, ["safe", "--strict", str(sample)])
+    assert result.exit_code == 1
+
+
 def test_safe_strict_medium_only_exit_0(tmp_path):
     sample = tmp_path / "prod.txt"
     sample.write_text("kubectl apply -f deploy.yaml\n", encoding="utf-8")

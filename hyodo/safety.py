@@ -27,7 +27,12 @@ SECRET_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
 )
 
 DANGEROUS_COMMAND_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
-    ("rm_rf_root", re.compile(r"\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)*(/|/\*|~|/home)\b")),
+    # Target must begin with `/` (root/absolute) or `~` (home). `\S*` consumes the
+    # rest of the token, so bare `rm -rf /`, `rm -rf /*` and `rm -rf ~` at end of
+    # line are detected (the previous trailing `\b` missed non-word-ending targets).
+    # Relative targets (`./build`, `build/`) never start with `/` or `~`, so they
+    # stay undetected.
+    ("rm_rf_root", re.compile(r"\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)*[/~]\S*")),
     ("git_reset_hard", re.compile(r"\bgit\s+reset\s+--hard\b")),
     ("git_push_force", re.compile(r"\bgit\s+push\b[^\n]*\s--force\b")),
     ("drop_database", re.compile(r"(?i)\bDROP\s+(DATABASE|SCHEMA)\b")),

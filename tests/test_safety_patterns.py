@@ -7,10 +7,11 @@ added that MUST NOT match that label.
 
 All samples were derived from the actual regex source (see ``hyodo/safety.py``)
 and confirmed empirically against :func:`scan_text`, not from guessing. Notably,
-``rm_rf_root`` anchors the target with a trailing ``\\b`` word boundary, so a
-bare ``rm -rf /`` (root at end of line) does NOT match, while ``rm -rf /home``
-does; the ``migration`` label matches literal tokens (``alembic`` etc.) and not
-the plain English word "migration".
+``rm_rf_root`` matches any target that begins with ``/`` (root/absolute) or ``~``
+(home) — including bare ``rm -rf /``, ``rm -rf /*`` and ``rm -rf ~`` at end of
+line — while relative targets such as ``rm -rf ./build`` stay undetected; the
+``migration`` label matches literal tokens (``alembic`` etc.) and not the plain
+English word "migration".
 """
 
 from __future__ import annotations
@@ -106,6 +107,32 @@ def test_safety_pattern_sample(label: str, sample: str, should_match: bool) -> N
         )
     else:
         assert not matched, f"label {label!r} must NOT be detected in near-miss sample {sample!r}"
+
+
+@pytest.mark.parametrize(
+    "sample",
+    ["rm -rf /", "rm -rf /*", "rm -rf ~", "rm -rf /home", "sudo rm -rf /", "rm -fr /"],
+)
+def test_rm_rf_root_detects_root_and_home_targets(sample: str) -> None:
+    """Regression: catastrophic bare targets must be detected.
+
+    The previous regex anchored the target with a trailing ``\\b``, so
+    non-word-ending targets (``/``, ``/*``, ``~``) at end of line slipped
+    through. hyodo safe's whole purpose is early warning on exactly these.
+    """
+    findings = scan_text(sample)
+    assert any(f.label == "rm_rf_root" for f in findings), (
+        f"expected rm_rf_root to be detected in {sample!r}"
+    )
+
+
+@pytest.mark.parametrize("sample", ["rm -rf ./build", "rm -rf build/", "rm -rf .", "rm -rf tmpdir"])
+def test_rm_rf_root_ignores_relative_targets(sample: str) -> None:
+    """Relative targets (not starting with / or ~) must stay undetected."""
+    findings = scan_text(sample)
+    assert not any(f.label == "rm_rf_root" for f in findings), (
+        f"relative target {sample!r} must not trigger rm_rf_root"
+    )
 
 
 def test_every_registry_label_has_a_positive_case() -> None:
