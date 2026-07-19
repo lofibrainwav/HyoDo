@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `hyodo safe --json` emits a single machine-readable JSON document (findings,
+  risk score, level, and a self-reported exit code) so external CI can consume
+  `safe` results programmatically; exit codes are identical to text mode.
+- `docs/SAFE_RULES.md` documenting every `safe` rule family (secrets, dangerous
+  commands, production impact), the scoring model, and known limits and
+  false-positive shapes.
+
 ### Changed
 
 - Simplified the README, contribution guide, repository agent guidance, and
@@ -14,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Consolidated onboarding into `QUICK_START.md`.
 - Made public entry-document lint a release blocker and reduced the extended
   `afo_core` advisory lint to one non-blocking, visible snapshot.
+- `hyodo check` now reports how many gates actually executed (`N/M gates ran`)
+  in the pass and fail banners, so exit-code consumers can tell a full run from
+  a partial one.
+- README reframed around two tracks: `safe` (runs on any repository) versus
+  `check` (validates a HyoDo checkout only).
 
 ### Removed
 
@@ -21,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Redundant `QUICK_START_SIMPLE.md`.
 - Stale tracked demo receipt; `scripts/demo-dry-run.sh` now produces local
   evidence that must be regenerated before use.
+
+### Fixed
+
+- `hyodo check` SBOM/Eternity gate no longer swallows HyoDo's own invocation
+  bugs as an environment SKIP: a genuine OS/environment failure still SKIPs, but
+  an unexpected exception now FAILs — closing an anti-ghost-gate gap.
 
 ## [3.1.8] - 2026-07-16
 

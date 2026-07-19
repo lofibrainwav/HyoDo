@@ -67,6 +67,15 @@ memory/
 *.sqlite3
 chroma_db/
 .pytest_cache/
+.hypothesis/
+
+# Coverage (regenerate locally; never track)
+.coverage
+.coverage.*
+htmlcov/
+
+# Agent worktrees (Orca/Claude scaffolding — never track)
+.claude/worktrees/
 
 # Artifacts
 *.backup
