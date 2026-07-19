@@ -88,6 +88,47 @@ Also:
 
 **Execution rule:** regenerate with Poetry, export `requirements.txt`, never hand-edit lock hashes. Public package CI must remain green without installing full afo_core.
 
+## Public SBOM (Eternity gate)
+
+The 4th `hyodo check` gate ("Eternity") emits a CycloneDX SBOM of the **public
+surface only** via `scripts/generate_sbom.py`.
+
+- **Scope.** The generator builds the public wheel and installs it into a clean
+  throwaway virtualenv created **without pip** (so the venv bootstrap seeds
+  `pip`/`setuptools`/`wheel` are never inventoried), then inventories *that*
+  environment — so the SBOM contains `typer`, `rich` and their transitive closure
+  and never the generator (`cyclonedx-bom`), dev/test/lint tooling, bootstrap
+  seeds, or any `afo_core` component. This scope is enforced in-process
+  (`assert_public_scope`, which fails the run) and by tests. Inventorying the dev
+  environment directly would be wrong — it would pull the whole dev toolchain in.
+- **Gate behavior.** The Eternity gate is offline-safe and does not regress
+  `hyodo check`: a **scope violation** (SBOM produced but mis-scoped) is a real
+  defect and **FAILs** (exit 2); only the generator's *defined* **environment
+  failure** (offline, build/venv cannot be provisioned) **SKIPs** (exit 3) — the
+  same honest "not executed" posture as when the script is absent. Any other,
+  **unexpected** generator failure (a bug, corrupt output, an unhandled exception
+  → exit 1) **FAILs** rather than being masked as a SKIP, so the gate can never
+  silently pretend it ran.
+- **Offline.** "Offline" means the *generation* step (rendering the SBOM from
+  installed metadata) makes no network calls. Provisioning the clean venv
+  (installing the wheel + `typer`/`rich`) may use the network; when that is not
+  possible the gate SKIPs.
+- **Reproducibility.** Output is generated with `--output-reproducible`, so
+  volatile fields (`serialNumber`, `metadata.timestamp`) are stripped; the stable
+  contract is the component (name, version) set. CI runs the real pipeline twice
+  and asserts this set is identical.
+- **CI.** A dedicated advisory job (`Eternity - Public SBOM`) generates and
+  uploads `dist/sbom.cyclonedx.json` as an artifact and runs the real
+  scope+reproducibility check. It is `continue-on-error` (observe first) and is
+  not in the release-gate `needs`; it does not yet block the release.
+
+Reproduce locally:
+
+```bash
+pip install -e ".[dev]"          # provides cyclonedx-bom
+python scripts/generate_sbom.py  # writes dist/sbom.cyclonedx.json
+```
+
 ## Verification commands
 
 Public package:

@@ -58,6 +58,9 @@ dev = [
     "build>=1.2",
     "twine>=5.0",
     "PyYAML>=6.0",
+    # Capped: generate_sbom.py depends on the `environment` CLI surface
+    # (--output-reproducible, --pyproject, --mc-type); re-validate before a major bump.
+    "cyclonedx-bom>=7.0,<9",
 ]
 
 [project.scripts]

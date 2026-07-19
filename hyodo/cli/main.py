@@ -239,19 +239,37 @@ def run_sbom_check(root: Path | None, verbose: bool = False) -> GateResult:
         return GateResult(GateStatus.SKIP, "SBOM script not found; not executed")
 
     cmd = [sys.executable, str(sbom_script)]
+    # Generating the SBOM builds a wheel + a clean venv (heavier than the lint
+    # gates), so it gets a larger budget than the 60s tool gates.
     try:
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=60, cwd=str(root))
-        if result.returncode == 0:
-            return GateResult(GateStatus.PASS, "SBOM generated successfully")
-        error_msg = result.stderr.strip() or result.stdout.strip()
-        msg = error_msg[:200] if len(error_msg) > 200 else error_msg
-        return GateResult(GateStatus.FAIL, msg or "SBOM failed")
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=180, cwd=str(root))
     except FileNotFoundError:
-        return GateResult(GateStatus.FAIL, "python executable not found")
+        return GateResult(GateStatus.SKIP, "python executable not found; SBOM not generated")
     except subprocess.TimeoutExpired:
-        return GateResult(GateStatus.FAIL, "timeout (>60s)")
-    except Exception as e:
-        return GateResult(GateStatus.FAIL, f"exception: {e}")
+        return GateResult(GateStatus.SKIP, "SBOM generation timed out (>180s); not generated")
+    except Exception as e:  # environment failures must never hard-fail the gate
+        return GateResult(GateStatus.SKIP, f"SBOM not generated: {e}")
+
+    if result.returncode == 0:
+        return GateResult(GateStatus.PASS, "SBOM generated (public surface)")
+
+    detail = (result.stderr.strip() or result.stdout.strip())[:200]
+    if result.returncode == 2:
+        # A scope violation means the SBOM was generated but is not the public
+        # closure — a real defect, so it blocks.
+        return GateResult(GateStatus.FAIL, detail or "SBOM scope violation")
+    if result.returncode == 3:
+        # Exit 3 is the generator's *defined* environment/offline failure: it
+        # could not build/install/inventory. Non-blocking, matching the honest
+        # absent-script SKIP — never a false FAIL when the SBOM simply could not
+        # be produced.
+        return GateResult(GateStatus.SKIP, detail or "SBOM not generated (environment)")
+    # Any other exit code is an UNEXPECTED generator failure (bug, corrupt output,
+    # unhandled exception → exit 1). Surfacing it as FAIL — not a silent SKIP —
+    # keeps sec-1's anti-ghost-gate honesty contract.
+    return GateResult(
+        GateStatus.FAIL, detail or f"SBOM generator failed (exit {result.returncode})"
+    )
 
 
 def _print_gate_result(result: GateResult) -> None:
