@@ -37,8 +37,7 @@ Start with the README top:
 - tiered routing is **intent only** (no guaranteed savings)
 - PyPI: `pip install hyodo` (measure live version if you claim it)
 
-Say: public package is `hyodo/`; extended `afo_core/` is advisory and not the
-demo path.
+Say: the public package is `hyodo/` (Python package + CLI).
 
 ### 0:50-1:50 - Command loop
 
@@ -74,7 +73,7 @@ Open `.github/workflows/smoke.yml` or CI badge/history.
 Point out:
 
 - package build + twine + wheel install
-- sdist does **not** ship `afo_core`
+- sdist ships only the public `hyodo` package
 - public API and version SSOT
 - public pytest is a release blocker (Truth Patch)
 
@@ -87,8 +86,7 @@ State clearly:
 
 1. Scores are review signals; humans approve merges.
 2. `check` is not a universal multi-language gate.
-3. `afo_core` is advisory extended tree.
-4. No public cost-savings benchmark; tiered routing is design intent.
+3. No public cost-savings benchmark; tiered routing is design intent.
 
 ### 2:45-3:00 - Close
 

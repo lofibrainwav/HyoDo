@@ -16,7 +16,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 - Maintain one short README and one Quick Start.
 - Keep provider, security, and release claims tied to inspectable evidence.
-- Separate the supported `hyodo/` package from advisory `afo_core/` modules.
+- Keep the public surface limited to the `hyodo/` package and its tests.
 
 ### Secure releases
 

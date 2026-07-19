@@ -7,13 +7,9 @@ HyoDo is a developer workflow tool for AI-assisted code review. Security reports
 | Surface | Path | Release gate |
 |---------|------|--------------|
 | Public product | `hyodo/`, root `pyproject.toml` | Yes — CI smoke + truth/goodness gates |
-| Extended / legacy | `afo_core/` | Advisory — not a public package release blocker |
 
-GitHub Dependabot counts on `afo_core` lockfiles can be large even when the public
-install path stays thin. Details: [`docs/SECURITY_SURFACE.md`](docs/SECURITY_SURFACE.md).
-
-Historical patch notes: [`SECURITY_PATCHES.md`](SECURITY_PATCHES.md) (may be stale;
-Dependabot is the live inventory for extended deps).
+The public install path is intentionally thin (`typer`, `rich`). Details:
+[`docs/SECURITY_SURFACE.md`](docs/SECURITY_SURFACE.md).
 
 ## Supply chain / PyPI publish
 

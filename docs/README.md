@@ -13,7 +13,7 @@ language-agnostic.
 | [../README.md](../README.md) | Product overview + exit contracts |
 | [../QUICK_START.md](../QUICK_START.md) | Short install + CLI path (PyPI + clone) |
 | [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
-| [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public package vs afo_core boundary |
+| [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public package security surface |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
 
 ## Release and demo (demo last)
@@ -30,8 +30,3 @@ language-agnostic.
 | Doc | Purpose |
 | --- | --- |
 | [ANTHROPIC_PROOF.md](./ANTHROPIC_PROOF.md) | Claude-specific adapter map |
-
-## Historical (may be stale)
-
-- Root [`SECURITY_PATCHES.md`](../SECURITY_PATCHES.md) is a historical patch
-  log. Dependabot is the live inventory for the extended tree.
