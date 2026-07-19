@@ -178,11 +178,21 @@ def test_sbom_timeout_skips(tmp_path):
     assert result.status is GateStatus.SKIP
 
 
-def test_sbom_generic_exception_skips(tmp_path):
+def test_sbom_unexpected_exception_fails(tmp_path):
     root = _sbom_root(tmp_path)
     with patch("hyodo.cli.main.subprocess.run", side_effect=RuntimeError("boom")):
         result = run_sbom_check(root)
+    assert result.status is GateStatus.FAIL
+    assert "unexpected" in result.message
+
+
+def test_sbom_oserror_skips(tmp_path):
+    # A genuine OS/environment failure stays an honest SKIP, not a false FAIL.
+    root = _sbom_root(tmp_path)
+    with patch("hyodo.cli.main.subprocess.run", side_effect=OSError("disk full")):
+        result = run_sbom_check(root)
     assert result.status is GateStatus.SKIP
+    assert "environment" in result.message
 
 
 if __name__ == "__main__":  # pragma: no cover

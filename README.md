@@ -1,6 +1,6 @@
 # HyoDo
 
-**Practical quality gates for AI-assisted Python development.**
+**Honest quality gates for AI-assisted Python work.**
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
@@ -10,6 +10,20 @@
 HyoDo provides a small CLI and CI workflow for reviewing AI-assisted changes.
 It combines type checking, linting, tests, safety warnings, and an optional
 review score without granting automatic approval.
+
+## Two tracks
+
+HyoDo has two surfaces with deliberately different scopes:
+
+- **`safe` — outward, any repository.** A dependency-light safety
+  early-warning scanner (secrets, dangerous commands, production
+  impact). Run `hyodo safe` or `hyodo safe --json` on your diff.
+- **`check` — reference, a HyoDo checkout only.** HyoDo's own
+  release gates (Pyright/Ruff/pytest/SBOM). It proves HyoDo's
+  honesty contract; it does not gate arbitrary projects.
+
+If you want a gate for *your* repo today, use `safe`. `check` is intentionally
+scoped to HyoDo itself.
 
 ## Install
 
@@ -51,6 +65,7 @@ See [Quick Start](./QUICK_START.md) for the complete first-run path.
 | `hyodo score ...` | Produce a review signal |
 | `hyodo safe [PATH]` | Print safety findings without blocking |
 | `hyodo safe --strict [PATH]` | Exit 1 when high-severity findings exist |
+| `hyodo safe --json [PATH]` | Emit machine-readable JSON findings for CI |
 | `hyodo trinity "CHANGE"` | Produce a structured review checklist |
 
 ### `hyodo check` exit contract
