@@ -25,14 +25,3 @@ updates:
     commit-message:
       prefix: "ci"
       include: "scope"
-
-  # afo_core/ is a legacy tree excluded from the public wheel (sdist guard
-  # enforces this). Suppress both version and security update PRs for it
-  # until the AFO tree's fate is decided (issue #41).
-  - package-ecosystem: "pip"
-    directory: "/afo_core"
-    schedule:
-      interval: "monthly"
-    open-pull-requests-limit: 0
-    ignore:
-      - dependency-name: "*"

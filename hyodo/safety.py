@@ -57,6 +57,20 @@ ROLLBACK_HINT_PATTERNS: Sequence[re.Pattern[str]] = (
     re.compile(r"(?i)\brevert\b"),
 )
 
+_BINARY_SUFFIXES = {
+    ".png",
+    ".jpg",
+    ".jpeg",
+    ".gif",
+    ".webp",
+    ".pdf",
+    ".zip",
+    ".gz",
+    ".whl",
+    ".so",
+    ".dylib",
+}
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -64,6 +78,13 @@ class Finding:
     severity: str  # high | medium | low | info
     label: str
     detail: str
+    path: str | None = None
+    line: int | None = None
+
+
+def _line_at(text: str, index: int) -> int:
+    """1-based line number for a character offset into *text*."""
+    return text.count("\n", 0, index) + 1
 
 
 def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
@@ -99,19 +120,7 @@ def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tup
                     continue
                 if any(part.startswith(".git") for part in file_path.parts):
                     continue
-                if file_path.suffix.lower() in {
-                    ".png",
-                    ".jpg",
-                    ".jpeg",
-                    ".gif",
-                    ".webp",
-                    ".pdf",
-                    ".zip",
-                    ".gz",
-                    ".whl",
-                    ".so",
-                    ".dylib",
-                }:
+                if file_path.suffix.lower() in _BINARY_SUFFIXES:
                     continue
                 try:
                     chunks.append(_read_text_file(file_path))
@@ -151,7 +160,13 @@ def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tup
     return "", "empty-corpus"
 
 
-def scan_text(text: str) -> list[Finding]:
+def scan_text(text: str, *, path: str | None = None) -> list[Finding]:
+    """Scan *text* for early-warning patterns.
+
+    When *path* is provided it is attached to each finding. Line numbers are
+    always set for pattern matches (1-based). Empty input yields a single
+    info finding without a line.
+    """
     findings: list[Finding] = []
     if not text:
         findings.append(
@@ -160,59 +175,74 @@ def scan_text(text: str) -> list[Finding]:
                 severity="info",
                 label="empty_input",
                 detail="No file content or git diff available to scan",
+                path=path,
+                line=None,
             )
         )
         return findings
 
     for label, pattern in SECRET_PATTERNS:
-        if pattern.search(text):
+        match = pattern.search(text)
+        if match:
             findings.append(
                 Finding(
                     category="secret",
                     severity="high",
                     label=label,
                     detail="Possible credential or secret material matched",
+                    path=path,
+                    line=_line_at(text, match.start()),
                 )
             )
 
     for label, pattern in DANGEROUS_COMMAND_PATTERNS:
-        if pattern.search(text):
+        match = pattern.search(text)
+        if match:
             findings.append(
                 Finding(
                     category="dangerous_command",
                     severity="high",
                     label=label,
                     detail="Destructive or high-risk command pattern matched",
+                    path=path,
+                    line=_line_at(text, match.start()),
                 )
             )
 
     for label, pattern in PRODUCTION_IMPACT_PATTERNS:
-        if pattern.search(text):
+        match = pattern.search(text)
+        if match:
             findings.append(
                 Finding(
                     category="production_impact",
                     severity="medium",
                     label=label,
                     detail="Production/schema/deploy impact pattern matched",
+                    path=path,
+                    line=_line_at(text, match.start()),
                 )
             )
 
     return findings
 
 
-def assess_rollback_signal(text: str) -> Finding:
+def assess_rollback_signal(text: str, *, path: str | None = None) -> Finding:
     if any(p.search(text) for p in ROLLBACK_HINT_PATTERNS):
         return Finding(
             category="rollback",
             severity="info",
             label="rollback_hint_present",
             detail="Migration/rollback wording found (not proof of safe rollback)",
+            path=path,
+            line=None,
         )
     return Finding(
         category="rollback",
         severity="low",
         label="rollback_hint_missing",
         detail="No explicit rollback/migration hint found in scan corpus",
+        path=path,
+        line=None,
     )
 
 
@@ -229,7 +259,12 @@ def risk_score(findings: Iterable[Finding]) -> int:
 
 
 def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tuple[str, str, str]]:
-    """Return display rows: (name, status_icon, color)."""
+    """Return display rows: (name, status_icon, color).
+
+    *strict* is retained for call-site compatibility; empty production impact
+    is always shown as OK so non-strict mode no longer invents a caution icon.
+    """
+    del strict  # display contract is mode-independent for empty rows
     secrets = [f for f in findings if f.category == "secret"]
     dangerous = [f for f in findings if f.category == "dangerous_command"]
     production = [f for f in findings if f.category == "production_impact"]
@@ -247,9 +282,7 @@ def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tupl
 
     secret_icon, secret_color = status(secrets)
     danger_icon, danger_color = status(dangerous)
-    prod_icon, prod_color = status(production, empty_ok="✅" if strict else "⚠️")
-    if not production and not strict:
-        prod_icon, prod_color = "⚠️", "yellow"
+    prod_icon, prod_color = status(production, empty_ok="✅")
 
     rollback_icon, rollback_color = "✅", "green"
     if rollback and rollback[0].label == "rollback_hint_missing" and production:
@@ -263,14 +296,66 @@ def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tupl
     ]
 
 
+def _scan_directory(target: Path) -> tuple[list[Finding], str, str]:
+    """Per-file scan for directories (path attached). Caps at 40 files."""
+    findings: list[Finding] = []
+    chunks: list[str] = []
+    count = 0
+    for file_path in sorted(target.rglob("*")):
+        if not file_path.is_file():
+            continue
+        if any(part.startswith(".git") for part in file_path.parts):
+            continue
+        if file_path.suffix.lower() in _BINARY_SUFFIXES:
+            continue
+        try:
+            text = _read_text_file(file_path)
+        except OSError:
+            return [], "", f"error:read:{file_path}"
+        findings.extend(scan_text(text, path=str(file_path)))
+        chunks.append(text)
+        count += 1
+        if count >= 40:
+            break
+    corpus = "\n".join(chunks)
+    findings.append(assess_rollback_signal(corpus))
+    source = f"dir:{target} ({count} files)"
+    return findings, corpus, source
+
+
 def run_safety_scan(
     path: str | None = None,
     strict: bool = False,
     cwd: Path | None = None,
 ) -> dict:
-    corpus, source = collect_scan_corpus(path=path, cwd=cwd)
-    findings = scan_text(corpus)
-    findings.append(assess_rollback_signal(corpus))
+    root = (cwd or Path.cwd()).resolve()
+    findings: list[Finding]
+    source: str
+
+    if path:
+        target = Path(path)
+        if not target.is_absolute():
+            target = (root / target).resolve()
+        if target.is_file():
+            try:
+                text = _read_text_file(target)
+            except OSError:
+                findings = []
+                source = f"error:read:{target}"
+            else:
+                findings = scan_text(text, path=str(target))
+                findings.append(assess_rollback_signal(text, path=str(target)))
+                source = f"file:{target}"
+        elif target.is_dir():
+            findings, _corpus, source = _scan_directory(target)
+        else:
+            findings = []
+            source = f"missing:{target}"
+    else:
+        corpus, source = collect_scan_corpus(path=None, cwd=root)
+        findings = scan_text(corpus)
+        findings.append(assess_rollback_signal(corpus))
+
     score = risk_score(findings)
     rows = summarize_checks(findings, strict=strict)
     if score >= 31:

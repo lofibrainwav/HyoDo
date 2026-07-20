@@ -2,7 +2,7 @@
 
 The Way of Devotion: Philosophy-driven code review for AI-assisted development.
 
-Built with the Six Pillars (HYOGOOK V5, philosophy V6):
+Built with the Six Pillars (HYOGOOK F-score, philosophy V6):
 - Benevolence: Developer experience and user serenity
 - Truth: Technical accuracy
 - Goodness: Security and stability
@@ -11,7 +11,7 @@ Built with the Six Pillars (HYOGOOK V5, philosophy V6):
 - Beauty: Code clarity and UX
 - Eternity: Geometric mean of harmony (calculated)
 
-HYOGOOK V5 F-score formula (SSOT):
+HYOGOOK F-score formula (SSOT; formula lineage label V5, philosophy V6):
   F = sum(five pillars on 1–10 scale) + geometric_mean
   S = geometric_mean
 Review-emphasis percentages are philosophical labels only — not F weights.
@@ -19,18 +19,19 @@ Review-emphasis percentages are philosophical labels only — not F weights.
 
 from __future__ import annotations
 
-__version__ = "4.0.0"
+__version__ = "4.0.1"
 __philosophy_version__ = "V6"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
 
 # Legacy compatibility weights (WEIGHTED_V1 / calculate_trinity_score legacy path).
-# Not used by HYOGOOK V5 F-score. Sum is normalized at use site.
+# Not used by the HYOGOOK F-score. Sum is normalized at use site.
+# Key name "loyalty" is frozen for historical score reproducibility.
 TRINITY_WEIGHTS = {
     "benevolence": 0.25,  # Developer/user experience (legacy)
     "truth": 0.22,  # Technical accuracy (legacy)
     "goodness": 0.18,  # Security/stability (legacy)
-    "loyalty": 0.15,  # SSOT compliance (legacy)
+    "loyalty": 0.15,  # SSOT compliance (legacy; philosophy V6 uses Hyo)
     "beauty": 0.15,  # Code clarity/UX (legacy)
 }
 LEGACY_TRINITY_WEIGHTS = TRINITY_WEIGHTS
@@ -146,13 +147,24 @@ def is_strong_review_signal(trinity_score: float, risk_score: float = 0) -> bool
     Humans remain the final gate.
 
     Args:
-        trinity_score: Trinity Score (0-100)
-        risk_score: Risk score (0-100), lower is better
+        trinity_score: Trinity Score (0-100), numeric
+        risk_score: Risk score (0-100), lower is better; must be numeric
+            (level strings such as ``"low"`` / ``"high"`` are rejected)
 
     Returns:
         True if strong-review-signal eligible (Trinity >= 90, Risk <= 10)
+
+    Raises:
+        TypeError: if either argument is not an int or float (bool excluded)
     """
-    return trinity_score >= 90 and risk_score <= 10
+    if isinstance(trinity_score, bool) or not isinstance(trinity_score, (int, float)):
+        raise TypeError(f"trinity_score must be a number 0-100, got {type(trinity_score).__name__}")
+    if isinstance(risk_score, bool) or not isinstance(risk_score, (int, float)):
+        raise TypeError(
+            "risk_score must be a number 0-100 (not a level string), "
+            f"got {type(risk_score).__name__}"
+        )
+    return float(trinity_score) >= 90 and float(risk_score) <= 10
 
 
 __all__ = [
