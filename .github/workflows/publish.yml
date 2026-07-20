@@ -170,9 +170,14 @@ jobs:
           EXPECTED_VERSION: ${{ needs.build.outputs.version }}
           EXPECTED_COMMIT: ${{ needs.build.outputs.commit }}
         run: |
+          # Version JSON often appears before PEP 740 integrity attestations.
+          # verify-pypi-release.py polls provenance separately (integrity API +
+          # version-JSON fallback) so a single early 404 is not a false red.
+          # 30 x 10s ≈ 5 min provenance budget (observed 4.0.1 CDN lag).
           python scripts/release/verify-pypi-release.py \
             --version "$EXPECTED_VERSION" \
             --require-provenance \
             --install-smoke \
             --retries 24 \
+            --provenance-retries 30 \
             --sleep-seconds 10

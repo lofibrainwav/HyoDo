@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Post-publish verify** (`scripts/release/verify-pypi-release.py`): provenance
+  is polled with its own retry budget (version JSON + PEP 740 integrity API),
+  instead of a single-shot check right after the version appears. Prevents the
+  false red seen on 4.0.1 when attestation CDN lagged the package JSON.
+  Publish workflow uses `--provenance-retries 30` (~5 min). Install smoke
+  refreshes the wheel URL each attempt (index → wheel-url fallback retained).
+
 ## [4.0.1] - 2026-07-20
 
 ### Fixed
