@@ -39,7 +39,7 @@ directory:
 
 ```bash
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
-  --benevolence 0.9 --loyalty 0.9
+  --benevolence 0.9 --hyo 0.9
 hyodo safe path/to/file_or_diff_context
 hyodo safe --strict path/to/file_or_diff_context
 ```
@@ -101,7 +101,7 @@ agent UI. It does not mean language-agnostic or universal repository support.
 
 ## Optional review score
 
-HYOGOOK V5 evaluates Truth, Goodness, Beauty, Benevolence, and Loyalty, with a
+HYOGOOK V5 evaluates Truth, Goodness, Beauty, Benevolence, and Hyo, with a
 geometric-mean harmony signal. Scores support review; they never replace tests,
 security checks, or human approval.
 

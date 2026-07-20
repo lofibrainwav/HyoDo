@@ -2,11 +2,12 @@
 
 The Way of Devotion: Philosophy-driven code review for AI-assisted development.
 
-Built with the Six Pillars (HYOGOOK V5):
+Built with the Six Pillars (HYOGOOK V5, philosophy V6):
 - Benevolence: Developer experience and user serenity
 - Truth: Technical accuracy
 - Goodness: Security and stability
-- Loyalty: SSOT compliance and cultural continuity
+- Hyo: Reciprocal and voluntary continuity — SSOT discipline
+  (supersedes one-sided Loyalty; `loyalty=` remains a deprecated alias until 4.0.0)
 - Beauty: Code clarity and UX
 - Eternity: Geometric mean of harmony (calculated)
 
@@ -20,7 +21,8 @@ from __future__ import annotations
 
 import warnings
 
-__version__ = "3.2.1"
+__version__ = "3.3.0"
+__philosophy_version__ = "V6"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
 
@@ -63,8 +65,10 @@ def calculate_hygook_v5_score(
     benevolence: float,
     truth: float,
     goodness: float,
-    loyalty: float,
-    beauty: float,
+    hyo: float | None = None,
+    beauty: float | None = None,
+    *,
+    loyalty: float | None = None,
 ) -> tuple[float, float]:
     """Calculate HYOGOOK V5 F score and S (Eternity) value.
 
@@ -75,18 +79,37 @@ def calculate_hygook_v5_score(
         benevolence: Benevolence score (0-1, will be scaled to 1-10)
         truth: Truth score (0-1, will be scaled to 1-10)
         goodness: Goodness score (0-1, will be scaled to 1-10)
-        loyalty: Loyalty score (0-1, will be scaled to 1-10)
+        hyo: Hyo score (0-1, will be scaled to 1-10). Reciprocal and
+            voluntary continuity; supersedes the one-sided ``loyalty``.
         beauty: Beauty score (0-1, will be scaled to 1-10)
+        loyalty: Deprecated alias of ``hyo``. Emits DeprecationWarning.
+            Scheduled for removal in 4.0.0.
 
     Returns:
         Tuple of (F_score, S_eternity)
     """
+    if loyalty is not None:
+        if hyo is not None:
+            raise TypeError(
+                "calculate_hygook_v5_score() got both 'hyo' and its deprecated alias 'loyalty'"
+            )
+        warnings.warn(
+            "'loyalty' is deprecated; use 'hyo' (reciprocal, voluntary continuity). "
+            "Scheduled for removal in 4.0.0.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        hyo = loyalty
+    if hyo is None:
+        raise TypeError("calculate_hygook_v5_score() missing required argument: 'hyo'")
+    if beauty is None:
+        raise TypeError("calculate_hygook_v5_score() missing required argument: 'beauty'")
 
     def to_10_scale(v: float) -> float:
         bounded = max(0.0, min(1.0, v))
         return 1 + bounded * 9  # 0->1, 1->10
 
-    values_10 = [to_10_scale(v) for v in [benevolence, truth, goodness, loyalty, beauty]]
+    values_10 = [to_10_scale(v) for v in [benevolence, truth, goodness, hyo, beauty]]
     s_eternity = calculate_geometric_mean(values_10)
     f_score = sum(values_10) + s_eternity
     return f_score, s_eternity
@@ -174,6 +197,7 @@ __all__ = [
     "TRINITY_WEIGHTS",
     "__author__",
     "__license__",
+    "__philosophy_version__",
     "__version__",
     "calculate_geometric_mean",
     "calculate_hygook_v5_score",

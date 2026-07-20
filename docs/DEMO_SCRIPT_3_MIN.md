@@ -44,7 +44,7 @@ Say: the public package is `hyodo/` (Python package + CLI).
 ```bash
 hyodo --version
 hyodo check
-hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9
 hyodo safe
 # secret fixture
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-demo-safe.txt

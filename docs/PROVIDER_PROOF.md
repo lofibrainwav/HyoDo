@@ -35,7 +35,7 @@ required:
 hyodo --version
 hyodo check          # HyoDo checkout only: Pyright/Ruff/pytest/SBOM gates
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
-  --benevolence 0.9 --loyalty 0.9
+  --benevolence 0.9 --hyo 0.9
 hyodo safe            # dependency-light safety early-warning scan
 hyodo safe --strict   # exit 1 on high-severity findings
 hyodo start           # onboarding
