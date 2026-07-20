@@ -17,7 +17,7 @@ is English. Scores are **review signals**, not automatic approval.
 ## Operating boundaries
 
 1. Human approval remains required for merge/write authority.
-2. Public package is `hyodo/`; `afo_core/` is advisory extended tree.
+2. Public package is `hyodo/` (Python package + CLI).
 3. Tiered model routing is design intent only — no guaranteed cost savings.
 4. Prefer CLI + CI proof over vendor-locked demos.
 

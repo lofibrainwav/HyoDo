@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.2.1] - 2026-07-20
+
+### Fixed
+
+- `hyodo check` and the public verification script now pass the interpreter
+  running HyoDo to Pyright. This prevents false missing-import failures when a
+  virtual environment is active but a different system Python appears first on
+  `PATH`.
+
 ## [3.2.0] - 2026-07-19
 
 ### Added

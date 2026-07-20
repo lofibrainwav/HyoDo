@@ -112,7 +112,11 @@ def run_pyright_check(root: Path | None, verbose: bool = False) -> GateResult:
     if not _module_importable("pyright"):
         return _missing_tool_result("pyright", root)
 
-    cmd = _tool_cmd("pyright", "hyodo")
+    # Pyright otherwise discovers the first `python` on PATH. That can be a
+    # different interpreter from the one running HyoDo (for example macOS's
+    # system Python when HyoDo is installed in a virtual environment), which
+    # makes installed runtime dependencies appear missing.
+    cmd = _tool_cmd("pyright", "--pythonpath", sys.executable, "hyodo")
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=str(root))
         if result.returncode == 0:
