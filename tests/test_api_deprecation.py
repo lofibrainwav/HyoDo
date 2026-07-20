@@ -24,6 +24,18 @@ def test_is_strong_review_signal_threshold():
     assert is_strong_review_signal(90, 0) is True
     assert is_strong_review_signal(89, 0) is False
     assert is_strong_review_signal(95, 11) is False
+    assert is_strong_review_signal(90, 10.0) is True
+
+
+def test_is_strong_review_signal_rejects_non_numeric_risk():
+    import pytest
+
+    with pytest.raises(TypeError, match="risk_score"):
+        is_strong_review_signal(90, "low")  # type: ignore[arg-type]
+    with pytest.raises(TypeError, match="trinity_score"):
+        is_strong_review_signal("90", 0)  # type: ignore[arg-type]
+    with pytest.raises(TypeError):
+        is_strong_review_signal(True, 0)  # type: ignore[arg-type]
 
 
 def test_should_auto_approve_removed_in_400():

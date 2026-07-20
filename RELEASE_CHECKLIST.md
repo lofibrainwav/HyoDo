@@ -92,5 +92,6 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 | 2026-07-20 | 3.2.1 | Pyright interpreter pin (venv false missing-import fix) |
 | 2026-07-20 | 3.3.0 | Philosophy V6: `hyo` pillar restored; `loyalty` deprecated alias until 4.0.0 |
 | 2026-07-20 | 4.0.0 | Philosophy V6 complete: `loyalty` alias + `should_auto_approve` removed |
+| 2026-07-20 | 4.0.1 | Score honesty: required pillars, legacy flag conflicts, safe path/line |
 
 Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published + (if claiming pip) Trusted Publishing success with non-null provenance.

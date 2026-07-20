@@ -5,7 +5,7 @@
 ### PyPI
 
 ```bash
-pip install -U 'hyodo==4.0.0'
+pip install -U 'hyodo==4.0.1'
 ```
 
 ### From source

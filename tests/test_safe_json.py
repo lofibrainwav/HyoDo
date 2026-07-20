@@ -35,7 +35,12 @@ def test_safe_json_emits_parseable_json(tmp_path):
 
     payload = json.loads(result.output)
     assert payload["source"].startswith("file:")
-    assert any(f["category"] == "secret" and f["severity"] == "high" for f in payload["findings"])
+    secrets = [
+        f for f in payload["findings"] if f["category"] == "secret" and f["severity"] == "high"
+    ]
+    assert secrets
+    assert secrets[0]["path"] == str(sample)
+    assert secrets[0]["line"] == 1
 
 
 def test_safe_json_exit_codes_match_text(tmp_path):

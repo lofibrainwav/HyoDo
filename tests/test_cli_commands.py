@@ -48,11 +48,16 @@ def _uniform_score_args(value: float, *, short: bool = True) -> list[str]:
 # --------------------------------------------------------------------------- #
 
 
-def test_score_defaults_strong_band():
-    """No options -> all pillars 1.0 -> 100% -> STRONG signal band."""
-    result = runner.invoke(app, ["score"])
-    assert result.exit_code == 0
-    assert "STRONG" in result.output
+def test_score_missing_pillars_exit_2():
+    """No options / partial options must not invent 1.0 defaults (false STRONG)."""
+    bare = runner.invoke(app, ["score"])
+    assert bare.exit_code == 2
+    assert "required" in bare.output.lower() or "Missing" in bare.output
+
+    partial = runner.invoke(app, ["score", "-t", "0.9", "-g", "0.8"])
+    assert partial.exit_code == 2
+    assert "REVIEW_SIGNAL_STRONG" not in partial.output
+    assert "TOTAL" not in partial.output
 
 
 def test_score_high_long_flags_strong_band():
@@ -77,11 +82,10 @@ def test_score_low_short_flags_block_band():
 
 
 def test_score_legacy_serenity_eternity_aliases_block_band():
-    """Legacy aliases (-s serenity, -e eternity) drive the effective pillars.
+    """Legacy aliases (-s serenity, -e eternity) may fill benevolence/hyo.
 
-    ``--serenity`` overrides benevolence and ``--eternity`` overrides loyalty
-    when they are not 1.0. Setting every effective pillar to 0.30 lands in the
-    BLOCK band, which exercises the legacy-alias branches in ``score``.
+    Primary and legacy for the same pillar cannot be combined; this path uses
+    legacy only for those two pillars.
     """
     result = runner.invoke(
         app,
@@ -91,11 +95,59 @@ def test_score_legacy_serenity_eternity_aliases_block_band():
     assert "BLOCK" in result.output
 
 
+def test_score_conflict_hyo_and_eternity_exit_2():
+    """Primary --hyo and legacy --eternity together must fail, not silently override."""
+    result = runner.invoke(
+        app,
+        [
+            "score",
+            "-t",
+            "0.9",
+            "-g",
+            "0.9",
+            "-b",
+            "0.9",
+            "-i",
+            "0.9",
+            "--hyo",
+            "0.2",
+            "--eternity",
+            "0.9",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "Conflict" in result.output or "conflict" in result.output.lower()
+
+
+def test_score_conflict_benevolence_and_serenity_exit_2():
+    result = runner.invoke(
+        app,
+        [
+            "score",
+            "-t",
+            "0.9",
+            "-g",
+            "0.9",
+            "-b",
+            "0.9",
+            "-c",
+            "0.9",
+            "--benevolence",
+            "0.2",
+            "--serenity",
+            "0.9",
+        ],
+    )
+    assert result.exit_code == 2
+    assert "Conflict" in result.output or "conflict" in result.output.lower()
+
+
 def test_score_output_mentions_review_signal():
     """Output identifies itself as a review signal, not an auto-approval."""
-    result = runner.invoke(app, ["score"])
+    result = runner.invoke(app, _uniform_score_args(0.95, short=False))
     assert result.exit_code == 0
     assert "Review Signal" in result.output or "REVIEW_SIGNAL" in result.output
+    assert "V6" in result.output or "philosophy" in result.output.lower()
 
 
 # --------------------------------------------------------------------------- #
@@ -108,6 +160,8 @@ def test_start_shows_onboarding_keywords():
     assert result.exit_code == 0
     assert "quick start" in result.output.lower()
     assert "score" in result.output.lower()
+    # Onboarding must not teach the false-STRONG partial example.
+    assert "-t 0.9 -g 0.8" not in result.output.replace("\n", " ")
 
 
 def test_trinity_shows_checklist_keywords():
