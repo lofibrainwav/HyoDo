@@ -1,13 +1,11 @@
 """Public API: review-signal naming and legacy score normalization."""
 
-import warnings
-
+import hyodo
 from hyodo import (
     LEGACY_TRINITY_WEIGHTS,
     TRINITY_WEIGHTS,
     calculate_trinity_score,
     is_strong_review_signal,
-    should_auto_approve,
 )
 
 
@@ -28,10 +26,6 @@ def test_is_strong_review_signal_threshold():
     assert is_strong_review_signal(95, 11) is False
 
 
-def test_should_auto_approve_warns_and_delegates():
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always")
-        value = should_auto_approve(95, 5)
-    assert value is True
-    assert any(issubclass(w.category, DeprecationWarning) for w in caught)
-    assert any("is_strong_review_signal" in str(w.message) for w in caught)
+def test_should_auto_approve_removed_in_400():
+    # 3.2.x에서 예고한 4.0.0 제거 이행 확인
+    assert not hasattr(hyodo, "should_auto_approve")

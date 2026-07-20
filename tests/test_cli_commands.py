@@ -34,7 +34,7 @@ def _uniform_score_args(value: float, *, short: bool = True) -> list[str]:
             "--benevolence",
             "--truth",
             "--goodness",
-            "--loyalty",
+            "--hyo",
             "--beauty",
         ]
     args = ["score"]

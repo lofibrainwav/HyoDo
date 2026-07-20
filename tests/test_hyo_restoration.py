@@ -1,8 +1,8 @@
 """Hyo restoration (philosophy V6) contract tests.
 
-Covers the v3.3.0 rename path: ``hyo`` supersedes the one-sided ``loyalty``
-(kept as a deprecated keyword alias until 4.0.0), the frozen legacy trinity
-path, and doc/code pillar alignment.
+Covers the v4.0.0 completion: ``hyo`` is the canonical fourth pillar, the
+``loyalty`` keyword alias is fully removed, the legacy trinity path stays
+frozen, and doc/code pillar naming stays aligned.
 """
 
 from __future__ import annotations
@@ -30,22 +30,10 @@ def test_hyo_keyword_works():
     assert s_eternity > 1.0
 
 
-def test_loyalty_deprecation_warns_and_maps():
-    # loyalty 키워드는 DeprecationWarning을 내고 hyo와 동일 결과로 매핑된다
-    with pytest.warns(DeprecationWarning, match="loyalty"):
-        legacy = calculate_hygook_v5_score(
-            benevolence=0.7, truth=0.7, goodness=0.7, beauty=0.7, loyalty=0.5
-        )
-    modern = calculate_hygook_v5_score(
-        benevolence=0.7, truth=0.7, goodness=0.7, hyo=0.5, beauty=0.7
-    )
-    assert legacy == modern
-
-
-def test_hyo_loyalty_conflict_raises():
-    # 두 인자 동시 전달은 TypeError로 즉시 차단된다
+def test_loyalty_keyword_removed():
+    # 4.0.0에서 loyalty 키워드 alias는 완전 제거 — TypeError
     with pytest.raises(TypeError):
-        calculate_hygook_v5_score(benevolence=1, truth=1, goodness=1, hyo=1, beauty=1, loyalty=1)
+        calculate_hygook_v5_score(benevolence=1, truth=1, goodness=1, beauty=1, loyalty=1)
 
 
 def test_positional_fourth_arg_no_warning():
@@ -60,7 +48,7 @@ def test_positional_fourth_arg_no_warning():
 
 
 def test_trinity_legacy_frozen():
-    # 레거시 trinity 경로는 동결 — 기존 결과 재현 + 경고 없음
+    # 레거시 trinity 경로는 동결 — 기존 결과 재현 + 경고 없음 (loyalty 파라미터 유지)
     with warnings.catch_warnings():
         warnings.simplefilter("error")
         assert calculate_trinity_score(1, 1, 1, benevolence=1, loyalty=1) == 100
@@ -76,15 +64,10 @@ def test_philosophy_version_field():
 
 
 def test_signature_pillar_parity():
-    # API 위치 인자 집합 = 5기둥 집합 (문서-코드 정합의 코드 쪽 앵커)
+    # API 인자 집합 = 5기둥 집합, loyalty는 존재하지 않는다
     sig = inspect.signature(calculate_hygook_v5_score)
-    positional = [
-        name
-        for name, p in sig.parameters.items()
-        if p.kind is inspect.Parameter.POSITIONAL_OR_KEYWORD
-    ]
-    assert positional == ["benevolence", "truth", "goodness", "hyo", "beauty"]
-    assert sig.parameters["loyalty"].kind is inspect.Parameter.KEYWORD_ONLY
+    assert list(sig.parameters) == ["benevolence", "truth", "goodness", "hyo", "beauty"]
+    assert "loyalty" not in sig.parameters
 
 
 def test_philosophy_doc_alignment():
@@ -92,6 +75,12 @@ def test_philosophy_doc_alignment():
     text = (REPO_ROOT / "PHILOSOPHY.md").read_text(encoding="utf-8")
     assert "| Hyo |" in text
     assert "| Loyalty |" not in text
+
+
+def test_should_auto_approve_removed():
+    # 4.0.0 제거 예고를 이행 — deprecated alias 완전 소멸
+    assert not hasattr(hyodo, "should_auto_approve")
+    assert "should_auto_approve" not in hyodo.__all__
 
 
 def test_score_floor_is_six():

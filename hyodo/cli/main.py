@@ -366,8 +366,7 @@ def score(
     benevolence: float = typer.Option(1.0, "--benevolence", "-i", help="Benevolence score (0-1)"),
     truth: float = typer.Option(1.0, "--truth", "-t", help="Truth score (0-1)"),
     goodness: float = typer.Option(1.0, "--goodness", "-g", help="Goodness score (0-1)"),
-    hyo: float | None = typer.Option(None, "--hyo", help="Hyo score (0-1); supersedes --loyalty"),
-    loyalty: float = typer.Option(1.0, "--loyalty", "-c", help="[Deprecated] alias of --hyo (0-1)"),
+    hyo: float = typer.Option(1.0, "--hyo", "-c", help="Hyo score (0-1)"),
     beauty: float = typer.Option(1.0, "--beauty", "-b", help="Beauty score (0-1)"),
     serenity: float = typer.Option(
         1.0, "--serenity", "-s", help="[Legacy] maps to benevolence (0-1)"
@@ -386,7 +385,7 @@ def score(
     from hyodo import calculate_hygook_v5_score
 
     effective_benevolence = benevolence if serenity == 1.0 else serenity
-    effective_hyo = hyo if hyo is not None else (loyalty if eternity == 1.0 else eternity)
+    effective_hyo = hyo if eternity == 1.0 else eternity
 
     F, S = calculate_hygook_v5_score(effective_benevolence, truth, goodness, effective_hyo, beauty)
     score_value = ((F - 6) / (60 - 6)) * 100

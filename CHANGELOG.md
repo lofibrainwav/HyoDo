@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-07-20
+
+### Removed
+
+- **Breaking:** the `loyalty=` keyword alias on `calculate_hygook_v5_score`
+  and the `--loyalty` CLI flag (deprecated in 3.3.0). Use `hyo=` / `--hyo`
+  (the `-c` short flag now feeds `--hyo`). Positional callers are unaffected.
+- **Breaking:** `should_auto_approve()` (deprecated since 3.2.x with removal
+  announced for 4.0.0). Use `is_strong_review_signal()`.
+
+### Changed
+
+- CI and verification scripts exercise `--hyo` directly; the legacy
+  `calculate_trinity_score()` path (including its `loyalty` parameter and
+  `TRINITY_WEIGHTS` keys) stays frozen for historical reproducibility.
+
+### Note
+
+- The 3.3.0 deprecation window was intentionally short (same-day releases);
+  3.x remains on PyPI for callers that still pass `loyalty=`.
+
 ## [3.3.0] - 2026-07-20
 
 ### Added
