@@ -7,6 +7,10 @@ Success criteria (supply-chain seal):
   - optional: both files have non-null provenance (Trusted Publishing attestations)
   - optional: cold pip install + hyodo --version smoke
 
+Provenance and simple-index lag are common right after publish. This script
+polls the version JSON first, then **separately retries** provenance (JSON
+fields + PEP 740 integrity API) and install smoke (index → wheel-url fallback).
+
 Exit 0 on success, 1 on failure.
 """
 
@@ -21,61 +25,95 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
+
+USER_AGENT = "hyodo-verify-pypi-release/1.1"
 
 
-def fetch_json(url: str, timeout: int = 30) -> Dict[str, Any]:
-    req = urllib.request.Request(url, headers={"User-Agent": "hyodo-verify-pypi-release/1.0"})
+def fetch_json(url: str, timeout: int = 30) -> dict[str, Any]:
+    req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
     with urllib.request.urlopen(req, timeout=timeout) as resp:
         return json.load(resp)
 
 
-def version_payload(version: str) -> Dict[str, Any]:
+def version_payload(version: str) -> dict[str, Any]:
     return fetch_json(f"https://pypi.org/pypi/hyodo/{version}/json")
 
 
-def provenance_for_file(meta: Dict[str, Any], filename: str) -> Optional[Any]:
-    """Best-effort provenance extraction across PyPI JSON shapes."""
-    # Top-level (some Warehouse responses)
+def integrity_provenance_url(version: str, filename: str) -> str:
+    return f"https://pypi.org/integrity/hyodo/{version}/{filename}/provenance"
+
+
+def fetch_integrity_provenance(version: str, filename: str) -> tuple[Any | None, str | None]:
+    """Return (payload_or_None, error_kind).
+
+    error_kind:
+      - None when payload is present
+      - ``\"http_404\"`` when integrity API says not ready / missing
+      - ``\"http_N\"`` for other HTTP errors
+      - ``\"network\"`` for transport/parse failures
+    """
+    url = integrity_provenance_url(version, filename)
+    try:
+        payload = fetch_json(url)
+        if payload in (None, {}, [], False):
+            return None, "empty"
+        return payload, None
+    except urllib.error.HTTPError as exc:
+        if exc.code == 404:
+            return None, "http_404"
+        return None, f"http_{exc.code}"
+    except Exception:
+        return None, "network"
+
+
+def provenance_from_version_json(meta: dict[str, Any], filename: str) -> Any | None:
+    """Extract provenance from the version JSON only (no integrity HTTP call)."""
     top = meta.get("provenance")
-    if top is not None:
+    if top not in (None, {}, [], False):
         return top
     for url in meta.get("urls") or []:
         if url.get("filename") != filename:
             continue
-        if "provenance" in url and url["provenance"] is not None:
-            return url["provenance"]
-        # Some responses embed attestation URLs under digests/extensions
-        for key in ("provenance", "attestations", "has_provenance"):
+        if url.get("provenance") not in (None, {}, [], False):
+            return url.get("provenance")
+        for key in ("attestations", "has_provenance"):
             if url.get(key) not in (None, False, ""):
                 return url.get(key)
-    # Integrity API (PEP 740 / Warehouse integrity)
-    try:
-        integrity = fetch_json(f"https://pypi.org/integrity/hyodo/{meta['info']['version']}/{filename}/provenance")
-        return integrity
-    except urllib.error.HTTPError as exc:
-        if exc.code == 404:
-            return None
-        raise
-    except Exception:
+    return None
+
+
+def provenance_for_file(meta: dict[str, Any], filename: str) -> Any | None:
+    """Best-effort provenance: version JSON first, then PEP 740 integrity API."""
+    from_json = provenance_from_version_json(meta, filename)
+    if from_json is not None:
+        return from_json
+    version = str(meta.get("info", {}).get("version") or "")
+    if not version:
         return None
+    payload, _kind = fetch_integrity_provenance(version, filename)
+    return payload
 
 
-def wait_for_version(version: str, retries: int, sleep_seconds: float) -> Dict[str, Any]:
-    last_err: Optional[Exception] = None
+def wait_for_version(version: str, retries: int, sleep_seconds: float) -> dict[str, Any]:
+    last_err: Exception | None = None
     for attempt in range(1, retries + 1):
         try:
             data = version_payload(version)
             if data.get("info", {}).get("version") == version:
+                if attempt > 1:
+                    print(f"version {version} ready on poll {attempt}/{retries}")
                 return data
-        except Exception as exc:  # noqa: BLE001 - retry loop
+            last_err = RuntimeError("version field mismatch")
+        except Exception as exc:
             last_err = exc
-        print(f"poll {attempt}/{retries}: version {version} not ready yet ({last_err})")
-        time.sleep(sleep_seconds)
+        print(f"poll version {attempt}/{retries}: not ready yet ({last_err})")
+        if attempt < retries:
+            time.sleep(sleep_seconds)
     raise SystemExit(f"PyPI version {version} not available after {retries} polls: {last_err}")
 
 
-def require_files(meta: Dict[str, Any]) -> List[Dict[str, Any]]:
+def require_files(meta: dict[str, Any]) -> list[dict[str, Any]]:
     urls = meta.get("urls") or []
     kinds = {u.get("packagetype") for u in urls}
     if "bdist_wheel" not in kinds or "sdist" not in kinds:
@@ -88,8 +126,95 @@ def require_files(meta: Dict[str, Any]) -> List[Dict[str, Any]]:
     return urls
 
 
-def check_provenance(meta: Dict[str, Any], urls: List[Dict[str, Any]]) -> None:
-    missing: List[str] = []
+def _artifact_filenames(urls: list[dict[str, Any]]) -> list[str]:
+    names = [u["filename"] for u in urls if u.get("filename")]
+    # Prefer wheel + sdist only (ignore any extra legacy files).
+    preferred = [
+        n for n in names if n.endswith(".whl") or n.endswith(".tar.gz") or n.endswith(".zip")
+    ]
+    return preferred or names
+
+
+def wait_for_provenance(
+    version: str,
+    filenames: list[str],
+    retries: int,
+    sleep_seconds: float,
+) -> None:
+    """Poll until every artifact has provenance, or fail with a clear reason.
+
+    PyPI Trusted Publishing often attaches integrity attestations *after* the
+    version JSON is already queryable. A single-shot check right after
+    ``wait_for_version`` produces false reds (observed on 4.0.1).
+    """
+    last_missing: list[str] = []
+    last_kinds: dict[str, str] = {}
+
+    for attempt in range(1, retries + 1):
+        missing: list[str] = []
+        kinds: dict[str, str] = {}
+        meta: dict[str, Any] | None = None
+        try:
+            meta = version_payload(version)
+        except Exception as exc:
+            print(f"poll provenance {attempt}/{retries}: version JSON refresh failed ({exc})")
+            if attempt < retries:
+                time.sleep(sleep_seconds)
+            last_missing = list(filenames)
+            continue
+
+        for name in filenames:
+            from_json = provenance_from_version_json(meta, name)
+            if from_json not in (None, {}, [], False):
+                print(f"PROVENANCE present (version-json): {name}")
+                continue
+            payload, kind = fetch_integrity_provenance(version, name)
+            if payload not in (None, {}, [], False):
+                print(f"PROVENANCE present (integrity-api): {name}")
+                continue
+            missing.append(name)
+            kinds[name] = kind or "unknown"
+            print(f"PROVENANCE missing: {name} ({kinds[name]})")
+
+        if not missing:
+            if attempt > 1:
+                print(f"PROVENANCE ready for all files on poll {attempt}/{retries}")
+            return
+
+        last_missing = missing
+        last_kinds = kinds
+        print(
+            f"poll provenance {attempt}/{retries}: still missing "
+            f"{', '.join(missing)} — CDN/attestation lag is common right after publish"
+        )
+        if attempt < retries:
+            time.sleep(sleep_seconds)
+
+    # Fail with a message that distinguishes lag from misconfiguration.
+    only_404 = last_missing and all(
+        last_kinds.get(n) in {"http_404", "empty"} for n in last_missing
+    )
+    if only_404:
+        raise SystemExit(
+            "provenance still missing after "
+            f"{retries} polls for: {', '.join(last_missing)} "
+            "(integrity API returned 404/empty — either Trusted Publishing is not "
+            "configured, or attestation CDN lag exceeded the retry budget; "
+            "re-run this job once attestations are live)"
+        )
+    raise SystemExit(
+        "provenance null/missing for: "
+        + ", ".join(f"{n}({last_kinds.get(n, '?')})" for n in last_missing)
+        + " after "
+        + str(retries)
+        + " polls"
+    )
+
+
+def check_provenance(meta: dict[str, Any], urls: list[dict[str, Any]]) -> None:
+    """One-shot provenance check (kept for unit tests / local dry use)."""
+    version = str(meta.get("info", {}).get("version") or "")
+    missing: list[str] = []
     for u in urls:
         name = u["filename"]
         prov = provenance_for_file(meta, name)
@@ -102,7 +227,11 @@ def check_provenance(meta: Dict[str, Any], urls: List[Dict[str, Any]]) -> None:
         raise SystemExit(
             "provenance null/missing for: "
             + ", ".join(missing)
-            + " (configure PyPI Trusted Publishing + re-publish)"
+            + (
+                " (configure PyPI Trusted Publishing + re-publish)"
+                if not version
+                else " (re-run after attestation lag, or configure Trusted Publishing)"
+            )
         )
 
 
@@ -112,14 +241,9 @@ def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) 
     Prefer ``pip install hyodo==VERSION`` from the public index. If the simple
     index lags the version JSON API (common right after publish), fall back to
     the wheel URL from the version JSON (still files.pythonhosted.org).
+    Refresh the wheel URL each attempt so a late-published wheel is picked up.
     """
-    meta = version_payload(version)
-    wheel = next((u for u in meta.get("urls") or [] if u.get("packagetype") == "bdist_wheel"), None)
-    if not wheel or not wheel.get("url"):
-        raise SystemExit("no wheel URL in version JSON for install smoke")
-    wheel_url = wheel["url"]
-
-    last_err: Optional[Exception] = None
+    last_err: Exception | None = None
     with tempfile.TemporaryDirectory(prefix="hyodo-pypi-smoke-") as tmp:
         venv = Path(tmp) / "venv"
         subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)
@@ -129,10 +253,23 @@ def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) 
         subprocess.run([str(pip), "install", "-U", "pip"], check=True, capture_output=True)
 
         for attempt in range(1, retries + 1):
-            for target, label in (
-                (f"hyodo=={version}", "index"),
-                (wheel_url, "wheel-url"),
-            ):
+            wheel_url: str | None = None
+            try:
+                meta = version_payload(version)
+                wheel = next(
+                    (u for u in meta.get("urls") or [] if u.get("packagetype") == "bdist_wheel"),
+                    None,
+                )
+                if wheel and wheel.get("url"):
+                    wheel_url = str(wheel["url"])
+            except Exception as exc:
+                print(f"install attempt {attempt}/{retries}: version JSON refresh failed ({exc})")
+
+            targets: list[tuple[str, str]] = [(f"hyodo=={version}", "index")]
+            if wheel_url:
+                targets.append((wheel_url, "wheel-url"))
+
+            for target, label in targets:
                 try:
                     subprocess.run(
                         [str(pip), "install", "--no-cache-dir", target],
@@ -155,17 +292,32 @@ def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) 
                     last_err = exc
                     err = (exc.stderr or exc.stdout or str(exc))[-300:]
                     print(f"install attempt {attempt}/{retries} via {label} failed: {err}")
-            time.sleep(sleep_seconds)
+                except SystemExit as exc:
+                    last_err = exc
+                    print(f"install attempt {attempt}/{retries} via {label} failed: {exc}")
+            if attempt < retries:
+                time.sleep(sleep_seconds)
     raise SystemExit(f"install smoke failed after {retries} attempts: {last_err}")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--version", required=True, help="Expected PyPI version, e.g. 3.1.8")
+    parser.add_argument("--version", required=True, help="Expected PyPI version, e.g. 4.0.1")
     parser.add_argument("--require-provenance", action="store_true")
     parser.add_argument("--install-smoke", action="store_true")
-    parser.add_argument("--retries", type=int, default=18)
+    parser.add_argument(
+        "--retries",
+        type=int,
+        default=18,
+        help="Max polls for version readiness, provenance lag, and install smoke",
+    )
     parser.add_argument("--sleep-seconds", type=float, default=10.0)
+    parser.add_argument(
+        "--provenance-retries",
+        type=int,
+        default=None,
+        help="Override provenance-only poll budget (default: same as --retries)",
+    )
     args = parser.parse_args()
 
     meta = wait_for_version(args.version, args.retries, args.sleep_seconds)
@@ -178,7 +330,15 @@ def main() -> int:
         )
 
     if args.require_provenance:
-        check_provenance(meta, urls)
+        prov_retries = (
+            args.provenance_retries if args.provenance_retries is not None else args.retries
+        )
+        wait_for_provenance(
+            args.version,
+            _artifact_filenames(urls),
+            retries=prov_retries,
+            sleep_seconds=args.sleep_seconds,
+        )
 
     if args.install_smoke:
         install_smoke(args.version, retries=args.retries, sleep_seconds=args.sleep_seconds)
