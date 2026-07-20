@@ -78,7 +78,7 @@ jobs:
           hyodo version
           hyodo start
           hyodo safe
-          hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+          hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9
 
       - name: Validate package import and public API
         run: |

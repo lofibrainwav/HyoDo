@@ -115,7 +115,7 @@ if grep -q "All gates passed" /tmp/hyodo-check-empty.out; then
   echo "ERROR: false-green 'All gates passed' on empty tree"
   exit 1
 fi
-$HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9 >/tmp/hyodo-score.out
+$HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9 >/tmp/hyodo-score.out
 grep -q "REVIEW_SIGNAL" /tmp/hyodo-score.out
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' >/tmp/hyodo-safe-fixture.txt
 set +e

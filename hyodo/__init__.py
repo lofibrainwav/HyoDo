@@ -7,7 +7,7 @@ Built with the Six Pillars (HYOGOOK V5, philosophy V6):
 - Truth: Technical accuracy
 - Goodness: Security and stability
 - Hyo: Reciprocal and voluntary continuity — SSOT discipline
-  (supersedes one-sided Loyalty; `loyalty=` remains a deprecated alias until 4.0.0)
+  (supersedes one-sided Loyalty; the `loyalty=` alias was removed in 4.0.0)
 - Beauty: Code clarity and UX
 - Eternity: Geometric mean of harmony (calculated)
 
@@ -19,9 +19,7 @@ Review-emphasis percentages are philosophical labels only — not F weights.
 
 from __future__ import annotations
 
-import warnings
-
-__version__ = "3.3.0"
+__version__ = "4.0.0"
 __philosophy_version__ = "V6"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
@@ -65,10 +63,8 @@ def calculate_hygook_v5_score(
     benevolence: float,
     truth: float,
     goodness: float,
-    hyo: float | None = None,
-    beauty: float | None = None,
-    *,
-    loyalty: float | None = None,
+    hyo: float,
+    beauty: float,
 ) -> tuple[float, float]:
     """Calculate HYOGOOK V5 F score and S (Eternity) value.
 
@@ -80,30 +76,13 @@ def calculate_hygook_v5_score(
         truth: Truth score (0-1, will be scaled to 1-10)
         goodness: Goodness score (0-1, will be scaled to 1-10)
         hyo: Hyo score (0-1, will be scaled to 1-10). Reciprocal and
-            voluntary continuity; supersedes the one-sided ``loyalty``.
+            voluntary continuity; supersedes the one-sided ``loyalty``,
+            whose keyword alias was removed in 4.0.0.
         beauty: Beauty score (0-1, will be scaled to 1-10)
-        loyalty: Deprecated alias of ``hyo``. Emits DeprecationWarning.
-            Scheduled for removal in 4.0.0.
 
     Returns:
         Tuple of (F_score, S_eternity)
     """
-    if loyalty is not None:
-        if hyo is not None:
-            raise TypeError(
-                "calculate_hygook_v5_score() got both 'hyo' and its deprecated alias 'loyalty'"
-            )
-        warnings.warn(
-            "'loyalty' is deprecated; use 'hyo' (reciprocal, voluntary continuity). "
-            "Scheduled for removal in 4.0.0.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        hyo = loyalty
-    if hyo is None:
-        raise TypeError("calculate_hygook_v5_score() missing required argument: 'hyo'")
-    if beauty is None:
-        raise TypeError("calculate_hygook_v5_score() missing required argument: 'beauty'")
 
     def to_10_scale(v: float) -> float:
         bounded = max(0.0, min(1.0, v))
@@ -176,22 +155,6 @@ def is_strong_review_signal(trinity_score: float, risk_score: float = 0) -> bool
     return trinity_score >= 90 and risk_score <= 10
 
 
-def should_auto_approve(trinity_score: float, risk_score: float = 0) -> bool:
-    """Deprecated alias of is_strong_review_signal.
-
-    Kept for API compatibility through 3.2.x. Does not grant merge/write authority.
-    Removal planned for 4.0.0.
-    """
-    warnings.warn(
-        "should_auto_approve() is deprecated; use is_strong_review_signal(). "
-        "The result is a review signal, not merge or write authorization. "
-        "Scheduled for removal in 4.0.0.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return is_strong_review_signal(trinity_score, risk_score)
-
-
 __all__ = [
     "LEGACY_TRINITY_WEIGHTS",
     "TRINITY_WEIGHTS",
@@ -203,5 +166,4 @@ __all__ = [
     "calculate_hygook_v5_score",
     "calculate_trinity_score",
     "is_strong_review_signal",
-    "should_auto_approve",
 ]

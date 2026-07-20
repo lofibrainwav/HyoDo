@@ -15,8 +15,8 @@ is English. Scores are **review signals**, not automatic approval.
 | Eternity | Geometric-mean harmony (derived) |
 
 Philosophy version: **V6**. Hyo (孝) supersedes the earlier one-sided
-Loyalty (忠): a reciprocal and voluntary relational discipline. The public
-API accepts `loyalty=` as a deprecated alias of `hyo=` until 4.0.0. The
+Loyalty (忠): a reciprocal and voluntary relational discipline. The
+`loyalty=` alias (deprecated in 3.3.0) was removed in 4.0.0. The
 legacy `calculate_trinity_score()` compatibility path is frozen as-is so
 historical scores remain reproducible.
 
