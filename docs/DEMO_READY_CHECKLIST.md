@@ -5,7 +5,7 @@ step when everything works — not a progress ritual mid-cleanup.
 
 ## Preconditions (measured)
 
-- [ ] On `main` (or latest release tag `v3.2.0+`), clean worktree
+- [ ] On `main` (or latest release tag `v3.2.1+`), clean worktree
 - [ ] `bash scripts/verify-public.sh` exits 0
 - [ ] Inside HyoDo checkout: `hyodo check` prints **All executed gates passed** and exits 0
 - [ ] Empty dir: `hyodo check /tmp/empty` exits **2** (not a false green)
@@ -35,13 +35,11 @@ hyodo safe --strict /tmp/hyodo-demo-safe.txt   # expect exit 1
 5. State boundaries:
    - scores are review signals, not auto-approval
    - `check` is HyoDo-checkout release gates, not language-agnostic universal CI
-   - `afo_core` is advisory extended tree, not the public package
    - no guaranteed cost-savings benchmark
 
 ## Do not show
 
 - Real `.env` secrets
-- afo_core Docker/Redis unless asked
 - Dependabot historical 310 without current open count
 - Claude-only docs as the first frame (`ANTHROPIC_PROOF` is optional appendix)
 - Stale dry-run receipt headers as live truth (use live terminal)

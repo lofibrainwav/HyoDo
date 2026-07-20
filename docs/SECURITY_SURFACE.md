@@ -1,137 +1,32 @@
 # HyoDo Security Surface
 
-This document defines what GitHub "Security and quality" numbers mean for HyoDo
-and how release gates relate to dependency alerts.
+This document defines the security boundaries of the public `hyodo` package,
+CLI, and CI/release pipeline. It reflects only what is present in this
+repository today.
 
-## Two surfaces
+## What ships
 
-| Surface | Path | Release blocker? | Typical Dependabot impact |
-|---------|------|------------------|---------------------------|
-| **Public product** | `hyodo/`, root `pyproject.toml` | **Yes** | Minimal (`typer`, `rich`, optional dev tools) |
-| **Extended / legacy** | `afo_core/` lockfiles | **No (advisory)** | High volume (LLM stacks, parsers, servers) |
+- Public package: `hyodo/`, root `pyproject.toml` — release gate: Yes
+- Public tests: `tests/` — release gate: Yes (`pytest`)
+- Release/verify scripts: `scripts/` — release gate: Yes
 
-CI already treats `afo_core` lint as advisory (`continue-on-error: true` in
-`.github/workflows/ci.yml`). Public smoke tests install and run the `hyodo`
-package only.
+## Thin runtime dependency surface
 
-## Historical security-count context
-
-Before the 2026-07-16 cleanup, the Security view showed a large Dependabot count
-because of duplicated extended-tree manifests. The current open-alert count must
-always be measured live; it is not a release-document constant.
-
-- Open Dependabot alerts were **pip-only** and concentrated under `afo_core/`
-  manifests (`poetry.lock`, `requirements.txt`, `requirements-lock.txt`).
-- The same CVE often appears on multiple lock files, so UI count **inflates**
-  unique issues.
-- Code scanning (CodeQL) was **not** configured (`no analysis found`).
-- Secret scanning open alerts: **0**.
-
-Therefore:
+`pyproject.toml` declares exactly two runtime dependencies for the `hyodo`
+package:
 
 ```text
-UI alert count ≠ public package vulnerability count
-UI alert count ≠ unique CVE count
+typer>=0.9.0
+rich>=13.0.0
 ```
 
-## Current operational policy
+Everything else (`pytest`, `ruff`, `pyright`, `build`, `twine`, `PyYAML`, ...)
+is in the `dev` optional-dependency group and is never installed for an end
+user running `pip install hyodo`. Keeping this list short and reviewed is the
+primary control against a large third-party attack surface: fewer transitive
+packages means fewer places a supply-chain issue can enter.
 
-1. **Public install path must stay thin.** Do not add heavy LLM/server deps to
-   root `pyproject.toml` without an explicit optional extra and review.
-2. **afo_core upgrades are a separate track.** Prefer lock single-sourcing
-   (one generator) before mass version bumps.
-3. **Critical/High on afo_core** should be patched or removed when those modules
-   are actually executed; otherwise mark optional/unmaintained clearly.
-4. **Do not claim "all vulnerabilities patched"** in `SECURITY_PATCHES.md`
-   unless a fresh Dependabot/pip-audit readback is attached.
-
-## Next patch track (afo_core)
-
-### Applied in Dependabot P0 PR (2026-07-16)
-
-Lock regenerated with Poetry after security floor bumps:
-
-| Package | Before (stale lock) | After |
-|---------|---------------------|-------|
-| litellm | 1.72.0 | **1.92.0** |
-| nltk | 3.9.2 | **3.10.0** |
-| json-repair | 0.55.0 | **0.61.5** |
-| transformers | 4.57.6 | **5.12.1** |
-| pypdf | 6.6.0 | **6.14.2** |
-| python-multipart | 0.0.21 | **0.0.32** |
-| urllib3 | 2.6.3 | **2.7.0** |
-| cryptography | 46.0.3 | **49.0.0** |
-| langchain-core | 1.2.7 | **1.4.9** |
-| chromadb | 1.4.1 | 1.4.1 (no safe patched release in range yet) |
-
-Also:
-- Removed `requirements-lock.txt` (duplicate Dependabot surface)
-- `requirements.txt` is export of `poetry.lock` (SSOT)
-- Dropped `crewai` (forced vulnerable litellm/json-repair pins)
-- Dropped `moviepy` (conflicted with secure pillow>=12.2)
-- Python range for afo_core: `>=3.10,<3.14` (litellm constraint)
-
-### Residual risk
-
-| Item | Status |
-|------|--------|
-| chromadb | **Removed** from afo_core deps/lock (Qdrant SSOT; was deprecated in compose) |
-| starlette/aiohttp | May still have medium/high depending on advisory DB |
-| agents extras without crewai | Reduced capability until upstream allows secure pins |
-
-### chromadb removal (follow-up)
-
-- Dropped `chromadb` and `llama-index-vector-stores-chroma` from optional `rag`/`all` extras
-- `lazy_imports.chromadb` is a permanent dummy (never imports the package)
-- `VECTOR_DB=chroma` falls back to Qdrant with unsupported note
-- Stale `afo_core/requirements.lock` removed
-
-**Execution rule:** regenerate with Poetry, export `requirements.txt`, never hand-edit lock hashes. Public package CI must remain green without installing full afo_core.
-
-## Public SBOM (Eternity gate)
-
-The 4th `hyodo check` gate ("Eternity") emits a CycloneDX SBOM of the **public
-surface only** via `scripts/generate_sbom.py`.
-
-- **Scope.** The generator builds the public wheel and installs it into a clean
-  throwaway virtualenv created **without pip** (so the venv bootstrap seeds
-  `pip`/`setuptools`/`wheel` are never inventoried), then inventories *that*
-  environment — so the SBOM contains `typer`, `rich` and their transitive closure
-  and never the generator (`cyclonedx-bom`), dev/test/lint tooling, bootstrap
-  seeds, or any `afo_core` component. This scope is enforced in-process
-  (`assert_public_scope`, which fails the run) and by tests. Inventorying the dev
-  environment directly would be wrong — it would pull the whole dev toolchain in.
-- **Gate behavior.** The Eternity gate is offline-safe and does not regress
-  `hyodo check`: a **scope violation** (SBOM produced but mis-scoped) is a real
-  defect and **FAILs** (exit 2); only the generator's *defined* **environment
-  failure** (offline, build/venv cannot be provisioned) **SKIPs** (exit 3) — the
-  same honest "not executed" posture as when the script is absent. Any other,
-  **unexpected** generator failure (a bug, corrupt output, an unhandled exception
-  → exit 1) **FAILs** rather than being masked as a SKIP, so the gate can never
-  silently pretend it ran.
-- **Offline.** "Offline" means the *generation* step (rendering the SBOM from
-  installed metadata) makes no network calls. Provisioning the clean venv
-  (installing the wheel + `typer`/`rich`) may use the network; when that is not
-  possible the gate SKIPs.
-- **Reproducibility.** Output is generated with `--output-reproducible`, so
-  volatile fields (`serialNumber`, `metadata.timestamp`) are stripped; the stable
-  contract is the component (name, version) set. CI runs the real pipeline twice
-  and asserts this set is identical.
-- **CI.** A dedicated advisory job (`Eternity - Public SBOM`) generates and
-  uploads `dist/sbom.cyclonedx.json` as an artifact and runs the real
-  scope+reproducibility check. It is `continue-on-error` (observe first) and is
-  not in the release-gate `needs`; it does not yet block the release.
-
-Reproduce locally:
-
-```bash
-pip install -e ".[dev]"          # provides cyclonedx-bom
-python scripts/generate_sbom.py  # writes dist/sbom.cyclonedx.json
-```
-
-## Verification commands
-
-Public package:
+Verify locally:
 
 ```bash
 pip install -e ".[dev]"
@@ -140,56 +35,156 @@ hyodo safe
 python -m pytest tests -q
 ```
 
-Dependency posture (extended tree; not a public gate):
+## Package contents are scoped to the public surface
+
+`pyproject.toml` uses hatchling's `only-include` to restrict what actually
+lands in the sdist and wheel:
 
 ```bash
-# example — requires tooling installed in that environment
-pip-audit -r afo_core/requirements.txt || true
+python -c "
+import tomllib
+print(tomllib.load(open('pyproject.toml', 'rb'))['tool']['hatch']['build'])
+"
+```
+
+This means the distributed artifact contains the `hyodo` package (plus
+declared metadata files such as `README.md` and `LICENSE`) and nothing else
+from the repository. Reviewers can confirm this directly by building and
+inspecting the artifact:
+
+```bash
+python -m build
+python -m tarfile -l dist/hyodo-*.tar.gz
+unzip -l dist/hyodo-*.whl
+```
+
+## Public SBOM (Eternity gate)
+
+The 4th `hyodo check` gate ("Eternity") emits a CycloneDX SBOM of the public
+surface via `scripts/generate_sbom.py`.
+
+- **Scope.** The generator builds the public wheel and installs it into a
+  clean throwaway virtualenv created **without pip** (so the venv bootstrap
+  seeds `pip`/`setuptools`/`wheel` are never inventoried), then inventories
+  *that* environment — so the SBOM contains `typer`, `rich`, and their
+  transitive closure, and never the generator (`cyclonedx-bom`) or dev/test/
+  lint tooling. This scope is enforced in-process (`assert_public_scope`,
+  which fails the run) and by tests. Inventorying the dev environment
+  directly would be wrong — it would pull the whole dev toolchain in.
+- **Gate behavior.** The Eternity gate is offline-safe and does not regress
+  `hyodo check`: a **scope violation** (SBOM produced but mis-scoped) is a
+  real defect and **FAILs** (exit 2); only the generator's *defined*
+  **environment failure** (offline, build/venv cannot be provisioned)
+  **SKIPs** (exit 3) — the same honest "not executed" posture as when the
+  script is absent. Any other, **unexpected** generator failure (a bug,
+  corrupt output, an unhandled exception → exit 1) **FAILs** rather than
+  being masked as a SKIP, so the gate can never silently pretend it ran.
+- **Offline.** "Offline" means the *generation* step (rendering the SBOM
+  from installed metadata) makes no network calls. Provisioning the clean
+  venv (installing the wheel + `typer`/`rich`) may use the network; when
+  that is not possible, the gate SKIPs.
+- **Reproducibility.** Output is generated with `--output-reproducible`, so
+  volatile fields (`serialNumber`, `metadata.timestamp`) are stripped; the
+  stable contract is the component (name, version) set. CI runs the real
+  pipeline twice and asserts this set is identical.
+- **CI.** A dedicated advisory job (`Eternity - Public SBOM`) generates and
+  uploads `dist/sbom.cyclonedx.json` as an artifact and runs the real
+  scope+reproducibility check. It is `continue-on-error` (observe first) and
+  is not in the release-gate `needs`; it does not yet block the release.
+
+Reproduce locally:
+
+```bash
+pip install -e ".[dev]"          # provides cyclonedx-bom
+python scripts/generate_sbom.py  # writes dist/sbom.cyclonedx.json
+```
+
+## `hyodo safe` is early warning, not full SAST
+
+`hyodo safe` is a fast, offline, pattern-based scanner. It flags obvious
+risk signals (for example hardcoded-secret-shaped strings or dangerous
+call patterns) in the current working tree. It is **not**:
+
+- a full static-analysis (SAST) engine,
+- a comprehensive secret-scanning service,
+- a substitute for `hyodo check`, dependency scanning, or human review.
+
+Treat a clean `hyodo safe` run as "no obvious red flags found," not as
+"verified secure." Run it with:
+
+```bash
+hyodo safe
+```
+
+## Release pipeline: Trusted Publishing + provenance
+
+Releases to PyPI are handled by `.github/workflows/publish.yml` using PyPI
+**Trusted Publishing** (OIDC) — there is no long-lived PyPI API token stored
+as a repository secret. The workflow:
+
+1. Builds the sdist/wheel from the tagged commit.
+2. Publishes via the OIDC-based trusted-publisher flow
+   (`pypa/gh-action-pypi-publish`).
+3. Generates build provenance/attestation for the published artifacts.
+
+This means a PyPI release is cryptographically traceable back to the exact
+GitHub Actions run and workflow file that produced it, and does not depend
+on a credential that could leak or be reused outside CI. See
+[`docs/PYPI_TRUSTED_PUBLISHING.md`](PYPI_TRUSTED_PUBLISHING.md) for the
+mechanics, and verify a specific release with:
+
+```bash
+python scripts/release/verify-pypi-release.py
+```
+
+`scripts/release/check_version_sync.py` additionally checks that `VERSION`,
+`pyproject.toml`, and any other declared version sources agree before a tag
+is cut, so a release can't ship with mismatched version metadata.
+
+## CI checks (`.github/workflows/ci.yml`, `smoke.yml`)
+
+- `ci.yml` installs the package with `pip install -e ".[dev]"`, then runs
+  `ruff check`, `pyright`, and `pytest tests -q` against the public surface
+  only.
+- `smoke.yml` installs the built package and exercises the `hyodo` CLI
+  entry points end-to-end, catching packaging/entry-point regressions that
+  unit tests alone would miss.
+- `scripts/verify-public.sh` and `scripts/demo-dry-run.sh` provide local
+  equivalents of the CI checks a contributor can run before pushing.
+
+## Dependabot scope
+
+`.github/dependabot.yml` tracks the root `pyproject.toml` (the public
+package's dependency graph) and the GitHub Actions workflow files. Because
+the runtime dependency list is intentionally short (`typer`, `rich`), the
+expected steady-state alert volume is low; any alert against the public
+surface is expected to be triaged and patched promptly, not deferred.
+
+## Secrets
+
+- Do not commit secrets, tokens, or credentials to this repository.
+- The PyPI release path uses OIDC Trusted Publishing specifically to avoid
+  needing a long-lived publish token as a stored secret (see above).
+- Report suspected credential leaks per [`SECURITY.md`](../SECURITY.md).
+
+## Verification commands
+
+```bash
+pip install -e ".[dev]"
+hyodo check
+hyodo safe
+python -m pytest tests -q
+ruff check hyodo/
+pyright hyodo
+python scripts/generate_sbom.py
+python scripts/release/check_version_sync.py
 ```
 
 ## Related docs
 
 - [`SECURITY.md`](../SECURITY.md) — reporting and keyword safety gates
-- [`SECURITY_PATCHES.md`](../SECURITY_PATCHES.md) — historical patch log (may be stale)
-- [`.github/dependabot.yml`](../.github/dependabot.yml) — update grouping
-
-
-### P1 high-volume patch (2026-07-16)
-
-Raised floors and re-locked: aiohttp>=3.14.1, starlette>=1.3.1, fastapi>=0.139,
-Mako, PyJWT, banks, langsmith, lxml, mcp, orjson, protobuf, soupsieve.
-Stale chromadb Dependabot alerts (package absent from lock) should auto-close on re-scan.
-
-
-### Dependabot double-count fix
-
-`requirements.txt` is no longer a pinned export. Dependabot SSOT for afo_core is
-`poetry.lock` only. This removes the 2x inflation (poetry.lock + requirements.txt).
-
-### P2 medium patch
-
-Raised floors for remaining patchable medium/low: idna, requests, pytest,
-python-dotenv, Pygments, pydantic-settings, torch>=2.10. Residual: diskcache (no
-patch), mem0ai (beta-only fix).
-
-### mem0ai removal
-
-Removed optional `mem0ai` (agent long-term memory experiment). Not used by
-public `hyodo` package. Runtime soft-fails without it. Clears CVE-2026-7597 low.
-
-
-### No-patch residual policy (2026-07-16)
-
-Open Dependabot alerts with **no upstream patched version** may be dismissed as
-`tolerable_risk` when:
-
-1. package is not on the public `hyodo` runtime path, and
-2. advisory is documented here, and
-3. re-check when vendor ships a fix.
-
-Dismissed examples (afo_core advisory tree only):
-
-| Package | CVE | Reason |
-|---------|-----|--------|
-| diskcache | CVE-2025-69872 | no patched version; transitive (dspy/ag2/litellm extras) |
-| torch | CVE-2025-3000 | no patched version; ml optional path only |
+- [`docs/PYPI_TRUSTED_PUBLISHING.md`](PYPI_TRUSTED_PUBLISHING.md) — OIDC
+  publish flow details
+- [`docs/EXTERNAL_CLAIM_AUDIT.md`](EXTERNAL_CLAIM_AUDIT.md) — audit of
+  externally-facing claims
+- [`.github/dependabot.yml`](../.github/dependabot.yml) — update scope

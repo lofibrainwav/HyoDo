@@ -3,7 +3,7 @@
 Purpose: a short recorded walkthrough or live screen-share script for reviewers,
 technical enablement roles, and developer-facing interviews.
 
-**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **3.2.0**.
+**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **3.2.1**.
 
 ## Title
 
@@ -11,7 +11,7 @@ HyoDo in 3 minutes: model-agnostic quality gates for AI-assisted code
 
 ## Setup
 
-- On `main`, clean worktree (`git status` clean), tag `v3.2.0` or later if demoing a release.
+- On `main`, clean worktree (`git status` clean), tag `v3.2.1` or later if demoing a release.
 - Run `bash scripts/verify-public.sh` (must exit 0) before recording.
 - Run `bash scripts/demo-dry-run.sh`; its receipt is a pre-commit worktree
   record, so use the live terminal output—not the receipt header—as the
@@ -37,8 +37,7 @@ Start with the README top:
 - tiered routing is **intent only** (no guaranteed savings)
 - PyPI: `pip install hyodo` (measure live version if you claim it)
 
-Say: public package is `hyodo/`; extended `afo_core/` is advisory and not the
-demo path.
+Say: the public package is `hyodo/` (Python package + CLI).
 
 ### 0:50-1:50 - Command loop
 
@@ -74,7 +73,7 @@ Open `.github/workflows/smoke.yml` or CI badge/history.
 Point out:
 
 - package build + twine + wheel install
-- sdist does **not** ship `afo_core`
+- sdist ships only the public `hyodo` package
 - public API and version SSOT
 - public pytest is a release blocker (Truth Patch)
 
@@ -87,8 +86,7 @@ State clearly:
 
 1. Scores are review signals; humans approve merges.
 2. `check` is not a universal multi-language gate.
-3. `afo_core` is advisory extended tree.
-4. No public cost-savings benchmark; tiered routing is design intent.
+3. No public cost-savings benchmark; tiered routing is design intent.
 
 ### 2:45-3:00 - Close
 
@@ -115,4 +113,4 @@ Measure live before claiming:
 curl -s https://pypi.org/pypi/hyodo/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
 ```
 
-As of the v3.2.0 release, public PyPI ships **3.2.0** (confirm live).
+As of the v3.2.1 release, public PyPI ships **3.2.1** (confirm live).

@@ -5,7 +5,7 @@ This checklist blocks a public release until the package, CLI, and workflow path
 ## Current target
 
 - Target version: see `VERSION` (SSOT; do not hardcode)
-- Public package path only — `afo_core/` is advisory, not a release blocker
+- Public package path only — the sdist ships only the `hyodo` package
 - Truth contracts (v3.1.7+): `check` zero-gates → exit 2; `safe --strict` high → exit 1
 - Supply-chain (v3.1.8+): PyPI via Trusted Publishing only — see `docs/PYPI_TRUSTED_PUBLISHING.md`
 
@@ -16,7 +16,7 @@ bash scripts/verify-public.sh
 python scripts/release/check_version_sync.py
 ```
 
-Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke green
+Expected: exit 0, version synchronized, sdist limited to the public package, CLI smoke green
 (including empty-tree `check` exit 2 and `safe --strict` high-fixture exit 1).
 
 ### Documentation
@@ -24,7 +24,7 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 - [ ] `README.md` leads with model-agnostic quality gate (CLI + CI) and honest check scope
 - [ ] `CHANGELOG.md` has a section for the target version
 - [ ] `QUICK_START.md` / `CONTRIBUTING.md` use HYOGOOK V5 + review-signal language
-- [ ] `SECURITY.md` + `docs/SECURITY_SURFACE.md` document public vs advisory tree
+- [ ] `SECURITY.md` + `docs/SECURITY_SURFACE.md` document the public package security surface
 - [ ] No public claim language that implies automatic merge/write authority
 - [ ] Exit-code contracts for `check` / `safe` documented in README or quick start
 - [ ] PyPI badge only if live index matches the release claim
@@ -36,7 +36,7 @@ Expected: exit 0, version synchronized, sdist without `afo_core`, CLI smoke gree
 - [ ] `hyodo score` emits REVIEW_SIGNAL (not approval)
 - [ ] `hyodo safe` flags secret fixtures; `--strict` exits 1 on high findings
 - [ ] Empty/non-HyoDo `hyodo check` exits 2 (not false green)
-- [ ] Sdist does not ship `afo_core`
+- [ ] Sdist ships only the public `hyodo` package
 
 ### CI and smoke (GitHub Actions)
 

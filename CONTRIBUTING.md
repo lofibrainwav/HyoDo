@@ -9,8 +9,6 @@ small, inspectable, and honest about what was actually verified.
   [pull requests](https://github.com/lofibrainwav/HyoDo/pulls).
 - Open an issue before large features or public API changes.
 - Use Python 3.10 or newer.
-- Keep `afo_core/` changes separate from the public `hyodo/` package when
-  possible.
 
 ## Development setup
 
