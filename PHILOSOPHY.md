@@ -10,9 +10,15 @@ is English. Scores are **review signals**, not automatic approval.
 | Benevolence | Developer experience and user serenity |
 | Truth | Technical accuracy and evidence |
 | Goodness | Security and stability |
-| Loyalty | Continuity and SSOT discipline |
+| Hyo | Reciprocal and voluntary continuity — SSOT discipline |
 | Beauty | Clarity and maintainability |
 | Eternity | Geometric-mean harmony (derived) |
+
+Philosophy version: **V6**. Hyo (孝) supersedes the earlier one-sided
+Loyalty (忠): a reciprocal and voluntary relational discipline. The public
+API accepts `loyalty=` as a deprecated alias of `hyo=` until 4.0.0. The
+legacy `calculate_trinity_score()` compatibility path is frozen as-is so
+historical scores remain reproducible.
 
 ## Operating boundaries
 

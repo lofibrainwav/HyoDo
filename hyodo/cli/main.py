@@ -366,12 +366,13 @@ def score(
     benevolence: float = typer.Option(1.0, "--benevolence", "-i", help="Benevolence score (0-1)"),
     truth: float = typer.Option(1.0, "--truth", "-t", help="Truth score (0-1)"),
     goodness: float = typer.Option(1.0, "--goodness", "-g", help="Goodness score (0-1)"),
-    loyalty: float = typer.Option(1.0, "--loyalty", "-c", help="Loyalty score (0-1)"),
+    hyo: float | None = typer.Option(None, "--hyo", help="Hyo score (0-1); supersedes --loyalty"),
+    loyalty: float = typer.Option(1.0, "--loyalty", "-c", help="[Deprecated] alias of --hyo (0-1)"),
     beauty: float = typer.Option(1.0, "--beauty", "-b", help="Beauty score (0-1)"),
     serenity: float = typer.Option(
         1.0, "--serenity", "-s", help="[Legacy] maps to benevolence (0-1)"
     ),
-    eternity: float = typer.Option(1.0, "--eternity", "-e", help="[Legacy] maps to loyalty (0-1)"),
+    eternity: float = typer.Option(1.0, "--eternity", "-e", help="[Legacy] maps to hyo (0-1)"),
 ):
     """
     Compute HYOGOOK V5 review signal.
@@ -385,11 +386,9 @@ def score(
     from hyodo import calculate_hygook_v5_score
 
     effective_benevolence = benevolence if serenity == 1.0 else serenity
-    effective_loyalty = loyalty if eternity == 1.0 else eternity
+    effective_hyo = hyo if hyo is not None else (loyalty if eternity == 1.0 else eternity)
 
-    F, S = calculate_hygook_v5_score(
-        effective_benevolence, truth, goodness, effective_loyalty, beauty
-    )
+    F, S = calculate_hygook_v5_score(effective_benevolence, truth, goodness, effective_hyo, beauty)
     score_value = ((F - 6) / (60 - 6)) * 100
 
     table = Table(title="HYOGOOK V5 Review Signal", show_header=True)
@@ -407,10 +406,10 @@ def score(
     table.add_row("Truth", f"{truth * 100:.0f}", "22% (not in F)", f"{truth:.2f}")
     table.add_row("Goodness", f"{goodness * 100:.0f}", "18% (not in F)", f"{goodness:.2f}")
     table.add_row(
-        "Loyalty",
-        f"{effective_loyalty * 100:.0f}",
+        "Hyo",
+        f"{effective_hyo * 100:.0f}",
         "15% (not in F)",
-        f"{effective_loyalty:.2f}",
+        f"{effective_hyo:.2f}",
     )
     table.add_row("Beauty", f"{beauty * 100:.0f}", "15% (not in F)", f"{beauty:.2f}")
     table.add_row("", "", "", "")

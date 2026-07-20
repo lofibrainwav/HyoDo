@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-07-20
+
+### Added
+
+- `hyo` is the canonical fourth pillar of the HYOGOOK score (philosophy V6):
+  `calculate_hygook_v5_score(..., hyo=...)` and `hyodo score --hyo`. Positional
+  callers are unaffected.
+- `hyodo.__philosophy_version__` (`"V6"`) exposes the philosophy lineage
+  separately from the package semver.
+- `tests/test_hyo_restoration.py`: deprecation contract, signature/doc pillar
+  parity, and the F-score floor (6.0) sealed as regression tests.
+
+### Deprecated
+
+- `loyalty=` keyword on `calculate_hygook_v5_score` and the `--loyalty` CLI
+  flag: both emit `DeprecationWarning` and map to `hyo`. Passing both raises
+  `TypeError`. Scheduled for removal in 4.0.0.
+
+### Changed
+
+- `PHILOSOPHY.md`, `README.md`, and demo docs now name the pillar Hyo —
+  a reciprocal and voluntary relational discipline superseding the earlier
+  one-sided Loyalty. The legacy `calculate_trinity_score()` path is frozen so
+  historical scores remain reproducible.
+
 ## [3.2.1] - 2026-07-20
 
 ### Fixed

@@ -89,5 +89,7 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 | 2026-07-16 | 3.1.7 | format gate + safe scan exit 2 + path-stable tests; tag/PyPI 3.1.7 |
 | 2026-07-16 | 3.1.8 | Supply-chain seal: Trusted Publishing workflow + provenance verify path |
 | 2026-07-19 | 3.2.0 | safe --json (outward CI) + check honesty hardening (SBOM exception split, N/M gates ran) |
+| 2026-07-20 | 3.2.1 | Pyright interpreter pin (venv false missing-import fix) |
+| 2026-07-20 | 3.3.0 | Philosophy V6: `hyo` pillar restored; `loyalty` deprecated alias until 4.0.0 |
 
 Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published + (if claiming pip) Trusted Publishing success with non-null provenance.

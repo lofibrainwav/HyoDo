@@ -46,7 +46,7 @@ The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`
 | Benevolence | 25% | Developer experience |
 | Truth | 22% | Technical accuracy |
 | Goodness | 18% | Security and stability |
-| Loyalty | 15% | Project/context alignment |
+| Hyo | 15% | Project/context alignment |
 | Beauty | 15% | Clarity and UX |
 | Eternity | geometric mean | Long-term harmony |
 

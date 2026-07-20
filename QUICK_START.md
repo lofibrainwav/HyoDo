@@ -5,7 +5,7 @@
 ### PyPI
 
 ```bash
-pip install -U 'hyodo==3.2.1'
+pip install -U 'hyodo==3.3.0'
 ```
 
 ### From source
@@ -22,7 +22,7 @@ pip install -e ".[dev]"
 hyodo --version
 hyodo check          # HyoDo checkout only
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
-  --benevolence 0.9 --loyalty 0.9
+  --benevolence 0.9 --hyo 0.9
 hyodo safe
 hyodo safe --strict  # exit 1 on high-severity findings
 ```

@@ -5,7 +5,7 @@ step when everything works — not a progress ritual mid-cleanup.
 
 ## Preconditions (measured)
 
-- [ ] On `main` (or latest release tag `v3.2.1+`), clean worktree
+- [ ] On `main` (or latest release tag `v3.3.0+`), clean worktree
 - [ ] `bash scripts/verify-public.sh` exits 0
 - [ ] Inside HyoDo checkout: `hyodo check` prints **All executed gates passed** and exits 0
 - [ ] Empty dir: `hyodo check /tmp/empty` exits **2** (not a false green)
@@ -23,7 +23,7 @@ step when everything works — not a progress ritual mid-cleanup.
 ```bash
 hyodo --version
 hyodo check
-hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9
 hyodo safe
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-demo-safe.txt
 hyodo safe /tmp/hyodo-demo-safe.txt

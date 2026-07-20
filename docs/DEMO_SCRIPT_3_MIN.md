@@ -3,7 +3,7 @@
 Purpose: a short recorded walkthrough or live screen-share script for reviewers,
 technical enablement roles, and developer-facing interviews.
 
-**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **3.2.1**.
+**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **3.3.0**.
 
 ## Title
 
@@ -11,7 +11,7 @@ HyoDo in 3 minutes: model-agnostic quality gates for AI-assisted code
 
 ## Setup
 
-- On `main`, clean worktree (`git status` clean), tag `v3.2.1` or later if demoing a release.
+- On `main`, clean worktree (`git status` clean), tag `v3.3.0` or later if demoing a release.
 - Run `bash scripts/verify-public.sh` (must exit 0) before recording.
 - Run `bash scripts/demo-dry-run.sh`; its receipt is a pre-commit worktree
   record, so use the live terminal output—not the receipt header—as the
@@ -44,7 +44,7 @@ Say: the public package is `hyodo/` (Python package + CLI).
 ```bash
 hyodo --version
 hyodo check
-hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9
 hyodo safe
 # secret fixture
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' > /tmp/hyodo-demo-safe.txt
@@ -113,4 +113,4 @@ Measure live before claiming:
 curl -s https://pypi.org/pypi/hyodo/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
 ```
 
-As of the v3.2.1 release, public PyPI ships **3.2.1** (confirm live).
+As of the v3.3.0 release, public PyPI ships **3.3.0** (confirm live).
