@@ -35,6 +35,18 @@ def test_run_safety_scan_on_inline_file(tmp_path):
     assert result["risk_score"] >= 15
     assert result["level"] in {"caution", "high"}
     assert "file:" in result["source"]
+    prod = [f for f in result["findings"] if f.category == "production_impact"]
+    assert prod
+    assert prod[0].path == str(sample)
+    assert prod[0].line == 1
+
+
+def test_scan_text_attaches_path_and_line():
+    text = "line1\ntoken = ghp_abcdefghijklmnopqrstuvwxyz012345\n"
+    findings = scan_text(text, path="/tmp/demo.py")
+    secret = next(f for f in findings if f.label == "github_token")
+    assert secret.path == "/tmp/demo.py"
+    assert secret.line == 2
 
 
 def test_run_safety_scan_missing_path_source(tmp_path):

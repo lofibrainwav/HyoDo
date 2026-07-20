@@ -3,7 +3,7 @@
 Purpose: a short recorded walkthrough or live screen-share script for reviewers,
 technical enablement roles, and developer-facing interviews.
 
-**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **4.0.0**.
+**Target version:** see `VERSION` (SSOT; do not hardcode). Current public line: **4.0.1**.
 
 ## Title
 
@@ -11,7 +11,7 @@ HyoDo in 3 minutes: model-agnostic quality gates for AI-assisted code
 
 ## Setup
 
-- On `main`, clean worktree (`git status` clean), tag `v4.0.0` or later if demoing a release.
+- On `main`, clean worktree (`git status` clean), tag `v4.0.1` or later if demoing a release.
 - Run `bash scripts/verify-public.sh` (must exit 0) before recording.
 - Run `bash scripts/demo-dry-run.sh`; its receipt is a pre-commit worktree
   record, so use the live terminal output—not the receipt header—as the
@@ -113,4 +113,4 @@ Measure live before claiming:
 curl -s https://pypi.org/pypi/hyodo/json | python3 -c "import sys,json; print(json.load(sys.stdin)['info']['version'])"
 ```
 
-As of the v4.0.0 release, public PyPI ships **4.0.0** (confirm live).
+As of the v4.0.0 release, public PyPI ships **4.0.1** (confirm live).

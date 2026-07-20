@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.0.1] - 2026-07-20
+
+### Fixed
+
+- **`hyodo score` no longer defaults missing pillars to 1.0.** All five
+  pillars must be provided explicitly; partial input exits `2` instead of
+  inventing a false `REVIEW_SIGNAL_STRONG`.
+- **Legacy flag collisions are errors.** Combining `--hyo` with `--eternity`,
+  or `--benevolence` with `--serenity`, exits `2` with a clear message
+  (previously the legacy flag silently overrode the primary value when it
+  was not exactly `1.0`).
+- **`is_strong_review_signal`** rejects non-numeric `risk_score` /
+  `trinity_score` (e.g. level strings like `"low"`) with `TypeError`.
+- **`hyodo safe` findings** include optional `path` and `line` for file and
+  per-file directory scans (JSON + text). Git-diff default corpus still has
+  no path attribution.
+- Empty **Production impact** row is always ✅ (no non-strict-only ⚠️ that
+  looked like a finding without a finding).
+
+### Changed
+
+- CLI score title and onboarding: **HYOGOOK F-score (philosophy V6)** — formula
+  lineage V5 remains the F math; philosophy version is V6.
+- Removed dead Dependabot `/afo_core` ecosystem block (tree removed from the
+  public repo on 2026-07-19).
+- Dockerfile: drop placeholder maintainer email; version label `4.0.1`.
+
+### Docs
+
+- Quick Start pin and demo checklists updated to `4.0.1`.
+- Onboarding example requires all five pillars.
+
 ## [4.0.0] - 2026-07-20
 
 ### Removed

@@ -10,7 +10,7 @@ Usage: hyodo [COMMAND] [OPTIONS]
 
 Examples:
     hyodo check              # HyoDo checkout release gates
-    hyodo score              # HYOGOOK V5 review signal
+    hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9
     hyodo safe               # lightweight safety scan
     hyodo safe --strict      # block on high-severity findings
     hyodo trinity "task"     # detailed review checklist
@@ -361,36 +361,112 @@ def check(
     raise typer.Exit(0)
 
 
+def _resolve_score_pillars(
+    benevolence: float | None,
+    truth: float | None,
+    goodness: float | None,
+    hyo: float | None,
+    beauty: float | None,
+    serenity: float | None,
+    eternity: float | None,
+) -> tuple[float, float, float, float, float]:
+    """Resolve primary vs legacy flags; require all five pillars explicitly.
+
+    Raises typer.Exit(2) on missing pillars or dual-flag conflicts.
+    """
+    if benevolence is not None and serenity is not None:
+        console.print(
+            "[red]Conflicting flags: pass only one of --benevolence/-i or "
+            "--serenity/-s (legacy).[/red]"
+        )
+        raise typer.Exit(2)
+    if hyo is not None and eternity is not None:
+        console.print(
+            "[red]Conflicting flags: pass only one of --hyo/-c or --eternity/-e (legacy).[/red]"
+        )
+        raise typer.Exit(2)
+
+    effective_benevolence = benevolence if benevolence is not None else serenity
+    effective_hyo = hyo if hyo is not None else eternity
+
+    missing: list[str] = []
+    if effective_benevolence is None:
+        missing.append("--benevolence/-i (or legacy --serenity/-s)")
+    if truth is None:
+        missing.append("--truth/-t")
+    if goodness is None:
+        missing.append("--goodness/-g")
+    if effective_hyo is None:
+        missing.append("--hyo/-c (or legacy --eternity/-e)")
+    if beauty is None:
+        missing.append("--beauty/-b")
+    if missing:
+        console.print("[red]All five pillars are required. Missing:[/red] " + ", ".join(missing))
+        console.print("[dim]Example: hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9[/dim]")
+        console.print(
+            "[yellow]Defaults no longer fill missing pillars "
+            "(avoids false STRONG signals).[/yellow]"
+        )
+        raise typer.Exit(2)
+
+    # Narrowed by the missing check above.
+    assert effective_benevolence is not None
+    assert truth is not None
+    assert goodness is not None
+    assert effective_hyo is not None
+    assert beauty is not None
+    return effective_benevolence, truth, goodness, effective_hyo, beauty
+
+
 @app.command()
 def score(
-    benevolence: float = typer.Option(1.0, "--benevolence", "-i", help="Benevolence score (0-1)"),
-    truth: float = typer.Option(1.0, "--truth", "-t", help="Truth score (0-1)"),
-    goodness: float = typer.Option(1.0, "--goodness", "-g", help="Goodness score (0-1)"),
-    hyo: float = typer.Option(1.0, "--hyo", "-c", help="Hyo score (0-1)"),
-    beauty: float = typer.Option(1.0, "--beauty", "-b", help="Beauty score (0-1)"),
-    serenity: float = typer.Option(
-        1.0, "--serenity", "-s", help="[Legacy] maps to benevolence (0-1)"
+    benevolence: float | None = typer.Option(
+        None, "--benevolence", "-i", help="Benevolence score (0-1); required"
     ),
-    eternity: float = typer.Option(1.0, "--eternity", "-e", help="[Legacy] maps to hyo (0-1)"),
+    truth: float | None = typer.Option(None, "--truth", "-t", help="Truth score (0-1); required"),
+    goodness: float | None = typer.Option(
+        None, "--goodness", "-g", help="Goodness score (0-1); required"
+    ),
+    hyo: float | None = typer.Option(None, "--hyo", "-c", help="Hyo score (0-1); required"),
+    beauty: float | None = typer.Option(
+        None, "--beauty", "-b", help="Beauty score (0-1); required"
+    ),
+    serenity: float | None = typer.Option(
+        None, "--serenity", "-s", help="[Legacy] maps to benevolence (0-1)"
+    ),
+    eternity: float | None = typer.Option(
+        None, "--eternity", "-e", help="[Legacy] maps to hyo (0-1)"
+    ),
 ):
     """
-    Compute HYOGOOK V5 review signal.
+    Compute HYOGOOK F-score review signal (philosophy V6).
 
     F = sum(five pillars on 1–10 scale) + geometric_mean
     S = geometric_mean
 
-    Review emphasis labels are philosophical emphasis only — not F-score weights.
+    All five pillars must be provided explicitly (no silent 1.0 defaults).
+    Legacy --serenity/--eternity may substitute for benevolence/hyo, but
+    primary and legacy flags for the same pillar cannot be combined.
+    Review emphasis labels are philosophical only — not F-score weights.
     Output is a review signal only — not automatic approval.
     """
     from hyodo import calculate_hygook_v5_score
 
-    effective_benevolence = benevolence if serenity == 1.0 else serenity
-    effective_hyo = hyo if eternity == 1.0 else eternity
+    (
+        effective_benevolence,
+        truth,
+        goodness,
+        effective_hyo,
+        beauty,
+    ) = _resolve_score_pillars(benevolence, truth, goodness, hyo, beauty, serenity, eternity)
 
     F, S = calculate_hygook_v5_score(effective_benevolence, truth, goodness, effective_hyo, beauty)
     score_value = ((F - 6) / (60 - 6)) * 100
 
-    table = Table(title="HYOGOOK V5 Review Signal", show_header=True)
+    table = Table(
+        title="HYOGOOK F-score Review Signal (philosophy V6)",
+        show_header=True,
+    )
     table.add_column("Pillar", style="cyan")
     table.add_column("Score", justify="right")
     table.add_column("Review emphasis", justify="right")
@@ -420,7 +496,7 @@ def score(
     console.print(table)
     console.print(
         "[dim]Review emphasis is not used in the F formula "
-        "(F = sum(1–10 pillars) + geometric mean).[/dim]"
+        "(F = sum(1–10 pillars) + geometric mean). Formula lineage V5 · philosophy V6.[/dim]"
     )
 
     if score_value >= 90:
@@ -506,8 +582,16 @@ def safe(
     if high_findings:
         console.print("\n[bold]Findings[/bold]")
         for finding in high_findings[:12]:
+            loc = ""
+            if finding.path:
+                loc = f" @ {finding.path}"
+                if finding.line is not None:
+                    loc += f":{finding.line}"
+            elif finding.line is not None:
+                loc = f" @ line {finding.line}"
             console.print(
-                f"  - [{finding.severity}] {finding.category}/{finding.label}: {finding.detail}"
+                f"  - [{finding.severity}] {finding.category}/{finding.label}: "
+                f"{finding.detail}{loc}"
             )
 
     console.print(f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}")
@@ -534,14 +618,14 @@ Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
 
 [bold cyan]Core commands:[/bold cyan]
   • [bold]check[/bold]  - HyoDo checkout release gates (ruff/pyright/pytest)
-  • [bold]score[/bold]  - HYOGOOK V5 review signal (not auto-approval)
+  • [bold]score[/bold]  - HYOGOOK F-score review signal, philosophy V6 (not auto-approval)
   • [bold]safe[/bold]   - lightweight safety early-warning scan
   • [bold]safe --strict[/bold] - exit 1 on high-severity findings
   • [bold]trinity[/bold] - structured review checklist
 
 [bold cyan]Examples:[/bold cyan]
   $ hyodo check
-  $ hyodo score -t 0.9 -g 0.8
+  $ hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9
   $ hyodo safe --strict
 
 [bold cyan]Boundary:[/bold cyan]
