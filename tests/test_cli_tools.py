@@ -14,6 +14,7 @@ from hyodo.cli.main import (
     app,
     find_repo_root,
     resolve_check_target,
+    run_pyright_check,
     run_pytest_check,
     run_ruff_check,
 )
@@ -42,6 +43,22 @@ def test_run_pytest_check_uses_python_m_pytest(tmp_path):
     cmd = run.call_args.args[0]
     assert cmd[0] == sys.executable
     assert cmd[1:3] == ["-m", "pytest"]
+
+
+def test_run_pyright_check_uses_host_interpreter_for_import_resolution(tmp_path):
+    """Pyright must resolve dependencies from the interpreter running HyoDo."""
+    ok = MagicMock(returncode=0, stdout="0 errors, 0 warnings\n", stderr="")
+    with (
+        patch("hyodo.cli.main._module_importable", return_value=True),
+        patch("hyodo.cli.main.subprocess.run", return_value=ok) as run,
+    ):
+        result = run_pyright_check(tmp_path, verbose=False)
+
+    assert result.status is GateStatus.PASS
+    cmd = run.call_args.args[0]
+    assert cmd[:3] == [sys.executable, "-m", "pyright"]
+    assert cmd[3:5] == ["--pythonpath", sys.executable]
+    assert cmd[5:] == ["hyodo"]
 
 
 def test_missing_tool_soft_skip_without_root():

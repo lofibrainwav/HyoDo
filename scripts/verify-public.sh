@@ -44,7 +44,7 @@ $PYTHON -m ruff check hyodo/ tests/ --output-format=concise
 $PYTHON -m ruff format --check hyodo/ tests/
 
 echo "-- pyright --"
-$PYTHON -m pyright hyodo
+$PYTHON -m pyright --pythonpath "$PYTHON" hyodo
 
 echo "-- pytest --"
 $PYTHON -m pytest tests -q --tb=short
