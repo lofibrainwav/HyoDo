@@ -113,6 +113,11 @@ inventory artifact and is never relabeled as a reliability measurement. The
 server listens only on loopback and exposes the exact snapshot at
 `/api/evidence`.
 
+The page follows the system light or dark theme and polls `/api/evidence`
+every 15 seconds, reloading only when a newer measurement exists. By default
+the snapshot stays fixed at server start; pass `--interval N` to re-measure
+in the background every `N` seconds.
+
 ## Scope
 
 The supported release surface is intentionally narrow:

@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 import webbrowser
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -34,7 +35,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from hyodo import __version__
-from hyodo.dashboard import render_dashboard_html
+from hyodo.dashboard import POLL_SCRIPT_SHA256, render_dashboard_html
 from hyodo.safety import run_safety_scan
 
 app = typer.Typer(
@@ -299,6 +300,75 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
     }
 
 
+DASHBOARD_CSP = (
+    "default-src 'none'; style-src 'unsafe-inline'; "
+    f"script-src 'sha256-{POLL_SCRIPT_SHA256}'; connect-src 'self'"
+)
+
+
+class DashboardState:
+    """Thread-safe holder for the latest rendered snapshot."""
+
+    def __init__(self, evidence: dict[str, object]) -> None:
+        self._lock = threading.Lock()
+        self.update(evidence)
+
+    def update(self, evidence: dict[str, object]) -> None:
+        page = render_dashboard_html(evidence).encode("utf-8")
+        evidence_json = json.dumps(evidence, default=str, sort_keys=True).encode("utf-8")
+        with self._lock:
+            self._page = page
+            self._evidence_json = evidence_json
+
+    def snapshot(self) -> tuple[bytes, bytes]:
+        with self._lock:
+            return self._page, self._evidence_json
+
+
+def make_dashboard_handler(state: DashboardState) -> type[BaseHTTPRequestHandler]:
+    """Build the loopback request handler serving the current snapshot."""
+
+    class DashboardHandler(BaseHTTPRequestHandler):
+        def _resolve(self) -> tuple[bytes, str] | None:
+            page, evidence_json = state.snapshot()
+            if self.path == "/":
+                return page, "text/html; charset=utf-8"
+            if self.path == "/api/evidence":
+                return evidence_json, "application/json"
+            return None
+
+        def _send_headers(self, body: bytes, content_type: str) -> None:
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Security-Policy", DASHBOARD_CSP)
+            self.end_headers()
+
+        def do_GET(self) -> None:
+            resolved = self._resolve()
+            if resolved is None:
+                self.send_error(404, "Not found")
+                return
+            body, content_type = resolved
+            self._send_headers(body, content_type)
+            self.wfile.write(body)
+
+        def do_HEAD(self) -> None:
+            resolved = self._resolve()
+            if resolved is None:
+                self.send_error(404, "Not found")
+                return
+            body, content_type = resolved
+            self._send_headers(body, content_type)
+
+        def log_message(self, format: str, *_args: object) -> None:
+            return
+
+    return DashboardHandler
+
+
 @app.command()
 def dashboard(
     path: str | None = typer.Argument(
@@ -307,6 +377,12 @@ def dashboard(
     port: int = typer.Option(8768, "--port", min=1, max=65535, help="Loopback port"),
     open_browser: bool = typer.Option(
         False, "--open", help="Open the dashboard in the default browser"
+    ),
+    interval: int = typer.Option(
+        0,
+        "--interval",
+        min=0,
+        help="Re-measure every N seconds in the background (0 keeps the snapshot fixed)",
     ),
 ):
     """Serve a local, evidence-only Jin-Seon-Mi-In-Hyo-Yeong dashboard."""
@@ -319,40 +395,31 @@ def dashboard(
     if root is None:
         console.print("[red]dashboard requires a HyoDo checkout (pyproject.toml + hyodo/).[/red]")
         raise typer.Exit(2)
-    evidence = collect_dashboard_evidence(root)
-    page = render_dashboard_html(evidence).encode("utf-8")
-    evidence_json = json.dumps(evidence, default=str, sort_keys=True).encode("utf-8")
+    state = DashboardState(collect_dashboard_evidence(root))
+    stop_refresh = threading.Event()
 
-    class DashboardHandler(BaseHTTPRequestHandler):
-        def do_GET(self) -> None:
-            if self.path == "/":
-                body, content_type = page, "text/html; charset=utf-8"
-            elif self.path == "/api/evidence":
-                body, content_type = evidence_json, "application/json"
-            else:
-                self.send_error(404, "Not found")
-                return
-            self.send_response(200)
-            self.send_header("Content-Type", content_type)
-            self.send_header("Content-Length", str(len(body)))
-            self.send_header("Cache-Control", "no-store")
-            self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header(
-                "Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'"
-            )
-            self.end_headers()
-            self.wfile.write(body)
-
-        def log_message(self, format: str, *_args: object) -> None:
-            return
+    def _refresh_loop() -> None:
+        while not stop_refresh.wait(interval):
+            try:
+                state.update(collect_dashboard_evidence(root))
+            except Exception as exc:
+                console.print(f"[yellow]Re-measure failed; keeping last snapshot: {exc}[/yellow]")
 
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", port), DashboardHandler)
+        server = ThreadingHTTPServer(("127.0.0.1", port), make_dashboard_handler(state))
     except OSError as exc:
         console.print(f"[red]Cannot bind 127.0.0.1:{port}: {exc}[/red]")
         raise typer.Exit(1) from exc
     console.print(f"[green]Dashboard: http://127.0.0.1:{port}[/green]")
-    console.print("[dim]Local only. Press Ctrl+C to stop. Snapshot is fixed at server start.[/dim]")
+    if interval:
+        console.print(
+            f"[dim]Local only. Press Ctrl+C to stop. Re-measures every {interval}s.[/dim]"
+        )
+        threading.Thread(target=_refresh_loop, name="hyodo-dashboard-refresh", daemon=True).start()
+    else:
+        console.print(
+            "[dim]Local only. Press Ctrl+C to stop. Snapshot is fixed at server start.[/dim]"
+        )
     if open_browser:
         webbrowser.open(f"http://127.0.0.1:{port}/")
     try:
@@ -360,6 +427,7 @@ def dashboard(
     except KeyboardInterrupt:
         console.print("\nDashboard stopped.")
     finally:
+        stop_refresh.set()
         server.server_close()
 
 
