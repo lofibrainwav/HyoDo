@@ -6,7 +6,9 @@ SAST, dependency audit, tests, or human security review.
 
 from __future__ import annotations
 
+import json
 import re
+import shutil
 import subprocess
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
@@ -273,6 +275,7 @@ def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tupl
     dangerous = [f for f in findings if f.category == "dangerous_command"]
     production = [f for f in findings if f.category == "production_impact"]
     rollback = [f for f in findings if f.category == "rollback"]
+    external = [f for f in findings if f.category == "external_scan"]
 
     def status(items: list[Finding], empty_ok: str = "✅") -> tuple[str, str]:
         """Return the display icon and color for a group of findings."""
@@ -283,6 +286,8 @@ def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tupl
             return "❌", "red"
         if worst.severity == "medium":
             return "⚠️", "yellow"
+        if worst.severity == "info":
+            return empty_ok, "green"
         return "⚠️", "yellow"
 
     secret_icon, secret_color = status(secrets)
@@ -293,16 +298,149 @@ def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tupl
     if rollback and rollback[0].label == "rollback_hint_missing" and production:
         rollback_icon, rollback_color = "⚠️", "yellow"
 
-    return [
+    rows = [
         ("Secrets exposure", secret_icon, secret_color),
         ("Dangerous commands", danger_icon, danger_color),
         ("Production impact", prod_icon, prod_color),
         ("Rollback signal", rollback_icon, rollback_color),
     ]
+    if external:
+        ext_icon, ext_color = status(external)
+        rows.append(("External scan", ext_icon, ext_color))
+    return rows
 
 
-def _scan_directory(target: Path) -> tuple[list[Finding], str, str]:
-    """Per-file scan for directories (path attached). Caps at 40 files."""
+def _run_external_scanner(
+    tool: str, cwd: Path, path: str | None = None
+) -> tuple[list[Finding], str]:
+    """Run gitleaks or trufflehog as an external secret scanner.
+
+    Returns (findings, source_description). On tool-not-found or execution
+    failure, returns ([], "error:<detail>").
+
+    Note: trufflehog performs live verification (candidate secrets are sent to
+    the issuing service's API to test validity). Verified hits are reported as
+    high severity; unverified hits as medium (frequent false positives).
+    """
+    tool_map = {
+        "gitleaks": {
+            "binary": "gitleaks",
+            "scan_args": ["detect", "--source", ".", "--no-banner", "--format", "json", "--no-git"],
+        },
+        "trufflehog": {
+            "binary": "trufflehog",
+            "scan_args": ["git", "file://.", "--json", "--no-update"],
+        },
+    }
+
+    config = tool_map.get(tool)
+    if not config:
+        return [], f"error:unknown scanner '{tool}' (use gitleaks or trufflehog)"
+
+    binary = shutil.which(config["binary"])
+    if not binary:
+        return [], f"error:{config['binary']} not installed (brew install {config['binary']})"
+
+    scan_cmd = [binary] + config["scan_args"]
+    if path:
+        if tool == "trufflehog":
+            scan_cmd = [binary, "git", f"file://{path}", "--json", "--no-update"]
+        else:
+            scan_cmd = [
+                binary,
+                "detect",
+                "--source",
+                str(path),
+                "--no-banner",
+                "--format",
+                "json",
+                "--no-git",
+            ]
+
+    try:
+        result = subprocess.run(
+            scan_cmd,
+            capture_output=True,
+            text=True,
+            timeout=120,
+            cwd=str(cwd),
+        )
+    except subprocess.TimeoutExpired:
+        return [], f"error:{tool} scan timed out (>120s)"
+    except OSError as e:
+        return [], f"error:{tool} execution failed: {e}"
+
+    findings: list[Finding] = []
+    source = f"{tool}:scan"
+    raw = result.stdout.strip()
+
+    if not raw:
+        findings.append(
+            Finding(
+                category="external_scan",
+                severity="info",
+                label=f"{tool}_clean",
+                detail=f"{tool} found no secrets",
+                path=None,
+                line=None,
+            )
+        )
+        return findings, source
+
+    try:
+        if raw.startswith("["):
+            items = json.loads(raw)
+        else:
+            items = [json.loads(line) for line in raw.splitlines() if line.strip()]
+    except json.JSONDecodeError:
+        findings.append(
+            Finding(
+                category="external_scan",
+                severity="info",
+                label=f"{tool}_output",
+                detail=f"{tool} produced non-JSON output ({len(raw)} bytes)",
+                path=None,
+                line=None,
+            )
+        )
+        return findings, source
+
+    for item in items:
+        desc = (
+            item.get("Description")
+            or item.get("DetectorName")
+            or item.get("Reason", "secret detected")
+        )
+        file_path = item.get("File") or item.get("SourceMetadata", {}).get("data", {}).get(
+            "filesystem", {}
+        ).get("file", "")
+        line_num = item.get("StartLine") or item.get("SourceMetadata", {}).get("data", {}).get(
+            "filesystem", {}
+        ).get("line")
+        # trufflehog live-verifies candidates; unverified hits are common false
+        # positives, so only verified ones carry high severity.
+        severity = "high"
+        if tool == "trufflehog" and not item.get("Verified", False):
+            severity = "medium"
+        findings.append(
+            Finding(
+                category="external_scan",
+                severity=severity,
+                label=f"{tool}_finding",
+                detail=f"{tool}: {desc}",
+                path=file_path if file_path else None,
+                line=line_num if isinstance(line_num, int) else None,
+            )
+        )
+
+    return findings, source
+
+
+def _scan_directory(target: Path, max_files: int = 40) -> tuple[list[Finding], str, str]:
+    """Per-file scan for directories (path attached).
+
+    Caps at *max_files* files; ``max_files <= 0`` means unlimited.
+    """
     findings: list[Finding] = []
     chunks: list[str] = []
     count = 0
@@ -320,7 +458,7 @@ def _scan_directory(target: Path) -> tuple[list[Finding], str, str]:
         findings.extend(scan_text(text, path=str(file_path)))
         chunks.append(text)
         count += 1
-        if count >= 40:
+        if max_files > 0 and count >= max_files:
             break
     corpus = "\n".join(chunks)
     findings.append(assess_rollback_signal(corpus))
@@ -328,15 +466,88 @@ def _scan_directory(target: Path) -> tuple[list[Finding], str, str]:
     return findings, corpus, source
 
 
+def _risk_level_action(score: int) -> tuple[str, str]:
+    """Map a risk score to its (level, action) verdict — single source of truth."""
+    if score >= 31:
+        return "high", "Review required — do not proceed without human approval"
+    if score >= 11:
+        return "caution", "Caution — explicit human review before any proceed decision"
+    return "low", "Low early-warning risk — final approval remains human"
+
+
+def _result_payload(source: str, findings: list[Finding], strict: bool) -> dict:
+    """Assemble the scan result dict from findings — single source of truth."""
+    score = risk_score(findings)
+    level, action = _risk_level_action(score)
+    return {
+        "source": source,
+        "findings": findings,
+        "rows": summarize_checks(findings, strict=strict),
+        "risk_score": score,
+        "level": level,
+        "action": action,
+    }
+
+
+def _run_merged_external_scan(root: Path, path: str | None, strict: bool) -> dict:
+    """Run gitleaks + trufflehog and merge results.
+
+    A scanner that fails to run is surfaced as a medium `*_unavailable` finding
+    (failure to observe is never reported as healthy). If neither scanner runs,
+    the source is an ``error:`` value so callers treat it as a failed scan.
+    """
+    merged: list[Finding] = []
+    sources: list[str] = []
+    errors: list[str] = []
+    for tool in ("gitleaks", "trufflehog"):
+        tool_findings, tool_source = _run_external_scanner(tool, root, path)
+        if tool_source.startswith("error:"):
+            errors.append(tool_source)
+            merged.append(
+                Finding(
+                    category="external_scan",
+                    severity="medium",
+                    label=f"{tool}_unavailable",
+                    detail=f"{tool} did not run — {tool_source.removeprefix('error:')}",
+                    path=None,
+                    line=None,
+                )
+            )
+        else:
+            merged.extend(tool_findings)
+            sources.append(tool_source)
+    if not sources:
+        return _result_payload(
+            "error:external scanners unavailable (" + "; ".join(errors) + ")", merged, strict
+        )
+    label = "+".join(sources) + f" ({len(merged)} findings)"
+    if errors:
+        label += " [partial: " + "; ".join(errors) + "]"
+    return _result_payload(label, merged, strict)
+
+
 def run_safety_scan(
     path: str | None = None,
     strict: bool = False,
     cwd: Path | None = None,
+    max_files: int = 40,
+    scan_tool: str | None = None,
 ) -> dict:
-    """Scan a target and return findings, display rows, and risk metadata."""
+    """Scan a target and return findings, display rows, and risk metadata.
+
+    ``scan_tool`` may be ``gitleaks``, ``trufflehog``, or ``all`` (runs both
+    and merges findings). ``max_files <= 0`` disables the directory scan cap.
+    """
     root = (cwd or Path.cwd()).resolve()
     findings: list[Finding]
     source: str
+
+    # External scanner integration (gitleaks/trufflehog)
+    if scan_tool == "all":
+        return _run_merged_external_scan(root, path, strict)
+    if scan_tool:
+        ext_findings, ext_source = _run_external_scanner(scan_tool, root, path)
+        return _result_payload(ext_source, ext_findings, strict)
 
     if path:
         target = Path(path)
@@ -353,7 +564,7 @@ def run_safety_scan(
                 findings.append(assess_rollback_signal(text, path=str(target)))
                 source = f"file:{target}"
         elif target.is_dir():
-            findings, _corpus, source = _scan_directory(target)
+            findings, _corpus, source = _scan_directory(target, max_files=max_files)
         else:
             findings = []
             source = f"missing:{target}"
@@ -362,22 +573,4 @@ def run_safety_scan(
         findings = scan_text(corpus)
         findings.append(assess_rollback_signal(corpus))
 
-    score = risk_score(findings)
-    rows = summarize_checks(findings, strict=strict)
-    if score >= 31:
-        level = "high"
-        action = "Review required — do not proceed without human approval"
-    elif score >= 11:
-        level = "caution"
-        action = "Caution — explicit human review before any proceed decision"
-    else:
-        level = "low"
-        action = "Low early-warning risk — final approval remains human"
-    return {
-        "source": source,
-        "findings": findings,
-        "rows": rows,
-        "risk_score": score,
-        "level": level,
-        "action": action,
-    }
+    return _result_payload(source, findings, strict)
