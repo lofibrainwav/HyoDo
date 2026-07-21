@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.3.0] - 2026-07-21
+
+### Added
+
+- **BYOG shell idioms** (#89, found by the first real-world BYOG dogfood):
+  `KEY=VALUE` env prefixes in a gate command are split out and passed to the
+  subprocess environment (so `command[0]` is the real binary — no more false
+  SKIP "not installed"), and wildcard arguments are glob-expanded before
+  execution. Expansion is sandboxed to the project root: absolute patterns and
+  `../` escapes are never expanded, and zero matches keep the literal argument
+  (POSIX nullglob-off behavior). `shell=False` remains the only execution mode.
+- **Gate-set fingerprint in history receipts** (#87): every receipt now carries
+  `gate_set_fingerprint` (SHA-256/12 of the JSON-encoded sorted gate-name set —
+  collision-proof against delimiter tricks), and `consecutive_all_pass_runs`
+  resets at gate-set boundaries so shrinking the gate set can no longer
+  silently extend a streak. Legacy receipts are compared via fingerprints
+  derived from their recorded gate names; the ledger stays append-only.
+  `RECEIPT_SCHEMA_VERSION` is now 2.
+
+### Fixed
+
+- `hyodo check` against a checkout whose canonical gates use env-prefix or
+  glob shell idioms (e.g. `KINGDOM_TEST_SCOPE=unit bash scripts/run-tests.sh`,
+  `shellcheck scripts/*.sh`) now actually executes those gates instead of
+  reporting a misleading SKIP/FAIL.
+
 ## [4.2.0] - 2026-07-21
 
 ### Added
