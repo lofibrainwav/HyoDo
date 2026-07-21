@@ -417,12 +417,26 @@ class DashboardState:
             self._render_locked()
 
 
+# Only these routes carry evidence read from the loopback board. The HTML
+# page at "/" is never a CORS target (a cross-origin page can only read
+# response bodies from these two JSON endpoints when the browser lets it).
+_CORS_ELIGIBLE_PATHS = frozenset({"/api/evidence", "/api/status"})
+
+
 def make_dashboard_handler(
     state: DashboardState,
     refresh: Callable[[], dict[str, object]] | None = None,
     refresh_token: str = "",
+    allow_origins: tuple[str, ...] = (),
 ) -> type[BaseHTTPRequestHandler]:
-    """Build the loopback request handler serving the current snapshot."""
+    """Build the loopback request handler serving the current snapshot.
+
+    ``allow_origins`` is an opt-in exact-match CORS allow-list (empty by
+    default, matching prior behaviour byte-for-byte: no CORS headers at
+    all). No wildcard support — an origin must match one of the configured
+    values exactly before ``Access-Control-Allow-Origin`` is echoed back.
+    """
+    allowed_origins = frozenset(allow_origins)
 
     class DashboardHandler(BaseHTTPRequestHandler):
         """Serve the dashboard's current loopback snapshot over HTTP."""
@@ -437,6 +451,20 @@ def make_dashboard_handler(
                 return state.status(), "application/json"
             return None
 
+        def _cors_headers(self) -> list[tuple[str, str]]:
+            """Return (name, value) CORS header pairs for the current request.
+
+            Empty unless: the path is CORS-eligible, an `Origin` request
+            header was sent, and it exactly matches a configured allowed
+            origin. No wildcard, no partial/prefix/suffix match.
+            """
+            if self.path not in _CORS_ELIGIBLE_PATHS or not allowed_origins:
+                return []
+            origin = self.headers.get("Origin")
+            if not origin or origin not in allowed_origins:
+                return []
+            return [("Access-Control-Allow-Origin", origin), ("Vary", "Origin")]
+
         def _send_headers(self, body: bytes, content_type: str) -> None:
             self.send_response(200)
             self.send_header("Content-Type", content_type)
@@ -444,6 +472,8 @@ def make_dashboard_handler(
             self.send_header("Cache-Control", "no-store")
             self.send_header("X-Content-Type-Options", "nosniff")
             self.send_header("Content-Security-Policy", DASHBOARD_CSP)
+            for name, value in self._cors_headers():
+                self.send_header(name, value)
             self.end_headers()
 
         def do_GET(self) -> None:
@@ -527,6 +557,17 @@ def dashboard(
         min=0,
         help="Re-measure every N seconds in the background (0 keeps the snapshot fixed)",
     ),
+    allow_origin: list[str] = typer.Option(  # noqa: B008 - typer repeatable-option pattern;
+        # ruff's B006/B008 heuristic fires on any `list[...]`-annotated Option default,
+        # but typer.Option's default is read once at CLI parse time, never mutated.
+        [],
+        "--allow-origin",
+        help=(
+            "Allow this exact Origin (e.g. http://localhost:5173) to read "
+            "/api/evidence and /api/status via CORS. Repeatable. No wildcard; "
+            "none allowed by default (existing behaviour unchanged)."
+        ),
+    ),
 ):
     """Serve a local, evidence-only Jin-Seon-Mi-In-Hyo-Yeong dashboard."""
     try:
@@ -558,7 +599,8 @@ def dashboard(
 
     try:
         server = ThreadingHTTPServer(
-            (LOOPBACK_HOST, port), make_dashboard_handler(state, _refresh_evidence, refresh_token)
+            (LOOPBACK_HOST, port),
+            make_dashboard_handler(state, _refresh_evidence, refresh_token, tuple(allow_origin)),
         )
     except OSError as exc:
         console.print(f"[red]Cannot bind {LOOPBACK_HOST}:{port}: {exc}[/red]")
