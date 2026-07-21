@@ -74,6 +74,8 @@ _BINARY_SUFFIXES = {
 
 @dataclass(frozen=True)
 class Finding:
+    """Describe one immutable finding produced by a safety scan."""
+
     category: str
     severity: str  # high | medium | low | info
     label: str
@@ -227,6 +229,7 @@ def scan_text(text: str, *, path: str | None = None) -> list[Finding]:
 
 
 def assess_rollback_signal(text: str, *, path: str | None = None) -> Finding:
+    """Return a finding that describes whether rollback wording is present."""
     if any(p.search(text) for p in ROLLBACK_HINT_PATTERNS):
         return Finding(
             category="rollback",
@@ -247,6 +250,7 @@ def assess_rollback_signal(text: str, *, path: str | None = None) -> Finding:
 
 
 def risk_score(findings: Iterable[Finding]) -> int:
+    """Calculate the capped early-warning risk score for scan findings."""
     score = 0
     for finding in findings:
         if finding.severity == "high":
@@ -271,6 +275,7 @@ def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tupl
     rollback = [f for f in findings if f.category == "rollback"]
 
     def status(items: list[Finding], empty_ok: str = "✅") -> tuple[str, str]:
+        """Return the display icon and color for a group of findings."""
         if not items:
             return empty_ok, "green"
         worst = max(items, key=lambda f: {"high": 3, "medium": 2, "low": 1, "info": 0}[f.severity])
@@ -328,6 +333,7 @@ def run_safety_scan(
     strict: bool = False,
     cwd: Path | None = None,
 ) -> dict:
+    """Scan a target and return findings, display rows, and risk metadata."""
     root = (cwd or Path.cwd()).resolve()
     findings: list[Finding]
     source: str

@@ -23,11 +23,14 @@ import subprocess
 import sys
 import threading
 import webbrowser
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from secrets import compare_digest, token_urlsafe
+from urllib.parse import parse_qs
 
 import typer
 from rich.console import Console
@@ -53,6 +56,8 @@ console = Console()
 
 
 class GateStatus(str, Enum):
+    """Enumerate the possible outcomes for an individual verification gate."""
+
     PASS = "PASS"
     FAIL = "FAIL"
     SKIP = "SKIP"
@@ -61,6 +66,8 @@ class GateStatus(str, Enum):
 
 @dataclass(frozen=True)
 class GateResult:
+    """Store an immutable status and human-readable message for a verification gate."""
+
     status: GateStatus
     message: str
 
@@ -328,26 +335,41 @@ DASHBOARD_CSP = (
 class DashboardState:
     """Thread-safe holder for the latest rendered snapshot."""
 
-    def __init__(self, evidence: dict[str, object]) -> None:
+    def __init__(
+        self, evidence: dict[str, object], *, refresh_token: str = "", interval: int = 0
+    ) -> None:
+        """Initialize the state with optional local refresh controls."""
         self._lock = threading.Lock()
+        self._refresh_token = refresh_token
+        self._interval = interval
         self.update(evidence)
 
     def update(self, evidence: dict[str, object]) -> None:
-        page = render_dashboard_html(evidence).encode("utf-8")
+        """Render and atomically replace the dashboard snapshot from evidence."""
+        page = render_dashboard_html(
+            evidence, refresh_token=self._refresh_token, interval=self._interval
+        ).encode("utf-8")
         evidence_json = json.dumps(evidence, default=str, sort_keys=True).encode("utf-8")
         with self._lock:
             self._page = page
             self._evidence_json = evidence_json
 
     def snapshot(self) -> tuple[bytes, bytes]:
+        """Return the current rendered page and serialized evidence snapshot."""
         with self._lock:
             return self._page, self._evidence_json
 
 
-def make_dashboard_handler(state: DashboardState) -> type[BaseHTTPRequestHandler]:
+def make_dashboard_handler(
+    state: DashboardState,
+    refresh: Callable[[], dict[str, object]] | None = None,
+    refresh_token: str = "",
+) -> type[BaseHTTPRequestHandler]:
     """Build the loopback request handler serving the current snapshot."""
 
     class DashboardHandler(BaseHTTPRequestHandler):
+        """Serve the dashboard's current loopback snapshot over HTTP."""
+
         def _resolve(self) -> tuple[bytes, str] | None:
             page, evidence_json = state.snapshot()
             if self.path == "/":
@@ -366,6 +388,7 @@ def make_dashboard_handler(state: DashboardState) -> type[BaseHTTPRequestHandler
             self.end_headers()
 
         def do_GET(self) -> None:
+            """Serve the current page or evidence JSON for a GET request."""
             resolved = self._resolve()
             if resolved is None:
                 self.send_error(404, "Not found")
@@ -375,6 +398,7 @@ def make_dashboard_handler(state: DashboardState) -> type[BaseHTTPRequestHandler
             self.wfile.write(body)
 
         def do_HEAD(self) -> None:
+            """Serve headers for a current page or evidence JSON request."""
             resolved = self._resolve()
             if resolved is None:
                 self.send_error(404, "Not found")
@@ -382,7 +406,38 @@ def make_dashboard_handler(state: DashboardState) -> type[BaseHTTPRequestHandler
             body, content_type = resolved
             self._send_headers(body, content_type)
 
+        def do_POST(self) -> None:
+            """Refresh local evidence only when the server-issued token matches."""
+            if self.path != "/api/refresh" or refresh is None:
+                self.send_error(404, "Not found")
+                return
+            try:
+                size = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                self.send_error(400, "Invalid content length")
+                return
+            if size < 0 or size > 4096:
+                self.send_error(413, "Refresh request is too large")
+                return
+            body = self.rfile.read(min(size, 4096)).decode("utf-8", errors="replace")
+            token = parse_qs(body).get("token", [""])[0]
+            if not refresh_token or not compare_digest(token, refresh_token):
+                self.send_error(403, "Invalid refresh token")
+                return
+            try:
+                state.update(refresh())
+            except Exception:
+                self.send_error(503, "Measurement failed; keeping the last snapshot")
+                return
+            self.send_response(303)
+            self.send_header("Location", "/")
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header("Content-Security-Policy", DASHBOARD_CSP)
+            self.end_headers()
+
         def log_message(self, format: str, *_args: object) -> None:
+            """Suppress default HTTP request logging for the local dashboard."""
             return
 
     return DashboardHandler
@@ -414,18 +469,28 @@ def dashboard(
     if root is None:
         console.print("[red]dashboard requires a HyoDo checkout (pyproject.toml + hyodo/).[/red]")
         raise typer.Exit(2)
-    state = DashboardState(collect_dashboard_evidence(root))
+    refresh_token = token_urlsafe(32)
+    refresh_lock = threading.Lock()
+
+    def _refresh_evidence() -> dict[str, object]:
+        """Collect one serialized local measurement without concurrent gate runs."""
+        with refresh_lock:
+            return collect_dashboard_evidence(root)
+
+    state = DashboardState(_refresh_evidence(), refresh_token=refresh_token, interval=interval)
     stop_refresh = threading.Event()
 
     def _refresh_loop() -> None:
         while not stop_refresh.wait(interval):
             try:
-                state.update(collect_dashboard_evidence(root))
+                state.update(_refresh_evidence())
             except Exception as exc:
                 console.print(f"[yellow]Re-measure failed; keeping last snapshot: {exc}[/yellow]")
 
     try:
-        server = ThreadingHTTPServer((LOOPBACK_HOST, port), make_dashboard_handler(state))
+        server = ThreadingHTTPServer(
+            (LOOPBACK_HOST, port), make_dashboard_handler(state, _refresh_evidence, refresh_token)
+        )
     except OSError as exc:
         console.print(f"[red]Cannot bind {LOOPBACK_HOST}:{port}: {exc}[/red]")
         raise typer.Exit(1) from exc

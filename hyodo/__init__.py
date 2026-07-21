@@ -86,6 +86,7 @@ def calculate_hygook_v5_score(
     """
 
     def to_10_scale(v: float) -> float:
+        """Scale a unit-interval pillar value to the inclusive 1-to-10 range."""
         bounded = max(0.0, min(1.0, v))
         return 1 + bounded * 9  # 0->1, 1->10
 

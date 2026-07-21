@@ -33,6 +33,7 @@ hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
 hyodo safe
 hyodo safe --strict  # exit 1 on high-severity findings
 hyodo dashboard --open  # opens the local dashboard at 127.0.0.1:8768
+hyodo dashboard --interval 300  # re-measures locally every five minutes
 ```
 
 ## HyoDo checkout gates

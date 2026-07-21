@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 from hyodo.dashboard import render_dashboard_html
 from hyodo.pillars import (
@@ -61,6 +62,23 @@ def test_in_collector_measures_docstrings_help_and_messageless_raises(tmp_path):
     assert pillar["sources"]
 
 
+def test_in_collector_ignores_normal_typer_exit(tmp_path):
+    root = _make_checkout(tmp_path)
+    (root / "hyodo" / "cli.py").write_text(
+        'import typer\n\ndef complete():\n    """Finish normally."""\n    raise typer.Exit()\n',
+        encoding="utf-8",
+    )
+
+    metrics = collect_in_evidence(root)["metrics"]
+    assert metrics["messageless_raises"] == 1  # Only sample.py's ValueError remains.
+
+
+def test_current_public_definitions_are_all_documented():
+    root = Path(__file__).resolve().parent.parent
+    coverage = collect_in_evidence(root)["metrics"]["public_docstring_coverage"]
+    assert coverage["documented"] == coverage["public"]
+
+
 def test_hyo_collector_measures_consent_and_network_posture(tmp_path):
     root = _make_checkout(tmp_path)
     pillar = collect_hyo_evidence(root)
@@ -106,6 +124,8 @@ def test_yeong_ledger_round_trip_streak_and_corruption(tmp_path):
     metrics = collect_yeong_evidence(root)["metrics"]
     assert metrics["recorded_runs"] == 4
     assert metrics["consecutive_all_pass_runs"] == 2  # broken by the FAIL run
+    assert metrics["all_pass_runs"] == 3
+    assert metrics["last_non_pass_at"] == "2026-07-20T01:00:00+00:00"
     assert metrics["first_recorded_at"] == "2026-07-20T00:00:00+00:00"
     assert metrics["corrupt_lines"] == 1
 
@@ -164,6 +184,8 @@ def test_render_v2_pillars_without_composite_score(tmp_path):
     assert "67% (2/3)" in html
     assert "Mutating flags (--fix)" in html
     assert "Recorded measurement runs" in html
+    assert "All-PASS run rate" in html
+    assert "100% (1/1)" in html
     assert "Not measured" not in html
     assert "composite score" in html  # the header still promises no composite score
     assert "inventory artifact" in html  # SBOM stays labelled as inventory only

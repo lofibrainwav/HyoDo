@@ -62,6 +62,21 @@ def _request(port: int, method: str, path: str) -> tuple[int, dict[str, str], by
         conn.close()
 
 
+def _post(port: int, path: str, body: str) -> tuple[int, dict[str, str], bytes]:
+    conn = HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        conn.request(
+            "POST",
+            path,
+            body=body,
+            headers={"Content-Type": "application/x-www-form-urlencoded"},
+        )
+        response = conn.getresponse()
+        return response.status, dict(response.getheaders()), response.read()
+    finally:
+        conn.close()
+
+
 def test_root_serves_html_with_security_headers(server_port):
     status, headers, body = _request(server_port, "GET", "/")
     assert status == 200
@@ -108,6 +123,54 @@ def test_state_update_swaps_served_snapshot(dashboard_server):
     assert json.loads(after)["measured_at"] == "2026-07-20T01:00:00+00:00"
 
 
+def test_manual_refresh_requires_token_and_redirects_after_replacing_snapshot():
+    state = DashboardState(dict(EVIDENCE), refresh_token="issued-token", interval=30)
+    refreshed = dict(EVIDENCE)
+    refreshed["measured_at"] = "2026-07-20T01:00:00+00:00"
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0),
+        make_dashboard_handler(state, lambda: refreshed, "issued-token"),
+    )
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        port = server.server_address[1]
+        status, _headers, _body = _post(port, "/api/refresh", "token=wrong")
+        assert status == 403
+        status, headers, _body = _post(port, "/api/refresh", "token=issued-token")
+        assert status == 303
+        assert headers["Location"] == "/"
+        status, _headers, body = _request(port, "GET", "/api/evidence")
+        assert status == 200
+        assert json.loads(body)["measured_at"] == refreshed["measured_at"]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+def test_manual_refresh_failure_keeps_snapshot_and_returns_503():
+    state = DashboardState(dict(EVIDENCE))
+
+    def broken_refresh():
+        raise RuntimeError("collector unavailable")
+
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), make_dashboard_handler(state, broken_refresh, "issued-token")
+    )
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        status, _headers, _body = _post(
+            server.server_address[1], "/api/refresh", "token=issued-token"
+        )
+        assert status == 503
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
 def test_csp_hash_matches_inline_poll_script():
     digest = base64.b64encode(hashlib.sha256(POLL_SCRIPT.encode("utf-8")).digest()).decode("ascii")
     assert digest == POLL_SCRIPT_SHA256
@@ -121,6 +184,15 @@ def test_dashboard_declares_light_and_dark_schemes():
     html = render_dashboard_html(dict(EVIDENCE))
     assert "color-scheme: light dark" in html
     assert "@media (prefers-color-scheme: dark)" in html
+
+
+def test_dashboard_exposes_local_measurement_controls_when_token_is_issued():
+    html = render_dashboard_html(dict(EVIDENCE), refresh_token="issued-token", interval=30)
+    assert 'href="/api/evidence"' in html
+    assert 'action="/api/refresh"' in html
+    assert 'name="token" value="issued-token"' in html
+    assert "Measure again now" in html
+    assert "Auto re-measure every 30s" in html
 
 
 def test_card_headings_are_trilingual_hanja_korean_english():
