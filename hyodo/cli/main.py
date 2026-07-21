@@ -36,6 +36,12 @@ from rich.table import Table
 
 from hyodo import __version__
 from hyodo.dashboard import POLL_SCRIPT_SHA256, render_dashboard_html
+from hyodo.pillars import (
+    append_history_receipt,
+    collect_hyo_evidence,
+    collect_in_evidence,
+    collect_yeong_evidence,
+)
 from hyodo.safety import run_safety_scan
 
 app = typer.Typer(
@@ -288,8 +294,8 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         "sbom": run_sbom_check(root),
     }
     safety = run_safety_scan(cwd=root)
-    return {
-        "schema_version": "hyodo.dashboard-evidence/v1",
+    evidence: dict[str, object] = {
+        "schema_version": "hyodo.dashboard-evidence/v2",
         "target": str(root),
         "measured_at": datetime.now(timezone.utc).isoformat(),
         "gates": {name: asdict(result) for name, result in gates.items()},
@@ -298,6 +304,15 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
             "findings": [asdict(finding) for finding in safety["findings"]],
         },
     }
+    # Record this run before reading the ledger so Yeong includes it.
+    if not append_history_receipt(root, evidence):
+        console.print("[yellow]Could not append .hyodo/history.jsonl receipt.[/yellow]")
+    evidence["pillars"] = {
+        "in": collect_in_evidence(root),
+        "hyo": collect_hyo_evidence(root),
+        "yeong": collect_yeong_evidence(root),
+    }
+    return evidence
 
 
 DASHBOARD_CSP = (

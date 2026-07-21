@@ -107,11 +107,16 @@ hyodo dashboard --open
 ```
 
 The panel never creates a composite score. It shows raw gate evidence for
-Truth, Goodness, and Beauty. In, Hyo, and Yeong explicitly show `Not measured`
-until their real event sources are connected; an SBOM is shown only as its own
-inventory artifact and is never relabeled as a reliability measurement. The
-server listens only on loopback and exposes the exact snapshot at
-`/api/evidence`.
+Truth, Goodness, and Beauty. In, Hyo, and Yeong are measured from real,
+local sources only: In from an AST scan of the checkout (public docstring
+coverage, CLI help coverage, message-less raises), Hyo from the same scan's
+consent and data-protection posture (mutating flags stay opt-in, outbound
+network import sites, non-loopback bind literals), and Yeong from the
+append-only measurement ledger at `.hyodo/history.jsonl` (recorded runs,
+consecutive all-PASS streak). Any pillar whose source is unavailable still
+shows `Not measured`; an SBOM is shown only as its own inventory artifact and
+is never relabeled as a reliability measurement. The server listens only on
+loopback and exposes the exact snapshot at `/api/evidence`.
 
 The page follows the system light or dark theme and polls `/api/evidence`
 every 15 seconds, reloading only when a newer measurement exists. By default

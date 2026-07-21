@@ -85,3 +85,6 @@ htmlcov/
 *.db
 # Generated local demo evidence; regenerate before use.
 docs/DEMO_DRY_RUN_LATEST.md
+
+# Local measurement ledger (append-only receipts; machine-local, never shipped)
+.hyodo/
