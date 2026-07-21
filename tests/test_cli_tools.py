@@ -8,10 +8,12 @@ import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import (
+    GateResult,
     GateStatus,
     _missing_tool_result,
     _tool_cmd,
     app,
+    collect_dashboard_evidence,
     find_repo_root,
     resolve_check_target,
     run_pyright_check,
@@ -27,6 +29,25 @@ def test_tool_cmd_uses_current_interpreter():
     assert cmd[0] == sys.executable
     assert cmd[1:3] == ["-m", "pytest"]
     assert cmd[3:] == ["tests", "-q"]
+
+
+def test_dashboard_evidence_is_versioned_and_preserves_raw_gate_statuses(tmp_path):
+    ok = GateResult(GateStatus.PASS, "ok")
+    safety = {
+        "risk_score": 5,
+        "findings": [],
+    }
+    with (
+        patch("hyodo.cli.main.run_pyright_check", return_value=ok),
+        patch("hyodo.cli.main.run_ruff_check", return_value=ok),
+        patch("hyodo.cli.main.run_pytest_check", return_value=ok),
+        patch("hyodo.cli.main.run_sbom_check", return_value=ok),
+        patch("hyodo.cli.main.run_safety_scan", return_value=safety),
+    ):
+        evidence = collect_dashboard_evidence(tmp_path)
+    assert evidence["schema_version"] == "hyodo.dashboard-evidence/v1"
+    assert evidence["gates"]["typecheck"]["status"] == "PASS"
+    assert evidence["safety"]["risk_score"] == 5
 
 
 def test_run_pytest_check_uses_python_m_pytest(tmp_path):

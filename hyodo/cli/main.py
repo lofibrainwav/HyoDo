@@ -21,8 +21,11 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import webbrowser
 from dataclasses import asdict, dataclass
+from datetime import datetime, timezone
 from enum import Enum
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
 import typer
@@ -31,6 +34,7 @@ from rich.panel import Panel
 from rich.table import Table
 
 from hyodo import __version__
+from hyodo.dashboard import render_dashboard_html
 from hyodo.safety import run_safety_scan
 
 app = typer.Typer(
@@ -272,6 +276,91 @@ def _print_gate_result(result: GateResult) -> None:
         console.print(f"  [yellow]SKIP {result.message}[/yellow]")
     else:
         console.print(f"  [yellow]UNSUPPORTED {result.message}[/yellow]")
+
+
+def collect_dashboard_evidence(root: Path) -> dict[str, object]:
+    """Collect one honest snapshot for the local dashboard."""
+    gates = {
+        "typecheck": run_pyright_check(root),
+        "lint_format": run_ruff_check(root),
+        "tests": run_pytest_check(root),
+        "sbom": run_sbom_check(root),
+    }
+    safety = run_safety_scan(cwd=root)
+    return {
+        "schema_version": "hyodo.dashboard-evidence/v1",
+        "target": str(root),
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "gates": {name: asdict(result) for name, result in gates.items()},
+        "safety": {
+            "risk_score": safety["risk_score"],
+            "findings": [asdict(finding) for finding in safety["findings"]],
+        },
+    }
+
+
+@app.command()
+def dashboard(
+    path: str | None = typer.Argument(
+        None, help="HyoDo checkout path (defaults to current directory)"
+    ),
+    port: int = typer.Option(8768, "--port", min=1, max=65535, help="Loopback port"),
+    open_browser: bool = typer.Option(
+        False, "--open", help="Open the dashboard in the default browser"
+    ),
+):
+    """Serve a local, evidence-only Jin-Seon-Mi-In-Hyo-Yeong dashboard."""
+    try:
+        target = resolve_check_target(path)
+    except FileNotFoundError as exc:
+        console.print(f"[red]Path not found: {exc}[/red]")
+        raise typer.Exit(2) from exc
+    root = find_repo_root(target)
+    if root is None:
+        console.print("[red]dashboard requires a HyoDo checkout (pyproject.toml + hyodo/).[/red]")
+        raise typer.Exit(2)
+    evidence = collect_dashboard_evidence(root)
+    page = render_dashboard_html(evidence).encode("utf-8")
+    evidence_json = json.dumps(evidence, default=str, sort_keys=True).encode("utf-8")
+
+    class DashboardHandler(BaseHTTPRequestHandler):
+        def do_GET(self) -> None:
+            if self.path == "/":
+                body, content_type = page, "text/html; charset=utf-8"
+            elif self.path == "/api/evidence":
+                body, content_type = evidence_json, "application/json"
+            else:
+                self.send_error(404, "Not found")
+                return
+            self.send_response(200)
+            self.send_header("Content-Type", content_type)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.send_header("X-Content-Type-Options", "nosniff")
+            self.send_header(
+                "Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'"
+            )
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, format: str, *_args: object) -> None:
+            return
+
+    try:
+        server = ThreadingHTTPServer(("127.0.0.1", port), DashboardHandler)
+    except OSError as exc:
+        console.print(f"[red]Cannot bind 127.0.0.1:{port}: {exc}[/red]")
+        raise typer.Exit(1) from exc
+    console.print(f"[green]Dashboard: http://127.0.0.1:{port}[/green]")
+    console.print("[dim]Local only. Press Ctrl+C to stop. Snapshot is fixed at server start.[/dim]")
+    if open_browser:
+        webbrowser.open(f"http://127.0.0.1:{port}/")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        console.print("\nDashboard stopped.")
+    finally:
+        server.server_close()
 
 
 @app.command()

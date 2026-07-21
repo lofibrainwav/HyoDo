@@ -62,6 +62,8 @@ memory/
 # Tool Caches
 .ruff_cache/
 .mypy_cache/
+.playwright-cli/
+output/playwright/
 
 # Databases
 *.sqlite3

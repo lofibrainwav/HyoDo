@@ -72,6 +72,7 @@ See [Quick Start](./QUICK_START.md) for the complete first-run path.
 | `hyodo start` | Show onboarding guidance |
 | `hyodo check [PATH]` | Run HyoDo checkout gates |
 | `hyodo score ...` | Produce a review signal |
+| `hyodo dashboard` | Serve a local evidence-only instrument panel |
 | `hyodo safe [PATH]` | Print safety findings without blocking |
 | `hyodo safe --strict [PATH]` | Exit 1 when high-severity findings exist |
 | `hyodo safe --json [PATH]` | Emit machine-readable JSON findings for CI |
@@ -95,6 +96,22 @@ zero-gate run is never reported as success.
 - Missing or unreadable paths exit `2`.
 
 `hyodo safe` is an early-warning scanner, not a security audit.
+
+### Local instrument panel
+
+Run this from a HyoDo checkout to collect one fresh snapshot and open a local
+dashboard at `http://127.0.0.1:8768`:
+
+```bash
+hyodo dashboard --open
+```
+
+The panel never creates a composite score. It shows raw gate evidence for
+Truth, Goodness, and Beauty. In, Hyo, and Yeong explicitly show `Not measured`
+until their real event sources are connected; an SBOM is shown only as its own
+inventory artifact and is never relabeled as a reliability measurement. The
+server listens only on loopback and exposes the exact snapshot at
+`/api/evidence`.
 
 ## Scope
 

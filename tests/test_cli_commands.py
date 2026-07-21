@@ -21,6 +21,7 @@ from typer.testing import CliRunner
 
 from hyodo import __version__
 from hyodo.cli.main import app
+from hyodo.dashboard import render_dashboard_html
 
 runner = CliRunner()
 
@@ -148,6 +149,28 @@ def test_score_output_mentions_review_signal():
     assert result.exit_code == 0
     assert "Review Signal" in result.output or "REVIEW_SIGNAL" in result.output
     assert "V6" in result.output or "philosophy" in result.output.lower()
+
+
+def test_dashboard_html_uses_raw_evidence_and_never_invents_ux_score():
+    evidence = {
+        "target": "/tmp/HyoDo",
+        "measured_at": "2026-07-20T00:00:00+00:00",
+        "gates": {
+            "typecheck": {"status": "PASS", "message": "0 errors"},
+            "lint_format": {"status": "PASS", "message": "passed"},
+            "tests": {"status": "PASS", "message": "==== 173 passed, 1 skipped in 0.61s ===="},
+            "sbom": {"status": "PASS", "message": "generated"},
+        },
+        "safety": {"risk_score": 5, "findings": []},
+    }
+    html = render_dashboard_html(evidence)
+    assert "Raw evidence only" in html
+    assert "173 passed, 1 skipped in 0.61s" in html
+    assert "==== 173 passed" not in html
+    assert "GateStatus.PASS" not in html
+    assert html.count("Not measured") == 3
+    assert "composite score" in html
+    assert "inventory artifact" in html
 
 
 # --------------------------------------------------------------------------- #
