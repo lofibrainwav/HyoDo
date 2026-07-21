@@ -72,7 +72,7 @@ See [Quick Start](./QUICK_START.md) for the complete first-run path.
 | `hyodo start` | Show onboarding guidance |
 | `hyodo check [PATH]` | Run HyoDo checkout gates |
 | `hyodo score ...` | Produce a review signal |
-| `hyodo dashboard` | Serve a local evidence-only Jin-Seon-Mi-In-Hyo-Yeong dashboard |
+| `hyodo dashboard` | Serve a local evidence-only instrument panel |
 | `hyodo safe [PATH]` | Print safety findings without blocking |
 | `hyodo safe --strict [PATH]` | Exit 1 when high-severity findings exist |
 | `hyodo safe --json [PATH]` | Emit machine-readable JSON findings for CI |
