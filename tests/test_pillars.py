@@ -134,6 +134,51 @@ def test_yeong_ledger_round_trip_streak_and_corruption(tmp_path):
     assert lines[1]["gates"]["tests"] == "FAIL"
 
 
+def test_yeong_skip_gates_do_not_block_all_pass(tmp_path):
+    """SKIP is unobserved, not failed: executed gates decide all-PASS (제6조 10항).
+
+    A gate that never runs (e.g. sbom tool not installed) must not permanently
+    pin the all-PASS rate to 0%, and must stay visible as a skipped-gate count.
+    """
+    root = _make_checkout(tmp_path)
+    green_with_skip = {
+        "measured_at": "2026-07-20T00:00:00+00:00",
+        "gates": {"tests": {"status": "PASS"}, "sbom": {"status": "SKIP"}},
+    }
+    assert append_history_receipt(root, green_with_skip)
+    metrics = collect_yeong_evidence(root)["metrics"]
+    assert metrics["all_pass_runs"] == 1
+    assert metrics["consecutive_all_pass_runs"] == 1
+    assert metrics["last_non_pass_at"] == ""
+    assert metrics["runs_with_skipped_gates"] == 1
+
+
+def test_yeong_all_skip_run_is_not_all_pass(tmp_path):
+    """A run with zero executed gates must not count as all-PASS (no false green)."""
+    root = _make_checkout(tmp_path)
+    all_skip = {
+        "measured_at": "2026-07-20T00:00:00+00:00",
+        "gates": {"sbom": {"status": "SKIP"}, "typecheck": {"status": "UNSUPPORTED"}},
+    }
+    assert append_history_receipt(root, all_skip)
+    metrics = collect_yeong_evidence(root)["metrics"]
+    assert metrics["all_pass_runs"] == 0
+    assert metrics["consecutive_all_pass_runs"] == 0
+    assert metrics["last_non_pass_at"] == "2026-07-20T00:00:00+00:00"
+
+
+def test_yeong_fail_with_skip_is_not_all_pass(tmp_path):
+    root = _make_checkout(tmp_path)
+    red_with_skip = {
+        "measured_at": "2026-07-20T02:00:00+00:00",
+        "gates": {"tests": {"status": "FAIL"}, "sbom": {"status": "SKIP"}},
+    }
+    assert append_history_receipt(root, red_with_skip)
+    metrics = collect_yeong_evidence(root)["metrics"]
+    assert metrics["all_pass_runs"] == 0
+    assert metrics["last_non_pass_at"] == "2026-07-20T02:00:00+00:00"
+
+
 def test_receipt_serializes_gate_status_enums_as_values(tmp_path):
     from hyodo.cli.main import GateStatus
 

@@ -183,15 +183,22 @@ def _yeong_body(pillar: Any) -> str:
     last_non_pass_item = (
         _metric("Last non-PASS run", last_non_pass_at, source) if last_non_pass_at else ""
     )
+    skipped_runs = int(metrics.get("runs_with_skipped_gates", 0))
+    skipped_item = (
+        _metric("Runs with skipped (unmeasured) gates", str(skipped_runs), source)
+        if skipped_runs
+        else ""
+    )
     return (
         "<ul>"
         + _metric("Recorded measurement runs", str(metrics.get("recorded_runs", 0)), source)
-        + _metric("All-PASS run rate", pass_rate, source)
+        + _metric("All-PASS run rate (executed gates)", pass_rate, source)
         + _metric(
             "Consecutive all-PASS runs",
             str(metrics.get("consecutive_all_pass_runs", 0)),
             source,
         )
+        + skipped_item
         + _metric("First recorded", str(metrics.get("first_recorded_at", "")), source)
         + _metric("Last recorded", str(metrics.get("last_recorded_at", "")), source)
         + last_non_pass_item
