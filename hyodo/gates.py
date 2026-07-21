@@ -15,7 +15,10 @@ directly-observed subprocess outcome -- a missing binary is reported as
 
 from __future__ import annotations
 
+import glob
 import json
+import os
+import re
 import shlex
 import shutil
 import subprocess
@@ -40,6 +43,12 @@ DEFAULT_TIMEOUT_SECONDS = 120
 GATES_CONFIG_RELATIVE_PATH = Path(".hyodo") / "gates.toml"
 GATE_MESSAGE_TAIL_CHARS = 200
 
+# A leading token shaped like ``KEY=VALUE`` (POSIX env-prefix assignment) that
+# must be separated from the executable when running with shell=False.
+_ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+# Argument characters that mark a token as a glob pattern needing expansion.
+_GLOB_CHARS = ("*", "?", "[")
+
 _HEADER_COMMENT = (
     "# HyoDo Bring-Your-Own-Gates: absorb your existing tools as command gates.\n"
     "# 仁(benevolence, In)/孝(hyo)/永(eternity, Yeong) pillars are not command\n"
@@ -61,6 +70,9 @@ class UserGate:
     pillar: str
     command: tuple[str, ...]
     timeout: int
+    # Leading ``KEY=VALUE`` assignments peeled from the command so shell=False
+    # can still honor ``VAR=value bin args``. Empty means no env-prefix syntax.
+    env: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -131,14 +143,29 @@ def _parse_gate_spec(path: Path, name: str, spec: Any) -> UserGate:
 
     command = spec.get("command")
     if isinstance(command, str) and command.strip():
-        command_tuple = tuple(shlex.split(command))
+        tokens: list[str] = shlex.split(command)
     elif isinstance(command, list) and command and all(isinstance(part, str) for part in command):
-        command_tuple = tuple(command)
+        tokens = list(command)
     else:
         raise GatesConfigError(
             f"{path}: gate {name!r} is missing a valid 'command' "
             "(non-empty string or array of strings)"
         )
+
+    # Peel leading KEY=VALUE assignments off the command. With shell=False the
+    # subprocess module would otherwise treat the first ``KEY=VALUE`` as the
+    # executable path (surfacing as ``"<KEY>=value not installed"``). Emulating
+    # POSIX ``VAR=value bin args`` means these tokens become an env override
+    # and the real executable stays ``command[0]``.
+    env_tokens: list[str] = []
+    while tokens and _ENV_ASSIGNMENT_RE.match(tokens[0]):
+        env_tokens.append(tokens.pop(0))
+    if not tokens:
+        raise GatesConfigError(
+            f"{path}: gate {name!r} command has only env assignments; missing executable after them"
+        )
+
+    command_tuple = tuple(tokens)
     if not command_tuple:
         raise GatesConfigError(f"{path}: gate {name!r} command resolved to zero arguments")
 
@@ -146,7 +173,13 @@ def _parse_gate_spec(path: Path, name: str, spec: Any) -> UserGate:
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout <= 0:
         raise GatesConfigError(f"{path}: gate {name!r} has invalid timeout {timeout!r}")
 
-    return UserGate(name=name, pillar=pillar, command=command_tuple, timeout=timeout)
+    return UserGate(
+        name=name,
+        pillar=pillar,
+        command=command_tuple,
+        timeout=timeout,
+        env=tuple(env_tokens),
+    )
 
 
 def _tail(text: str | None) -> str:
@@ -158,18 +191,75 @@ def run_user_gates(config: GatesConfig, root: Path, verbose: bool = False) -> li
     return [_run_one_gate(gate, root, verbose=verbose) for gate in config.gates]
 
 
+def _expand_glob_args(args: tuple[str, ...], root: Path) -> list[str]:
+    """Expand wildcard args relative to *root* (POSIX nullglob=off).
+
+    Only arguments containing ``*``, ``?`` or ``[`` are treated as patterns;
+    literal arguments are passed through untouched. Zero matches keep the
+    original literal so a stray pattern is surfaced to the underlying tool
+    rather than dropped silently.
+
+    ``glob.glob(..., root_dir=...)`` is not a sandbox: an absolute pattern
+    (e.g. ``/etc/*``) ignores ``root_dir`` entirely and a ``../`` pattern can
+    walk above *root*. Absolute patterns are therefore never expanded (kept
+    literal), and relative-pattern matches are filtered to those that resolve
+    to a path inside *root* before being accepted.
+    """
+    resolved_root = root.resolve()
+    expanded: list[str] = []
+    for arg in args:
+        if any(ch in arg for ch in _GLOB_CHARS):
+            if os.path.isabs(arg):
+                expanded.append(arg)
+                continue
+            matches = sorted(glob.glob(arg, root_dir=str(root)))
+            in_root_matches = [
+                match for match in matches if _is_within_root(root, match, resolved_root)
+            ]
+            expanded.extend(in_root_matches if in_root_matches else [arg])
+        else:
+            expanded.append(arg)
+    return expanded
+
+
+def _is_within_root(root: Path, match: str, resolved_root: Path) -> bool:
+    """Return whether *match* (relative to *root*) resolves inside *root*."""
+    resolved_match = (root / match).resolve()
+    return resolved_match == resolved_root or resolved_root in resolved_match.parents
+
+
+def _build_env(env_tokens: tuple[str, ...]) -> dict[str, str] | None:
+    """Merge leading ``KEY=VALUE`` assignments onto ``os.environ``.
+
+    An empty tuple means the gate did not use env-prefix syntax; returning
+    ``None`` keeps ``subprocess.run`` on its default inherit-parent path so
+    pre-existing behavior is byte-for-byte unchanged.
+    """
+    if not env_tokens:
+        return None
+    merged = dict(os.environ)
+    for token in env_tokens:
+        key, _, value = token.partition("=")
+        merged[key] = value
+    return merged
+
+
 def _run_one_gate(gate: UserGate, root: Path, *, verbose: bool) -> UserGateResult:
     binary = gate.command[0]
     if shutil.which(binary) is None:
         return UserGateResult(gate.name, gate.pillar, "SKIP", f"{binary} not installed")
 
+    args = _expand_glob_args(gate.command, root)
+    env = _build_env(gate.env)
+
     try:
         completed = subprocess.run(
-            list(gate.command),
+            args,
             cwd=root,
             capture_output=True,
             text=True,
             timeout=gate.timeout,
+            env=env,
             shell=False,
         )
     except FileNotFoundError:
