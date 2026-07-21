@@ -45,7 +45,7 @@ from hyodo.pillars import (
     collect_in_evidence,
     collect_yeong_evidence,
 )
-from hyodo.safety import run_safety_scan
+from hyodo.safety import run_safety_scan, risk_score as risk_score_from_findings, summarize_checks as _summarize_checks
 
 app = typer.Typer(
     name="hyodo",
@@ -593,6 +593,9 @@ def check(
     path: str | None = typer.Argument(None, help="Path to file or directory"),
     fix: bool = typer.Option(False, "--fix", "-f", help="Apply auto-fixes where supported"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Verbose output"),
+    general: bool = typer.Option(
+        False, "--general", help="Run language-agnostic gates (auto-detect Python/JS/Go/Rust/Shell)"
+    ),
 ):
     """
     Run HyoDo checkout release gates (4-Gate CI).
@@ -612,6 +615,26 @@ def check(
         raise typer.Exit(2) from exc
 
     console.print(f"Target: {target}")
+
+    # --general mode: language-agnostic gates
+    if general:
+        gen_root = target if target.is_dir() else target.parent
+        console.print(f"[cyan]General mode: auto-detecting languages in {gen_root}[/cyan]")
+        gen_results = _run_general_gates(gen_root, verbose)
+        _print_general_results(gen_results, gen_root)
+        failed = [r for r in gen_results if r.status is GateStatus.FAIL]
+        executed = [r for r in gen_results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
+        console.print("\n" + "=" * 50)
+        if not executed:
+            console.print("[bold yellow]No language gates were executed[/bold yellow]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+            raise typer.Exit(2)
+        if failed:
+            console.print(f"[bold red]Some gates failed[/bold red] ({len(executed)}/{len(gen_results)} gates ran)")
+            raise typer.Exit(1)
+        console.print(f"[bold green]All executed gates passed ({len(executed)}/{len(gen_results)} gates ran)[/bold green]")
+        raise typer.Exit(0)
+
     root = find_repo_root(target)
     if root is None:
         console.print(
@@ -677,10 +700,15 @@ def _resolve_score_pillars(
     beauty: float | None,
     serenity: float | None,
     eternity: float | None,
-) -> tuple[float, float, float, float, float]:
+    partial: bool = False,
+) -> tuple[float, float, float, float, float, str]:
     """Resolve primary vs legacy flags; require all five pillars explicitly.
 
-    Raises typer.Exit(2) on missing pillars or dual-flag conflicts.
+    When *partial* is True, missing pillars default to 0.5 (neutral) and the
+    signal label is downgraded to WEAK.
+
+    Returns (benevolence, truth, goodness, hyo, beauty, signal_label).
+    Raises typer.Exit(2) on dual-flag conflicts or (non-partial) missing pillars.
     """
     if benevolence is not None and serenity is not None:
         console.print(
@@ -708,14 +736,34 @@ def _resolve_score_pillars(
         missing.append("--hyo/-c (or legacy --eternity/-e)")
     if beauty is None:
         missing.append("--beauty/-b")
+    signal_label = "STRONG"
+
     if missing:
-        console.print("[red]All five pillars are required. Missing:[/red] " + ", ".join(missing))
-        console.print("[dim]Example: hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9[/dim]")
-        console.print(
-            "[yellow]Defaults no longer fill missing pillars "
-            "(avoids false STRONG signals).[/yellow]"
-        )
-        raise typer.Exit(2)
+        if not partial:
+            console.print("[red]All five pillars are required. Missing:[/red] " + ", ".join(missing))
+            console.print("[dim]Example: hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9[/dim]")
+            console.print(
+                "[yellow]Defaults no longer fill missing pillars "
+                "(avoids false STRONG signals).[/yellow]"
+            )
+            console.print("[dim]Use --partial to allow missing pillars (defaults to 0.5, WEAK signal).[/dim]")
+            raise typer.Exit(2)
+        else:
+            console.print(
+                f"[yellow]Partial mode: filling {len(missing)} missing pillar(s) with 0.5 (neutral).[/yellow]"
+            )
+            console.print(f"[dim]Missing: {', '.join(missing)}[/dim]")
+            if effective_benevolence is None:
+                effective_benevolence = 0.5
+            if truth is None:
+                truth = 0.5
+            if goodness is None:
+                goodness = 0.5
+            if effective_hyo is None:
+                effective_hyo = 0.5
+            if beauty is None:
+                beauty = 0.5
+            signal_label = "WEAK"
 
     # Narrowed by the missing check above.
     assert effective_benevolence is not None
@@ -723,7 +771,7 @@ def _resolve_score_pillars(
     assert goodness is not None
     assert effective_hyo is not None
     assert beauty is not None
-    return effective_benevolence, truth, goodness, effective_hyo, beauty
+    return effective_benevolence, truth, goodness, effective_hyo, beauty, signal_label
 
 
 @app.command()
@@ -745,6 +793,9 @@ def score(
     eternity: float | None = typer.Option(
         None, "--eternity", "-e", help="[Legacy] maps to hyo (0-1)"
     ),
+    partial: bool = typer.Option(
+        False, "--partial", help="Allow missing pillars (defaults to 0.5, WEAK signal)"
+    ),
 ):
     """
     Compute HYOGOOK F-score review signal (philosophy V6).
@@ -753,6 +804,7 @@ def score(
     S = geometric_mean
 
     All five pillars must be provided explicitly (no silent 1.0 defaults).
+    Use --partial to allow missing pillars (filled with 0.5, WEAK signal).
     Legacy --serenity/--eternity may substitute for benevolence/hyo, but
     primary and legacy flags for the same pillar cannot be combined.
     Review emphasis labels are philosophical only — not F-score weights.
@@ -766,7 +818,8 @@ def score(
         goodness,
         effective_hyo,
         beauty,
-    ) = _resolve_score_pillars(benevolence, truth, goodness, hyo, beauty, serenity, eternity)
+        signal_label,
+    ) = _resolve_score_pillars(benevolence, truth, goodness, hyo, beauty, serenity, eternity, partial=partial)
 
     F, S = calculate_hygook_v5_score(effective_benevolence, truth, goodness, effective_hyo, beauty)
     score_value = ((F - 6) / (60 - 6)) * 100
@@ -808,16 +861,16 @@ def score(
     )
 
     if score_value >= 90:
-        console.print("\n[bold green]REVIEW_SIGNAL_STRONG (90+)[/bold green]")
+        console.print(f"\n[bold green]REVIEW_SIGNAL_{signal_label} (90+)[/bold green]")
         console.print(
             "[green]Strong review signal only. Still run tests/security checks; "
             "human approval required.[/green]"
         )
     elif score_value >= 70:
-        console.print("\n[bold yellow]REVIEW_SIGNAL_CAUTION (70-89)[/bold yellow]")
+        console.print(f"\n[bold yellow]REVIEW_SIGNAL_{signal_label} (70-89)[/bold yellow]")
         console.print("[yellow]Review recommended before proceed. Not an approval.[/yellow]")
     else:
-        console.print("\n[bold red]REVIEW_SIGNAL_BLOCK (<70)[/bold red]")
+        console.print(f"\n[bold red]REVIEW_SIGNAL_{signal_label} (<70)[/bold red]")
         console.print(
             "[red]Improve before merge. Score is not a substitute for human judgment.[/red]"
         )
@@ -836,6 +889,16 @@ def safe(
         "--json",
         help="Emit machine-readable JSON instead of formatted text",
     ),
+    max_files: int = typer.Option(
+        40,
+        "--max-files",
+        help="Maximum files to scan in directory mode (default 40, use 0 for unlimited)",
+    ),
+    scan: str | None = typer.Option(
+        None,
+        "--scan",
+        help="External scanner: gitleaks, trufflehog, or all (runs both)",
+    ),
 ):
     """
     Safety early-warning scan.
@@ -846,11 +909,33 @@ def safe(
     --json emits a single JSON document instead of formatted text; exit codes
     are identical between the two modes.
 
-    Limits: directory scans read at most 40 files; default mode prefers git diff
-    HEAD, else git status text (not full working tree contents).
-    Not a full SAST / secret-scan / dependency audit.
+    --max-files N: override the directory scan cap (default 40, 0 = unlimited).
+    --scan gitleaks: run gitleaks as external secret scanner.
+    --scan trufflehog: run trufflehog as external verified secret scanner.
+    --scan all: run both gitleaks + trufflehog.
+
+    Limits: directory scans read at most --max-files files; default mode prefers
+    git diff HEAD, else git status text (not full working tree contents).
+    Not a full SAST / secret-scan / dependency audit unless --scan is used.
     """
-    result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd())
+    scan_tool = scan
+    if scan_tool == "all":
+        gl_result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd(), scan_tool="gitleaks")
+        th_result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd(), scan_tool="trufflehog")
+        merged_findings = gl_result["findings"] + th_result["findings"]
+        merged_score = risk_score_from_findings(merged_findings)
+        source_str = f"gitleaks+trufflehog:merged ({len(merged_findings)} findings)"
+        result = {
+            "source": source_str,
+            "findings": merged_findings,
+            "rows": _summarize_checks(merged_findings, strict=strict),
+            "risk_score": merged_score,
+            "level": "high" if merged_score >= 31 else ("caution" if merged_score >= 11 else "low"),
+            "action": "Review required — do not proceed without human approval" if merged_score >= 31 else ("Caution — explicit human review" if merged_score >= 11 else "Low early-warning risk — final approval remains human"),
+        }
+    else:
+        effective_max = max_files if max_files > 0 else 999999
+        result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd(), max_files=effective_max, scan_tool=scan_tool)
     source = str(result["source"])
     high_only = [f for f in result["findings"] if f.severity == "high"]
 

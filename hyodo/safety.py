@@ -301,8 +301,90 @@ def summarize_checks(findings: list[Finding], strict: bool = False) -> list[tupl
     ]
 
 
-def _scan_directory(target: Path) -> tuple[list[Finding], str, str]:
-    """Per-file scan for directories (path attached). Caps at 40 files."""
+def _run_external_scanner(
+    tool: str, cwd: Path, path: str | None = None
+) -> tuple[list[Finding], str]:
+    """Run gitleaks or trufflehog as an external secret scanner.
+
+    Returns (findings, source_description). On tool-not-found or execution
+    failure, returns ([], "error:<detail>").
+    """
+    import shutil
+
+    tool_map = {
+        "gitleaks": {
+            "binary": "gitleaks",
+            "scan_args": ["detect", "--source", ".", "--no-banner", "--format", "json", "--no-git"],
+        },
+        "trufflehog": {
+            "binary": "trufflehog",
+            "scan_args": ["git", "file://.", "--json", "--no-update"],
+        },
+    }
+
+    config = tool_map.get(tool)
+    if not config:
+        return [], f"error:unknown scanner '{tool}' (use gitleaks or trufflehog)"
+
+    binary = shutil.which(config["binary"])
+    if not binary:
+        return [], f"error:{config['binary']} not installed (brew install {config['binary']})"
+
+    scan_cmd = [binary] + config["scan_args"]
+    if path:
+        if tool == "trufflehog":
+            scan_cmd = [binary, "git", f"file://{path}", "--json", "--no-update"]
+        else:
+            scan_cmd = [binary, "detect", "--source", str(path), "--no-banner", "--format", "json", "--no-git"]
+
+    try:
+        result = subprocess.run(
+            scan_cmd, capture_output=True, text=True, timeout=120, cwd=str(cwd),
+        )
+    except subprocess.TimeoutExpired:
+        return [], f"error:{tool} scan timed out (>120s)"
+    except OSError as e:
+        return [], f"error:{tool} execution failed: {e}"
+
+    findings: list[Finding] = []
+    source = f"{tool}:scan"
+    raw = result.stdout.strip()
+
+    if not raw:
+        findings.append(Finding(
+            category="external_scan", severity="info",
+            label=f"{tool}_clean", detail=f"{tool} found no secrets",
+            path=None, line=None,
+        ))
+        return findings, source
+
+    import json as _json
+    try:
+        items = _json.loads(raw) if raw.startswith("[") else [_json.loads(line) for line in raw.splitlines() if line.strip()]
+    except _json.JSONDecodeError:
+        findings.append(Finding(
+            category="external_scan", severity="info",
+            label=f"{tool}_output", detail=f"{tool} produced non-JSON output ({len(raw)} bytes)",
+            path=None, line=None,
+        ))
+        return findings, source
+
+    for item in items:
+        desc = item.get("Description") or item.get("DetectorName") or item.get("Reason", "secret detected")
+        file_path = item.get("File") or item.get("SourceMetadata", {}).get("data", {}).get("filesystem", {}).get("file", "")
+        line_num = item.get("StartLine") or item.get("SourceMetadata", {}).get("data", {}).get("filesystem", {}).get("line")
+        findings.append(Finding(
+            category="external_scan", severity="high",
+            label=f"{tool}_finding", detail=f"{tool}: {desc}",
+            path=file_path if file_path else None,
+            line=line_num if isinstance(line_num, int) else None,
+        ))
+
+    return findings, source
+
+
+def _scan_directory(target: Path, max_files: int = 40) -> tuple[list[Finding], str, str]:
+    """Per-file scan for directories (path attached). Caps at *max_files* files."""
     findings: list[Finding] = []
     chunks: list[str] = []
     count = 0
@@ -320,7 +402,7 @@ def _scan_directory(target: Path) -> tuple[list[Finding], str, str]:
         findings.extend(scan_text(text, path=str(file_path)))
         chunks.append(text)
         count += 1
-        if count >= 40:
+        if count >= max_files:
             break
     corpus = "\n".join(chunks)
     findings.append(assess_rollback_signal(corpus))
@@ -332,11 +414,37 @@ def run_safety_scan(
     path: str | None = None,
     strict: bool = False,
     cwd: Path | None = None,
+    max_files: int = 40,
+    scan_tool: str | None = None,
 ) -> dict:
     """Scan a target and return findings, display rows, and risk metadata."""
     root = (cwd or Path.cwd()).resolve()
     findings: list[Finding]
     source: str
+
+    # External scanner integration (gitleaks/trufflehog)
+    if scan_tool:
+        ext_findings, ext_source = _run_external_scanner(scan_tool, root, path)
+        if ext_findings or ext_source.startswith("error:"):
+            score = risk_score(ext_findings)
+            rows = summarize_checks(ext_findings, strict=strict)
+            if score >= 31:
+                level = "high"
+                action = "Review required — do not proceed without human approval"
+            elif score >= 11:
+                level = "caution"
+                action = "Caution — explicit human review before any proceed decision"
+            else:
+                level = "low"
+                action = "Low early-warning risk — final approval remains human"
+            return {
+                "source": ext_source,
+                "findings": ext_findings,
+                "rows": rows,
+                "risk_score": score,
+                "level": level,
+                "action": action,
+            }
 
     if path:
         target = Path(path)
@@ -353,7 +461,7 @@ def run_safety_scan(
                 findings.append(assess_rollback_signal(text, path=str(target)))
                 source = f"file:{target}"
         elif target.is_dir():
-            findings, _corpus, source = _scan_directory(target)
+            findings, _corpus, source = _scan_directory(target, max_files=max_files)
         else:
             findings = []
             source = f"missing:{target}"
