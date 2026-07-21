@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 HISTORY_RELATIVE_PATH = Path(".hyodo") / "history.jsonl"
+RECEIPT_SCHEMA_VERSION = "hyodo.history-receipt/v1"
 
 # Outbound-capable modules whose presence in the package would open a
 # telemetry or data-exfiltration pathway. http.server (inbound loopback
@@ -150,7 +151,7 @@ def append_history_receipt(root: Path, evidence: dict[str, Any]) -> bool:
         # GateStatus enums must land as their value ("PASS"), not "GateStatus.PASS".
         statuses[name] = str(getattr(raw, "value", raw))
     entry = {
-        "schema_version": "hyodo.history-receipt/v1",
+        "schema_version": RECEIPT_SCHEMA_VERSION,
         "measured_at": evidence.get("measured_at"),
         "gates": statuses,
     }
