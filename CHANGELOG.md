@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **README positioning** — lead with FDE / AI agent guardrail value
+  (audit evidence, policy DENY, BYOG, fail-closed), not pre-commit
+  replacement. Engineering labels first; pillar branding dual-mapped.
+  Claim boundary: interceptor/PDF export not shipped.
+
 ### Added
 
 - **FDE Evidence Spine (Phase 1 MVP)** — opt-in agent event ledger and local

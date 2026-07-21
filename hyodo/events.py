@@ -35,9 +35,6 @@ EVENT_KINDS = frozenset(
 ACTORS = frozenset({"agent", "human", "hyodo"})
 POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK"})
 
-_UUID_RE = re.compile(
-    r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
-)
 _DIGEST_RE = re.compile(r"^[0-9a-f]{12}$")
 
 
@@ -90,12 +87,8 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
     if _is_non_empty_str(actor) and actor not in ACTORS:
         reasons.append("invalid_actor")
 
-    for id_field in ("event_id", "run_id"):
-        value = raw.get(id_field)
-        if _is_non_empty_str(value) and not _UUID_RE.match(value):
-            # Soft: accept non-UUID opaque ids (FDE runners often use ulid/nanoid).
-            # Only reject empty (already handled). Opaque strings are allowed.
-            pass
+    # event_id / run_id may be UUID or opaque ids (ulid/nanoid); only
+    # non-empty string is required (checked above).
 
     tool_raw = raw.get("tool")
     tool_out: dict[str, Any] | None = None

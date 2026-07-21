@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hyodo"
 version = "4.3.0"
-description = "Model-agnostic quality-gate kit for AI-assisted developers"
+description = "Local AI agent guardrails for FDE and CI — evidence spine, policy DENY, fail-closed quality gates"
 readme = "README.md"
 license = "MIT"
 authors = [
