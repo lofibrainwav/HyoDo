@@ -305,13 +305,20 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         "sbom": run_sbom_check(root),
     }
     safety = run_safety_scan(cwd=root)
+    safety_source = str(safety["source"])
+    safety_risk: int | None = (
+        safety["risk_score"]
+        if "empty" not in safety_source and "no diff" not in safety_source
+        else None
+    )
     evidence: dict[str, object] = {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "target": str(root),
         "measured_at": datetime.now(timezone.utc).isoformat(),
         "gates": {name: asdict(result) for name, result in gates.items()},
         "safety": {
-            "risk_score": safety["risk_score"],
+            "risk_score": safety_risk,
+            "source": safety_source,
             "findings": [asdict(finding) for finding in safety["findings"]],
         },
     }
@@ -344,6 +351,7 @@ class DashboardState:
         self._interval = interval
         self._refreshing = False
         self._refresh_message = "Snapshot ready."
+        self._refresh_started_at: str | None = None
         self.update(evidence)
 
     def _render_locked(self) -> None:
@@ -354,6 +362,7 @@ class DashboardState:
             interval=self._interval,
             refreshing=self._refreshing,
             refresh_message=self._refresh_message,
+            refresh_started_at=self._refresh_started_at or "",
         ).encode("utf-8")
         self._evidence_json = json.dumps(self._evidence, default=str, sort_keys=True).encode(
             "utf-8"
@@ -365,6 +374,7 @@ class DashboardState:
             self._evidence = evidence
             self._refreshing = False
             self._refresh_message = "Measurement complete."
+            self._refresh_started_at = None
             self._render_locked()
 
     def snapshot(self) -> tuple[bytes, bytes]:
@@ -376,7 +386,11 @@ class DashboardState:
         """Return the current refresh state as a small JSON response."""
         with self._lock:
             return json.dumps(
-                {"refreshing": self._refreshing, "message": self._refresh_message}
+                {
+                    "refreshing": self._refreshing,
+                    "message": self._refresh_message,
+                    "started_at": self._refresh_started_at,
+                }
             ).encode("utf-8")
 
     def begin_refresh(self) -> bool:
@@ -386,6 +400,7 @@ class DashboardState:
                 return False
             self._refreshing = True
             self._refresh_message = "Measurement running. This page will update when it finishes."
+            self._refresh_started_at = datetime.now(timezone.utc).isoformat()
             self._render_locked()
             return True
 
@@ -396,6 +411,7 @@ class DashboardState:
             self._refresh_message = (
                 "Measurement failed; the last successful snapshot is still shown."
             )
+            self._refresh_started_at = None
             self._render_locked()
 
 

@@ -128,6 +128,9 @@ per-server token, accepts no path or command input, and records one new local
 history receipt; it can take several minutes while the normal gates run.
 The measurement runs in the background: the page reports its running,
 successful, or failed state and keeps the last successful snapshot if it fails.
+Its change-safety card scans the current Git diff and names that scope. When
+there is no diff to inspect, the card reports `Not measured` instead of turning
+an empty input into a project-wide risk claim.
 
 ## Scope
 

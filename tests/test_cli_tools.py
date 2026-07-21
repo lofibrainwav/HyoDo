@@ -35,6 +35,7 @@ def test_dashboard_evidence_is_versioned_and_preserves_raw_gate_statuses(tmp_pat
     ok = GateResult(GateStatus.PASS, "ok")
     safety = {
         "risk_score": 5,
+        "source": "git diff HEAD",
         "findings": [],
     }
     with (
@@ -48,10 +49,25 @@ def test_dashboard_evidence_is_versioned_and_preserves_raw_gate_statuses(tmp_pat
     assert evidence["schema_version"] == "hyodo.dashboard-evidence/v2"
     assert evidence["gates"]["typecheck"]["status"] == "PASS"
     assert evidence["safety"]["risk_score"] == 5
+    assert evidence["safety"]["source"] == "git diff HEAD"
     assert set(evidence["pillars"]) == {"in", "hyo", "yeong"}
     # The collection itself must leave a receipt in the local ledger.
     assert (tmp_path / ".hyodo" / "history.jsonl").exists()
     assert evidence["pillars"]["yeong"]["metrics"]["recorded_runs"] == 1
+
+
+def test_dashboard_marks_safety_risk_not_measured_for_an_empty_change_set(tmp_path):
+    ok = GateResult(GateStatus.PASS, "ok")
+    safety = {"risk_score": 5, "source": "git status (no diff against HEAD)", "findings": []}
+    with (
+        patch("hyodo.cli.main.run_pyright_check", return_value=ok),
+        patch("hyodo.cli.main.run_ruff_check", return_value=ok),
+        patch("hyodo.cli.main.run_pytest_check", return_value=ok),
+        patch("hyodo.cli.main.run_sbom_check", return_value=ok),
+        patch("hyodo.cli.main.run_safety_scan", return_value=safety),
+    ):
+        evidence = collect_dashboard_evidence(tmp_path)
+    assert evidence["safety"]["risk_score"] is None
 
 
 def test_run_pytest_check_uses_python_m_pytest(tmp_path):

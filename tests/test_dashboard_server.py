@@ -29,7 +29,7 @@ EVIDENCE: dict[str, object] = {
         "tests": {"status": "PASS", "message": "175 passed in 1.50s"},
         "sbom": {"status": "PASS", "message": "generated"},
     },
-    "safety": {"risk_score": 5, "findings": []},
+    "safety": {"risk_score": 5, "source": "git diff HEAD", "findings": []},
 }
 
 
@@ -152,10 +152,13 @@ def test_manual_refresh_requires_token_and_redirects_after_replacing_snapshot():
         assert started.wait(timeout=1)
         status, _headers, body = _request(port, "GET", "/api/status")
         assert status == 200
-        assert json.loads(body) == {
-            "refreshing": True,
-            "message": "Measurement running. This page will update when it finishes.",
-        }
+        status_payload = json.loads(body)
+        assert status_payload["refreshing"] is True
+        assert (
+            status_payload["message"]
+            == "Measurement running. This page will update when it finishes."
+        )
+        assert status_payload["started_at"]
         release.set()
         for _ in range(20):
             status, _headers, body = _request(port, "GET", "/api/evidence")
@@ -197,6 +200,7 @@ def test_manual_refresh_failure_keeps_snapshot_and_exposes_failure_status():
         assert json.loads(body) == {
             "refreshing": False,
             "message": "Measurement failed; the last successful snapshot is still shown.",
+            "started_at": None,
         }
     finally:
         server.shutdown()
@@ -226,6 +230,8 @@ def test_dashboard_exposes_local_measurement_controls_when_token_is_issued():
     assert 'name="token" value="issued-token"' in html
     assert "Measure again now" in html
     assert "Auto re-measure every 30s" in html
+    assert "Safety scan scope" in html
+    assert "git diff HEAD" in html
 
 
 def test_dashboard_exposes_live_measurement_status_and_disables_running_button():
@@ -234,10 +240,12 @@ def test_dashboard_exposes_live_measurement_status_and_disables_running_button()
         refresh_token="issued-token",
         refreshing=True,
         refresh_message="Measurement running.",
+        refresh_started_at="2026-07-21T05:00:00+00:00",
     )
     assert 'id="measurement-status"' in html
     assert 'aria-live="polite"' in html
-    assert "Measurement running." in html
+    assert "Measurement running since 2026-07-21T05:00:00+00:00." in html
+    assert "Gates can take several minutes." in html
     assert '<button type="submit" disabled>Measurement running</button>' in html
 
 

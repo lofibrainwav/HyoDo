@@ -22,7 +22,13 @@ setInterval(() => {
     fetch("/api/status", { cache: "no-store" }).then((r) => r.json()),
   ])
     .then(([evidence, status]) => {
-      if (statusNode) statusNode.textContent = status.message;
+      if (statusNode) {
+        const startedAt = Date.parse(status.started_at || "");
+        const elapsed = Number.isNaN(startedAt) ? 0 : Math.max(0, Math.floor((Date.now() - startedAt) / 1000));
+        statusNode.textContent = status.refreshing
+          ? `Measurement running for ${elapsed}s. Gates can take several minutes.`
+          : status.message;
+      }
       if (measureButton) measureButton.disabled = status.refreshing;
       if (evidence.measured_at && evidence.measured_at !== seen) location.reload();
     })
@@ -203,13 +209,16 @@ def render_dashboard_html(
     interval: int = 0,
     refreshing: bool = False,
     refresh_message: str = "Snapshot ready.",
+    refresh_started_at: str = "",
 ) -> str:
     """Render raw evidence without creating a composite score or fake values."""
     typecheck = _gate(evidence, "typecheck")
     tests = _gate(evidence, "tests")
     lint = _gate(evidence, "lint_format")
     safety = evidence.get("safety", {})
-    risk = safety.get("risk_score", "Not measured")
+    risk = safety.get("risk_score")
+    risk_display = f"{risk}/100" if isinstance(risk, int | float) else "Not measured"
+    safety_source = str(safety.get("source", "Not recorded"))
     findings = safety.get("findings", [])
     high = sum(1 for finding in findings if finding.get("severity") == "high")
     measured_at = str(evidence.get("measured_at", "Not recorded"))
@@ -226,7 +235,8 @@ def render_dashboard_html(
         "seon": (
             "<ul>"
             + _metric("Tests", f"{tests['status']}: {_display_message(tests['message'])}", "pytest")
-            + _metric("Safety risk", f"{risk}/100", "HyoDo safe", "0")
+            + _metric("Change safety risk", risk_display, "HyoDo safe", "0")
+            + _metric("Safety scan scope", safety_source, "HyoDo safe")
             + _metric("High-risk findings", str(high), "HyoDo safe", "0")
             + "</ul>"
         ),
@@ -259,6 +269,11 @@ def render_dashboard_html(
         if refresh_token
         else ""
     )
+    refresh_status = refresh_message
+    if refreshing and refresh_started_at:
+        refresh_status = (
+            f"Measurement running since {refresh_started_at}. Gates can take several minutes."
+        )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HyoDo Instrument Panel</title><style>
@@ -272,4 +287,4 @@ h1 {{ margin:0; font-size:clamp(1.7rem,4vw,2.5rem) }} .meta {{ color:var(--muted
 h2 {{ margin:0 0 14px; font-size:1.1rem }} h2 span {{ color:var(--accent); font-size:1rem; letter-spacing:.02em }} ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} small,.reference {{ grid-column:1/-1; color:var(--muted); font-size:.82rem }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:700; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0 }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }} @media (prefers-reduced-motion:reduce) {{ * {{ scroll-behavior:auto }} }}
 @media (max-width:820px) {{ header {{ display:block }} .legend {{ text-align:left; margin-top:10px }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
-</style></head><body><main><header><div><h1>HyoDo Instrument Panel</h1><p class="meta">Target: {escape(target)} · Measured: {escape(measured_at)}</p></div><p class="legend">Raw evidence only · No composite score<br><a href="/api/evidence">Open current evidence JSON</a></p></header><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="meta" aria-live="polite">{escape(refresh_message)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
+</style></head><body><main><header><div><h1>HyoDo Instrument Panel</h1><p class="meta">Target: {escape(target)} · Measured: {escape(measured_at)}</p></div><p class="legend">Raw evidence only · No composite score<br><a href="/api/evidence">Open current evidence JSON</a></p></header><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="meta" aria-live="polite">{escape(refresh_status)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
