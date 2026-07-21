@@ -67,6 +67,103 @@ def _not_measured(reason: str) -> str:
     return f'<p class="not-measured">Not measured</p><p class="reason">{escape(reason)}</p>'
 
 
+def _pillar_metrics(pillar: Any) -> tuple[dict[str, Any], str]:
+    """Return (metrics, source label) for a pillar entry; empty means not measured."""
+    if not isinstance(pillar, dict):
+        return {}, ""
+    metrics = pillar.get("metrics")
+    if not isinstance(metrics, dict) or not metrics:
+        return {}, ""
+    sources = pillar.get("sources") or []
+    return metrics, "; ".join(str(source) for source in sources)
+
+
+def _coverage(pair: Any, done_key: str, total_key: str) -> str:
+    if not isinstance(pair, dict):
+        return "Not measured"
+    done = int(pair.get(done_key, 0))
+    total = int(pair.get(total_key, 0))
+    percent = f"{done / total:.0%}" if total else "n/a"
+    return f"{percent} ({done}/{total})"
+
+
+def _in_body(pillar: Any) -> str:
+    metrics, source = _pillar_metrics(pillar)
+    if not metrics:
+        return _not_measured(
+            "No real UI task-completion events are connected to this HyoDo CLI checkout."
+        )
+    return (
+        "<ul>"
+        + _metric(
+            "Public docstring coverage",
+            _coverage(metrics.get("public_docstring_coverage"), "documented", "public"),
+            source,
+        )
+        + _metric(
+            "CLI parameters with help text",
+            _coverage(metrics.get("cli_parameters_with_help"), "with_help", "total"),
+            source,
+        )
+        + _metric("Message-less raises", str(metrics.get("messageless_raises", 0)), source, "0")
+        + "</ul>"
+    )
+
+
+def _hyo_body(pillar: Any) -> str:
+    metrics, source = _pillar_metrics(pillar)
+    if not metrics:
+        return _not_measured("No consent, undo, or data-protection event source is connected.")
+    flags = metrics.get("mutating_flags")
+    flags = flags if isinstance(flags, dict) else {}
+    flag_list = ", ".join(flags.get("flags", [])) or "none found"
+    defaulting_on = flags.get("defaulting_on", [])
+    consent = "all opt-in" if not defaulting_on else "defaulting ON: " + ", ".join(defaulting_on)
+    return (
+        "<ul>"
+        + _metric(f"Mutating flags ({flag_list})", consent, source)
+        + _metric(
+            "Outbound network import sites",
+            str(metrics.get("outbound_network_import_sites", 0)),
+            source,
+            "0",
+        )
+        + _metric(
+            "Non-loopback bind literals",
+            str(metrics.get("non_loopback_bind_literals", 0)),
+            source,
+            "0",
+        )
+        + "</ul>"
+    )
+
+
+def _yeong_body(pillar: Any) -> str:
+    metrics, source = _pillar_metrics(pillar)
+    if not metrics:
+        return _not_measured(
+            "SBOM status is an inventory artifact, not a direct measurement of long-term "
+            "reliability. No incident or recovery data source is connected."
+        )
+    corrupt = int(metrics.get("corrupt_lines", 0))
+    corrupt_item = _metric("Corrupt ledger lines", str(corrupt), source, "0") if corrupt else ""
+    return (
+        "<ul>"
+        + _metric("Recorded measurement runs", str(metrics.get("recorded_runs", 0)), source)
+        + _metric(
+            "Consecutive all-PASS runs",
+            str(metrics.get("consecutive_all_pass_runs", 0)),
+            source,
+        )
+        + _metric("First recorded", str(metrics.get("first_recorded_at", "")), source)
+        + _metric("Last recorded", str(metrics.get("last_recorded_at", "")), source)
+        + corrupt_item
+        + "</ul>"
+        + '<p class="reason">SBOM remains an inventory artifact, not a reliability '
+        "measurement.</p>"
+    )
+
+
 def render_dashboard_html(evidence: dict[str, Any]) -> str:
     """Render raw evidence without creating a composite score or fake values."""
     typecheck = _gate(evidence, "typecheck")
@@ -105,29 +202,11 @@ def render_dashboard_html(evidence: dict[str, Any]) -> str:
         + _metric("Lint and format", f"{lint['status']}: {lint['message']}", "Ruff")
         + "</ul>",
     )
-    in_card = _card(
-        "in",
-        "In / Benevolence",
-        "orange",
-        _not_measured(
-            "No real UI task-completion events are connected to this HyoDo CLI checkout."
-        ),
-    )
-    hyo = _card(
-        "hyo",
-        "Hyo",
-        "gold",
-        _not_measured("No consent, undo, or data-protection event source is connected."),
-    )
-    yeong = _card(
-        "yeong",
-        "Yeong / Durability",
-        "indigo",
-        _not_measured(
-            "SBOM status is an inventory artifact, not a direct measurement of long-term reliability. "
-            "No incident or recovery data source is connected."
-        ),
-    )
+    pillars = evidence.get("pillars")
+    pillars = pillars if isinstance(pillars, dict) else {}
+    in_card = _card("in", "In / Benevolence", "orange", _in_body(pillars.get("in")))
+    hyo = _card("hyo", "Hyo", "gold", _hyo_body(pillars.get("hyo")))
+    yeong = _card("yeong", "Yeong / Durability", "indigo", _yeong_body(pillars.get("yeong")))
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HyoDo Instrument Panel</title><style>
