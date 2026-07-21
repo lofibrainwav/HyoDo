@@ -41,6 +41,14 @@ from rich.table import Table
 
 from hyodo import __version__
 from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
+from hyodo.events import (
+    AGENT_EVENTS_RELATIVE_PATH,
+    append_agent_event,
+    load_event_from_path,
+    load_event_from_text,
+    strip_full_bodies,
+    validate_event,
+)
 from hyodo.gates import (
     GATES_CONFIG_RELATIVE_PATH,
     SCHEMA_ID,
@@ -56,6 +64,12 @@ from hyodo.pillars import (
     collect_in_evidence,
     collect_yeong_evidence,
 )
+from hyodo.policy import (
+    POLICY_RELATIVE_PATH,
+    apply_decision_to_event,
+    evaluate_policy,
+    try_load_policy,
+)
 from hyodo.safety import run_safety_scan
 
 app = typer.Typer(
@@ -63,6 +77,18 @@ app = typer.Typer(
     help="HyoDo - model-agnostic AI code quality gates",
     add_completion=True,
 )
+event_app = typer.Typer(
+    name="event",
+    help="Agent event ledger (FDE evidence spine; opt-in, not a runtime interceptor)",
+    add_completion=False,
+)
+policy_app = typer.Typer(
+    name="policy",
+    help="Local policy gate for agent events (ALLOW|DENY; unobserved ≠ ALLOW)",
+    add_completion=False,
+)
+app.add_typer(event_app, name="event")
+app.add_typer(policy_app, name="policy")
 console = Console()
 
 
@@ -1445,6 +1471,330 @@ def safe(
     raise typer.Exit(0)
 
 
+def _load_event_payload(
+    file: Path | None,
+    stdin_flag: bool,
+) -> tuple[object | None, str | None]:
+    """Load event JSON from --file or stdin. Returns (data, error_code)."""
+    if stdin_flag and file is not None:
+        return None, "file_and_stdin"
+    if stdin_flag:
+        text = sys.stdin.read()
+        return load_event_from_text(text)
+    if file is None:
+        return None, "missing_input"
+    return load_event_from_path(file)
+
+
+@event_app.command("validate")
+def event_validate(
+    file: str | None = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="Path to a JSON agent event (hyodo.agent-event/v1)",
+    ),
+    stdin_flag: bool = typer.Option(
+        False,
+        "--stdin",
+        help="Read event JSON from stdin instead of --file",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON {ok, reasons}",
+    ),
+):
+    """
+    Validate one agent event against hyodo.agent-event/v1.
+
+    Exit: 0 valid · 1 invalid · 2 unreadable / missing input.
+    Does not write the ledger.
+    """
+    file_path = Path(file) if file else None
+    data, err = _load_event_payload(file_path, stdin_flag)
+    if err == "file_and_stdin":
+        msg = "Use either --file or --stdin, not both."
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": [err], "exit_code": 2}))
+        else:
+            console.print(f"[red]{msg}[/red]")
+        raise typer.Exit(2)
+    if err == "missing_input":
+        msg = "Provide --file PATH or --stdin."
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": [err], "exit_code": 2}))
+        else:
+            console.print(f"[red]{msg}[/red]")
+        raise typer.Exit(2)
+    if err is not None:
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": [err], "exit_code": 2}))
+        else:
+            console.print(f"[red]Cannot load event: {err}[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2)
+
+    ok, reasons, _normalized = validate_event(data)
+    if json_output:
+        console.print_json(json.dumps({"ok": ok, "reasons": reasons, "exit_code": 0 if ok else 1}))
+    elif ok:
+        console.print("[green]VALID[/green] hyodo.agent-event/v1")
+    else:
+        console.print("[red]INVALID[/red] event")
+        for reason in reasons:
+            console.print(f"  - {reason}")
+    raise typer.Exit(0 if ok else 1)
+
+
+@event_app.command("record")
+def event_record(
+    file: str | None = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="Path to a JSON agent event (hyodo.agent-event/v1)",
+    ),
+    stdin_flag: bool = typer.Option(
+        False,
+        "--stdin",
+        help="Read event JSON from stdin instead of --file",
+    ),
+    root: str = typer.Option(
+        ".",
+        "--root",
+        help="Project root that owns .hyodo/agent-events.jsonl",
+    ),
+    policy: str | None = typer.Option(
+        None,
+        "--policy",
+        help="Optional policy.toml; when set, DENY is recorded and exit 1",
+    ),
+    full_body: bool = typer.Option(
+        False,
+        "--full-body",
+        help="Keep io.input_text/output_text when present (default: digest-only)",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON receipt",
+    ),
+):
+    """
+    Validate and append one agent event to .hyodo/agent-events.jsonl.
+
+    Default storage is digest-only (strips full text bodies). Use --full-body
+    only when the operator accepts retaining raw payloads.
+
+    With --policy: evaluate policy, stamp policy.* on the event, always try to
+    append (including DENY) for audit continuity. Exit 1 on DENY or invalid
+    event; exit 2 when input/policy path is unreadable or policy is unobserved.
+
+    HyoDo is a gate, not an agent runtime — callers must enforce DENY.
+    """
+    root_path = Path(root).resolve()
+    file_path = Path(file) if file else None
+    data, err = _load_event_payload(file_path, stdin_flag)
+    if err in {"file_and_stdin", "missing_input"} or err is not None:
+        code = 2
+        reasons = [err or "load_failed"]
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": code}))
+        else:
+            console.print(f"[red]Cannot load event: {err}[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(code)
+
+    ok, reasons, normalized = validate_event(data)
+    if not ok or normalized is None:
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": 1}))
+        else:
+            console.print("[red]INVALID[/red] event — not recorded")
+            for reason in reasons:
+                console.print(f"  - {reason}")
+        raise typer.Exit(1)
+
+    if not full_body:
+        normalized = strip_full_bodies(normalized)
+
+    decision_label = None
+    if policy is not None:
+        cfg, policy_err = try_load_policy(Path(policy))
+        if cfg is None:
+            # Fail-closed: missing/invalid policy is unobserved, never ALLOW.
+            if json_output:
+                console.print_json(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "reasons": [policy_err or "policy_unobserved"],
+                            "exit_code": 2,
+                        }
+                    )
+                )
+            else:
+                console.print(
+                    f"[red]Policy unobserved ({policy_err}).[/red] "
+                    "Not ALLOW. Fix --policy path or TOML."
+                )
+            raise typer.Exit(2)
+        decision = evaluate_policy(normalized, cfg)
+        normalized = apply_decision_to_event(normalized, decision)
+        decision_label = decision.decision
+
+    if not append_agent_event(root_path, normalized):
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "reasons": ["append_failed"],
+                        "exit_code": 2,
+                        "ledger": str(root_path / AGENT_EVENTS_RELATIVE_PATH),
+                    }
+                )
+            )
+        else:
+            console.print("[red]Failed to append agent event ledger.[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2)
+
+    exit_code = 1 if decision_label == "DENY" else 0
+    ledger = str(root_path / AGENT_EVENTS_RELATIVE_PATH)
+    if json_output:
+        console.print_json(
+            json.dumps(
+                {
+                    "ok": exit_code == 0,
+                    "exit_code": exit_code,
+                    "event_id": normalized["event_id"],
+                    "decision": decision_label,
+                    "ledger": ledger,
+                    "full_body": full_body,
+                }
+            )
+        )
+    else:
+        console.print(f"[green]RECORDED[/green] {normalized['event_id']}")
+        console.print(f"ledger: {ledger}")
+        if decision_label is not None:
+            color = "red" if decision_label == "DENY" else "green"
+            console.print(f"policy: [{color}]{decision_label}[/{color}]")
+            if decision_label == "DENY":
+                console.print(
+                    "[yellow]DENY is recorded for audit; the caller must stop "
+                    "the agent. HyoDo is not a runtime interceptor.[/yellow]"
+                )
+    raise typer.Exit(exit_code)
+
+
+@policy_app.command("check")
+def policy_check(
+    file: str | None = typer.Option(
+        None,
+        "--file",
+        "-f",
+        help="Path to a JSON agent event",
+    ),
+    stdin_flag: bool = typer.Option(
+        False,
+        "--stdin",
+        help="Read event JSON from stdin",
+    ),
+    config: str | None = typer.Option(
+        None,
+        "--config",
+        "-c",
+        help="policy.toml path (default: ./.hyodo/policy.toml)",
+    ),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable decision JSON",
+    ),
+):
+    """
+    Evaluate one event against a local policy.toml.
+
+    Exit: 0 ALLOW · 1 DENY · 2 unobserved (missing/invalid policy or event).
+    Does not write the ledger (use ``hyodo event record --policy`` for that).
+    """
+    file_path = Path(file) if file else None
+    data, err = _load_event_payload(file_path, stdin_flag)
+    if err is not None:
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {
+                        "decision": "UNOBSERVED",
+                        "rule_id": None,
+                        "reason": err,
+                        "exit_code": 2,
+                    }
+                )
+            )
+        else:
+            console.print(f"[red]Cannot load event: {err}[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2)
+
+    ok, reasons, normalized = validate_event(data)
+    if not ok or normalized is None:
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {
+                        "decision": "UNOBSERVED",
+                        "rule_id": None,
+                        "reason": ";".join(reasons),
+                        "exit_code": 2,
+                    }
+                )
+            )
+        else:
+            console.print("[red]INVALID event — policy not evaluated.[/red]")
+            for reason in reasons:
+                console.print(f"  - {reason}")
+        raise typer.Exit(2)
+
+    policy_path = (
+        Path(config).resolve() if config else (Path.cwd() / POLICY_RELATIVE_PATH).resolve()
+    )
+    cfg, policy_err = try_load_policy(policy_path)
+    if cfg is None:
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {
+                        "decision": "UNOBSERVED",
+                        "rule_id": None,
+                        "reason": policy_err,
+                        "exit_code": 2,
+                    }
+                )
+            )
+        else:
+            console.print(f"[red]Policy unobserved ({policy_err}).[/red] Not ALLOW.")
+        raise typer.Exit(2)
+
+    decision = evaluate_policy(normalized, cfg)
+    exit_code = 0 if decision.decision == "ALLOW" else 1
+    if json_output:
+        payload = decision.as_dict()
+        payload["exit_code"] = exit_code
+        console.print_json(json.dumps(payload))
+    else:
+        color = "green" if decision.decision == "ALLOW" else "red"
+        console.print(f"[{color}]{decision.decision}[/{color}]")
+        if decision.rule_id:
+            console.print(f"rule_id: {decision.rule_id}")
+        if decision.reason:
+            console.print(f"reason: {decision.reason}")
+    raise typer.Exit(exit_code)
+
+
 @app.command()
 def start():
     """Print HyoDo onboarding guide and basic usage."""
@@ -1461,15 +1811,19 @@ Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
   • [bold]score[/bold]  - HYOGOOK F-score review signal, philosophy V6 (not auto-approval)
   • [bold]safe[/bold]   - lightweight safety early-warning scan
   • [bold]safe --strict[/bold] - exit 1 on high-severity findings
+  • [bold]event[/bold]  - agent event ledger (opt-in FDE evidence spine)
+  • [bold]policy[/bold] - local agent policy gate (ALLOW|DENY)
   • [bold]trinity[/bold] - structured review checklist
 
 [bold cyan]Examples:[/bold cyan]
   $ hyodo check
   $ hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9
   $ hyodo safe --strict
+  $ hyodo event record --file step.json --policy .hyodo/policy.toml
 
 [bold cyan]Boundary:[/bold cyan]
   Scores and scans support review. Human approval remains required.
+  Event/policy are gates and evidence — not an agent runtime interceptor.
     """
     console.print(guide)
 

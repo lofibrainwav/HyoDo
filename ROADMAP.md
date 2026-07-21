@@ -31,16 +31,26 @@ implementation:
 
 - Generalize `hyodo check` beyond HyoDo checkouts without weakening its exit
   contract.
-- Define a stable adapter contract for agent UIs.
 - Improve safety rule precision and document known false positives.
 - Add machine-readable check results for CI consumers.
 - Measure routing guidance before making any cost-savings claim.
+- **FDE Phase 2** — strict schema validation gate for agent payloads
+  (`hyodo schema check`).
+- **FDE Phase 3** — local golden-dataset eval harness (`hyodo eval`).
+- **FDE Phase 4** — executive sign-off HTML/MD report from ledger evidence.
+
+## In progress / landed (Unreleased)
+
+- **FDE Phase 1 Evidence Spine** — agent event ledger + policy gate + adapter
+  contract (`hyodo event` / `hyodo policy`). Digest-default; not a full
+  tool-call interceptor. Sample MCP/runtime adapters remain optional follow-ups.
 
 ## Later exploration
 
 - Additional language and repository adapters.
 - A plugin API for custom gates.
 - Optional browser or service integrations outside the core CLI.
+- Optional hash-chain / at-rest encryption for agent-events (needs key story).
 
 Exploration does not imply support or a release date. The public package should
 remain useful without optional services, model providers, or agent interfaces.

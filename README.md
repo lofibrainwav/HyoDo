@@ -121,6 +121,8 @@ See [Quick Start](./QUICK_START.md).
 | `hyodo dashboard` | Local evidence panel |
 | `hyodo start` | Onboarding guidance |
 | `hyodo trinity "…"` | Structured review checklist |
+| `hyodo event validate` / `record` | Opt-in agent event ledger (FDE evidence spine) |
+| `hyodo policy check` | Local agent policy gate (ALLOW/DENY; unobserved ≠ ALLOW) |
 
 ### Exit contracts
 
@@ -131,6 +133,21 @@ failed · `2` missing path, malformed `gates.toml`, or zero executed gates.
 
 Resolution: `--general` → `.hyodo/gates.toml` → HyoDo checkout preset →
 guidance toward `hyodo init`.
+
+### Agent evidence spine (opt-in FDE)
+
+```bash
+# Validate / record one agent step (digest-only by default)
+hyodo event validate --file step.json
+hyodo event record --file step.json --root . --policy .hyodo/policy.toml
+
+# Policy only (does not write the ledger)
+hyodo policy check --file step.json --config .hyodo/policy.toml
+```
+
+Ledger path: `.hyodo/agent-events.jsonl` (separate from gate `history.jsonl`).
+HyoDo records DENY for audit; **the caller must stop the agent** — this is a
+gate, not a runtime interceptor. See `examples/fde-evidence-spine/`.
 
 ## Optional review score
 
