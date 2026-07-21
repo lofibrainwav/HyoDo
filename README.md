@@ -7,155 +7,208 @@
 [![Python](https://img.shields.io/pypi/pyversions/hyodo)](https://pypi.org/project/hyodo/)
 [![License](https://img.shields.io/github/license/lofibrainwav/HyoDo)](./LICENSE)
 
-HyoDo provides a small CLI and CI workflow for reviewing AI-assisted changes.
-It combines type checking, linting, tests, safety warnings, and an optional
-review score without granting automatic approval.
+Scan AI-assisted changes for secrets, dangerous commands, and production-impact
+risks — then, when you are ready, absorb *your* project's own tests and linters
+as quality gates. Scores and philosophy labels are **review signals only**; they
+never grant automatic approval.
 
-## Two tracks
+## Start here (any repository)
 
-HyoDo has two surfaces with deliberately different scopes:
-
-- **`safe` — outward, any repository.** A dependency-light safety
-  early-warning scanner (secrets, dangerous commands, production
-  impact). Run `hyodo safe` or `hyodo safe --json` on your diff.
-- **`check` — reference, a HyoDo checkout only.** HyoDo's own
-  release gates (Pyright/Ruff/pytest/SBOM). It proves HyoDo's
-  honesty contract; it does not gate arbitrary projects.
-
-If you want a gate for *your* repo today, use `safe`. `check` is intentionally
-scoped to HyoDo itself.
-
-## Install
-
-Python 3.10 or newer is required.
+Value you can feel in under a minute — no HyoDo checkout required:
 
 ```bash
-pip install -U hyodo
-hyodo --version
+pipx install hyodo              # isolated CLI (or: pip install -U hyodo)
+cd your-project
+hyodo safe                      # early-warning scan (secrets, dangerous cmds, prod impact)
+hyodo safe --strict             # exit 1 when a high-severity finding exists
+hyodo safe --json               # machine-readable findings for CI
 ```
 
-For an isolated command-line installation, use `pipx install hyodo` instead.
+### CI snippet (GitHub Actions)
 
-The installed package exposes `score`, `safe`, and onboarding commands from any
-directory:
+```yaml
+- run: pipx install hyodo
+- run: hyodo safe --strict --json
+```
+
+`hyodo safe` is an early-warning scanner, not a full security audit. It runs on
+any repository with no setup.
+
+### Bring your own gates (optional, 4.2+)
+
+When you want *your* typechecker / linter / test runner as first-class gates:
+
+```bash
+hyodo init                 # detect tooling → write .hyodo/gates.toml
+hyodo check                # run absorbed gates (Bring-Your-Own-Gates)
+hyodo dashboard --open     # local evidence panel
+```
+
+`hyodo init` reads existing project signals (`pyproject.toml` pytest/ruff/mypy/
+pyright, npm test/lint, `tsconfig.json`, `go.mod`, `Cargo.toml`, Makefile
+`test:`/`lint:`) and writes `.hyodo/gates.toml`. HyoDo does not reinvent those
+tools — it runs the ones you already trust.
+
+## Six pillars — philosophy kept, engineering mapped
+
+Branding stays. Every label always ships with its technical meaning so you never
+have to translate mid-incident:
+
+| Pillar (Hanja / Korean / English) | Technical meaning | How it is measured |
+| --- | --- | --- |
+| 眞 / 진 / **Truth** | Type / static correctness | **Command gate** — Pyright, mypy, `tsc --noEmit`, `go vet`, `cargo check`, … (yours via `init`, or HyoDo preset) |
+| 善 / 선 / **Goodness** | Tests + safety stability | **Command gate** — pytest, `npm test`, `go test`, `cargo test`, … plus `hyodo safe` findings |
+| 美 / 미 / **Beauty** | Lint / format / maintainability | **Command gate** — Ruff, ESLint, formatters, … |
+| 仁 / 인 / **Benevolence** | Structural integrity of public surface | **Native AST scan** — public docstrings, CLI help coverage, message-less `raise` |
+| 孝 / 효 / **Filial Piety (Hyo)** | Consent + data-protection posture | **Native AST scan** — mutating flags stay opt-in, outbound network import sites, non-loopback bind literals |
+| 永 / 영 / **Eternity (Yeong)** | Continuity of honest measurement | **Local ledger** — append-only `.hyodo/history.jsonl`, consecutive all-PASS on *executed* gates |
+
+Truth / Goodness / Beauty come from commands you (or `hyodo init`) absorb.
+Benevolence / Hyo / Yeong are **never** command gates — HyoDo measures them from
+the checkout so a fake-green shell script cannot game them. Unavailable sources
+show `Not measured` instead of inventing a score.
+
+### Optional review score (fail-closed math)
 
 ```bash
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
   --benevolence 0.9 --hyo 0.9
-hyodo safe path/to/file_or_diff_context
-hyodo safe --strict path/to/file_or_diff_context
 ```
 
-`hyodo check` currently validates a **HyoDo repository checkout**, not an
-arbitrary project. Clone the repository to run its full release gates:
+HYOGOOK F-score (philosophy **V6**; formula lineage V5) combines the five input
+pillars with a **geometric mean**. That is not literary “harmony” — it is a
+**fail-closed gate**: if any pillar is 0, the whole signal collapses to 0
+(arithmetic mean would hide a zero security axis behind a high average).
+
+- All five pillars must be provided unless you pass `--partial` (marks
+  `SIGNAL_CONFIDENCE_WEAK`; does not invent a STRONG band).
+- Scores support review; they never replace tests, `safe`, or human approval.
+
+Full map: [PHILOSOPHY.md](./PHILOSOPHY.md).
+
+## Local instrument panel
+
+Watch stability and pillar evidence update on your machine:
 
 ```bash
-git clone https://github.com/lofibrainwav/HyoDo.git
-cd HyoDo
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
-hyodo check
+hyodo dashboard --open
+# → http://127.0.0.1:8768
 ```
 
-Activating the checkout virtual environment ensures that `check` uses its
-Pyright, Ruff, pytest, and SBOM dependencies. If another HyoDo installation is
-earlier on your `PATH` (for example, a `pipx` installation), run
-`./.venv/bin/hyodo check` explicitly.
+```text
+┌─ HyoDo evidence ──────────────────────────────────────┐
+│  眞 Truth     PASS / FAIL / Not measured              │
+│  善 Goodness  PASS / FAIL / Not measured              │
+│  美 Beauty    PASS / FAIL / Not measured              │
+│  仁 In        AST structural integrity …              │
+│  孝 Hyo       consent / outbound / bind posture …     │
+│  永 Yeong     history streak (executed gates only)    │
+│  [Measure again now]   raw JSON → /api/evidence       │
+└───────────────────────────────────────────────────────┘
+```
 
-See [Quick Start](./QUICK_START.md) for the complete first-run path.
+(Replace this ASCII stand-in with a real screenshot when you record one —
+`docs/` is a good home.)
+
+The panel **never** invents a composite score. With `.hyodo/gates.toml`, gate
+rows use your absorbed gate names; otherwise the HyoDo checkout preset labels
+apply. In / Hyo / Yeong always come from native collectors.
+
+### How it works / security (details)
+
+- **Loopback only** — the server binds to `127.0.0.1` so local analysis is not
+  exposed on the LAN.
+- **Poll, not websocket** — the page hits `/api/evidence` every 15s and reloads
+  only when the snapshot changes (keeps the CLI dependency surface small).
+- **`--interval N`** — background re-measure every N seconds; default snapshot
+  is fixed at server start.
+- **Measure again now** — token-protected, no path/command injection; may take
+  minutes while gates run; last good snapshot is kept on failure.
+- **Change-safety card** — scans the current Git diff scope; no diff →
+  `Not measured` (never inflated into a whole-repo risk claim).
+- Optional `--allow-origin` allowlist for local API consumers (explicit only).
+
+## Install
+
+Python 3.10 or newer.
+
+```bash
+pip install -U hyodo
+# or: pipx install hyodo
+hyodo --version
+```
+
+See [Quick Start](./QUICK_START.md) for the full first-run path.
 
 ## Commands
 
 | Command | Purpose |
 | --- | --- |
-| `hyodo start` | Show onboarding guidance |
-| `hyodo check [PATH]` | Run HyoDo checkout gates |
-| `hyodo score ...` | Produce a review signal |
-| `hyodo dashboard` | Serve a local evidence-only instrument panel |
-| `hyodo safe [PATH]` | Print safety findings without blocking |
-| `hyodo safe --strict [PATH]` | Exit 1 when high-severity findings exist |
-| `hyodo safe --json [PATH]` | Emit machine-readable JSON findings for CI |
-| `hyodo trinity "CHANGE"` | Produce a structured review checklist |
+| `hyodo start` | Onboarding guidance |
+| `hyodo safe [PATH]` | Safety findings (non-blocking) |
+| `hyodo safe --strict [PATH]` | Exit 1 on high-severity findings |
+| `hyodo safe --json [PATH]` | JSON findings for CI |
+| `hyodo init [PATH]` | Detect tools → write `.hyodo/gates.toml` (BYOG, 4.2+) |
+| `hyodo check [PATH]` | Run absorbed gates, else HyoDo checkout preset |
+| `hyodo check --general` | Bounded multi-language syntax sample gates (opt-in) |
+| `hyodo score ...` | Optional review signal (fail-closed geometric mean) |
+| `hyodo dashboard` | Local evidence-only instrument panel |
+| `hyodo trinity "CHANGE"` | Structured review checklist |
+
+### `hyodo safe` exit contract
+
+| Exit | Meaning |
+| ---: | --- |
+| `0` | Findings printed (default mode never blocks) |
+| `1` | `--strict` and at least one high-severity finding |
+| `2` | Path missing or unreadable |
 
 ### `hyodo check` exit contract
 
 | Exit | Meaning |
 | ---: | --- |
-| `0` | At least one gate ran and every executed gate passed |
+| `0` | At least one gate ran and every **executed** gate passed |
 | `1` | An executed gate failed |
-| `2` | The path is missing or no applicable gate ran |
+| `2` | Path missing, malformed `.hyodo/gates.toml`, or no applicable gate ran |
 
-The checkout gates run Pyright, Ruff, pytest, and an optional SBOM check. A
-zero-gate run is never reported as success.
-
-### `hyodo safe` exit contract
-
-- Default mode prints findings and exits `0`.
-- `--strict` exits `1` when a high-severity finding is present.
-- Missing or unreadable paths exit `2`.
-
-`hyodo safe` is an early-warning scanner, not a security audit.
-
-### Local instrument panel
-
-Run this from a HyoDo checkout to collect one fresh snapshot and open a local
-dashboard at `http://127.0.0.1:8768`:
-
-```bash
-hyodo dashboard --open
-```
-
-The panel never creates a composite score. It shows raw gate evidence for
-Truth, Goodness, and Beauty. In, Hyo, and Yeong are measured from real,
-local sources only: In from an AST scan of the checkout (public docstring
-coverage, CLI help coverage, message-less raises), Hyo from the same scan's
-consent and data-protection posture (mutating flags stay opt-in, outbound
-network import sites, non-loopback bind literals), and Yeong from the
-append-only measurement ledger at `.hyodo/history.jsonl` (recorded runs,
-consecutive all-PASS streak). Any pillar whose source is unavailable still
-shows `Not measured`; an SBOM is shown only as its own inventory artifact and
-is never relabeled as a reliability measurement. The server listens only on
-loopback and exposes the exact snapshot at `/api/evidence`.
-
-The page follows the system light or dark theme and polls `/api/evidence`
-every 15 seconds, reloading only when a newer measurement exists. It links to
-the exact current JSON evidence and displays whether the snapshot is fixed or
-auto-refreshing. By default the snapshot stays fixed at server start; pass
-`--interval N` to re-measure in the background every `N` seconds. The local
-page also offers **Measure again now**. That action is protected by a
-per-server token, accepts no path or command input, and records one new local
-history receipt; it can take several minutes while the normal gates run.
-The measurement runs in the background: the page reports its running,
-successful, or failed state and keeps the last successful snapshot if it fails.
-Its change-safety card scans the current Git diff and names that scope. When
-there is no diff to inspect, the card reports `Not measured` instead of turning
-an empty input into a project-wide risk claim.
+Resolution order: `--general` (explicit) → `.hyodo/gates.toml` (BYOG) → HyoDo
+checkout preset (Pyright / Ruff / pytest / optional SBOM) → guidance toward
+`hyodo init`. Zero executed gates is never success. Malformed `gates.toml`
+exits `2` with the parse error (never silent skip).
 
 ## Scope
-
-The supported release surface is intentionally narrow:
 
 | Surface | Status |
 | --- | --- |
 | `hyodo/` Python package and CLI | Public release surface |
 | `tests/` and `.github/workflows/` | Release verification |
 
-Model-agnostic means the core CLI does not require a specific AI provider or
-agent UI. It does not mean language-agnostic or universal repository support.
+**Model-agnostic** means the core CLI does not require a specific AI provider or
+agent UI. It does **not** mean every language is fully supported end-to-end.
+`--general` is a bounded syntax sample (per-language file caps, vendor dirs
+pruned), not a claim of universal multi-stack coverage.
 
-## Optional review score
+## For contributors (HyoDo dogfood)
 
-HYOGOOK V5 evaluates Truth, Goodness, Beauty, Benevolence, and Hyo, with a
-geometric-mean harmony signal. Scores support review; they never replace tests,
-security checks, or human approval.
+HyoDo runs its **own** release preset on this repository so the tool eats its
+cooking (honesty contract). That path is for people contributing to HyoDo — not
+the first thing a new adopter should read.
 
-The practical CLI works without this optional philosophy layer. See
-[HyoDo philosophy](./PHILOSOPHY.md) for the short model description.
+```bash
+git clone https://github.com/lofibrainwav/HyoDo.git
+cd HyoDo
+python -m venv .venv && source .venv/bin/activate
+python -m pip install -e ".[dev]"
+./.venv/bin/hyodo check          # Pyright + Ruff + pytest + optional SBOM
+```
+
+Prefer `./.venv/bin/hyodo` when a global/`pipx` install shadows the checkout.
+Day-to-day contribution workflow: [CONTRIBUTING.md](./CONTRIBUTING.md).
 
 ## Documentation
 
 - [Quick Start](./QUICK_START.md)
+- [Philosophy (pillar ↔ engineering map)](./PHILOSOPHY.md)
 - [Documentation index](./docs/README.md)
 - [Provider support evidence](./docs/PROVIDER_PROOF.md)
 - [Security boundaries](./docs/SECURITY_SURFACE.md)
