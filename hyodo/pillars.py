@@ -59,6 +59,19 @@ def _is_typer_parameter(node: ast.Call) -> bool:
     )
 
 
+def _is_normal_typer_exit(node: ast.AST) -> bool:
+    """Return whether *node* is Typer's argument-free successful CLI exit."""
+    return (
+        isinstance(node, ast.Call)
+        and not node.args
+        and not node.keywords
+        and isinstance(node.func, ast.Attribute)
+        and node.func.attr == "Exit"
+        and isinstance(node.func.value, ast.Name)
+        and node.func.value.id == "typer"
+    )
+
+
 def collect_in_evidence(root: Path) -> dict[str, Any]:
     """Measure how kindly the checkout treats the humans who use it."""
     public_defs = 0
@@ -75,8 +88,9 @@ def collect_in_evidence(root: Path) -> dict[str, Any]:
                         documented += 1
             elif isinstance(node, ast.Raise) and node.exc is not None:
                 exc = node.exc
-                if isinstance(exc, ast.Name) or (
-                    isinstance(exc, ast.Call) and not exc.args and not exc.keywords
+                if not _is_normal_typer_exit(exc) and (
+                    isinstance(exc, ast.Name)
+                    or (isinstance(exc, ast.Call) and not exc.args and not exc.keywords)
                 ):
                     messageless_raises += 1
             elif isinstance(node, ast.Call) and _is_typer_parameter(node):
@@ -193,17 +207,27 @@ def collect_yeong_evidence(root: Path) -> dict[str, Any]:
     if not entries:
         return empty
     streak = 0
+    all_pass_runs = 0
+    last_non_pass_at = ""
     for entry in reversed(entries):
         gates = entry.get("gates", {})
         if gates and all(status == "PASS" for status in gates.values()):
             streak += 1
         else:
             break
+    for entry in entries:
+        gates = entry.get("gates", {})
+        if gates and all(status == "PASS" for status in gates.values()):
+            all_pass_runs += 1
+        else:
+            last_non_pass_at = str(entry.get("measured_at", ""))
     return {
         "sources": [f"{HISTORY_RELATIVE_PATH} append-only receipts"],
         "metrics": {
             "recorded_runs": len(entries),
             "consecutive_all_pass_runs": streak,
+            "all_pass_runs": all_pass_runs,
+            "last_non_pass_at": last_non_pass_at,
             "first_recorded_at": str(entries[0].get("measured_at", "")),
             "last_recorded_at": str(entries[-1].get("measured_at", "")),
             "corrupt_lines": corrupt_lines,

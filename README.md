@@ -119,9 +119,13 @@ is never relabeled as a reliability measurement. The server listens only on
 loopback and exposes the exact snapshot at `/api/evidence`.
 
 The page follows the system light or dark theme and polls `/api/evidence`
-every 15 seconds, reloading only when a newer measurement exists. By default
-the snapshot stays fixed at server start; pass `--interval N` to re-measure
-in the background every `N` seconds.
+every 15 seconds, reloading only when a newer measurement exists. It links to
+the exact current JSON evidence and displays whether the snapshot is fixed or
+auto-refreshing. By default the snapshot stays fixed at server start; pass
+`--interval N` to re-measure in the background every `N` seconds. The local
+page also offers **Measure again now**. That action is protected by a
+per-server token, accepts no path or command input, and records one new local
+history receipt; it can take several minutes while the normal gates run.
 
 ## Scope
 
