@@ -151,7 +151,9 @@ def test_cli_safe_max_files_caps_directory_scan(tmp_path: Path):
     result = runner.invoke(app, ["safe", str(tmp_path), "--max-files", "2"])
 
     assert result.exit_code == 0
-    assert "(2 files)" in result.output
+    # Rich wraps long source lines at terminal width (wrap position varies
+    # with tmp_path length across OSes) — normalize whitespace before asserting.
+    assert "(2 files)" in " ".join(result.output.split())
 
 
 def test_cli_safe_max_files_zero_is_unlimited(tmp_path: Path):
@@ -160,7 +162,7 @@ def test_cli_safe_max_files_zero_is_unlimited(tmp_path: Path):
 
     result = runner.invoke(app, ["safe", str(tmp_path), "--max-files", "0"])
 
-    assert "(3 files)" in result.output
+    assert "(3 files)" in " ".join(result.output.split())
 
 
 # --------------------------------------------------------------------------- #
