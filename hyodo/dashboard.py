@@ -13,13 +13,21 @@ from typing import Any
 # of being interpolated into the script body.
 POLL_SCRIPT = """\
 const seen = document.currentScript.dataset.measured;
+const statusNode = document.getElementById("measurement-status");
+const measureButton = document.querySelector(".controls button");
 setInterval(() => {
   // A failed poll means the server stopped; keep the last rendered snapshot.
-  fetch("/api/evidence", { cache: "no-store" })
-    .then((r) => r.json())
-    .then((j) => { if (j.measured_at && j.measured_at !== seen) location.reload(); })
+  Promise.all([
+    fetch("/api/evidence", { cache: "no-store" }).then((r) => r.json()),
+    fetch("/api/status", { cache: "no-store" }).then((r) => r.json()),
+  ])
+    .then(([evidence, status]) => {
+      if (statusNode) statusNode.textContent = status.message;
+      if (measureButton) measureButton.disabled = status.refreshing;
+      if (evidence.measured_at && evidence.measured_at !== seen) location.reload();
+    })
     .catch(() => {});
-}, 15000);"""
+}, 2000);"""
 
 POLL_SCRIPT_SHA256 = base64.b64encode(hashlib.sha256(POLL_SCRIPT.encode("utf-8")).digest()).decode(
     "ascii"
@@ -189,7 +197,12 @@ def _yeong_body(pillar: Any) -> str:
 
 
 def render_dashboard_html(
-    evidence: dict[str, Any], *, refresh_token: str = "", interval: int = 0
+    evidence: dict[str, Any],
+    *,
+    refresh_token: str = "",
+    interval: int = 0,
+    refreshing: bool = False,
+    refresh_message: str = "Snapshot ready.",
 ) -> str:
     """Render raw evidence without creating a composite score or fake values."""
     typecheck = _gate(evidence, "typecheck")
@@ -235,10 +248,14 @@ def render_dashboard_html(
     )
     refresh_control = (
         '<form class="controls" method="post" action="/api/refresh">'
-        f'<input type="hidden" name="token" value="{escape(refresh_token)}">'
-        '<button type="submit">Measure again now</button>'
-        "<small>Local only. Records one new history receipt and may take several minutes.</small>"
-        "</form>"
+        + f'<input type="hidden" name="token" value="{escape(refresh_token)}">'
+        + (
+            '<button type="submit" disabled>Measurement running</button>'
+            if refreshing
+            else '<button type="submit">Measure again now</button>'
+        )
+        + "<small>Local only. Records one new history receipt and may take several minutes.</small>"
+        + "</form>"
         if refresh_token
         else ""
     )
@@ -255,4 +272,4 @@ h1 {{ margin:0; font-size:clamp(1.7rem,4vw,2.5rem) }} .meta {{ color:var(--muted
 h2 {{ margin:0 0 14px; font-size:1.1rem }} h2 span {{ color:var(--accent); font-size:1rem; letter-spacing:.02em }} ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} small,.reference {{ grid-column:1/-1; color:var(--muted); font-size:.82rem }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:700; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0 }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }} @media (prefers-reduced-motion:reduce) {{ * {{ scroll-behavior:auto }} }}
 @media (max-width:820px) {{ header {{ display:block }} .legend {{ text-align:left; margin-top:10px }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
-</style></head><body><main><header><div><h1>HyoDo Instrument Panel</h1><p class="meta">Target: {escape(target)} · Measured: {escape(measured_at)}</p></div><p class="legend">Raw evidence only · No composite score<br><a href="/api/evidence">Open current evidence JSON</a></p></header><p class="meta">{escape(refresh_mode)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
+</style></head><body><main><header><div><h1>HyoDo Instrument Panel</h1><p class="meta">Target: {escape(target)} · Measured: {escape(measured_at)}</p></div><p class="legend">Raw evidence only · No composite score<br><a href="/api/evidence">Open current evidence JSON</a></p></header><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="meta" aria-live="polite">{escape(refresh_message)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""

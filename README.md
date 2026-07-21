@@ -126,6 +126,8 @@ auto-refreshing. By default the snapshot stays fixed at server start; pass
 page also offers **Measure again now**. That action is protected by a
 per-server token, accepts no path or command input, and records one new local
 history receipt; it can take several minutes while the normal gates run.
+The measurement runs in the background: the page reports its running,
+successful, or failed state and keeps the last successful snapshot if it fails.
 
 ## Scope
 

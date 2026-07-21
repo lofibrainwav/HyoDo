@@ -11,7 +11,8 @@ import hashlib
 import json
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
-from threading import Thread
+from threading import Event, Thread
+from time import sleep
 
 import pytest
 
@@ -127,9 +128,17 @@ def test_manual_refresh_requires_token_and_redirects_after_replacing_snapshot():
     state = DashboardState(dict(EVIDENCE), refresh_token="issued-token", interval=30)
     refreshed = dict(EVIDENCE)
     refreshed["measured_at"] = "2026-07-20T01:00:00+00:00"
+    started = Event()
+    release = Event()
+
+    def refresh():
+        started.set()
+        assert release.wait(timeout=2)
+        return refreshed
+
     server = ThreadingHTTPServer(
         ("127.0.0.1", 0),
-        make_dashboard_handler(state, lambda: refreshed, "issued-token"),
+        make_dashboard_handler(state, refresh, "issued-token"),
     )
     thread = Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -140,16 +149,30 @@ def test_manual_refresh_requires_token_and_redirects_after_replacing_snapshot():
         status, headers, _body = _post(port, "/api/refresh", "token=issued-token")
         assert status == 303
         assert headers["Location"] == "/"
+        assert started.wait(timeout=1)
+        status, _headers, body = _request(port, "GET", "/api/status")
+        assert status == 200
+        assert json.loads(body) == {
+            "refreshing": True,
+            "message": "Measurement running. This page will update when it finishes.",
+        }
+        release.set()
+        for _ in range(20):
+            status, _headers, body = _request(port, "GET", "/api/evidence")
+            if json.loads(body)["measured_at"] == refreshed["measured_at"]:
+                break
+            sleep(0.01)
         status, _headers, body = _request(port, "GET", "/api/evidence")
         assert status == 200
         assert json.loads(body)["measured_at"] == refreshed["measured_at"]
     finally:
+        release.set()
         server.shutdown()
         server.server_close()
         thread.join(timeout=5)
 
 
-def test_manual_refresh_failure_keeps_snapshot_and_returns_503():
+def test_manual_refresh_failure_keeps_snapshot_and_exposes_failure_status():
     state = DashboardState(dict(EVIDENCE))
 
     def broken_refresh():
@@ -164,7 +187,17 @@ def test_manual_refresh_failure_keeps_snapshot_and_returns_503():
         status, _headers, _body = _post(
             server.server_address[1], "/api/refresh", "token=issued-token"
         )
-        assert status == 503
+        assert status == 303
+        for _ in range(20):
+            status, _headers, body = _request(server.server_address[1], "GET", "/api/status")
+            if not json.loads(body)["refreshing"]:
+                break
+            sleep(0.01)
+        assert status == 200
+        assert json.loads(body) == {
+            "refreshing": False,
+            "message": "Measurement failed; the last successful snapshot is still shown.",
+        }
     finally:
         server.shutdown()
         server.server_close()
@@ -193,6 +226,19 @@ def test_dashboard_exposes_local_measurement_controls_when_token_is_issued():
     assert 'name="token" value="issued-token"' in html
     assert "Measure again now" in html
     assert "Auto re-measure every 30s" in html
+
+
+def test_dashboard_exposes_live_measurement_status_and_disables_running_button():
+    html = render_dashboard_html(
+        dict(EVIDENCE),
+        refresh_token="issued-token",
+        refreshing=True,
+        refresh_message="Measurement running.",
+    )
+    assert 'id="measurement-status"' in html
+    assert 'aria-live="polite"' in html
+    assert "Measurement running." in html
+    assert '<button type="submit" disabled>Measurement running</button>' in html
 
 
 def test_card_headings_are_trilingual_hanja_korean_english():
