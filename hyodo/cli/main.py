@@ -285,6 +285,10 @@ def _print_gate_result(result: GateResult) -> None:
         console.print(f"  [yellow]UNSUPPORTED {result.message}[/yellow]")
 
 
+EVIDENCE_SCHEMA_VERSION = "hyodo.dashboard-evidence/v2"
+LOOPBACK_HOST = "127.0.0.1"
+
+
 def collect_dashboard_evidence(root: Path) -> dict[str, object]:
     """Collect one honest snapshot for the local dashboard."""
     gates = {
@@ -295,7 +299,7 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
     }
     safety = run_safety_scan(cwd=root)
     evidence: dict[str, object] = {
-        "schema_version": "hyodo.dashboard-evidence/v2",
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
         "target": str(root),
         "measured_at": datetime.now(timezone.utc).isoformat(),
         "gates": {name: asdict(result) for name, result in gates.items()},
@@ -421,11 +425,11 @@ def dashboard(
                 console.print(f"[yellow]Re-measure failed; keeping last snapshot: {exc}[/yellow]")
 
     try:
-        server = ThreadingHTTPServer(("127.0.0.1", port), make_dashboard_handler(state))
+        server = ThreadingHTTPServer((LOOPBACK_HOST, port), make_dashboard_handler(state))
     except OSError as exc:
-        console.print(f"[red]Cannot bind 127.0.0.1:{port}: {exc}[/red]")
+        console.print(f"[red]Cannot bind {LOOPBACK_HOST}:{port}: {exc}[/red]")
         raise typer.Exit(1) from exc
-    console.print(f"[green]Dashboard: http://127.0.0.1:{port}[/green]")
+    console.print(f"[green]Dashboard: http://{LOOPBACK_HOST}:{port}[/green]")
     if interval:
         console.print(
             f"[dim]Local only. Press Ctrl+C to stop. Re-measures every {interval}s.[/dim]"
@@ -436,7 +440,7 @@ def dashboard(
             "[dim]Local only. Press Ctrl+C to stop. Snapshot is fixed at server start.[/dim]"
         )
     if open_browser:
-        webbrowser.open(f"http://127.0.0.1:{port}/")
+        webbrowser.open(f"http://{LOOPBACK_HOST}:{port}/")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
