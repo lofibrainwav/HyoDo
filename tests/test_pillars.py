@@ -97,6 +97,79 @@ def test_hyo_collector_flags_mutating_option_defaulting_on(tmp_path):
     assert metrics["mutating_flags"]["defaulting_on"] == ["--fix"]
 
 
+def test_src_layout_repo_is_autodetected_via_pyproject_name(tmp_path):
+    root = tmp_path
+    (root / "pyproject.toml").write_text('[project]\nname = "mypkg"\n', encoding="utf-8")
+    package = root / "src" / "mypkg"
+    package.mkdir(parents=True)
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "core.py").write_text(
+        '"""Core module."""\n\n'
+        "import socket\n\n\n"
+        "def documented():\n"
+        '    """Docstring."""\n'
+        "    return 1\n\n\n"
+        "def undocumented():\n"
+        "    return 2\n",
+        encoding="utf-8",
+    )
+    in_pillar = collect_in_evidence(root)
+    assert in_pillar["sources"] == ["ast scan of src/mypkg"]
+    assert in_pillar["metrics"]["public_docstring_coverage"] == {"documented": 1, "public": 2}
+
+    hyo_pillar = collect_hyo_evidence(root)
+    assert hyo_pillar["sources"] == ["ast scan of src/mypkg"]
+    assert hyo_pillar["metrics"]["outbound_network_import_sites"] == 1  # socket
+
+
+def test_top_level_package_repo_is_autodetected_and_skips_venv_and_hidden(tmp_path):
+    root = tmp_path
+    (root / ".venv").mkdir()
+    (root / ".venv" / "__init__.py").write_text("", encoding="utf-8")
+    (root / ".hidden").mkdir()
+    (root / ".hidden" / "__init__.py").write_text("", encoding="utf-8")
+    package = root / "mypkg"
+    package.mkdir()
+    (package / "__init__.py").write_text("", encoding="utf-8")
+    (package / "core.py").write_text(
+        '"""Core."""\n\n\ndef documented():\n    """Docstring."""\n    return 1\n',
+        encoding="utf-8",
+    )
+    pillar = collect_in_evidence(root)
+    assert pillar["sources"] == ["ast scan of mypkg"]
+    assert pillar["metrics"]["public_docstring_coverage"] == {"documented": 1, "public": 1}
+
+
+def test_repo_without_python_code_returns_empty_contract(tmp_path):
+    root = tmp_path
+    (root / "go.mod").write_text("module example.com/thing\n\ngo 1.22\n", encoding="utf-8")
+    assert collect_in_evidence(root) == {"sources": [], "metrics": {}}
+    assert collect_hyo_evidence(root) == {"sources": [], "metrics": {}}
+
+
+def test_root_level_scripts_only_repo_is_scanned(tmp_path):
+    root = tmp_path
+    (root / "build.py").write_text(
+        '"""Build script."""\n\n\ndef run():\n    """Run it."""\n    return 0\n',
+        encoding="utf-8",
+    )
+    pillar = collect_in_evidence(root)
+    assert pillar["sources"] == ["ast scan of root-level *.py files"]
+    assert pillar["metrics"]["public_docstring_coverage"] == {"documented": 1, "public": 1}
+
+
+def test_root_hyodo_checkout_takes_priority_over_pyproject_name(tmp_path):
+    # _make_checkout writes tmp_path/hyodo/sample.py + a bare pyproject.toml;
+    # overriding the name here proves root/hyodo (a) still wins over the
+    # src/<name>-or-<name> lookup (b) — the original hardcoded path is a
+    # regression lock, not just one option among several.
+    root = _make_checkout(tmp_path)
+    (root / "pyproject.toml").write_text('[project]\nname = "other"\n', encoding="utf-8")
+    pillar = collect_in_evidence(root)
+    assert pillar["sources"] == ["ast scan of the checkout's hyodo/ package"]
+    assert pillar["metrics"]["public_docstring_coverage"] == {"documented": 2, "public": 3}
+
+
 def test_yeong_collector_reports_not_connected_without_ledger(tmp_path):
     root = _make_checkout(tmp_path)
     pillar = collect_yeong_evidence(root)

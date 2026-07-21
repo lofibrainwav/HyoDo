@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.2.0] - 2026-07-21
+
+### Added
+
+- **`hyodo init [PATH]`** — detects a project's existing quality tools
+  (`detect_project_gates`) and writes `.hyodo/gates.toml` (Bring-Your-Own-Gates,
+  schema `hyodo.gates/v1`), printing a trilingual pillar/command/source table
+  for every absorbed gate. Refuses to overwrite an existing config unless
+  `--force` is passed. An empty detection writes an honest starter template
+  (commented-out examples) instead of guessing.
+- **`hyodo check` resolves `.hyodo/gates.toml` first**: when present, `check`
+  runs the absorbed user gates instead of the HyoDo-checkout-only preset
+  (`--general` remains an explicit, unchanged override). A malformed
+  `gates.toml` exits `2` with the parse/schema error instead of silently
+  skipping the user's gates. The checkout-only guidance now points to
+  `hyodo init` when neither a user config nor a HyoDo checkout is found.
+- **`hyodo dashboard` measures `.hyodo/gates.toml` gates when present** —
+  `evidence.gates` is built from the user's own gate names instead of the
+  fixed `typecheck`/`lint_format`/`tests`/`sbom` keys; falls back to the
+  built-in checkout gates otherwise. Benevolence/Hyo/Eternity stay native
+  collectors, unaffected by Bring-Your-Own-Gates.
+- Base dependency `tomli>=1.2.0; python_version < "3.11"` — `hyodo.gates`
+  needs a TOML parser on Python 3.10 checkouts (stdlib `tomllib` is 3.11+),
+  and `hyodo.cli.main` now imports `hyodo.gates` unconditionally at startup.
+
 ## [4.1.0] - 2026-07-21
 
 ### Added

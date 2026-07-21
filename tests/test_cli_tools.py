@@ -56,6 +56,34 @@ def test_dashboard_evidence_is_versioned_and_preserves_raw_gate_statuses(tmp_pat
     assert evidence["pillars"]["yeong"]["metrics"]["recorded_runs"] == 1
 
 
+def test_dashboard_evidence_uses_user_gates_when_gates_toml_present(tmp_path):
+    """Bring-Your-Own-Gates: .hyodo/gates.toml present -> evidence.gates uses
+    the user's own gate names, not the fixed typecheck/lint_format/tests/sbom
+    keys, and the built-in checkout gate functions are never called."""
+    hyodo_dir = tmp_path / ".hyodo"
+    hyodo_dir.mkdir()
+    (hyodo_dir / "gates.toml").write_text(
+        'schema = "hyodo.gates/v1"\n\n[gates.custom_tests]\npillar = "goodness"\ncommand = "true"\n',
+        encoding="utf-8",
+    )
+    safety = {"risk_score": 5, "source": "git diff HEAD", "findings": []}
+    with (
+        patch("hyodo.cli.main.run_pyright_check") as pyright_mock,
+        patch("hyodo.cli.main.run_ruff_check") as ruff_mock,
+        patch("hyodo.cli.main.run_pytest_check") as pytest_mock,
+        patch("hyodo.cli.main.run_sbom_check") as sbom_mock,
+        patch("hyodo.cli.main.run_safety_scan", return_value=safety),
+    ):
+        evidence = collect_dashboard_evidence(tmp_path)
+
+    assert set(evidence["gates"]) == {"custom_tests"}
+    assert evidence["gates"]["custom_tests"]["status"] == "PASS"
+    pyright_mock.assert_not_called()
+    ruff_mock.assert_not_called()
+    pytest_mock.assert_not_called()
+    sbom_mock.assert_not_called()
+
+
 def test_dashboard_marks_safety_risk_not_measured_for_an_empty_change_set(tmp_path):
     ok = GateResult(GateStatus.PASS, "ok")
     safety = {"risk_score": 5, "source": "git status (no diff against HEAD)", "findings": []}

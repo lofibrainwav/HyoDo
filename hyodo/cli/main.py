@@ -40,7 +40,16 @@ from rich.panel import Panel
 from rich.table import Table
 
 from hyodo import __version__
-from hyodo.dashboard import POLL_SCRIPT_SHA256, render_dashboard_html
+from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
+from hyodo.gates import (
+    GATES_CONFIG_RELATIVE_PATH,
+    SCHEMA_ID,
+    GatesConfigError,
+    detect_project_gates,
+    load_gates_config,
+    render_gates_toml,
+    run_user_gates,
+)
 from hyodo.pillars import (
     append_history_receipt,
     collect_hyo_evidence,
@@ -72,6 +81,32 @@ class GateResult:
 
     status: GateStatus
     message: str
+
+
+# hyodo.gates pillar name -> hyodo.dashboard.PILLAR_SPECS key. Both name the
+# same six pillars; the dashboard SSOT carries the trilingual (Hanja/Korean/
+# English) label, so BYOG output reuses it instead of hardcoding a duplicate.
+_PILLAR_SPEC_KEY_BY_GATE_PILLAR = {
+    "truth": "jin",
+    "goodness": "seon",
+    "beauty": "mi",
+    "benevolence": "in",
+    "hyo": "hyo",
+    "eternity": "yeong",
+}
+_PILLAR_LABELS_BY_SPEC_KEY = {
+    key: (hanja, korean, english) for key, hanja, korean, english, _ in PILLAR_SPECS
+}
+
+
+def _trilingual_pillar_label(pillar: str) -> str:
+    """Render a `.hyodo/gates.toml` pillar name as Hanja/Korean/English (SSOT: PILLAR_SPECS)."""
+    spec_key = _PILLAR_SPEC_KEY_BY_GATE_PILLAR.get(pillar)
+    labels = _PILLAR_LABELS_BY_SPEC_KEY.get(spec_key) if spec_key else None
+    if labels is None:
+        return pillar
+    hanja, korean, english = labels
+    return f"{hanja} {korean} {english}"
 
 
 def find_repo_root(start: Path | None = None) -> Path | None:
@@ -299,13 +334,32 @@ LOOPBACK_HOST = "127.0.0.1"
 
 
 def collect_dashboard_evidence(root: Path) -> dict[str, object]:
-    """Collect one honest snapshot for the local dashboard."""
-    gates = {
-        "typecheck": run_pyright_check(root),
-        "lint_format": run_ruff_check(root),
-        "tests": run_pytest_check(root),
-        "sbom": run_sbom_check(root),
-    }
+    """Collect one honest snapshot for the local dashboard.
+
+    Uses `.hyodo/gates.toml` (Bring-Your-Own-Gates, see `hyodo init`) when
+    present -- the user's own gate names become the evidence keys -- else the
+    built-in HyoDo checkout preset. A malformed gates.toml is surfaced as one
+    failing `gates_config` entry rather than silently falling back.
+    """
+    try:
+        gates_config = load_gates_config(root)
+    except GatesConfigError as exc:
+        gates: dict[str, GateResult] = {
+            "gates_config": GateResult(GateStatus.FAIL, f"{GATES_CONFIG_RELATIVE_PATH}: {exc}")
+        }
+    else:
+        if gates_config is not None:
+            gates = {
+                result.name: GateResult(GateStatus(result.status), result.message)
+                for result in run_user_gates(gates_config, root)
+            }
+        else:
+            gates = {
+                "typecheck": run_pyright_check(root),
+                "lint_format": run_ruff_check(root),
+                "tests": run_pytest_check(root),
+                "sbom": run_sbom_check(root),
+            }
     safety = run_safety_scan(cwd=root)
     safety_source = str(safety["source"])
     safety_risk: int | None = (
@@ -632,6 +686,88 @@ def version():
     console.print(f"HyoDo v{__version__} - model-agnostic quality gates")
 
 
+_GATES_INIT_EMPTY_TEMPLATE = f"""schema = "{SCHEMA_ID}"
+
+# HyoDo Bring-Your-Own-Gates: no existing tool footprint was detected in this
+# checkout (no pyproject.toml/package.json/tsconfig.json/go.mod/Cargo.toml, and
+# no Makefile test:/lint: target). Absorb your own commands here -- each
+# becomes a first-class gate for `hyodo check`. Uncomment and edit:
+#
+# [gates.tests]
+# pillar = "goodness"
+# command = "pytest -q"
+# timeout = 120
+#
+# [gates.lint]
+# pillar = "beauty"
+# command = "ruff check ."
+#
+# Benevolence/Hyo/Eternity are measured natively from the checkout (see
+# hyodo/pillars.py) and are never command gates.
+"""
+
+
+@app.command()
+def init(
+    path: str | None = typer.Argument(
+        None, help="Project path to scan and initialize (defaults to current directory)"
+    ),
+    force: bool = typer.Option(False, "--force", help="Overwrite an existing .hyodo/gates.toml"),
+):
+    """
+    Detect this project's existing quality tools and write .hyodo/gates.toml.
+
+    Bring-Your-Own-Gates: absorbed commands become first-class `hyodo check`
+    gates attributed to Truth/Goodness/Beauty. Benevolence/Hyo/Eternity are
+    measured natively from the checkout and are never command gates.
+    """
+    console.print(Panel.fit("HyoDo init - Bring-Your-Own-Gates", style="bold blue"))
+    try:
+        target = resolve_check_target(path)
+    except FileNotFoundError as exc:
+        console.print(f"[red]Path not found: {exc}[/red]")
+        raise typer.Exit(2) from exc
+
+    root = target if target.is_dir() else target.parent
+    gates_path = root / GATES_CONFIG_RELATIVE_PATH
+    console.print(f"Target: {root}")
+
+    if gates_path.exists() and not force:
+        console.print(f"[red]{gates_path} already exists.[/red]")
+        console.print("[yellow]Use --force to overwrite it.[/yellow]")
+        raise typer.Exit(1)
+
+    detected = detect_project_gates(root)
+
+    if detected:
+        table = Table(title="Detected gates to absorb", show_header=True)
+        table.add_column("Gate", style="cyan")
+        table.add_column("Pillar (Hanja/Korean/English)")
+        table.add_column("Command")
+        table.add_column("Source")
+        for name in sorted(detected):
+            spec = detected[name]
+            table.add_row(
+                name, _trilingual_pillar_label(spec["pillar"]), spec["command"], spec["source"]
+            )
+        console.print(table)
+        rendered = render_gates_toml(detected)
+    else:
+        console.print("[yellow]No existing tooling detected in this checkout.[/yellow]")
+        console.print("[dim]Writing a starter .hyodo/gates.toml with commented-out examples.[/dim]")
+        rendered = _GATES_INIT_EMPTY_TEMPLATE
+
+    gates_path.parent.mkdir(parents=True, exist_ok=True)
+    gates_path.write_text(rendered, encoding="utf-8")
+    console.print(f"[green]Wrote {gates_path}[/green]")
+
+    console.print("\n[bold cyan]Next steps:[/bold cyan]")
+    console.print("  1. Review/edit .hyodo/gates.toml")
+    console.print("  2. hyodo check              # runs the absorbed gates")
+    console.print("  3. hyodo dashboard --open   # view evidence")
+    raise typer.Exit(0)
+
+
 @dataclass(frozen=True)
 class GeneralGateResult:
     """Result of one language-agnostic gate (``hyodo check --general``)."""
@@ -848,7 +984,9 @@ def check(
     Model-agnostic means independent of the AI model or agent UI.
     It does not currently mean language-agnostic or any-repo universal.
 
-    Order: Pyright -> Ruff -> pytest -> SBOM
+    Resolution order: --general (explicit opt-in) -> .hyodo/gates.toml
+    (Bring-Your-Own-Gates, if present -- see `hyodo init`) -> HyoDo checkout
+    preset (Pyright -> Ruff -> pytest -> SBOM) -> guidance.
 
     --general instead runs bounded language-agnostic syntax gates
     (Python/TS/JS/Go/Rust/Shell auto-detected, up to 50 files per language).
@@ -863,10 +1001,11 @@ def check(
         raise typer.Exit(2) from exc
 
     console.print(f"Target: {target}")
+    check_root = target if target.is_dir() else target.parent
 
-    # --general mode: language-agnostic gates
+    # --general mode: language-agnostic gates (explicit opt-in, unchanged)
     if general:
-        gen_root = target if target.is_dir() else target.parent
+        gen_root = check_root
         console.print(f"[cyan]General mode: auto-detecting languages in {gen_root}[/cyan]")
         gen_results = _run_general_gates(gen_root, verbose)
         _print_general_results(gen_results, gen_root)
@@ -893,6 +1032,47 @@ def check(
         )
         raise typer.Exit(0)
 
+    # Bring-Your-Own-Gates: a `.hyodo/gates.toml` (see `hyodo init`) takes
+    # priority over the HyoDo-checkout-only preset below.
+    try:
+        gates_config = load_gates_config(check_root)
+    except GatesConfigError as exc:
+        console.print(f"[red]{exc}[/red]")
+        console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2) from exc
+
+    if gates_config is not None:
+        console.print(f"[cyan]User gates: {check_root / GATES_CONFIG_RELATIVE_PATH}[/cyan]")
+        user_results = run_user_gates(gates_config, check_root, verbose=verbose)
+        user_styles = {"PASS": "green", "FAIL": "red", "SKIP": "yellow"}
+        for user_result in user_results:
+            style = user_styles.get(user_result.status, "yellow")
+            console.print(
+                f"  [{style}]{user_result.status}[/{style}] {user_result.name} "
+                f"({_trilingual_pillar_label(user_result.pillar)}): {user_result.message}"
+            )
+        user_failed = [r for r in user_results if r.status == "FAIL"]
+        user_executed = [r for r in user_results if r.status in {"PASS", "FAIL"}]
+        console.print("\n" + "=" * 50)
+        if not user_executed:
+            console.print("[bold yellow]No user gates were executed[/bold yellow]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+            raise typer.Exit(2)
+        if user_failed:
+            console.print(
+                f"[bold red]Some gates failed[/bold red] "
+                f"({len(user_executed)}/{len(user_results)} gates ran)"
+            )
+            raise typer.Exit(1)
+        console.print(
+            f"[bold green]All executed gates passed "
+            f"({len(user_executed)}/{len(user_results)} gates ran)[/bold green]"
+        )
+        console.print(
+            "[green]Gates support review readiness. Human approval still required.[/green]"
+        )
+        raise typer.Exit(0)
+
     root = find_repo_root(target)
     if root is None:
         console.print(
@@ -902,6 +1082,10 @@ def check(
         console.print(
             "[dim]Model-agnostic ≠ language-agnostic. "
             "General Python project gates are not claimed in this version.[/dim]"
+        )
+        console.print(
+            "[dim]Tip: run 'hyodo init' to absorb this project's own tools as gates "
+            "(Bring-Your-Own-Gates).[/dim]"
         )
     else:
         console.print(f"HyoDo checkout: {root}")

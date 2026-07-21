@@ -37,9 +37,92 @@ MUTATING_FLAG_NAMES = {"--fix"}
 _NON_LOOPBACK_BIND = "0.0" + ".0.0"
 
 
-def _package_trees(root: Path) -> list[ast.Module]:
+_EXCLUDED_TOP_LEVEL_DIRS = {".venv", "venv", "node_modules"}
+
+_ROOT_SCRIPT_SCAN_LIMIT = 50
+
+
+def _pyproject_project_name(root: Path) -> str | None:
+    """Best-effort read of ``[project].name`` from ``pyproject.toml``.
+
+    A minimal line scan (not a full TOML parser) is deliberate: it needs no
+    TOML library (``tomllib`` is unavailable on the project's own minimum of
+    Python 3.10) and this is a discovery heuristic, not a config loader.
+    """
+    try:
+        text = (root / "pyproject.toml").read_text(encoding="utf-8")
+    except OSError:
+        return None
+    in_project_table = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if line.startswith("["):
+            in_project_table = line == "[project]"
+            continue
+        if not in_project_table:
+            continue
+        key, sep, value = line.partition("=")
+        if not sep or key.strip() != "name":
+            continue
+        name = value.strip().strip('"').strip("'")
+        return name or None
+    return None
+
+
+def _iter_top_level_package_dirs(root: Path) -> list[Path]:
+    """Top-level directories that look like Python packages, sorted by name."""
+    candidates: list[Path] = []
+    for entry in sorted(root.iterdir()):
+        if not entry.is_dir():
+            continue
+        if entry.name.startswith(".") or entry.name in _EXCLUDED_TOP_LEVEL_DIRS:
+            continue
+        if (entry / "__init__.py").is_file():
+            candidates.append(entry)
+    return candidates
+
+
+def _resolve_scan_target(root: Path) -> tuple[list[Path], str]:
+    """Locate the Python files the In/Hyo collectors should scan for *root*.
+
+    Priority: (a) ``root/hyodo`` — the HyoDo checkout itself, preserving the
+    original hardcoded behaviour byte-for-byte; (b) a ``src/<name>`` or
+    ``<name>`` directory matching ``pyproject.toml``'s ``[project].name``;
+    (c) the first top-level directory (sorted, ``.venv``/``node_modules``/
+    hidden excluded) that has an ``__init__.py``; (d) up to
+    ``_ROOT_SCRIPT_SCAN_LIMIT`` root-level ``*.py`` files. Returns
+    ``([], "")`` when no Python code is found anywhere, so callers can be
+    honest instead of inventing a measurement.
+    """
+    hyodo_dir = root / "hyodo"
+    if hyodo_dir.is_dir():
+        files = sorted(hyodo_dir.rglob("*.py"))
+        return files, "ast scan of the checkout's hyodo/ package"
+
+    name = _pyproject_project_name(root)
+    if name:
+        normalized = name.replace("-", "_")
+        for relative in (Path("src") / normalized, Path(normalized)):
+            candidate = root / relative
+            if candidate.is_dir() and (candidate / "__init__.py").is_file():
+                return sorted(candidate.rglob("*.py")), f"ast scan of {relative.as_posix()}"
+
+    package_dirs = _iter_top_level_package_dirs(root)
+    if package_dirs:
+        candidate = package_dirs[0]
+        relative = candidate.relative_to(root)
+        return sorted(candidate.rglob("*.py")), f"ast scan of {relative.as_posix()}"
+
+    root_py_files = sorted(p for p in root.glob("*.py") if p.is_file())[:_ROOT_SCRIPT_SCAN_LIMIT]
+    if root_py_files:
+        return root_py_files, "ast scan of root-level *.py files"
+
+    return [], ""
+
+
+def _parse_python_files(paths: list[Path]) -> list[ast.Module]:
     trees: list[ast.Module] = []
-    for path in sorted((root / "hyodo").rglob("*.py")):
+    for path in paths:
         try:
             trees.append(ast.parse(path.read_text(encoding="utf-8")))
         except (OSError, SyntaxError):
@@ -74,12 +157,15 @@ def _is_normal_typer_exit(node: ast.AST) -> bool:
 
 def collect_in_evidence(root: Path) -> dict[str, Any]:
     """Measure how kindly the checkout treats the humans who use it."""
+    files, source = _resolve_scan_target(root)
+    if not files:
+        return {"sources": [], "metrics": {}}
     public_defs = 0
     documented = 0
     messageless_raises = 0
     parameters_total = 0
     parameters_with_help = 0
-    for tree in _package_trees(root):
+    for tree in _parse_python_files(files):
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef | ast.AsyncFunctionDef | ast.ClassDef):
                 if not node.name.startswith("_"):
@@ -98,7 +184,7 @@ def collect_in_evidence(root: Path) -> dict[str, Any]:
                 if any(keyword.arg == "help" for keyword in node.keywords):
                     parameters_with_help += 1
     return {
-        "sources": ["ast scan of the checkout's hyodo/ package"],
+        "sources": [source],
         "metrics": {
             "public_docstring_coverage": {"documented": documented, "public": public_defs},
             "cli_parameters_with_help": {
@@ -112,11 +198,14 @@ def collect_in_evidence(root: Path) -> dict[str, Any]:
 
 def collect_hyo_evidence(root: Path) -> dict[str, Any]:
     """Measure the consent and data-protection posture of the checkout."""
+    files, source = _resolve_scan_target(root)
+    if not files:
+        return {"sources": [], "metrics": {}}
     outbound_import_sites = 0
     non_loopback_bind_literals = 0
     mutating_flags: list[str] = []
     mutating_flags_defaulting_on: list[str] = []
-    for tree in _package_trees(root):
+    for tree in _parse_python_files(files):
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 outbound_import_sites += sum(
@@ -142,7 +231,7 @@ def collect_hyo_evidence(root: Path) -> dict[str, Any]:
                 if not opt_in:
                     mutating_flags_defaulting_on.extend(matched)
     return {
-        "sources": ["ast scan of the checkout's hyodo/ package"],
+        "sources": [source],
         "metrics": {
             "outbound_network_import_sites": outbound_import_sites,
             "non_loopback_bind_literals": non_loopback_bind_literals,
