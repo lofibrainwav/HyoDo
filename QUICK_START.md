@@ -8,23 +8,46 @@
 pip install -U 'hyodo==4.0.1'
 ```
 
+Or install an isolated command-line version:
+
+```bash
+pipx install hyodo
+```
+
 ### From source
 
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git
 cd HyoDo
-pip install -e ".[dev]"
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
 ```
 
-## Core CLI (model-agnostic)
+## Core CLI (any directory)
 
 ```bash
 hyodo --version
-hyodo check          # HyoDo checkout only
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
   --benevolence 0.9 --hyo 0.9
 hyodo safe
 hyodo safe --strict  # exit 1 on high-severity findings
+```
+
+## HyoDo checkout gates
+
+After the **From source** setup above, run the HyoDo release gates from the
+checkout:
+
+```bash
+hyodo check
+```
+
+If a separate installation (such as `pipx`) appears earlier on your `PATH`, use
+the checkout command explicitly:
+
+```bash
+./.venv/bin/hyodo check
 ```
 
 ## Score meaning
