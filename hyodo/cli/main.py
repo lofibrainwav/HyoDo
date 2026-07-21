@@ -342,22 +342,61 @@ class DashboardState:
         self._lock = threading.Lock()
         self._refresh_token = refresh_token
         self._interval = interval
+        self._refreshing = False
+        self._refresh_message = "Snapshot ready."
         self.update(evidence)
+
+    def _render_locked(self) -> None:
+        """Render the page and evidence JSON while the state lock is held."""
+        self._page = render_dashboard_html(
+            self._evidence,
+            refresh_token=self._refresh_token,
+            interval=self._interval,
+            refreshing=self._refreshing,
+            refresh_message=self._refresh_message,
+        ).encode("utf-8")
+        self._evidence_json = json.dumps(self._evidence, default=str, sort_keys=True).encode(
+            "utf-8"
+        )
 
     def update(self, evidence: dict[str, object]) -> None:
         """Render and atomically replace the dashboard snapshot from evidence."""
-        page = render_dashboard_html(
-            evidence, refresh_token=self._refresh_token, interval=self._interval
-        ).encode("utf-8")
-        evidence_json = json.dumps(evidence, default=str, sort_keys=True).encode("utf-8")
         with self._lock:
-            self._page = page
-            self._evidence_json = evidence_json
+            self._evidence = evidence
+            self._refreshing = False
+            self._refresh_message = "Measurement complete."
+            self._render_locked()
 
     def snapshot(self) -> tuple[bytes, bytes]:
         """Return the current rendered page and serialized evidence snapshot."""
         with self._lock:
             return self._page, self._evidence_json
+
+    def status(self) -> bytes:
+        """Return the current refresh state as a small JSON response."""
+        with self._lock:
+            return json.dumps(
+                {"refreshing": self._refreshing, "message": self._refresh_message}
+            ).encode("utf-8")
+
+    def begin_refresh(self) -> bool:
+        """Mark a manual measurement running unless one is already active."""
+        with self._lock:
+            if self._refreshing:
+                return False
+            self._refreshing = True
+            self._refresh_message = "Measurement running. This page will update when it finishes."
+            self._render_locked()
+            return True
+
+    def fail_refresh(self) -> None:
+        """Keep the last evidence and expose a refresh failure to the page."""
+        with self._lock:
+            self._refreshing = False
+            self._refresh_message = (
+                "Measurement failed; the last successful snapshot is still shown."
+            )
+            self._render_locked()
 
 
 def make_dashboard_handler(
@@ -376,6 +415,8 @@ def make_dashboard_handler(
                 return page, "text/html; charset=utf-8"
             if self.path == "/api/evidence":
                 return evidence_json, "application/json"
+            if self.path == "/api/status":
+                return state.status(), "application/json"
             return None
 
         def _send_headers(self, body: bytes, content_type: str) -> None:
@@ -424,11 +465,21 @@ def make_dashboard_handler(
             if not refresh_token or not compare_digest(token, refresh_token):
                 self.send_error(403, "Invalid refresh token")
                 return
-            try:
-                state.update(refresh())
-            except Exception:
-                self.send_error(503, "Measurement failed; keeping the last snapshot")
-                return
+            refresh_callback = refresh
+            assert refresh_callback is not None
+            if state.begin_refresh():
+
+                def _collect_in_background() -> None:
+                    try:
+                        state.update(refresh_callback())
+                    except Exception:
+                        state.fail_refresh()
+
+                threading.Thread(
+                    target=_collect_in_background,
+                    name="hyodo-dashboard-manual-refresh",
+                    daemon=True,
+                ).start()
             self.send_response(303)
             self.send_header("Location", "/")
             self.send_header("Cache-Control", "no-store")
