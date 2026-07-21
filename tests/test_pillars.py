@@ -375,9 +375,7 @@ def test_receipt_records_gate_set_fingerprint(tmp_path):
 
 def test_receipt_empty_gate_set_fingerprint_is_deterministic(tmp_path):
     root = _make_checkout(tmp_path)
-    assert append_history_receipt(
-        root, {"measured_at": "2026-07-21T00:00:00+00:00", "gates": {}}
-    )
+    assert append_history_receipt(root, {"measured_at": "2026-07-21T00:00:00+00:00", "gates": {}})
     line = json.loads((root / HISTORY_RELATIVE_PATH).read_text().strip())
     assert line["gates"] == {}
     assert line["gate_set_fingerprint"] == gate_set_fingerprint([])
@@ -417,15 +415,9 @@ def test_yeong_gate_set_change_resets_streak(tmp_path):
         },
     }
     trivial = {"gates": {"npm-test": {"status": "PASS"}}}
-    assert append_history_receipt(
-        root, {**four_gate, "measured_at": "2026-07-21T00:00:00+00:00"}
-    )
-    assert append_history_receipt(
-        root, {**four_gate, "measured_at": "2026-07-21T01:00:00+00:00"}
-    )
-    assert append_history_receipt(
-        root, {**trivial, "measured_at": "2026-07-21T02:00:00+00:00"}
-    )
+    assert append_history_receipt(root, {**four_gate, "measured_at": "2026-07-21T00:00:00+00:00"})
+    assert append_history_receipt(root, {**four_gate, "measured_at": "2026-07-21T01:00:00+00:00"})
+    assert append_history_receipt(root, {**trivial, "measured_at": "2026-07-21T02:00:00+00:00"})
     metrics = collect_yeong_evidence(root)["metrics"]
     # Only the latest fingerprint (trivial) participates; streak is 1, not 3.
     assert metrics["consecutive_all_pass_runs"] == 1

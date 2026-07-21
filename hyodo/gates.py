@@ -162,8 +162,7 @@ def _parse_gate_spec(path: Path, name: str, spec: Any) -> UserGate:
         env_tokens.append(tokens.pop(0))
     if not tokens:
         raise GatesConfigError(
-            f"{path}: gate {name!r} command has only env assignments; "
-            "missing executable after them"
+            f"{path}: gate {name!r} command has only env assignments; missing executable after them"
         )
 
     command_tuple = tuple(tokens)

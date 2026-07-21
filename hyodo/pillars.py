@@ -46,6 +46,7 @@ def _fingerprint_for_receipt_entry(entry: dict[str, Any]) -> str:
     names = gates.keys() if isinstance(gates, dict) else ()
     return gate_set_fingerprint(names)
 
+
 # Outbound-capable modules whose presence in the package would open a
 # telemetry or data-exfiltration pathway. http.server (inbound loopback
 # serving) is intentionally not in this set.
