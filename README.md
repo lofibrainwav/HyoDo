@@ -34,6 +34,8 @@ pip install -U hyodo
 hyodo --version
 ```
 
+For an isolated command-line installation, use `pipx install hyodo` instead.
+
 The installed package exposes `score`, `safe`, and onboarding commands from any
 directory:
 
@@ -50,9 +52,16 @@ arbitrary project. Clone the repository to run its full release gates:
 ```bash
 git clone https://github.com/lofibrainwav/HyoDo.git
 cd HyoDo
+python -m venv .venv
+source .venv/bin/activate
 python -m pip install -e ".[dev]"
 hyodo check
 ```
+
+Activating the checkout virtual environment ensures that `check` uses its
+Pyright, Ruff, pytest, and SBOM dependencies. If another HyoDo installation is
+earlier on your `PATH` (for example, a `pipx` installation), run
+`./.venv/bin/hyodo check` explicitly.
 
 See [Quick Start](./QUICK_START.md) for the complete first-run path.
 
