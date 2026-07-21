@@ -206,18 +206,28 @@ def collect_yeong_evidence(root: Path) -> dict[str, Any]:
             corrupt_lines += 1
     if not entries:
         return empty
+
+    def executed_all_pass(gates: dict[str, Any]) -> bool:
+        """SKIP/UNSUPPORTED gates are unobserved, not failed: they neither
+        satisfy nor block all-PASS. A run with zero executed gates never
+        counts as all-PASS (no false green from pure skips)."""
+        executed = [status for status in gates.values() if status in ("PASS", "FAIL")]
+        return bool(executed) and all(status == "PASS" for status in executed)
+
     streak = 0
     all_pass_runs = 0
+    runs_with_skipped_gates = 0
     last_non_pass_at = ""
     for entry in reversed(entries):
-        gates = entry.get("gates", {})
-        if gates and all(status == "PASS" for status in gates.values()):
+        if executed_all_pass(entry.get("gates", {})):
             streak += 1
         else:
             break
     for entry in entries:
         gates = entry.get("gates", {})
-        if gates and all(status == "PASS" for status in gates.values()):
+        if any(status not in ("PASS", "FAIL") for status in gates.values()):
+            runs_with_skipped_gates += 1
+        if executed_all_pass(gates):
             all_pass_runs += 1
         else:
             last_non_pass_at = str(entry.get("measured_at", ""))
@@ -227,6 +237,7 @@ def collect_yeong_evidence(root: Path) -> dict[str, Any]:
             "recorded_runs": len(entries),
             "consecutive_all_pass_runs": streak,
             "all_pass_runs": all_pass_runs,
+            "runs_with_skipped_gates": runs_with_skipped_gates,
             "last_non_pass_at": last_non_pass_at,
             "first_recorded_at": str(entries[0].get("measured_at", "")),
             "last_recorded_at": str(entries[-1].get("measured_at", "")),
