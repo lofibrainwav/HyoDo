@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+from contextlib import contextmanager
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
 from threading import Event, Thread
@@ -76,6 +77,36 @@ def _post(port: int, path: str, body: str) -> tuple[int, dict[str, str], bytes]:
         return response.status, dict(response.getheaders()), response.read()
     finally:
         conn.close()
+
+
+def _request_with_origin(
+    port: int, path: str, origin: str | None
+) -> tuple[int, dict[str, str], bytes]:
+    conn = HTTPConnection("127.0.0.1", port, timeout=5)
+    try:
+        headers = {"Origin": origin} if origin is not None else {}
+        conn.request("GET", path, headers=headers)
+        response = conn.getresponse()
+        return response.status, dict(response.getheaders()), response.read()
+    finally:
+        conn.close()
+
+
+@contextmanager
+def _running_server(allow_origins: tuple[str, ...] = ()):
+    """Start a throwaway dashboard server with a given CORS allow-list."""
+    state = DashboardState(dict(EVIDENCE))
+    server = ThreadingHTTPServer(
+        ("127.0.0.1", 0), make_dashboard_handler(state, allow_origins=allow_origins)
+    )
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield server.server_address[1]
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
 
 
 def test_root_serves_html_with_security_headers(server_port):
@@ -247,6 +278,75 @@ def test_dashboard_exposes_live_measurement_status_and_disables_running_button()
     assert "Measurement running since 2026-07-21T05:00:00+00:00." in html
     assert "Gates can take several minutes." in html
     assert '<button type="submit" disabled>Measurement running</button>' in html
+
+
+def test_cors_header_reflects_exact_allowed_origin_on_evidence_and_status():
+    with _running_server(allow_origins=("http://localhost:5173",)) as port:
+        for path in ("/api/evidence", "/api/status"):
+            status, headers, _body = _request_with_origin(port, path, "http://localhost:5173")
+            assert status == 200
+            assert headers["Access-Control-Allow-Origin"] == "http://localhost:5173"
+            assert headers["Vary"] == "Origin"
+
+
+def test_cors_header_absent_for_origin_not_on_allowlist():
+    with _running_server(allow_origins=("http://localhost:5173",)) as port:
+        status, headers, _body = _request_with_origin(port, "/api/evidence", "http://evil.example")
+        assert status == 200
+        assert "Access-Control-Allow-Origin" not in headers
+        assert "Vary" not in headers
+
+
+def test_cors_header_requires_exact_match_not_prefix_or_suffix():
+    with _running_server(allow_origins=("http://localhost:5173",)) as port:
+        for sneaky_origin in (
+            "http://localhost:5173.evil.example",
+            "evil-http://localhost:5173",
+            "http://localhost:51730",
+        ):
+            status, headers, _body = _request_with_origin(port, "/api/evidence", sneaky_origin)
+            assert status == 200
+            assert "Access-Control-Allow-Origin" not in headers
+
+
+def test_cors_header_absent_when_no_origin_header_sent():
+    with _running_server(allow_origins=("http://localhost:5173",)) as port:
+        status, headers, _body = _request_with_origin(port, "/api/evidence", None)
+        assert status == 200
+        assert "Access-Control-Allow-Origin" not in headers
+
+
+def test_cors_header_absent_by_default_when_allow_origins_not_configured(server_port):
+    # server_port fixture builds the handler via make_dashboard_handler(state) with no
+    # allow_origins argument at all — the default must keep existing behaviour unchanged.
+    status, headers, _body = _request_with_origin(
+        server_port, "/api/evidence", "http://localhost:5173"
+    )
+    assert status == 200
+    assert "Access-Control-Allow-Origin" not in headers
+    assert "Vary" not in headers
+
+
+def test_cors_header_never_added_to_html_root_even_with_matching_origin():
+    with _running_server(allow_origins=("http://localhost:5173",)) as port:
+        status, headers, _body = _request_with_origin(port, "/", "http://localhost:5173")
+        assert status == 200
+        assert "Access-Control-Allow-Origin" not in headers
+        assert "Vary" not in headers
+
+
+def test_cors_header_present_on_head_requests_too():
+    with _running_server(allow_origins=("http://localhost:5173",)) as port:
+        conn = HTTPConnection("127.0.0.1", port, timeout=5)
+        try:
+            conn.request("HEAD", "/api/status", headers={"Origin": "http://localhost:5173"})
+            response = conn.getresponse()
+            headers = dict(response.getheaders())
+            response.read()
+        finally:
+            conn.close()
+        assert headers["Access-Control-Allow-Origin"] == "http://localhost:5173"
+        assert headers["Vary"] == "Origin"
 
 
 def test_card_headings_are_trilingual_hanja_korean_english():
