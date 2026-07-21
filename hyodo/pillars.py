@@ -10,12 +10,41 @@ pillar as ``Not measured``.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
 HISTORY_RELATIVE_PATH = Path(".hyodo") / "history.jsonl"
-RECEIPT_SCHEMA_VERSION = "hyodo.history-receipt/v1"
+RECEIPT_SCHEMA_VERSION = "hyodo.history-receipt/v2"
+
+
+def gate_set_fingerprint(gate_names: Iterable[str]) -> str:
+    """Return a short, deterministic fingerprint of a gate-name set.
+
+    Payload is ``json.dumps(sorted(names), separators=(",", ":"))`` so names
+    that contain JSON metacharacters (including ``|``) cannot collide.
+    First 12 hex chars of SHA-256 of the UTF-8 payload. An empty name set is
+    still deterministic (hash of ``[]``).
+    """
+    payload = json.dumps(sorted(gate_names), separators=(",", ":"))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:12]
+
+
+def _fingerprint_for_receipt_entry(entry: dict[str, Any]) -> str:
+    """Resolve the gate-set fingerprint for one history receipt.
+
+    Prefer the stored ``gate_set_fingerprint`` when present (v2+). Legacy
+    entries without the field derive the same value from ``gates`` keys so
+    streak boundaries remain comparable without rewriting the ledger.
+    """
+    stored = entry.get("gate_set_fingerprint")
+    if isinstance(stored, str) and len(stored) == 12:
+        return stored
+    gates = entry.get("gates", {})
+    names = gates.keys() if isinstance(gates, dict) else ()
+    return gate_set_fingerprint(names)
 
 # Outbound-capable modules whose presence in the package would open a
 # telemetry or data-exfiltration pathway. http.server (inbound loopback
@@ -257,6 +286,9 @@ def append_history_receipt(root: Path, evidence: dict[str, Any]) -> bool:
         "schema_version": RECEIPT_SCHEMA_VERSION,
         "measured_at": evidence.get("measured_at"),
         "gates": statuses,
+        # Gate-set fingerprint: streak metrics must not silently continue across
+        # a coverage shrink (e.g. 4-gate preset -> trivial single BYOG gate).
+        "gate_set_fingerprint": gate_set_fingerprint(statuses.keys()),
     }
     path = root / HISTORY_RELATIVE_PATH
     try:
@@ -303,11 +335,16 @@ def collect_yeong_evidence(root: Path) -> dict[str, Any]:
         executed = [status for status in gates.values() if status in ("PASS", "FAIL")]
         return bool(executed) and all(status == "PASS" for status in executed)
 
+    # Streak is scoped to the latest gate-set fingerprint. A coverage change
+    # (different gate names) ends the streak even if every run is all-PASS.
+    latest_fingerprint = _fingerprint_for_receipt_entry(entries[-1])
     streak = 0
     all_pass_runs = 0
     runs_with_skipped_gates = 0
     last_non_pass_at = ""
     for entry in reversed(entries):
+        if _fingerprint_for_receipt_entry(entry) != latest_fingerprint:
+            break
         if executed_all_pass(entry.get("gates", {})):
             streak += 1
         else:

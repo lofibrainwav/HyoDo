@@ -8,10 +8,12 @@ from pathlib import Path
 from hyodo.dashboard import render_dashboard_html
 from hyodo.pillars import (
     HISTORY_RELATIVE_PATH,
+    RECEIPT_SCHEMA_VERSION,
     append_history_receipt,
     collect_hyo_evidence,
     collect_in_evidence,
     collect_yeong_evidence,
+    gate_set_fingerprint,
 )
 
 SAMPLE_MODULE = '''
@@ -203,7 +205,7 @@ def test_yeong_ledger_round_trip_streak_and_corruption(tmp_path):
     assert metrics["corrupt_lines"] == 1
 
     lines = [json.loads(line) for line in ledger.read_text().splitlines()[:4]]
-    assert lines[0]["schema_version"] == "hyodo.history-receipt/v1"
+    assert lines[0]["schema_version"] == RECEIPT_SCHEMA_VERSION
     assert lines[1]["gates"]["tests"] == "FAIL"
 
 
@@ -323,3 +325,176 @@ def test_render_v1_evidence_still_falls_back_to_not_measured():
     }
     html = render_dashboard_html(evidence)
     assert html.count("Not measured") == 3
+
+
+# --- Issue #87: gate_set_fingerprint (receipt coverage shrink must break streak) ---
+
+
+def test_gate_set_fingerprint_is_deterministic_for_empty_and_named_sets():
+    """Empty and non-empty name sets hash via json.dumps(sorted(...)) (12 hex)."""
+    empty = gate_set_fingerprint([])
+    assert empty == gate_set_fingerprint(())
+    assert len(empty) == 12
+    assert all(c in "0123456789abcdef" for c in empty)
+
+    # Order of input names must not matter; payload is sorted then JSON-encoded.
+    a = gate_set_fingerprint(["tests", "lint_format", "typecheck", "sbom"])
+    b = gate_set_fingerprint(["sbom", "typecheck", "lint_format", "tests"])
+    assert a == b
+    assert a != empty
+    assert a != gate_set_fingerprint(["tests"])
+
+
+def test_gate_set_fingerprint_pipe_in_name_does_not_collide():
+    """TOML quoted keys may contain '|'; encoding must not join-collide (#87 fix)."""
+    left = gate_set_fingerprint(["a|b", "c"])
+    right = gate_set_fingerprint(["a", "b|c"])
+    assert left != right
+    assert len(left) == 12
+    assert len(right) == 12
+
+
+def test_receipt_records_gate_set_fingerprint(tmp_path):
+    root = _make_checkout(tmp_path)
+    evidence = {
+        "measured_at": "2026-07-21T00:00:00+00:00",
+        "gates": {
+            "typecheck": {"status": "PASS"},
+            "lint_format": {"status": "PASS"},
+            "tests": {"status": "PASS"},
+            "sbom": {"status": "PASS"},
+        },
+    }
+    assert append_history_receipt(root, evidence)
+    line = json.loads((root / HISTORY_RELATIVE_PATH).read_text().strip())
+    expected = gate_set_fingerprint(["typecheck", "lint_format", "tests", "sbom"])
+    assert line["gate_set_fingerprint"] == expected
+    assert line["schema_version"] == RECEIPT_SCHEMA_VERSION
+    assert RECEIPT_SCHEMA_VERSION == "hyodo.history-receipt/v2"
+
+
+def test_receipt_empty_gate_set_fingerprint_is_deterministic(tmp_path):
+    root = _make_checkout(tmp_path)
+    assert append_history_receipt(
+        root, {"measured_at": "2026-07-21T00:00:00+00:00", "gates": {}}
+    )
+    line = json.loads((root / HISTORY_RELATIVE_PATH).read_text().strip())
+    assert line["gates"] == {}
+    assert line["gate_set_fingerprint"] == gate_set_fingerprint([])
+
+
+def test_yeong_same_gate_set_streak_accumulates(tmp_path):
+    root = _make_checkout(tmp_path)
+    four_gate_pass = {
+        "measured_at": "2026-07-21T00:00:00+00:00",
+        "gates": {
+            "typecheck": {"status": "PASS"},
+            "lint_format": {"status": "PASS"},
+            "tests": {"status": "PASS"},
+            "sbom": {"status": "PASS"},
+        },
+    }
+    for hour in range(3):
+        four_gate_pass = {
+            **four_gate_pass,
+            "measured_at": f"2026-07-21T0{hour}:00:00+00:00",
+        }
+        assert append_history_receipt(root, four_gate_pass)
+    metrics = collect_yeong_evidence(root)["metrics"]
+    assert metrics["consecutive_all_pass_runs"] == 3
+    assert metrics["all_pass_runs"] == 3
+
+
+def test_yeong_gate_set_change_resets_streak(tmp_path):
+    """4-gate all-PASS then trivial 1-gate all-PASS must not extend the streak (#87)."""
+    root = _make_checkout(tmp_path)
+    four_gate = {
+        "gates": {
+            "typecheck": {"status": "PASS"},
+            "lint_format": {"status": "PASS"},
+            "tests": {"status": "PASS"},
+            "sbom": {"status": "PASS"},
+        },
+    }
+    trivial = {"gates": {"npm-test": {"status": "PASS"}}}
+    assert append_history_receipt(
+        root, {**four_gate, "measured_at": "2026-07-21T00:00:00+00:00"}
+    )
+    assert append_history_receipt(
+        root, {**four_gate, "measured_at": "2026-07-21T01:00:00+00:00"}
+    )
+    assert append_history_receipt(
+        root, {**trivial, "measured_at": "2026-07-21T02:00:00+00:00"}
+    )
+    metrics = collect_yeong_evidence(root)["metrics"]
+    # Only the latest fingerprint (trivial) participates; streak is 1, not 3.
+    assert metrics["consecutive_all_pass_runs"] == 1
+    assert metrics["all_pass_runs"] == 3  # all three runs were still all-PASS
+
+
+def test_yeong_legacy_receipt_without_fingerprint_derives_compatibly(tmp_path):
+    """Pre-v2 ledger lines lack gate_set_fingerprint; derive from gates keys."""
+    root = _make_checkout(tmp_path)
+    ledger = root / HISTORY_RELATIVE_PATH
+    ledger.parent.mkdir(exist_ok=True)
+    four_names = ["lint_format", "sbom", "tests", "typecheck"]
+    legacy_fp = gate_set_fingerprint(four_names)
+    # Append-only: write legacy-shaped lines by hand (no fingerprint field).
+    legacy_lines = [
+        {
+            "schema_version": "hyodo.history-receipt/v1",
+            "measured_at": "2026-07-20T00:00:00+00:00",
+            "gates": {
+                "typecheck": "PASS",
+                "lint_format": "PASS",
+                "tests": "PASS",
+                "sbom": "PASS",
+            },
+        },
+        {
+            "schema_version": "hyodo.history-receipt/v1",
+            "measured_at": "2026-07-20T01:00:00+00:00",
+            "gates": {
+                "typecheck": "PASS",
+                "lint_format": "PASS",
+                "tests": "PASS",
+                "sbom": "PASS",
+            },
+        },
+    ]
+    with ledger.open("w", encoding="utf-8") as handle:
+        for entry in legacy_lines:
+            handle.write(json.dumps(entry, sort_keys=True) + "\n")
+
+    # Same gate set via modern append (stores fingerprint).
+    assert append_history_receipt(
+        root,
+        {
+            "measured_at": "2026-07-21T00:00:00+00:00",
+            "gates": {
+                "typecheck": {"status": "PASS"},
+                "lint_format": {"status": "PASS"},
+                "tests": {"status": "PASS"},
+                "sbom": {"status": "PASS"},
+            },
+        },
+    )
+    modern = json.loads(ledger.read_text(encoding="utf-8").splitlines()[-1])
+    assert modern["gate_set_fingerprint"] == legacy_fp
+
+    metrics = collect_yeong_evidence(root)["metrics"]
+    # Derived legacy fingerprints match the modern one → streak continues.
+    assert metrics["consecutive_all_pass_runs"] == 3
+    assert metrics["recorded_runs"] == 3
+
+    # A coverage shrink after legacy lines still resets streak.
+    assert append_history_receipt(
+        root,
+        {
+            "measured_at": "2026-07-21T01:00:00+00:00",
+            "gates": {"npm-test": {"status": "PASS"}},
+        },
+    )
+    metrics_after = collect_yeong_evidence(root)["metrics"]
+    assert metrics_after["consecutive_all_pass_runs"] == 1
+    assert metrics_after["recorded_runs"] == 4
