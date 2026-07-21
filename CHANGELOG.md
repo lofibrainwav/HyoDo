@@ -7,12 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.4.0] - 2026-07-21
+
 ### Changed
 
 - **README positioning** — lead with FDE / AI agent guardrail value
   (audit evidence, policy DENY, BYOG, fail-closed), not pre-commit
   replacement. Engineering labels first; pillar branding dual-mapped.
   Claim boundary: interceptor/PDF export not shipped.
+- Package description updated to match FDE/agent-guardrail positioning.
 
 ### Added
 
@@ -28,6 +31,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - exit contracts: validate/record `0|1|2`; policy `ALLOW=0` / `DENY=1` /
     unobserved=`2` (never silent ALLOW)
   - tests: `tests/test_agent_events.py`
+  - examples: `examples/fde-evidence-spine/`
 
 ## [4.3.0] - 2026-07-21
 
