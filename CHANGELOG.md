@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-07-21
+
+### Added
+
+- **`hyodo safe --scan gitleaks|trufflehog|all`** — external secret scanner
+  integration. gitleaks runs offline regex detection; trufflehog live-verifies
+  candidates (documented: candidate secrets leave the machine) and unverified
+  hits report as medium severity. `--scan all` merges both; a scanner that
+  fails to run is surfaced as a medium `*_unavailable` finding — never
+  silently dropped. If neither runs, the scan exits `2`.
+- **`hyodo safe --max-files N`** — configurable directory scan cap
+  (default 40, `0` = unlimited).
+- **`hyodo score --partial`** — allows missing pillars (defaulted to 0.5).
+  The score band (STRONG/CAUTION/BLOCK) stays score-derived; partial input
+  adds a separate `SIGNAL_CONFIDENCE_WEAK` marker instead of overwriting the
+  band label.
+- **`hyodo check --general`** — bounded language-agnostic syntax gates with
+  auto-detection (Python `py_compile`, TS `tsc --noEmit`, JS `node --check`,
+  Go `go vet`, Rust `cargo check`, Shell `bash -n`; up to 50 files per
+  language, vendor directories pruned). Output states the sampling limit.
+- **External scan display row** — `summarize_checks` now renders an
+  "External scan" row when external findings exist, so scanner hits are
+  visible in the table instead of only inflating the risk score.
+
 ### Fixed
 
 - **Post-publish verify** (`scripts/release/verify-pypi-release.py`): provenance

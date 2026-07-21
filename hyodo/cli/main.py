@@ -19,6 +19,8 @@ Examples:
 from __future__ import annotations
 
 import json
+import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -45,7 +47,7 @@ from hyodo.pillars import (
     collect_in_evidence,
     collect_yeong_evidence,
 )
-from hyodo.safety import run_safety_scan, risk_score as risk_score_from_findings, summarize_checks as _summarize_checks
+from hyodo.safety import run_safety_scan
 
 app = typer.Typer(
     name="hyodo",
@@ -588,6 +590,207 @@ def version():
     console.print(f"HyoDo v{__version__} - model-agnostic quality gates")
 
 
+@dataclass(frozen=True)
+class GeneralGateResult:
+    """Result of one language-agnostic gate (``hyodo check --general``)."""
+
+    language: str
+    tool: str
+    status: GateStatus
+    message: str
+
+
+_GENERAL_SKIP_DIRS = {
+    ".git",
+    ".venv",
+    "venv",
+    "node_modules",
+    "dist",
+    "build",
+    "__pycache__",
+    ".tox",
+    "target",
+}
+_GENERAL_FILE_CAP = 50
+
+
+def _collect_files(
+    root: Path, suffixes: tuple[str, ...], cap: int = _GENERAL_FILE_CAP
+) -> list[Path]:
+    """Collect up to *cap* files under *root* matching *suffixes* (vendor dirs pruned)."""
+    collected: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(
+            d for d in dirnames if d not in _GENERAL_SKIP_DIRS and not d.startswith(".")
+        )
+        for name in sorted(filenames):
+            if name.endswith(suffixes):
+                collected.append(Path(dirpath) / name)
+                if len(collected) >= cap:
+                    return collected
+    return collected
+
+
+def _run_general_cmd(
+    language: str,
+    tool: str,
+    cmd: list[str],
+    root: Path,
+    verbose: bool,
+    ok_detail: str,
+) -> GeneralGateResult:
+    """Run one gate command and convert the outcome into a GeneralGateResult."""
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=120, cwd=str(root))
+    except subprocess.TimeoutExpired:
+        return GeneralGateResult(language, tool, GateStatus.FAIL, "timeout (>120s)")
+    except OSError as e:
+        return GeneralGateResult(language, tool, GateStatus.FAIL, f"exception: {e}")
+    if proc.returncode == 0:
+        return GeneralGateResult(language, tool, GateStatus.PASS, ok_detail)
+    detail = (proc.stderr or proc.stdout or "").strip()
+    message = f"exit {proc.returncode}"
+    if detail:
+        message += f": {detail[:600] if verbose else detail[:200]}"
+    return GeneralGateResult(language, tool, GateStatus.FAIL, message)
+
+
+def _run_per_file_general_cmd(
+    language: str,
+    tool: str,
+    binary: str,
+    flag: str,
+    files: list[Path],
+) -> GeneralGateResult:
+    """Run ``binary flag <file>`` per file (node --check / bash -n style gates)."""
+    bad: list[str] = []
+    for file_path in files:
+        try:
+            proc = subprocess.run(
+                [binary, flag, str(file_path)], capture_output=True, text=True, timeout=30
+            )
+        except (subprocess.TimeoutExpired, OSError) as e:
+            bad.append(f"{file_path.name} ({e})")
+            continue
+        if proc.returncode != 0:
+            bad.append(file_path.name)
+    if bad:
+        return GeneralGateResult(
+            language,
+            tool,
+            GateStatus.FAIL,
+            f"{len(bad)}/{len(files)} files failed: " + ", ".join(bad[:5]),
+        )
+    return GeneralGateResult(language, tool, GateStatus.PASS, f"{len(files)} files parsed")
+
+
+def _skip_missing_tool(language: str, tool: str) -> GeneralGateResult:
+    return GeneralGateResult(language, tool, GateStatus.SKIP, f"{tool} not installed; skipped")
+
+
+def _run_general_gates(root: Path, verbose: bool = False) -> list[GeneralGateResult]:
+    """Auto-detect project languages under *root* and run one syntax/vet gate each.
+
+    Detection is bounded (up to 50 files per language, vendor dirs pruned),
+    so PASS means "sampled files parse", not a full-project verification.
+    """
+    results: list[GeneralGateResult] = []
+
+    py_files = _collect_files(root, (".py",))
+    if py_files:
+        results.append(
+            _run_general_cmd(
+                "Python",
+                "py_compile",
+                [sys.executable, "-m", "py_compile", *map(str, py_files)],
+                root,
+                verbose,
+                f"{len(py_files)} files compiled",
+            )
+        )
+
+    ts_files = _collect_files(root, (".ts", ".tsx"))
+    js_files = _collect_files(root, (".js", ".mjs", ".cjs"))
+    tsconfig = root / "tsconfig.json"
+    if tsconfig.exists() and (ts_files or js_files):
+        tsc = shutil.which("tsc")
+        if tsc:
+            results.append(
+                _run_general_cmd(
+                    "TypeScript",
+                    "tsc",
+                    [tsc, "--noEmit", "-p", str(tsconfig)],
+                    root,
+                    verbose,
+                    "tsc --noEmit clean",
+                )
+            )
+        else:
+            results.append(_skip_missing_tool("TypeScript", "tsc"))
+    elif js_files:
+        node = shutil.which("node")
+        if node:
+            results.append(
+                _run_per_file_general_cmd("JavaScript", "node --check", node, "--check", js_files)
+            )
+        else:
+            results.append(_skip_missing_tool("JavaScript", "node"))
+
+    if (root / "go.mod").exists():
+        go = shutil.which("go")
+        if go:
+            results.append(
+                _run_general_cmd(
+                    "Go", "go vet", [go, "vet", "./..."], root, verbose, "go vet clean"
+                )
+            )
+        else:
+            results.append(_skip_missing_tool("Go", "go"))
+
+    if (root / "Cargo.toml").exists():
+        cargo = shutil.which("cargo")
+        if cargo:
+            results.append(
+                _run_general_cmd(
+                    "Rust",
+                    "cargo check",
+                    [cargo, "check", "--quiet"],
+                    root,
+                    verbose,
+                    "cargo check clean",
+                )
+            )
+        else:
+            results.append(_skip_missing_tool("Rust", "cargo"))
+
+    sh_files = _collect_files(root, (".sh", ".bash"))
+    if sh_files:
+        bash = shutil.which("bash")
+        if bash:
+            results.append(_run_per_file_general_cmd("Shell", "bash -n", bash, "-n", sh_files))
+        else:
+            results.append(_skip_missing_tool("Shell", "bash"))
+
+    return results
+
+
+def _print_general_results(results: list[GeneralGateResult], root: Path) -> None:
+    """Print one line per general gate result."""
+    if not results:
+        console.print(
+            f"[yellow]No supported languages detected in {root} "
+            "(Python/TypeScript/JavaScript/Go/Rust/Shell).[/yellow]"
+        )
+        return
+    styles = {GateStatus.PASS: "green", GateStatus.FAIL: "red"}
+    for result in results:
+        style = styles.get(result.status, "yellow")
+        console.print(
+            f"  [{style}]{result.status.value}[/{style}] "
+            f"{result.language} ({result.tool}): {result.message}"
+        )
+
+
 @app.command()
 def check(
     path: str | None = typer.Argument(None, help="Path to file or directory"),
@@ -604,6 +807,9 @@ def check(
     It does not currently mean language-agnostic or any-repo universal.
 
     Order: Pyright -> Ruff -> pytest -> SBOM
+
+    --general instead runs bounded language-agnostic syntax gates
+    (Python/TS/JS/Go/Rust/Shell auto-detected, up to 50 files per language).
     """
     console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
@@ -630,9 +836,19 @@ def check(
             console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2)
         if failed:
-            console.print(f"[bold red]Some gates failed[/bold red] ({len(executed)}/{len(gen_results)} gates ran)")
+            console.print(
+                f"[bold red]Some gates failed[/bold red] "
+                f"({len(executed)}/{len(gen_results)} gates ran)"
+            )
             raise typer.Exit(1)
-        console.print(f"[bold green]All executed gates passed ({len(executed)}/{len(gen_results)} gates ran)[/bold green]")
+        console.print(
+            f"[bold green]All executed gates passed "
+            f"({len(executed)}/{len(gen_results)} gates ran)[/bold green]"
+        )
+        console.print(
+            "[dim]Sampled syntax gates only (up to 50 files per language) — "
+            "not a full-project validation.[/dim]"
+        )
         raise typer.Exit(0)
 
     root = find_repo_root(target)
@@ -701,13 +917,14 @@ def _resolve_score_pillars(
     serenity: float | None,
     eternity: float | None,
     partial: bool = False,
-) -> tuple[float, float, float, float, float, str]:
+) -> tuple[float, float, float, float, float, bool]:
     """Resolve primary vs legacy flags; require all five pillars explicitly.
 
-    When *partial* is True, missing pillars default to 0.5 (neutral) and the
-    signal label is downgraded to WEAK.
+    When *partial* is True, missing pillars default to 0.5 (neutral); the band
+    label stays score-derived and a separate WEAK-confidence marker is emitted
+    by the caller (band and input completeness are orthogonal axes).
 
-    Returns (benevolence, truth, goodness, hyo, beauty, signal_label).
+    Returns (benevolence, truth, goodness, hyo, beauty, partial_filled).
     Raises typer.Exit(2) on dual-flag conflicts or (non-partial) missing pillars.
     """
     if benevolence is not None and serenity is not None:
@@ -736,34 +953,39 @@ def _resolve_score_pillars(
         missing.append("--hyo/-c (or legacy --eternity/-e)")
     if beauty is None:
         missing.append("--beauty/-b")
-    signal_label = "STRONG"
+    partial_filled = False
 
     if missing:
         if not partial:
-            console.print("[red]All five pillars are required. Missing:[/red] " + ", ".join(missing))
+            console.print(
+                "[red]All five pillars are required. Missing:[/red] " + ", ".join(missing)
+            )
             console.print("[dim]Example: hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9[/dim]")
             console.print(
                 "[yellow]Defaults no longer fill missing pillars "
                 "(avoids false STRONG signals).[/yellow]"
             )
-            console.print("[dim]Use --partial to allow missing pillars (defaults to 0.5, WEAK signal).[/dim]")
-            raise typer.Exit(2)
-        else:
             console.print(
-                f"[yellow]Partial mode: filling {len(missing)} missing pillar(s) with 0.5 (neutral).[/yellow]"
+                "[dim]Use --partial to allow missing pillars "
+                "(defaults to 0.5, WEAK-confidence signal).[/dim]"
             )
-            console.print(f"[dim]Missing: {', '.join(missing)}[/dim]")
-            if effective_benevolence is None:
-                effective_benevolence = 0.5
-            if truth is None:
-                truth = 0.5
-            if goodness is None:
-                goodness = 0.5
-            if effective_hyo is None:
-                effective_hyo = 0.5
-            if beauty is None:
-                beauty = 0.5
-            signal_label = "WEAK"
+            raise typer.Exit(2)
+        console.print(
+            f"[yellow]Partial mode: filling {len(missing)} missing pillar(s) "
+            "with 0.5 (neutral).[/yellow]"
+        )
+        console.print(f"[dim]Missing: {', '.join(missing)}[/dim]")
+        if effective_benevolence is None:
+            effective_benevolence = 0.5
+        if truth is None:
+            truth = 0.5
+        if goodness is None:
+            goodness = 0.5
+        if effective_hyo is None:
+            effective_hyo = 0.5
+        if beauty is None:
+            beauty = 0.5
+        partial_filled = True
 
     # Narrowed by the missing check above.
     assert effective_benevolence is not None
@@ -771,7 +993,7 @@ def _resolve_score_pillars(
     assert goodness is not None
     assert effective_hyo is not None
     assert beauty is not None
-    return effective_benevolence, truth, goodness, effective_hyo, beauty, signal_label
+    return effective_benevolence, truth, goodness, effective_hyo, beauty, partial_filled
 
 
 @app.command()
@@ -818,8 +1040,10 @@ def score(
         goodness,
         effective_hyo,
         beauty,
-        signal_label,
-    ) = _resolve_score_pillars(benevolence, truth, goodness, hyo, beauty, serenity, eternity, partial=partial)
+        partial_filled,
+    ) = _resolve_score_pillars(
+        benevolence, truth, goodness, hyo, beauty, serenity, eternity, partial=partial
+    )
 
     F, S = calculate_hygook_v5_score(effective_benevolence, truth, goodness, effective_hyo, beauty)
     score_value = ((F - 6) / (60 - 6)) * 100
@@ -861,18 +1085,25 @@ def score(
     )
 
     if score_value >= 90:
-        console.print(f"\n[bold green]REVIEW_SIGNAL_{signal_label} (90+)[/bold green]")
+        console.print("\n[bold green]REVIEW_SIGNAL_STRONG (90+)[/bold green]")
         console.print(
             "[green]Strong review signal only. Still run tests/security checks; "
             "human approval required.[/green]"
         )
     elif score_value >= 70:
-        console.print(f"\n[bold yellow]REVIEW_SIGNAL_{signal_label} (70-89)[/bold yellow]")
+        console.print("\n[bold yellow]REVIEW_SIGNAL_CAUTION (70-89)[/bold yellow]")
         console.print("[yellow]Review recommended before proceed. Not an approval.[/yellow]")
     else:
-        console.print(f"\n[bold red]REVIEW_SIGNAL_{signal_label} (<70)[/bold red]")
+        console.print("\n[bold red]REVIEW_SIGNAL_BLOCK (<70)[/bold red]")
         console.print(
             "[red]Improve before merge. Score is not a substitute for human judgment.[/red]"
+        )
+
+    if partial_filled:
+        console.print(
+            "[bold yellow]SIGNAL_CONFIDENCE_WEAK[/bold yellow] "
+            "[yellow]— missing pillars were defaulted to 0.5; "
+            "treat this signal as weak evidence, not a measured score.[/yellow]"
         )
 
 
@@ -910,32 +1141,21 @@ def safe(
     are identical between the two modes.
 
     --max-files N: override the directory scan cap (default 40, 0 = unlimited).
-    --scan gitleaks: run gitleaks as external secret scanner.
+    --scan gitleaks: run gitleaks as external secret scanner (offline regex).
     --scan trufflehog: run trufflehog as external verified secret scanner.
-    --scan all: run both gitleaks + trufflehog.
+    Note: trufflehog live-verifies candidates against issuing-service APIs
+    (candidate secrets leave the machine); unverified hits report as medium.
+    --scan all: run both gitleaks + trufflehog and merge findings. A scanner
+    that fails to run is reported as a medium `*_unavailable` finding, never
+    silently dropped.
 
     Limits: directory scans read at most --max-files files; default mode prefers
     git diff HEAD, else git status text (not full working tree contents).
     Not a full SAST / secret-scan / dependency audit unless --scan is used.
     """
-    scan_tool = scan
-    if scan_tool == "all":
-        gl_result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd(), scan_tool="gitleaks")
-        th_result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd(), scan_tool="trufflehog")
-        merged_findings = gl_result["findings"] + th_result["findings"]
-        merged_score = risk_score_from_findings(merged_findings)
-        source_str = f"gitleaks+trufflehog:merged ({len(merged_findings)} findings)"
-        result = {
-            "source": source_str,
-            "findings": merged_findings,
-            "rows": _summarize_checks(merged_findings, strict=strict),
-            "risk_score": merged_score,
-            "level": "high" if merged_score >= 31 else ("caution" if merged_score >= 11 else "low"),
-            "action": "Review required — do not proceed without human approval" if merged_score >= 31 else ("Caution — explicit human review" if merged_score >= 11 else "Low early-warning risk — final approval remains human"),
-        }
-    else:
-        effective_max = max_files if max_files > 0 else 999999
-        result = run_safety_scan(path=path, strict=strict, cwd=Path.cwd(), max_files=effective_max, scan_tool=scan_tool)
+    result = run_safety_scan(
+        path=path, strict=strict, cwd=Path.cwd(), max_files=max_files, scan_tool=scan
+    )
     source = str(result["source"])
     high_only = [f for f in result["findings"] if f.severity == "high"]
 
@@ -988,9 +1208,10 @@ def safe(
             )
 
     console.print(f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}")
+    cap_note = "unlimited" if max_files <= 0 else f"{max_files} files"
     console.print(
         "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit. "
-        "Directory scan cap: 40 files; default corpus is git diff/status when no path.[/dim]"
+        f"Directory scan cap: {cap_note}; default corpus is git diff/status when no path.[/dim]"
     )
 
     if strict and high_only:
