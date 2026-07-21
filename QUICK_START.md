@@ -1,6 +1,7 @@
 # HyoDo Quick Start
 
-Adopters first; HyoDo contributors second.
+Local AI agent guardrails for FDE and CI. Adopters first;
+contributors second.
 
 ## 1. Install
 

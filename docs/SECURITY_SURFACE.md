@@ -116,6 +116,21 @@ Treat a clean `hyodo safe` run as "no obvious red flags found," not as
 hyodo safe
 ```
 
+## Agent event ledger is opt-in evidence, not a runtime interceptor
+
+`hyodo event` / `hyodo policy` implement an **opt-in FDE evidence spine**:
+
+- Events are caller-supplied JSON (`hyodo.agent-event/v1`); HyoDo does not
+  monkey-patch model SDKs or automatically intercept tool calls.
+- Default ledger storage is **digest-only** (`.hyodo/agent-events.jsonl`).
+  Full prompt/tool bodies are written only with `--full-body`.
+- Policy DENY is recorded for audit; **the agent runtime must enforce stop**.
+- Missing or invalid policy is **unobserved** (exit 2), never silent ALLOW.
+- No network export, encryption, or cloud telemetry in this surface.
+
+Do not claim "all agent tool calls are intercepted" or "encrypted audit
+trail" unless those layers are implemented and tested separately.
+
 ## Release pipeline: Trusted Publishing + provenance
 
 Releases to PyPI are handled by `.github/workflows/publish.yml` using PyPI

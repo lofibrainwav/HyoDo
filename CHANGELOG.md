@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **README positioning** — lead with FDE / AI agent guardrail value
+  (audit evidence, policy DENY, BYOG, fail-closed), not pre-commit
+  replacement. Engineering labels first; pillar branding dual-mapped.
+  Claim boundary: interceptor/PDF export not shipped.
+
+### Added
+
+- **FDE Evidence Spine (Phase 1 MVP)** — opt-in agent event ledger and local
+  policy gate (not a runtime interceptor; callers must enforce DENY):
+  - schema `hyodo.agent-event/v1` in `hyodo/events.py`
+  - append-only ledger `.hyodo/agent-events.jsonl` (separate from gate
+    `history.jsonl`)
+  - digest-only default; `--full-body` opt-in for raw `io.*_text`
+  - policy schema `hyodo.policy/v1` (`.hyodo/policy.toml`) with
+    `allowed_tools`, `max_steps`, `blocked_path_globs`
+  - CLI: `hyodo event validate|record`, `hyodo policy check`
+  - exit contracts: validate/record `0|1|2`; policy `ALLOW=0` / `DENY=1` /
+    unobserved=`2` (never silent ALLOW)
+  - tests: `tests/test_agent_events.py`
+
 ## [4.3.0] - 2026-07-21
 
 ### Added
