@@ -80,6 +80,64 @@ _BINARY_SUFFIXES = {
     ".dylib",
 }
 
+# Build/test caches: machine-written, never reviewed, and they crowd real
+# sources out of the file cap. Matched by directory name so the guard also
+# holds outside a git checkout.
+_SKIPPED_DIR_NAMES = frozenset(
+    {
+        ".hypothesis",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".mypy_cache",
+        "__pycache__",
+        "node_modules",
+        ".venv",
+        "venv",
+        "dist",
+        "build",
+    }
+)
+
+# A suffix blocklist can only exclude what it already lists. `.coverage`
+# (a SQLite database) has no suffix at all, so it slipped through, was decoded
+# with errors="replace", and its internal `CREATE TABLE` text matched the
+# schema_change pattern. Sniff content instead, the way git does.
+_BINARY_SNIFF_BYTES = 8_000
+
+
+def _looks_binary(path: Path, sniff_bytes: int = _BINARY_SNIFF_BYTES) -> bool:
+    """Return True when *path* holds binary data (a NUL byte in its head).
+
+    Unreadable files are reported as non-binary so the caller's own OSError
+    handling still runs — a read failure must not be silently swallowed here.
+    """
+    try:
+        with path.open("rb") as handle:
+            return b"\x00" in handle.read(sniff_bytes)
+    except OSError:
+        return False
+
+
+def is_scannable_file(path: Path) -> bool:
+    """Single decision point for "does this file belong in the corpus?".
+
+    Both corpus builders call this, so the rule cannot drift between them.
+
+    Deliberately absent: any use of .gitignore. Ignored files are where live
+    credentials actually sit (`.env` is the canonical example), so skipping
+    them would blind the scanner precisely where it matters most. Narrow by
+    content and by build-cache name, never by "git does not track it".
+    """
+    if not path.is_file():
+        return False
+    if any(part.startswith(".git") for part in path.parts):
+        return False
+    if any(part in _SKIPPED_DIR_NAMES for part in path.parts):
+        return False
+    if path.suffix.lower() in _BINARY_SUFFIXES:
+        return False
+    return not _looks_binary(path)
+
 
 @dataclass(frozen=True)
 class Finding:
@@ -127,11 +185,7 @@ def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tup
             chunks: list[str] = []
             count = 0
             for file_path in sorted(target.rglob("*")):
-                if not file_path.is_file():
-                    continue
-                if any(part.startswith(".git") for part in file_path.parts):
-                    continue
-                if file_path.suffix.lower() in _BINARY_SUFFIXES:
+                if not is_scannable_file(file_path):
                     continue
                 try:
                     chunks.append(_read_text_file(file_path))
@@ -470,11 +524,7 @@ def _scan_directory(
     count = 0
     suppressed_count = 0
     for file_path in sorted(target.rglob("*")):
-        if not file_path.is_file():
-            continue
-        if any(part.startswith(".git") for part in file_path.parts):
-            continue
-        if file_path.suffix.lower() in _BINARY_SUFFIXES:
+        if not is_scannable_file(file_path):
             continue
         try:
             text = _read_text_file(file_path)
