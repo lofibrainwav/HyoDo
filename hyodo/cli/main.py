@@ -169,6 +169,30 @@ def find_repo_root(start: Path | None = None) -> Path | None:
     return None
 
 
+def resolve_dashboard_root(start: Path | None = None) -> Path | None:
+    """Resolve a directory the dashboard can honestly measure, else ``None``.
+
+    Wider than :func:`find_repo_root` on purpose. That function answers "is
+    this a HyoDo package checkout?" and drives ``check`` and built-in preset
+    selection, so widening it there would mis-route those. This one answers a
+    different question: "can the dashboard collect evidence here?"
+
+    A project that adopted HyoDo through ``hyodo init`` owns
+    ``.hyodo/gates.toml``; its gates are already honoured by
+    :func:`collect_dashboard_evidence`, so refusing to serve it only hid
+    In/Hyo/Yeong from projects that had opted in.
+
+    Pillar collectors stay honest on such targets: when no Python package is
+    found they report empty metrics (unobserved) rather than a 0/0 full score.
+    """
+    current = (start or Path.cwd()).resolve()
+    if current.is_file():
+        current = current.parent
+    if (current / GATES_CONFIG_RELATIVE_PATH).is_file():
+        return current
+    return find_repo_root(current)
+
+
 def resolve_check_target(path: str | None) -> Path:
     """Resolve check target path. Raises FileNotFoundError if missing."""
     raw = path or "."
@@ -678,9 +702,15 @@ def dashboard(
     except FileNotFoundError as exc:
         console.print(f"[red]Path not found: {exc}[/red]")
         raise typer.Exit(2) from exc
-    root = find_repo_root(target)
+    root = resolve_dashboard_root(target)
     if root is None:
-        console.print("[red]dashboard requires a HyoDo checkout (pyproject.toml + hyodo/).[/red]")
+        console.print(
+            "[red]dashboard requires a HyoDo checkout (pyproject.toml + hyodo/) "
+            "or a project with .hyodo/gates.toml.[/red]"
+        )
+        console.print(
+            "[dim]Tip: run 'hyodo init' to adopt this project's own tools as gates.[/dim]"
+        )
         raise typer.Exit(2)
     refresh_token = token_urlsafe(32)
     refresh_lock = threading.Lock()
