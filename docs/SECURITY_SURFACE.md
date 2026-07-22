@@ -131,17 +131,21 @@ hyodo safe
 Do not claim "all agent tool calls are intercepted" or "encrypted audit
 trail" unless those layers are implemented and tested separately.
 
-## MCP connector (design only until implemented)
+## Optional MCP stdio adapter
 
-Optional MCP adapter and remote connector URLs are specified in
-[`HYODO_MCP_CONNECTOR_DESIGN.md`](HYODO_MCP_CONNECTOR_DESIGN.md). Until that
-code ships:
+The optional `hyodo[mcp]` extra provides `hyodo mcp stdio --root PATH`. It
+starts a standard-input/output MCP process that delegates to the existing
+HyoDo CLI. The core `pip install hyodo` dependency set does not include the
+MCP SDK.
 
-- The public package does **not** open network MCP listeners.
-- Multi-machine access is **not** claimed.
-- When shipped: default remains stdio/local; private-net bind requires an
-  explicit token; public `0.0.0.0` is out of v1 scope; Vercel is not a gate
-  executor.
+- The M1 adapter does **not** open any network listener.
+- Tools are locked to the configured host workspace; relative policy paths
+  cannot escape it.
+- `safe`, `check`, `event record`, and `policy check` retain their CLI exit
+  contracts; a policy that cannot be observed remains exit `2`.
+- Loopback and private-network connectors are not shipped in M1. Public
+  `0.0.0.0`, a Vercel gate executor, and multi-machine access remain out of
+  scope until separately implemented and tested.
 
 ## Release pipeline: Trusted Publishing + provenance
 
