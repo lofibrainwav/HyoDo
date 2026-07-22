@@ -154,6 +154,18 @@ this repository.
   - Evidence: the runner command is supplied by the caller and runs locally;
     this surface has no network client, model provider, or approval action
 
+### 2.6 Local sign-off report
+
+- `hyodo report --format md|html` renders only local event, policy, and eval
+  evidence with a deterministic report hash
+  - Verdict: Confirmed
+  - Evidence: `hyodo/report.py` reads local files and writes under
+    `.hyodo/reports/`; identical evidence renders the same hash
+- Missing evidence remains visibly `Not measured`, never a deployment approval
+  - Verdict: Confirmed
+  - Evidence: schema results without a persisted artifact render as `Not
+    measured`; the report includes a blank human sign-off block
+
 ---
 
 ## 3) Positioning fit — measured state

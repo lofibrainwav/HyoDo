@@ -72,6 +72,7 @@ from hyodo.policy import (
     evaluate_policy,
     try_load_policy,
 )
+from hyodo.report import write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
 
@@ -1667,6 +1668,29 @@ def eval_command(
             console.print(f"  runner: {failure['code']}")
     else:
         console.print(f"[red]UNOBSERVED[/red] eval: {summary['reason']}")
+    raise typer.Exit(exit_code)
+
+
+@app.command("report")
+def report_command(
+    report_format: str = typer.Option("md", "--format", help="Local report format: md or html"),
+    root: str = typer.Option(".", "--root", help="Project root that owns local evidence"),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit a machine-readable report summary"
+    ),
+):
+    """Render a local FDE sign-off report from observed evidence only."""
+    if report_format not in {"md", "html"}:
+        console.print("[red]--format must be md or html[/red]")
+        raise typer.Exit(2)
+    exit_code, summary = write_report(Path(root).resolve(), report_format)
+    if json_output:
+        console.print_json(json.dumps(summary))
+    elif exit_code == 0:
+        console.print(f"[green]READY[/green] report: {summary['result_path']}")
+        console.print(f"  hash: {summary['report_hash']}")
+    else:
+        console.print(f"[red]UNOBSERVED[/red] report: {summary['reason']}")
     raise typer.Exit(exit_code)
 
 
