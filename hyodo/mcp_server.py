@@ -11,11 +11,14 @@ import json
 import subprocess
 import sys
 from pathlib import Path
+from secrets import compare_digest
 from typing import Any
 
 from mcp.server.fastmcp import FastMCP  # pyright: ignore[reportMissingImports]
 
 _CLI_TIMEOUT_SECONDS = 120
+_LOOPBACK_HOST = "127.0.0.1"
+_MCP_PATH = "/mcp"
 
 
 def resolve_workspace_root(root: Path) -> Path:
@@ -93,8 +96,13 @@ def _run_git(root: Path, *args: str) -> tuple[bool, str]:
     return process.returncode == 0, process.stdout
 
 
-def create_server(root: Path) -> FastMCP:
-    """Create a stdio-only MCP server locked to *root*."""
+def create_server(
+    root: Path,
+    *,
+    host: str = _LOOPBACK_HOST,
+    port: int = 8000,
+) -> FastMCP:
+    """Create one root-locked MCP server without owning gate logic."""
     workspace = resolve_workspace_root(root)
     server = FastMCP(
         "HyoDo",
@@ -103,6 +111,9 @@ def create_server(root: Path) -> FastMCP:
             "review signals never authorize approval."
         ),
         json_response=True,
+        host=host,
+        port=port,
+        streamable_http_path=_MCP_PATH,
     )
 
     @server.tool()
@@ -166,3 +177,45 @@ def create_server(root: Path) -> FastMCP:
 def run_stdio(root: Path) -> None:
     """Start the M1 local stdio transport. No network listener is created."""
     create_server(root).run(transport="stdio")
+
+
+class _BearerTokenMiddleware:
+    """Reject unauthenticated HTTP requests before the MCP SDK dispatches tools."""
+
+    def __init__(self, app: Any, token: str):
+        self.app = app
+        self.token = token
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            supplied = headers.get(b"authorization", b"").decode("latin-1")
+            if not compare_digest(supplied, f"Bearer {self.token}"):
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": 401,
+                        "headers": [(b"content-length", b"0")],
+                    }
+                )
+                await send({"type": "http.response.body", "body": b""})
+                return
+        await self.app(scope, receive, send)
+
+
+def create_loopback_app(root: Path, token: str | None = None, *, port: int = 8769) -> Any:
+    """Build the official streamable-HTTP MCP app for one loopback workspace."""
+    app: Any = create_server(root, host=_LOOPBACK_HOST, port=port).streamable_http_app()
+    return _BearerTokenMiddleware(app, token) if token else app
+
+
+def run_loopback(root: Path, *, port: int, token: str | None) -> None:
+    """Serve MCP streamable HTTP only on the local IPv4 loopback interface."""
+    import uvicorn
+
+    uvicorn.run(
+        create_loopback_app(root, token, port=port),
+        host=_LOOPBACK_HOST,
+        port=port,
+        log_level="warning",
+    )

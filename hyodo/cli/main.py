@@ -1500,6 +1500,55 @@ def mcp_stdio(
         raise typer.Exit(2) from exc
 
 
+@mcp_app.command("serve")
+def mcp_serve(
+    bind: str = typer.Option("loopback", "--bind", help="M2 only supports loopback"),
+    port: int = typer.Option(8769, "--port", min=1024, max=65535, help="Loopback MCP port"),
+    root: str = typer.Option(".", "--root", help="Workspace root locked for this MCP server"),
+    token: str | None = typer.Option(
+        None,
+        "--token",
+        envvar="HYODO_MCP_TOKEN",
+        help="Optional bearer token; absent means local process trust",
+    ),
+):
+    """Explicitly serve the optional MCP adapter on 127.0.0.1 only."""
+    if bind != "loopback":
+        console.print("[red]M2 only: only --bind loopback is available.[/red]")
+        raise typer.Exit(2)
+    if port == 8768:
+        console.print("[red]Port 8768 is reserved for the HyoDo dashboard.[/red]")
+        raise typer.Exit(2)
+    try:
+        import mcp.server.fastmcp  # pyright: ignore[reportMissingImports]  # noqa: F401
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.startswith("mcp"):
+            console.print("[red]MCP support is not installed.[/red]")
+            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            raise typer.Exit(2) from exc
+        raise
+
+    from hyodo.mcp_server import run_loopback
+
+    try:
+        root_path = Path(root)
+        # Resolve before printing an address so a failed root never resembles a live connector.
+        from hyodo.mcp_server import resolve_workspace_root
+
+        resolve_workspace_root(root_path)
+        console.print("HyoDo MCP connector ready")
+        console.print("  transport: loopback")
+        console.print(f"  url:       http://127.0.0.1:{port}/mcp")
+        console.print(f"  workspace: {root_path.expanduser().resolve()}")
+        console.print(
+            "  auth:      bearer token configured" if token else "  auth:      local process trust"
+        )
+        run_loopback(root_path, port=port, token=token)
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2) from exc
+
+
 def _load_event_payload(
     file: Path | None,
     stdin_flag: bool,
