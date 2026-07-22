@@ -41,6 +41,7 @@ from rich.table import Table
 
 from hyodo import __version__
 from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
+from hyodo.eval import EvalInputError, run_evaluation
 from hyodo.events import (
     AGENT_EVENTS_RELATIVE_PATH,
     append_agent_event,
@@ -1582,6 +1583,53 @@ def schema_check(
         console.print(f"[red]{label}[/red] JSON Schema validation")
         for reason in reasons:
             console.print(f"  - {reason['code']}: {reason['message']}")
+    raise typer.Exit(exit_code)
+
+
+@app.command("eval")
+def eval_command(
+    dataset: str = typer.Option(..., "--dataset", help="Path to a golden JSONL dataset"),
+    runner: str = typer.Option(..., "--runner", help="Local command run once per dataset case"),
+    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/eval-runs"),
+    min_pass_rate: float = typer.Option(
+        1.0,
+        "--min-pass-rate",
+        min=0.0,
+        max=1.0,
+        help="Minimum passing-case fraction required for exit 0",
+    ),
+    timeout_seconds: int = typer.Option(
+        30,
+        "--timeout-seconds",
+        min=1,
+        max=600,
+        help="Maximum runner time for one case",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable run summary"),
+):
+    """Run a local golden dataset with deterministic built-in scoring.
+
+    The runner receives ``{\"id\": ..., \"input\": ...}`` as JSON on stdin and
+    must print JSON, either directly or as ``{\"output\": ...}``. Runner failures
+    are recorded as failed eval runs; they are never counted as skips.
+    """
+    try:
+        exit_code, summary = run_evaluation(
+            Path(dataset), runner, Path(root).resolve(), min_pass_rate, timeout_seconds
+        )
+    except EvalInputError as exc:
+        summary = {"status": "UNOBSERVED", "reason": str(exc)}
+        exit_code = 2
+    if json_output:
+        console.print_json(json.dumps(summary))
+    elif exit_code == 0:
+        console.print(f"[green]PASS[/green] eval ({summary['pass_rate']:.1%})")
+    elif exit_code == 1:
+        console.print("[red]FAIL[/red] eval")
+        if summary.get("runner_failure"):
+            console.print(f"  runner: {summary['runner_failure']['code']}")
+    else:
+        console.print(f"[red]UNOBSERVED[/red] eval: {summary['reason']}")
     raise typer.Exit(exit_code)
 
 
