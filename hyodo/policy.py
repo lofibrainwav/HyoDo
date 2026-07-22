@@ -34,6 +34,12 @@ class PolicyConfig:
     max_steps: int | None
     allowed_tools: tuple[str, ...] | None  # None = no allowlist restriction
     blocked_path_globs: tuple[str, ...]
+    #: Opt-in strict mode. ``blocked_path_globs`` can only inspect paths the caller
+    #: *declared*; a tool event with ``paths: []`` sails past it. Turning this on makes
+    #: that silence UNOBSERVED instead of ALLOW. It is off by default because plenty of
+    #: legitimate tools (search, http, …) touch no paths, and flagging all of them would
+    #: push operators to delete blocked_path_globs entirely — a worse outcome.
+    require_declared_paths: bool = False
 
     @property
     def allowlist_active(self) -> bool:
@@ -108,11 +114,16 @@ def load_policy_config(path: Path) -> PolicyConfig:
             )
         blocked = tuple(globs)
 
+    require_declared_paths = raw.get("require_declared_paths", False)
+    if not isinstance(require_declared_paths, bool):
+        raise PolicyConfigError(f"{path}: require_declared_paths must be a boolean")
+
     return PolicyConfig(
         schema=schema,
         max_steps=max_steps,
         allowed_tools=allowed_tools,
         blocked_path_globs=blocked,
+        require_declared_paths=require_declared_paths,
     )
 
 
@@ -191,6 +202,18 @@ def evaluate_policy(
                 rule_id="tool_not_allowed",
                 reason=f"tool {tool_name!r} not in allowed_tools",
             )
+
+    if (
+        policy.require_declared_paths
+        and policy.blocked_path_globs
+        and kind in ("tool_call", "tool_result")
+        and not paths
+    ):
+        return PolicyDecision(
+            decision="UNOBSERVED",
+            rule_id="data_boundary_undeclared",
+            reason="tool declared no paths; blocked_path_globs cannot be checked",
+        )
 
     if policy.blocked_path_globs and paths:
         for p in paths:

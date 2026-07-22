@@ -104,6 +104,12 @@ _SKIPPED_DIR_NAMES = frozenset(
 # schema_change pattern. Sniff content instead, the way git does.
 _BINARY_SNIFF_BYTES = 8_000
 
+#: Substring of an ``error:`` source string meaning the scanner binary was never found.
+#: Distinguishes "you don't have this tool" (a known gap) from "the tool ran and broke"
+#: (an unobserved scan) — the two deserve different severities. Deliberately the same
+#: wording humans already read in the message, so there is one string and not two.
+NOT_INSTALLED = "not installed"
+
 
 def _looks_binary(path: Path, sniff_bytes: int = _BINARY_SNIFF_BYTES) -> bool:
     """Return True when *path* holds binary data (a NUL byte in its head).
@@ -400,7 +406,7 @@ def _run_external_scanner(
 
     binary = shutil.which(config["binary"])
     if not binary:
-        return [], f"error:{config['binary']} not installed (brew install {config['binary']})"
+        return [], f"error:{config['binary']} {NOT_INSTALLED} (brew install {config['binary']})"
 
     scan_cmd = [binary] + config["scan_args"]
     if path:
@@ -436,6 +442,25 @@ def _run_external_scanner(
     raw = result.stdout.strip()
 
     if not raw:
+        # No output is only "clean" when the process actually succeeded. A scanner that
+        # crashed, was killed, or refused to start also prints nothing — reporting that
+        # as clean is the exact failure-to-observe-as-healthy trap this tool exists to
+        # catch. Severity must be high: --strict only blocks on high.
+        if result.returncode != 0:
+            findings.append(
+                Finding(
+                    category="external_scan",
+                    severity="high",
+                    label=f"{tool}_failed",
+                    detail=(
+                        f"{tool} exited {result.returncode} with no output — "
+                        "scan did not run; this is not a clean result"
+                    ),
+                    path=None,
+                    line=None,
+                )
+            )
+            return findings, f"error:{tool} exited {result.returncode} without output"
         findings.append(
             Finding(
                 category="external_scan",
@@ -454,17 +479,23 @@ def _run_external_scanner(
         else:
             items = [json.loads(line) for line in raw.splitlines() if line.strip()]
     except json.JSONDecodeError:
+        # Unparseable output means we do not know what the scanner saw. That is an
+        # unobserved scan, not an informational note. Only the byte count is reported —
+        # the payload itself may contain the very secrets we are scanning for.
         findings.append(
             Finding(
                 category="external_scan",
-                severity="info",
-                label=f"{tool}_output",
-                detail=f"{tool} produced non-JSON output ({len(raw)} bytes)",
+                severity="high",
+                label=f"{tool}_unparseable",
+                detail=(
+                    f"{tool} produced non-JSON output ({len(raw)} bytes, "
+                    f"exit {result.returncode}) — results could not be read"
+                ),
                 path=None,
                 line=None,
             )
         )
-        return findings, source
+        return findings, f"error:{tool} output could not be parsed"
 
     for item in items:
         desc = (
@@ -585,11 +616,16 @@ def _run_merged_external_scan(root: Path, path: str | None, strict: bool) -> dic
         tool_findings, tool_source = _run_external_scanner(tool, root, path)
         if tool_source.startswith("error:"):
             errors.append(tool_source)
+            # A tool that is simply absent is a known gap, not a broken observation —
+            # medium keeps --scan all usable for people who installed only one scanner.
+            # A tool that *is* installed and still failed means we ran a scan and cannot
+            # trust the outcome, so it must be high or --strict (high-only) sails past it.
+            absent = NOT_INSTALLED in tool_source
             merged.append(
                 Finding(
                     category="external_scan",
-                    severity="medium",
-                    label=f"{tool}_unavailable",
+                    severity="medium" if absent else "high",
+                    label=f"{tool}_unavailable" if absent else f"{tool}_failed",
                     detail=f"{tool} did not run — {tool_source.removeprefix('error:')}",
                     path=None,
                     line=None,

@@ -95,16 +95,23 @@ def test_trufflehog_ndjson_verified_high_unverified_medium(monkeypatch, tmp_path
     assert "Slack" in unverified.detail
 
 
-def test_non_json_stdout_yields_info_output_finding(monkeypatch, tmp_path):
+def test_non_json_stdout_is_reported_as_a_failed_scan(monkeypatch, tmp_path):
+    """Unreadable output means we do not know what the scanner saw.
+
+    This test used to assert ``severity == "info"`` and a normal ``gitleaks:scan``
+    source — i.e. that an unparseable result counted as a successful, clean scan. That
+    was the bug: ``--strict`` only blocks on high, so a scanner spewing a stack trace
+    passed the gate. See tests/test_evidence_integrity.py for the full set.
+    """
     monkeypatch.setattr(safety.shutil, "which", lambda name: f"/usr/bin/{name}")
     monkeypatch.setattr(safety.subprocess, "run", _fake_run(stdout="not json at all"))
 
     findings, source = _run_external_scanner("gitleaks", tmp_path)
 
-    assert source == "gitleaks:scan"
+    assert source.startswith("error:")
     assert len(findings) == 1
-    assert findings[0].severity == "info"
-    assert findings[0].label == "gitleaks_output"
+    assert findings[0].severity == "high"
+    assert findings[0].label == "gitleaks_unparseable"
 
 
 def test_scanner_timeout_reported_as_error(monkeypatch, tmp_path):
