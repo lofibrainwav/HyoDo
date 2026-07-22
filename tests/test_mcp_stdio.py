@@ -44,12 +44,34 @@ def test_mcp_stdio_delegates_to_the_optional_adapter(tmp_path, monkeypatch):
     from hyodo import mcp_server
 
     seen = []
-    monkeypatch.setattr(mcp_server, "run_stdio", lambda root: seen.append(root))
+    monkeypatch.setattr(
+        mcp_server,
+        "run_stdio",
+        lambda root, *, allow_full_body=False: seen.append((root, allow_full_body)),
+    )
 
     result = runner.invoke(app, ["mcp", "stdio", "--root", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert seen == [tmp_path]
+    # Full-body storage is operator consent and must default to off.
+    assert seen == [(tmp_path, False)]
+
+
+def test_mcp_stdio_full_body_requires_operator_flag(tmp_path, monkeypatch):
+    """Only the person starting the server can enable raw-body storage."""
+    from hyodo import mcp_server
+
+    seen = []
+    monkeypatch.setattr(
+        mcp_server,
+        "run_stdio",
+        lambda root, *, allow_full_body=False: seen.append((root, allow_full_body)),
+    )
+
+    result = runner.invoke(app, ["mcp", "stdio", "--root", str(tmp_path), "--allow-full-body"])
+
+    assert result.exit_code == 0
+    assert seen == [(tmp_path, True)]
 
 
 def test_mcp_stdio_missing_workspace_exits_2(tmp_path):

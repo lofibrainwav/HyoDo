@@ -61,7 +61,13 @@ def unevaluated_policy(claimed: dict[str, Any] | None = None) -> dict[str, Any]:
 
 
 def content_digest(text: str | bytes | None) -> str | None:
-    """Return first 12 hex chars of SHA-256, or None when *text* is None."""
+    """Return first 12 hex chars of SHA-256, or None when *text* is None.
+
+    12 hex chars is 48 bits: enough to correlate a body with its ledger entry, **not**
+    a cryptographic commitment. Treat it as a short identifier, not tamper-proof
+    evidence. It is only trustworthy at all because :func:`validate_event` recomputes it
+    from the body rather than accepting whatever the caller supplied.
+    """
     if text is None:
         return None
     payload = text.encode("utf-8") if isinstance(text, str) else text
@@ -179,10 +185,15 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                         reasons.append(f"invalid_field:io.{body_key}")
                     else:
                         full_bodies[body_key] = body
-                        # Fill digest from body when digest omitted.
+                        # When the body is here, the digest is computed from it — never
+                        # taken on the caller's word. Trusting a supplied digest let a
+                        # caller pair real content with an unrelated digest, and once
+                        # digest-only mode dropped the body the lie was all that was left.
                         dig_key = "input_digest" if body_key == "input_text" else "output_digest"
-                        if io_out[dig_key] is None:
-                            io_out[dig_key] = content_digest(body)
+                        computed = content_digest(body)
+                        if io_out[dig_key] is not None and io_out[dig_key] != computed:
+                            reasons.append(f"digest_mismatch:io.{dig_key}")
+                        io_out[dig_key] = computed
 
     policy_raw = raw.get("policy")
     policy_claimed: dict[str, Any] | None = None
@@ -267,6 +278,46 @@ def strip_full_bodies(event: dict[str, Any]) -> dict[str, Any]:
         io.pop("output_text", None)
         # Ensure digests exist if bodies were the only source (already set in validate).
     return out
+
+
+#: Outcome of an idempotency check against an existing ``event_id`` in the ledger.
+EVENT_ID_NEW = "new"
+EVENT_ID_DUPLICATE = "duplicate"  # same id, same payload → already recorded
+EVENT_ID_CONFLICT = "conflict"  # same id, different payload → refuse
+EVENT_ID_UNOBSERVED = "unobserved"  # ledger unreadable → cannot tell
+
+
+def check_event_id(root: Path, event: dict[str, Any]) -> str:
+    """Classify *event* against ledger entries sharing its ``event_id``.
+
+    Standard idempotency-key semantics: replaying an identical event is harmless and
+    must not append a second line, while reusing an id with different content is a
+    conflict and must be refused — otherwise an agent can rewrite its own history by
+    re-sending an old id. An unreadable ledger is ``EVENT_ID_UNOBSERVED``, never "new".
+    """
+    event_id = event.get("event_id")
+    if not isinstance(event_id, str) or not event_id:
+        return EVENT_ID_NEW
+    path = root / AGENT_EVENTS_RELATIVE_PATH
+    if not path.exists():
+        return EVENT_ID_NEW
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return EVENT_ID_UNOBSERVED
+    incoming = json.dumps(event, sort_keys=True, ensure_ascii=False)
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and parsed.get("event_id") == event_id:
+            existing = json.dumps(parsed, sort_keys=True, ensure_ascii=False)
+            return EVENT_ID_DUPLICATE if existing == incoming else EVENT_ID_CONFLICT
+    return EVENT_ID_NEW
 
 
 def append_agent_event(root: Path, event: dict[str, Any]) -> bool:

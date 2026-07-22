@@ -45,7 +45,11 @@ from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_h
 from hyodo.eval import EvalInputError, run_evaluation
 from hyodo.events import (
     AGENT_EVENTS_RELATIVE_PATH,
+    EVENT_ID_CONFLICT,
+    EVENT_ID_DUPLICATE,
+    EVENT_ID_UNOBSERVED,
     append_agent_event,
+    check_event_id,
     count_run_events,
     load_event_from_path,
     load_event_from_text,
@@ -1549,6 +1553,14 @@ def safe(
 @mcp_app.command("stdio")
 def mcp_stdio(
     root: str = typer.Option(".", "--root", help="Workspace root locked for this MCP process"),
+    allow_full_body: bool = typer.Option(
+        False,
+        "--allow-full-body",
+        help=(
+            "Operator consent: permit clients to store raw prompt/output text. "
+            "Off by default — clients cannot turn this on themselves."
+        ),
+    ),
 ):
     """Run the optional local MCP adapter over standard input/output."""
     try:
@@ -1563,7 +1575,7 @@ def mcp_stdio(
     from hyodo.mcp_server import run_stdio
 
     try:
-        run_stdio(Path(root))
+        run_stdio(Path(root), allow_full_body=allow_full_body)
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2) from exc
@@ -1927,18 +1939,34 @@ def event_record(
         normalized = apply_decision_to_event(normalized, decision)
         decision_label = decision.decision
 
-    if not append_agent_event(root_path, normalized):
+    # Idempotency on event_id, checked against the *final* event so a genuine replay
+    # (same id, same content incl. the policy stamp) is a no-op, while reusing an id
+    # with different content is refused — otherwise an agent could rewrite its history.
+    id_state = check_event_id(root_path, normalized)
+    if id_state != EVENT_ID_DUPLICATE and not append_agent_event(root_path, normalized):
+        id_state = "append_failed"
+    if id_state in (EVENT_ID_CONFLICT, EVENT_ID_UNOBSERVED, "append_failed"):
+        reason = {
+            EVENT_ID_CONFLICT: "event_id_conflict",
+            EVENT_ID_UNOBSERVED: "ledger_unobserved",
+        }.get(id_state, "append_failed")
         if json_output:
             console.print_json(
                 json.dumps(
                     {
                         "ok": False,
-                        "reasons": ["append_failed"],
+                        "reasons": [reason],
                         "exit_code": 2,
                         "ledger": str(root_path / AGENT_EVENTS_RELATIVE_PATH),
                     }
                 )
             )
+        elif id_state == EVENT_ID_CONFLICT:
+            console.print(
+                "[red]event_id already recorded with different content.[/red] Not recorded."
+            )
+        elif id_state == EVENT_ID_UNOBSERVED:
+            console.print("[red]Ledger unreadable — cannot check event_id.[/red] Not recorded.")
         else:
             console.print("[red]Failed to append agent event ledger.[/red]")
             console.print("[yellow]This is not a validation pass.[/yellow]")

@@ -101,8 +101,15 @@ def create_server(
     *,
     host: str = _LOOPBACK_HOST,
     port: int = 8000,
+    allow_full_body: bool = False,
 ) -> FastMCP:
-    """Create one root-locked MCP server without owning gate logic."""
+    """Create one root-locked MCP server without owning gate logic.
+
+    ``allow_full_body`` is the operator's consent to store raw prompt/output text. It
+    defaults to off and can only be turned on when the server is started — never by a
+    connected client. Otherwise the agent being audited could raise its own privacy
+    ceiling simply by passing ``full_body=True``.
+    """
     workspace = resolve_workspace_root(root)
     server = FastMCP(
         "HyoDo",
@@ -145,16 +152,30 @@ def create_server(
         policy_path: str | None = None,
         full_body: bool = False,
     ) -> dict[str, Any]:
-        """Record one event through ``hyodo event record`` using digest-only storage by default."""
+        """Record one event through ``hyodo event record`` using digest-only storage by default.
+
+        ``full_body`` is a *request*, not a switch: it only takes effect when the
+        operator started this server with full-body storage allowed.
+        """
         args = ["event", "record", "--stdin", "--root", str(workspace), "--json"]
         if policy_path is not None:
             try:
                 args.extend(["--policy", str(_resolve_workspace_path(workspace, policy_path))])
             except ValueError as exc:
                 return {"exit_code": 2, "stdout": "", "stderr": "", "error": str(exc)}
-        if full_body:
+        full_body_applied = bool(full_body and allow_full_body)
+        if full_body_applied:
             args.append("--full-body")
-        return _run_cli(workspace, args, stdin=json.dumps(event))
+        result = _run_cli(workspace, args, stdin=json.dumps(event))
+        # Surfaced even when it matches the request: a silent downgrade would let a
+        # client believe raw bodies were stored when they were not.
+        result["full_body_requested"] = bool(full_body)
+        result["full_body_applied"] = full_body_applied
+        if full_body and not allow_full_body:
+            result["full_body_denied_reason"] = (
+                "server started without operator consent for full-body storage"
+            )
+        return result
 
     @server.tool()
     def hyodo_policy_check(
@@ -174,9 +195,9 @@ def create_server(
     return server
 
 
-def run_stdio(root: Path) -> None:
+def run_stdio(root: Path, *, allow_full_body: bool = False) -> None:
     """Start the M1 local stdio transport. No network listener is created."""
-    create_server(root).run(transport="stdio")
+    create_server(root, allow_full_body=allow_full_body).run(transport="stdio")
 
 
 class _BearerTokenMiddleware:
