@@ -7,13 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.0] - 2026-07-21
+
 ### Added
 
-- **MCP connector architecture design** (`docs/HYODO_MCP_CONNECTOR_DESIGN.md`):
-  optional stdio → loopback → Tailscale/private-net MCP layers; token
-  fail-closed remote; public default remains CLI-only. Not implemented yet.
-- **Codex implementer handoff** (`docs/CODEX_HANDOFF_NEXT.md`) — ordered
-  queue M1→P2→M2→M3→P3→P4→M4 after 4.4.0 (issue #95).
+- **Optional local MCP connector** — `hyodo[mcp]` exposes the existing CLI
+  operations (`context`, `safe`, `check`, event, and policy) to local LLM
+  clients over stdio. Loopback serving is opt-in; Tailscale binding requires a
+  token and never listens on public interfaces.
+- **FDE evidence gates (Phases 2–4)** — `hyodo schema check` validates
+  versioned JSON payloads, `hyodo eval` deterministically scores local golden
+  JSONL fixtures, and `hyodo report` produces local Markdown or HTML evidence
+  reports with a reproducible content hash.
+
+### Security
+
+- Remote MCP transports fail closed without a token. Public binding, wallet,
+  Redis, Vercel execution, and runtime-interceptor claims remain out of scope.
+
+### Notes
+
+- M4 polish (`mcp doctor`, access ledger, and agent-rule opt-in) is deferred.
+- Tailscale bind and token rejection are tested; a second-device MCP tool call
+  has not been measured and is not claimed as completed.
 
 ## [4.4.0] - 2026-07-21
 
