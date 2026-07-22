@@ -174,3 +174,94 @@ def test_mcp_stdio_protocol_lists_the_m1_tools(tmp_path):
         "hyodo_event_record",
         "hyodo_policy_check",
     }
+
+
+def test_mcp_serve_only_delegates_the_loopback_transport(tmp_path, monkeypatch):
+    """M2 leaves tool registration to M1 and fixes the listener to loopback."""
+    from hyodo import mcp_server
+
+    seen = []
+    monkeypatch.setattr(
+        mcp_server,
+        "run_loopback",
+        lambda root, *, port, token: seen.append((root, port, token)),
+    )
+
+    result = runner.invoke(
+        app,
+        ["mcp", "serve", "--bind", "loopback", "--port", "8769", "--root", str(tmp_path)],
+    )
+
+    assert result.exit_code == 0
+    assert seen == [(tmp_path, 8769, None)]
+    assert "http://127.0.0.1:8769/mcp" in result.output
+
+
+def test_mcp_serve_rejects_non_loopback_bind_dashboard_port_and_missing_root(tmp_path):
+    """M2 never broadens the listener and keeps the dashboard port separate."""
+    invalid_bind = runner.invoke(app, ["mcp", "serve", "--bind", "tailscale"])
+    dashboard_port = runner.invoke(app, ["mcp", "serve", "--port", "8768"])
+    missing_root = runner.invoke(app, ["mcp", "serve", "--root", str(tmp_path / "missing")])
+
+    assert invalid_bind.exit_code == 2
+    assert "only --bind loopback is available" in invalid_bind.output
+    assert dashboard_port.exit_code == 2
+    assert "reserved for the HyoDo dashboard" in dashboard_port.output
+    assert missing_root.exit_code == 2
+    assert "workspace root is not a directory" in missing_root.output
+
+
+def test_mcp_loopback_auth_rejects_missing_or_invalid_bearer_before_tools():
+    """A configured M2 token returns 401 before a request reaches MCP tools."""
+    from hyodo.mcp_server import _BearerTokenMiddleware
+
+    async def status_for(headers: list[tuple[bytes, bytes]]) -> tuple[int, bool]:
+        reached = False
+        messages = []
+
+        async def app(scope, receive, send):
+            nonlocal reached
+            reached = True
+
+        async def send(message):
+            messages.append(message)
+
+        async def receive():
+            return {"type": "http.disconnect"}
+
+        await _BearerTokenMiddleware(app, "expected-token")(
+            {"type": "http", "headers": headers},
+            receive,
+            send,
+        )
+        return messages[0]["status"], reached
+
+    assert asyncio.run(status_for([])) == (401, False)
+    assert asyncio.run(status_for([(b"authorization", b"Bearer wrong-token")])) == (401, False)
+
+
+def test_mcp_loopback_auth_allows_valid_bearer_to_reach_the_mcp_endpoint():
+    """A valid configured bearer reaches the SDK endpoint instead of a 401 response."""
+    from hyodo.mcp_server import _BearerTokenMiddleware
+
+    reached = False
+
+    async def app(scope, receive, send):
+        nonlocal reached
+        reached = True
+
+    async def receive():
+        return {"type": "http.disconnect"}
+
+    async def send(message):
+        return None
+
+    asyncio.run(
+        _BearerTokenMiddleware(app, "expected-token")(
+            {"type": "http", "headers": [(b"authorization", b"Bearer expected-token")]},
+            receive,
+            send,
+        )
+    )
+
+    assert reached
