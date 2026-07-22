@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.1] - 2026-07-21
+
+### Added
+
+- **Auditable local scan exceptions** — optional
+  `.hyodo/scan-exceptions.toml` keeps private legal or financial working
+  material outside a product-code syntax boundary with a required reason.
+  Safety exceptions require both an exact workspace-relative path and one
+  exact finding rule; malformed policies fail closed with exit code 2.
+
 ## [4.8.0] - 2026-07-21
 
 ### Added
