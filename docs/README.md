@@ -11,9 +11,10 @@ language-agnostic.
 | Doc | Purpose |
 | --- | --- |
 | [../README.md](../README.md) | Product overview + exit contracts |
-| [../QUICK_START.md](../QUICK_START.md) | Short install + CLI path (PyPI + clone) |
+| [../QUICK_START.md](../QUICK_START.md) | Install + CLI path |
 | [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
-| [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public package security surface |
+| [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
+| [HYODO_MCP_CONNECTOR_DESIGN.md](./HYODO_MCP_CONNECTOR_DESIGN.md) | MCP connector design (not shipped) |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
 
 ## Release and demo (demo last)
@@ -21,9 +22,9 @@ language-agnostic.
 | Doc | Purpose |
 | --- | --- |
 | [../RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) | Release readiness |
-| [DEMO_SCRIPT_3_MIN.md](./DEMO_SCRIPT_3_MIN.md) | Recording script; record only after verification |
+| [DEMO_SCRIPT_3_MIN.md](./DEMO_SCRIPT_3_MIN.md) | Recording script (after verify) |
 | [DEMO_READY_CHECKLIST.md](./DEMO_READY_CHECKLIST.md) | Pre-record gates |
-| [../scripts/demo-dry-run.sh](../scripts/demo-dry-run.sh) | Generate a fresh, local demo receipt before use |
+| [../scripts/demo-dry-run.sh](../scripts/demo-dry-run.sh) | Local demo receipt script |
 
 ## Optional
 
