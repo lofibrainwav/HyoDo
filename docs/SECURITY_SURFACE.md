@@ -12,12 +12,14 @@ repository today.
 
 ## Thin runtime dependency surface
 
-`pyproject.toml` declares exactly two runtime dependencies for the `hyodo`
-package:
+`pyproject.toml` declares three runtime dependencies for the `hyodo` package
+on Python 3.11+, plus the `tomli` backport on Python 3.10:
 
 ```text
+jsonschema>=4.18,<5
 typer>=0.9.0
 rich>=13.0.0
+tomli>=1.2.0; python_version < "3.11"
 ```
 
 Everything else (`pytest`, `ruff`, `pyright`, `build`, `twine`, `PyYAML`, ...)
@@ -66,11 +68,12 @@ surface via `scripts/generate_sbom.py`.
 - **Scope.** The generator builds the public wheel and installs it into a
   clean throwaway virtualenv created **without pip** (so the venv bootstrap
   seeds `pip`/`setuptools`/`wheel` are never inventoried), then inventories
-  *that* environment — so the SBOM contains `typer`, `rich`, and their
-  transitive closure, and never the generator (`cyclonedx-bom`) or dev/test/
-  lint tooling. This scope is enforced in-process (`assert_public_scope`,
-  which fails the run) and by tests. Inventorying the dev environment
-  directly would be wrong — it would pull the whole dev toolchain in.
+  *that* environment — so the SBOM contains `jsonschema`, `typer`, `rich`,
+  their transitive closure, and Python 3.10's conditional `tomli`; it never
+  contains the generator (`cyclonedx-bom`) or dev/test/lint tooling. This
+  scope is enforced in-process (`assert_public_scope`, which fails the run)
+  and by tests. Inventorying the dev environment directly would be wrong —
+  it would pull the whole dev toolchain in.
 - **Gate behavior.** The Eternity gate is offline-safe and does not regress
   `hyodo check`: a **scope violation** (SBOM produced but mis-scoped) is a
   real defect and **FAILs** (exit 2); only the generator's *defined*
@@ -81,8 +84,8 @@ surface via `scripts/generate_sbom.py`.
   being masked as a SKIP, so the gate can never silently pretend it ran.
 - **Offline.** "Offline" means the *generation* step (rendering the SBOM
   from installed metadata) makes no network calls. Provisioning the clean
-  venv (installing the wheel + `typer`/`rich`) may use the network; when
-  that is not possible, the gate SKIPs.
+  venv (installing the wheel and its runtime dependencies) may use the
+  network; when that is not possible, the gate SKIPs.
 - **Reproducibility.** Output is generated with `--output-reproducible`, so
   volatile fields (`serialNumber`, `metadata.timestamp`) are stripped; the
   stable contract is the component (name, version) set. CI runs the real
@@ -191,9 +194,9 @@ is cut, so a release can't ship with mismatched version metadata.
 
 `.github/dependabot.yml` tracks the root `pyproject.toml` (the public
 package's dependency graph) and the GitHub Actions workflow files. Because
-the runtime dependency list is intentionally short (`typer`, `rich`), the
-expected steady-state alert volume is low; any alert against the public
-surface is expected to be triaged and patched promptly, not deferred.
+the runtime dependency list is intentionally short, the expected steady-state
+alert volume is low; any alert against the public surface is expected to be
+triaged and patched promptly, not deferred.
 
 ## Secrets
 

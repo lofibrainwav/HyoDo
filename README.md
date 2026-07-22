@@ -172,8 +172,7 @@ python -m pip install -e ".[dev]" && ./.venv/bin/hyodo check
 ## Documentation
 
 - [Quick Start](./QUICK_START.md) · [Philosophy](./PHILOSOPHY.md)
-- [Security surface](./docs/SECURITY_SURFACE.md)
-- [FDE spine examples](./examples/fde-evidence-spine/)
+- [Security surface](./docs/SECURITY_SURFACE.md) · [FDE spine examples](./examples/fde-evidence-spine/)
 - [Changelog](./CHANGELOG.md) · [Roadmap](./ROADMAP.md)
 
 ## License

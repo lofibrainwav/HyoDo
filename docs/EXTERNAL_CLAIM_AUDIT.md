@@ -51,8 +51,8 @@ its implemented CLI behavior.
 
 - Public runtime deps are minimal
   - Verdict: Confirmed
-  - Evidence: `pyproject.toml` `dependencies = ["typer>=0.9.0",
-    "rich>=13.0.0"]`
+  - Evidence: `pyproject.toml` lists `jsonschema`, `typer`, and `rich`, plus
+    conditional `tomli` for Python 3.10
 - No required container/database services
   - Verdict: Confirmed for the surface in this repo
   - Evidence: Neither README nor `docs/` reference a required
@@ -118,8 +118,9 @@ this repository.
 
 - MCP support is opt-in and leaves the core runtime dependency set unchanged
   - Verdict: Confirmed
-  - Evidence: `pyproject.toml` defines `hyodo[mcp]`; the base dependency
-    list contains only `typer` and `rich`
+  - Evidence: `pyproject.toml` defines `hyodo[mcp]`; MCP remains outside the
+    base dependency list (`jsonschema`, `typer`, `rich`, and conditional
+    `tomli` for Python 3.10)
 - The shipped MCP transports are explicit local stdio, loopback, and guarded
   private-network HTTP
   - Verdict: Confirmed
@@ -155,7 +156,8 @@ Required attribute vs. current measured state:
   - `hyodo check` is explicitly documented and coded as
     HyoDo-checkout-only, with a three-way exit contract
 - Minimal runtime deps
-  - `typer` + `rich` only, per `pyproject.toml`
+  - `jsonschema`, `typer`, `rich`, plus conditional `tomli` for Python 3.10,
+    per `pyproject.toml`
 - Philosophy layer optional
   - HYOGOOK documented as optional and non-blocking
 - Release surface stated narrowly
@@ -177,7 +179,8 @@ Metric (2026-07-19), value, and source:
   - Source: `gh api graphql`
     `vulnerabilityAlerts(states: OPEN) { totalCount }`
 - Public runtime dependency count
-  - Value: 2 (`typer`, `rich`)
+  - Value: 3 on Python 3.11+ (`jsonschema`, `typer`, `rich`); 4 on Python
+    3.10 with conditional `tomli`
   - Source: `pyproject.toml`
 - Code scanning (CodeQL)
   - Value: not configured
@@ -233,7 +236,7 @@ Priority order implied by measurements:
 
 ```bash
 # deps and sdist scope
-rg -n "dependencies|typer|rich|only-include" pyproject.toml
+rg -n "dependencies|jsonschema|typer|rich|tomli|only-include" pyproject.toml
 
 # CI/publish/smoke mechanics
 rg -n "pip install|Trusted Publishing|check_version_sync" \
