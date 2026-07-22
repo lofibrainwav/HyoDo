@@ -45,7 +45,7 @@ cat VERSION   # expect 4.4.0 until you cut a new release
 | **FDE Phase 2** `hyodo schema check` | **Not implemented** |
 | **FDE Phase 3** `hyodo eval` | **Not implemented** |
 | **FDE Phase 4** `hyodo report` | **Not implemented** |
-| **MCP M1** stdio | **Not implemented** |
+| **MCP M1** stdio | **Implemented, pending release** (local stdio only) |
 | **MCP M2** loopback URL | **Not implemented** |
 | **MCP M3** Tailscale / private-net + token | **Not implemented** |
 | **MCP M4** doctor / access ledger / agent-rules | **Not implemented** |
