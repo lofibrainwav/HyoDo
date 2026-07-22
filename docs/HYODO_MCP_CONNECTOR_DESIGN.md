@@ -449,4 +449,5 @@ A release is complete for connector work only when:
 | --- | --- | --- |
 | v1 | 2026-07-22 | Initial full design (public + Tailscale family + non-goals) |
 
-When implementation starts, open a HyoDo issue referencing this file and tick Phase M0 remaining boxes.
+Implementation queue for Codex (or next agent): **`docs/CODEX_HANDOFF_NEXT.md`**.  
+GitHub tracking: issue **#95**. Phase M0 design is sealed; start at **M1**.
