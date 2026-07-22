@@ -140,6 +140,20 @@ this repository.
     the locked host workspace only; this repository has no observed
     second-device tool call receipt.
 
+### 2.5 Local golden evaluation
+
+- `hyodo eval` runs a caller-supplied local JSONL dataset through a local
+  runner with deterministic built-in `exact`, `contains`, `json_path`, and
+  bounded `custom` comparators
+  - Verdict: Confirmed
+  - Evidence: `hyodo/eval.py` writes each run to `.hyodo/eval-runs/` and an
+    append-only `.hyodo/eval-runs.jsonl` receipt; runner exits, timeouts, and
+    non-JSON output are recorded as `FAIL` (exit `1`), not skips
+- Eval is not an automated approval or a remote model service
+  - Verdict: Confirmed
+  - Evidence: the runner command is supplied by the caller and runs locally;
+    this surface has no network client, model provider, or approval action
+
 ---
 
 ## 3) Positioning fit — measured state
