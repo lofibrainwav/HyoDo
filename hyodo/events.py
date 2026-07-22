@@ -37,6 +37,28 @@ POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK"})
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{12}$")
 
+#: Marker written into ``policy.reason`` when no policy was actually evaluated.
+UNEVALUATED_POLICY_REASON = "unevaluated"
+
+
+def unevaluated_policy(claimed: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return a policy block that carries **no measured decision**.
+
+    ``evaluated_by`` is the provenance marker: it is ``None`` here and is only ever
+    set by :func:`hyodo.policy.apply_decision_to_event` after HyoDo itself ran the
+    policy. Anything a caller asserted is kept under ``claimed`` so the assertion is
+    preserved for audit without being counted as evidence.
+    """
+    out: dict[str, Any] = {
+        "decision": None,
+        "rule_id": None,
+        "reason": UNEVALUATED_POLICY_REASON,
+        "evaluated_by": None,
+    }
+    if claimed is not None:
+        out["claimed"] = claimed
+    return out
+
 
 def content_digest(text: str | bytes | None) -> str | None:
     """Return first 12 hex chars of SHA-256, or None when *text* is None."""
@@ -163,7 +185,7 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                             io_out[dig_key] = content_digest(body)
 
     policy_raw = raw.get("policy")
-    policy_out: dict[str, Any] | None = None
+    policy_claimed: dict[str, Any] | None = None
     if policy_raw is not None:
         if not isinstance(policy_raw, dict):
             reasons.append("invalid_field:policy")
@@ -177,11 +199,18 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
             reason = policy_raw.get("reason")
             if reason is not None and not isinstance(reason, str):
                 reasons.append("invalid_field:policy.reason")
-            policy_out = {
-                "decision": decision,
-                "rule_id": rule_id if isinstance(rule_id, str) else None,
-                "reason": reason if isinstance(reason, str) else None,
-            }
+            if decision is not None:
+                # Only an asserted *decision* is a claim worth quarantining. Keying on
+                # rule_id/reason too would make re-validating an already-normalized
+                # event (reason="unevaluated") invent a claim out of nothing and break
+                # ledger round-trip stability.
+                # Caller-asserted. Preserved for audit, never promoted to a measured
+                # decision — only evaluate_policy() may produce one.
+                policy_claimed = {
+                    "decision": decision,
+                    "rule_id": rule_id if isinstance(rule_id, str) else None,
+                    "reason": reason if isinstance(reason, str) else None,
+                }
 
     meta_raw = raw.get("meta")
     meta_out: dict[str, Any] = {"model": None, "tags": []}
@@ -218,9 +247,9 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
         if tool_out is not None
         else {"name": None, "args_digest": None, "paths": []},
         "io": io_out,
-        "policy": policy_out
-        if policy_out is not None
-        else {"decision": None, "rule_id": None, "reason": None},
+        # Always unevaluated at validation time. A measured decision can only be
+        # stamped later by apply_decision_to_event() after evaluate_policy() ran.
+        "policy": unevaluated_policy(policy_claimed),
         "meta": meta_out,
     }
     # Full bodies only when provided (opt-in by presence).
@@ -250,6 +279,35 @@ def append_agent_event(root: Path, event: dict[str, Any]) -> bool:
         return True
     except OSError:
         return False
+
+
+def count_run_events(root: Path, run_id: str) -> int | None:
+    """Count ledger events already recorded for *run_id*.
+
+    Returns ``None`` when the ledger cannot be observed (unreadable / undecodable).
+    ``None`` is **not** zero: callers must treat it as unobserved, because counting an
+    unreadable ledger as empty would hand out a free ALLOW to every step budget.
+    A missing ledger file *is* an honest zero — nothing has been recorded yet.
+    """
+    path = root / AGENT_EVENTS_RELATIVE_PATH
+    if not path.exists():
+        return 0
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return None
+    count = 0
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and parsed.get("run_id") == run_id:
+            count += 1
+    return count
 
 
 def read_agent_events(root: Path) -> tuple[list[dict[str, Any]], int]:

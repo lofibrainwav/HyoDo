@@ -46,6 +46,7 @@ from hyodo.eval import EvalInputError, run_evaluation
 from hyodo.events import (
     AGENT_EVENTS_RELATIVE_PATH,
     append_agent_event,
+    count_run_events,
     load_event_from_path,
     load_event_from_text,
     strip_full_bodies,
@@ -1921,7 +1922,8 @@ def event_record(
                     "Not ALLOW. Fix --policy path or TOML."
                 )
             raise typer.Exit(2)
-        decision = evaluate_policy(normalized, cfg)
+        observed = count_run_events(root_path, normalized["run_id"])
+        decision = evaluate_policy(normalized, cfg, observed_steps=observed)
         normalized = apply_decision_to_event(normalized, decision)
         decision_label = decision.decision
 
@@ -2060,8 +2062,14 @@ def policy_check(
             console.print(f"[red]Policy unobserved ({policy_err}).[/red] Not ALLOW.")
         raise typer.Exit(2)
 
-    decision = evaluate_policy(normalized, cfg)
-    exit_code = 0 if decision.decision == "ALLOW" else 1
+    # Step budget is counted from the working-tree ledger, never from the
+    # caller-supplied step_index. (Same cwd basis as the default policy lookup.)
+    observed = count_run_events(Path.cwd(), normalized["run_id"])
+    decision = evaluate_policy(normalized, cfg, observed_steps=observed)
+    # 0 = ALLOW, 1 = DENY, 2 = unobserved. UNOBSERVED must not exit like a plain DENY.
+    exit_code = (
+        0 if decision.decision == "ALLOW" else (2 if decision.decision == "UNOBSERVED" else 1)
+    )
     if json_output:
         payload = decision.as_dict()
         payload["exit_code"] = exit_code

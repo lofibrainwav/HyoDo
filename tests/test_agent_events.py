@@ -209,6 +209,12 @@ def test_policy_tool_not_allowed():
 
 
 def test_policy_max_steps():
+    """Budget is spent against the ledger count, not the caller's step_index.
+
+    The previous version of this test asserted that a self-reported ``step_index=3``
+    was enough to DENY. That was the bug: a caller that keeps sending ``step_index: 0``
+    never trips the budget. The authoritative number is ``observed_steps``.
+    """
     policy = PolicyConfig(
         schema=POLICY_SCHEMA_ID,
         max_steps=2,
@@ -217,8 +223,42 @@ def test_policy_max_steps():
     )
     event = validate_event(_valid_event(step_index=3, kind="prompt"))[2]
     assert event is not None
-    decision = evaluate_policy(event, policy)
+    decision = evaluate_policy(event, policy, observed_steps=2)
     assert decision.decision == "DENY"
+    assert decision.rule_id == "max_steps"
+
+
+def test_policy_max_steps_ignores_self_reported_step_index():
+    """A caller replaying step_index=0 forever must still exhaust the budget."""
+    policy = PolicyConfig(
+        schema=POLICY_SCHEMA_ID,
+        max_steps=2,
+        allowed_tools=None,
+        blocked_path_globs=(),
+    )
+    event = validate_event(_valid_event(step_index=0, kind="prompt"))[2]
+    assert event is not None
+    seen = [evaluate_policy(event, policy, observed_steps=n).decision for n in range(4)]
+    assert seen == ["ALLOW", "ALLOW", "DENY", "DENY"]
+
+    # A huge self-reported index must not DENY on its own either — only the ledger counts.
+    liar = validate_event(_valid_event(step_index=9999, kind="prompt"))[2]
+    assert liar is not None
+    assert evaluate_policy(liar, policy, observed_steps=0).decision == "ALLOW"
+
+
+def test_policy_max_steps_unobserved_ledger_is_not_allow():
+    """Unenforceable is not permitted: no ledger count means UNOBSERVED, never ALLOW."""
+    policy = PolicyConfig(
+        schema=POLICY_SCHEMA_ID,
+        max_steps=2,
+        allowed_tools=None,
+        blocked_path_globs=(),
+    )
+    event = validate_event(_valid_event(step_index=0, kind="prompt"))[2]
+    assert event is not None
+    decision = evaluate_policy(event, policy, observed_steps=None)
+    assert decision.decision == "UNOBSERVED"
     assert decision.rule_id == "max_steps"
 
 
@@ -262,7 +302,9 @@ blocked_path_globs = ["**/.env"]
     policy = load_policy_config(path)
     event = validate_event(_valid_event(step_index=1))[2]
     assert event is not None
-    decision = evaluate_policy(event, policy)
+    # max_steps is set, so the ledger count must be supplied; without it the honest
+    # answer is UNOBSERVED, not ALLOW.
+    decision = evaluate_policy(event, policy, observed_steps=0)
     assert decision.decision == "ALLOW"
 
 
