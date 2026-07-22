@@ -50,11 +50,17 @@ class PolicyDecision:
     reason: str | None
 
     def as_dict(self) -> dict[str, Any]:
-        """Serialize the decision for ledger stamping and JSON CLI output."""
+        """Serialize the decision for ledger stamping and JSON CLI output.
+
+        ``evaluated_by`` marks this as a *measured* decision. A PolicyDecision can only
+        come from :func:`evaluate_policy`, so its presence in the ledger is proof HyoDo
+        ran the policy rather than trusting the caller.
+        """
         return {
             "decision": self.decision,
             "rule_id": self.rule_id,
             "reason": self.reason,
+            "evaluated_by": POLICY_SCHEMA_ID,
         }
 
 
@@ -124,8 +130,17 @@ def _path_blocked(path: str, globs: tuple[str, ...]) -> str | None:
     """Return matching glob if *path* is blocked, else None."""
     # Normalize for matching: strip file:// and collapse redundant separators lightly.
     candidate = path.replace("\\", "/")
+    if candidate.startswith("file://"):
+        candidate = candidate[len("file://") :]
+    while candidate.startswith("./"):
+        candidate = candidate[2:]
     for pattern in globs:
         if fnmatch.fnmatch(candidate, pattern):
+            return pattern
+        # fnmatch has no "**" concept: it expands to ".*", so "**/.env" needs a literal
+        # slash and therefore misses a root-level ".env". Retry against the tail so the
+        # documented recursive pattern also covers depth zero.
+        if pattern.startswith("**/") and fnmatch.fnmatch(candidate, pattern[3:]):
             return pattern
         # Also match basename-only patterns against full path segments.
         if fnmatch.fnmatch(candidate.split("/")[-1], pattern):
@@ -133,19 +148,32 @@ def _path_blocked(path: str, globs: tuple[str, ...]) -> str | None:
     return None
 
 
-def evaluate_policy(event: dict[str, Any], policy: PolicyConfig) -> PolicyDecision:
-    """Evaluate a **validated** event against *policy*. Never returns silent pass on tools."""
-    step = event.get("step_index")
+def evaluate_policy(
+    event: dict[str, Any],
+    policy: PolicyConfig,
+    *,
+    observed_steps: int | None = None,
+) -> PolicyDecision:
+    """Evaluate a **validated** event against *policy*. Never returns silent pass on tools.
+
+    ``observed_steps`` is how many events this run already has **in the ledger**. It is
+    the only authoritative step count: ``event["step_index"]`` is self-reported by the
+    caller and a caller that keeps sending ``step_index: 0`` would otherwise run forever.
+    When ``max_steps`` is configured but the ledger was not observed, the result is
+    ``UNOBSERVED`` rather than ``ALLOW`` — unenforceable is not permitted.
+    """
     if (
         policy.max_steps is not None
-        and isinstance(step, int)
-        and not isinstance(step, bool)
-        and step > policy.max_steps
+        and observed_steps is not None
+        and observed_steps >= policy.max_steps
     ):
         return PolicyDecision(
             decision="DENY",
             rule_id="max_steps",
-            reason=f"step_index {step} exceeds max_steps {policy.max_steps}",
+            reason=(
+                f"run already has {observed_steps} recorded step(s); "
+                f"max_steps {policy.max_steps} would be exceeded"
+            ),
         )
 
     kind = event.get("kind")
@@ -176,11 +204,29 @@ def evaluate_policy(event: dict[str, Any], policy: PolicyConfig) -> PolicyDecisi
                     reason=f"path {p!r} matched blocked glob {matched!r}",
                 )
 
+    if policy.max_steps is not None and observed_steps is None:
+        # A step budget exists but we could not count the ledger. Refusing to call
+        # this ALLOW is the whole point: unobserved is not healthy.
+        return PolicyDecision(
+            decision="UNOBSERVED",
+            rule_id="max_steps",
+            reason="ledger step count unavailable; max_steps cannot be enforced",
+        )
+
     return PolicyDecision(decision="ALLOW", rule_id=None, reason=None)
 
 
 def apply_decision_to_event(event: dict[str, Any], decision: PolicyDecision) -> dict[str, Any]:
-    """Return a shallow-copied event with ``policy`` set from *decision*."""
+    """Return a shallow-copied event with ``policy`` set from *decision*.
+
+    This is the **only** path that may write a measured decision: it stamps
+    ``evaluated_by`` so readers can tell a HyoDo-computed decision apart from one a
+    caller merely asserted (which validate_event parks under ``policy.claimed``).
+    """
     out = dict(event)
-    out["policy"] = decision.as_dict()
+    stamped = decision.as_dict()
+    claimed = event.get("policy")
+    if isinstance(claimed, dict) and "claimed" in claimed:
+        stamped["claimed"] = claimed["claimed"]
+    out["policy"] = stamped
     return out

@@ -34,8 +34,21 @@ def _eval_summary(root: Path) -> tuple[str, float | None]:
 def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, Any]]:
     """Render deterministic local Markdown or HTML and return its SHA-256 hash."""
     events, corrupt = read_agent_events(root)
-    allow = sum(event.get("policy", {}).get("decision") == "ALLOW" for event in events)
-    deny = sum(event.get("policy", {}).get("decision") == "DENY" for event in events)
+
+    def _measured(event: dict[str, Any]) -> dict[str, Any]:
+        """Policy block only when HyoDo itself evaluated it (``evaluated_by`` stamped).
+
+        A caller can put ``{"policy": {"decision": "ALLOW"}}`` in its own event, so an
+        unstamped decision is an assertion, not evidence, and must never be counted.
+        """
+        block = event.get("policy")
+        if isinstance(block, dict) and block.get("evaluated_by"):
+            return block
+        return {}
+
+    allow = sum(_measured(event).get("decision") == "ALLOW" for event in events)
+    deny = sum(_measured(event).get("decision") == "DENY" for event in events)
+    unevaluated = len(events) - sum(bool(_measured(event)) for event in events)
     policy, policy_error = try_load_policy(root / POLICY_RELATIVE_PATH)
     eval_text, _ = _eval_summary(root)
     policy_text = (
@@ -54,6 +67,7 @@ def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, A
         "",
         "## Evidence spine",
         f"Events: {len(events)} (ALLOW: {allow}, DENY: {deny})",
+        f"Unevaluated by HyoDo (caller-asserted or no policy run): {unevaluated}",
         f"Corrupt event lines: {corrupt}",
         "",
         "## Schema gate results",

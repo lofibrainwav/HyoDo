@@ -18,9 +18,12 @@ def _write_evidence(root: Path) -> None:
     (hyodo_dir / "policy.toml").write_text(
         'schema = "hyodo.policy/v1"\nallowed_tools = ["safe"]\n', encoding="utf-8"
     )
+    # ``evaluated_by`` is what makes a decision countable evidence. Without it an entry
+    # is only a caller assertion — test_policy_self_report_boundary.py pins that an
+    # unstamped ALLOW is reported as unevaluated instead of tallied.
     events = [
-        {"policy": {"decision": "ALLOW"}},
-        {"policy": {"decision": "DENY"}},
+        {"policy": {"decision": "ALLOW", "evaluated_by": "hyodo.policy/v1"}},
+        {"policy": {"decision": "DENY", "evaluated_by": "hyodo.policy/v1"}},
     ]
     (hyodo_dir / "agent-events.jsonl").write_text(
         "".join(json.dumps(event) + "\n" for event in events), encoding="utf-8"
