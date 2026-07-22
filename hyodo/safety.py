@@ -14,6 +14,13 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
+from hyodo.exceptions import (
+    ScanExceptionsConfig,
+    ScanExceptionsConfigError,
+    load_scan_exceptions,
+    safety_exception_reason,
+)
+
 # Secret-like patterns (high signal, intentionally narrow to limit false positives).
 SECRET_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
     ("aws_access_key", re.compile(r"AKIA[0-9A-Z]{16}")),
@@ -436,7 +443,24 @@ def _run_external_scanner(
     return findings, source
 
 
-def _scan_directory(target: Path, max_files: int = 40) -> tuple[list[Finding], str, str]:
+def _apply_safety_exceptions(
+    findings: list[Finding], root: Path, config: ScanExceptionsConfig
+) -> tuple[list[Finding], int]:
+    """Suppress only findings covered by an audited path-and-rule exception."""
+    kept: list[Finding] = []
+    suppressed = 0
+    for finding in findings:
+        rule = f"{finding.category}/{finding.label}"
+        if safety_exception_reason(finding.path, rule, root, config) is not None:
+            suppressed += 1
+        else:
+            kept.append(finding)
+    return kept, suppressed
+
+
+def _scan_directory(
+    target: Path, root: Path, config: ScanExceptionsConfig, max_files: int = 40
+) -> tuple[list[Finding], str, str, int]:
     """Per-file scan for directories (path attached).
 
     Caps at *max_files* files; ``max_files <= 0`` means unlimited.
@@ -444,6 +468,7 @@ def _scan_directory(target: Path, max_files: int = 40) -> tuple[list[Finding], s
     findings: list[Finding] = []
     chunks: list[str] = []
     count = 0
+    suppressed_count = 0
     for file_path in sorted(target.rglob("*")):
         if not file_path.is_file():
             continue
@@ -454,8 +479,12 @@ def _scan_directory(target: Path, max_files: int = 40) -> tuple[list[Finding], s
         try:
             text = _read_text_file(file_path)
         except OSError:
-            return [], "", f"error:read:{file_path}"
-        findings.extend(scan_text(text, path=str(file_path)))
+            return [], "", f"error:read:{file_path}", 0
+        scanned, suppressed = _apply_safety_exceptions(
+            scan_text(text, path=str(file_path)), root, config
+        )
+        findings.extend(scanned)
+        suppressed_count += suppressed
         chunks.append(text)
         count += 1
         if max_files > 0 and count >= max_files:
@@ -463,7 +492,7 @@ def _scan_directory(target: Path, max_files: int = 40) -> tuple[list[Finding], s
     corpus = "\n".join(chunks)
     findings.append(assess_rollback_signal(corpus))
     source = f"dir:{target} ({count} files)"
-    return findings, corpus, source
+    return findings, corpus, source, suppressed_count
 
 
 def _risk_level_action(score: int) -> tuple[str, str]:
@@ -475,7 +504,9 @@ def _risk_level_action(score: int) -> tuple[str, str]:
     return "low", "Low early-warning risk — final approval remains human"
 
 
-def _result_payload(source: str, findings: list[Finding], strict: bool) -> dict:
+def _result_payload(
+    source: str, findings: list[Finding], strict: bool, exceptions_applied: int = 0
+) -> dict:
     """Assemble the scan result dict from findings — single source of truth."""
     score = risk_score(findings)
     level, action = _risk_level_action(score)
@@ -486,6 +517,7 @@ def _result_payload(source: str, findings: list[Finding], strict: bool) -> dict:
         "risk_score": score,
         "level": level,
         "action": action,
+        "exceptions_applied": exceptions_applied,
     }
 
 
@@ -549,6 +581,13 @@ def run_safety_scan(
         ext_findings, ext_source = _run_external_scanner(scan_tool, root, path)
         return _result_payload(ext_source, ext_findings, strict)
 
+    try:
+        exceptions = load_scan_exceptions(root)
+    except ScanExceptionsConfigError as exc:
+        return _result_payload(f"error:scan-exceptions:{exc}", [], strict)
+
+    exceptions_applied = 0
+
     if path:
         target = Path(path)
         if not target.is_absolute():
@@ -560,11 +599,15 @@ def run_safety_scan(
                 findings = []
                 source = f"error:read:{target}"
             else:
-                findings = scan_text(text, path=str(target))
+                findings, exceptions_applied = _apply_safety_exceptions(
+                    scan_text(text, path=str(target)), root, exceptions
+                )
                 findings.append(assess_rollback_signal(text, path=str(target)))
                 source = f"file:{target}"
         elif target.is_dir():
-            findings, _corpus, source = _scan_directory(target, max_files=max_files)
+            findings, _corpus, source, exceptions_applied = _scan_directory(
+                target, root, exceptions, max_files=max_files
+            )
         else:
             findings = []
             source = f"missing:{target}"
@@ -573,4 +616,4 @@ def run_safety_scan(
         findings = scan_text(corpus)
         findings.append(assess_rollback_signal(corpus))
 
-    return _result_payload(source, findings, strict)
+    return _result_payload(source, findings, strict, exceptions_applied)

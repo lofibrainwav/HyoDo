@@ -51,6 +51,12 @@ from hyodo.events import (
     strip_full_bodies,
     validate_event,
 )
+from hyodo.exceptions import (
+    ScanExceptionsConfig,
+    ScanExceptionsConfigError,
+    is_general_path_excluded,
+    load_scan_exceptions,
+)
 from hyodo.gates import (
     GATES_CONFIG_RELATIVE_PATH,
     SCHEMA_ID,
@@ -835,7 +841,10 @@ _GENERAL_FILE_CAP = 50
 
 
 def _collect_files(
-    root: Path, suffixes: tuple[str, ...], cap: int = _GENERAL_FILE_CAP
+    root: Path,
+    suffixes: tuple[str, ...],
+    cap: int = _GENERAL_FILE_CAP,
+    exclusions: ScanExceptionsConfig | None = None,
 ) -> list[Path]:
     """Collect up to *cap* files under *root* matching *suffixes* (vendor dirs pruned)."""
     collected: list[Path] = []
@@ -845,7 +854,10 @@ def _collect_files(
         )
         for name in sorted(filenames):
             if name.endswith(suffixes):
-                collected.append(Path(dirpath) / name)
+                candidate = Path(dirpath) / name
+                if exclusions is not None and is_general_path_excluded(candidate, root, exclusions):
+                    continue
+                collected.append(candidate)
                 if len(collected) >= cap:
                     return collected
     return collected
@@ -908,7 +920,9 @@ def _skip_missing_tool(language: str, tool: str) -> GeneralGateResult:
     return GeneralGateResult(language, tool, GateStatus.SKIP, f"{tool} not installed; skipped")
 
 
-def _run_general_gates(root: Path, verbose: bool = False) -> list[GeneralGateResult]:
+def _run_general_gates(
+    root: Path, verbose: bool = False, exclusions: ScanExceptionsConfig | None = None
+) -> list[GeneralGateResult]:
     """Auto-detect project languages under *root* and run one syntax/vet gate each.
 
     Detection is bounded (up to 50 files per language, vendor dirs pruned),
@@ -916,7 +930,7 @@ def _run_general_gates(root: Path, verbose: bool = False) -> list[GeneralGateRes
     """
     results: list[GeneralGateResult] = []
 
-    py_files = _collect_files(root, (".py",))
+    py_files = _collect_files(root, (".py",), exclusions=exclusions)
     if py_files:
         results.append(
             _run_general_cmd(
@@ -929,8 +943,8 @@ def _run_general_gates(root: Path, verbose: bool = False) -> list[GeneralGateRes
             )
         )
 
-    ts_files = _collect_files(root, (".ts", ".tsx"))
-    js_files = _collect_files(root, (".js", ".mjs", ".cjs"))
+    ts_files = _collect_files(root, (".ts", ".tsx"), exclusions=exclusions)
+    js_files = _collect_files(root, (".js", ".mjs", ".cjs"), exclusions=exclusions)
     tsconfig = root / "tsconfig.json"
     if tsconfig.exists() and (ts_files or js_files):
         tsc = shutil.which("tsc")
@@ -983,7 +997,7 @@ def _run_general_gates(root: Path, verbose: bool = False) -> list[GeneralGateRes
         else:
             results.append(_skip_missing_tool("Rust", "cargo"))
 
-    sh_files = _collect_files(root, (".sh", ".bash"))
+    sh_files = _collect_files(root, (".sh", ".bash"), exclusions=exclusions)
     if sh_files:
         bash = shutil.which("bash")
         if bash:
@@ -1049,7 +1063,17 @@ def check(
     if general:
         gen_root = check_root
         console.print(f"[cyan]General mode: auto-detecting languages in {gen_root}[/cyan]")
-        gen_results = _run_general_gates(gen_root, verbose)
+        try:
+            scan_exceptions = load_scan_exceptions(gen_root)
+        except ScanExceptionsConfigError as exc:
+            console.print(f"[red]Invalid scan exceptions: {exc}[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+            raise typer.Exit(2) from exc
+        gen_results = _run_general_gates(gen_root, verbose, scan_exceptions)
+        if scan_exceptions.general:
+            console.print(
+                f"[dim]Audited general exclusions configured: {len(scan_exceptions.general)}[/dim]"
+            )
         _print_general_results(gen_results, gen_root)
         failed = [r for r in gen_results if r.status is GateStatus.FAIL]
         executed = [r for r in gen_results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
@@ -1439,12 +1463,16 @@ def safe(
             "strict": strict,
             "exit_code": exit_code,
             "findings": [asdict(f) for f in result["findings"]],
+            "exceptions_applied": int(result.get("exceptions_applied", 0)),
         }
         console.print_json(json.dumps(payload))
         raise typer.Exit(exit_code)
 
     console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
     console.print(f"source: {source}")
+    exceptions_applied = int(result.get("exceptions_applied", 0))
+    if exceptions_applied:
+        console.print(f"[yellow]Audited safety exceptions applied: {exceptions_applied}[/yellow]")
 
     # missing path OR unreadable/scan IO failure — not a validation pass
     if source.startswith("missing:"):

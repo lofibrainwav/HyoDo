@@ -59,6 +59,30 @@ def test_collect_files_empty_dir_returns_empty_list(tmp_path: Path):
     assert collected == []
 
 
+def test_general_gate_excludes_only_documented_private_path(tmp_path: Path):
+    hyodo_dir = tmp_path / ".hyodo"
+    hyodo_dir.mkdir()
+    (hyodo_dir / "scan-exceptions.toml").write_text(
+        """schema = "hyodo.scan-exceptions/v1"
+
+[[general_exceptions]]
+path = "private/legal/**"
+reason = "private legal working material"
+""",
+        encoding="utf-8",
+    )
+    private_file = tmp_path / "private" / "legal" / "broken.py"
+    private_file.parent.mkdir(parents=True)
+    private_file.write_text("def broken(:\n", encoding="utf-8")
+    public_file = tmp_path / "public.py"
+    public_file.write_text("x = 1\n", encoding="utf-8")
+
+    result = runner.invoke(app, ["check", "--general", str(tmp_path)])
+
+    assert result.exit_code == 0
+    assert "Audited general exclusions configured: 1" in result.output
+
+
 # --------------------------------------------------------------------------- #
 # _run_general_gates - Python
 # --------------------------------------------------------------------------- #
