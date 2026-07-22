@@ -45,6 +45,7 @@ classifiers = [
 ]
 requires-python = ">=3.10"
 dependencies = [
+    "jsonschema>=4.18,<5",
     "typer>=0.9.0",
     "rich>=13.0.0",
     # hyodo.gates (Bring-Your-Own-Gates) parses .hyodo/gates.toml with stdlib

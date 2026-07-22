@@ -71,6 +71,7 @@ from hyodo.policy import (
     try_load_policy,
 )
 from hyodo.safety import run_safety_scan
+from hyodo.schema import validate_schema_payload
 
 app = typer.Typer(
     name="hyodo",
@@ -87,6 +88,11 @@ policy_app = typer.Typer(
     help="Local policy gate for agent events (ALLOW|DENY; unobserved ≠ ALLOW)",
     add_completion=False,
 )
+schema_app = typer.Typer(
+    name="schema",
+    help="Deterministic JSON Schema validation for local agent payloads",
+    add_completion=False,
+)
 mcp_app = typer.Typer(
     name="mcp",
     help="Optional local MCP adapter for the HyoDo CLI",
@@ -94,6 +100,7 @@ mcp_app = typer.Typer(
 )
 app.add_typer(event_app, name="event")
 app.add_typer(policy_app, name="policy")
+app.add_typer(schema_app, name="schema")
 app.add_typer(mcp_app, name="mcp")
 console = Console()
 
@@ -1547,6 +1554,35 @@ def mcp_serve(
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2) from exc
+
+
+@schema_app.command("check")
+def schema_check(
+    schema: str = typer.Option(..., "--schema", help="Path to a JSON Schema document"),
+    payload: str = typer.Option(..., "--payload", help="Path to a JSON payload document"),
+    json_output: bool = typer.Option(
+        False,
+        "--json",
+        help="Emit machine-readable JSON {ok, reasons, exit_code}",
+    ),
+):
+    """Validate one JSON payload against one JSON Schema document.
+
+    Exit 0 means valid, 1 means a validation failure, and 2 means an input or
+    schema observation failure. It never treats an unobserved input as valid.
+    """
+    ok, exit_code, reasons = validate_schema_payload(Path(schema), Path(payload))
+    machine = {"ok": ok, "reasons": reasons, "exit_code": exit_code}
+    if json_output:
+        console.print_json(json.dumps(machine))
+    elif ok:
+        console.print("[green]VALID[/green] JSON Schema payload")
+    else:
+        label = "INVALID" if exit_code == 1 else "UNOBSERVED"
+        console.print(f"[red]{label}[/red] JSON Schema validation")
+        for reason in reasons:
+            console.print(f"  - {reason['code']}: {reason['message']}")
+    raise typer.Exit(exit_code)
 
 
 def _load_event_payload(
