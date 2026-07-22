@@ -68,17 +68,19 @@ python -m pytest tests -q --tb=short
 
 ## How review actually works here
 
-Stating this plainly because a security tool should not overstate its own process.
+Stating this plainly because a security tool should not overstate its own
+process.
 
-HyoDo is maintained by a single person. Branch protection requires passing CI and an
-up-to-date branch; it does **not** require an approving review, and maintainer pull
-requests are normally self-merged once CI is green. "Human review" here means the
-maintainer reads the diff — not that a second person signed off.
+HyoDo is maintained by a single person. Branch protection requires passing
+CI and an up-to-date branch; it does **not** require an approving review,
+and maintainer pull requests are normally self-merged once CI is green.
+"Human review" here means the maintainer reads the diff — not that a second
+person signed off.
 
-For outside contributions the maintainer reviews before merge, which *is* a second pair
-of eyes. Automated reviewers, when configured, are advisory only; if one is paused or
-unavailable, that is a gap in coverage rather than a silent pass, and it should be noted
-on the pull request.
+For outside contributions the maintainer reviews before merge, which *is* a
+second pair of eyes. Automated reviewers, when configured, are advisory
+only; if one is paused or unavailable, that is a gap in coverage rather than
+a silent pass, and it should be noted on the pull request.
 
 ## Review principles
 
