@@ -140,7 +140,7 @@ See [Quick Start](./QUICK_START.md).
 | `hyodo check` | Absorbed gates or checkout preset |
 | `hyodo event …` | Agent event validate / record |
 | `hyodo policy check` | Agent policy ALLOW / DENY |
-| `hyodo schema` / `hyodo eval` | Deterministic local validation / golden eval |
+| `hyodo schema` / `eval` / `report` | Local validation, eval, evidence report |
 | `hyodo mcp stdio` | Optional local MCP CLI adapter |
 | `hyodo mcp serve` | Explicit loopback or authenticated Tailscale MCP adapter |
 | `hyodo score …` | Optional review signal |
