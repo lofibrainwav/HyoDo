@@ -7,6 +7,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.8.2] - 2026-07-22
+
+Security and observability release. An external review found fifteen ways the
+tool could be told what to conclude, or could report something it never looked
+at as clean. Every finding was reproduced before and after the fix.
+
+### Security
+
+- **Policy decisions are measured, not accepted.** A caller could put
+  `{"policy": {"decision": "ALLOW"}}` in its own event and have it recorded and
+  tallied. Validation now always produces an unevaluated policy block; only
+  HyoDo's own evaluation stamps `evaluated_by`. The caller's assertion is kept
+  under `policy.claimed` for audit rather than deleted.
+- **`max_steps` counts the ledger, not the caller.** The budget was checked
+  against the self-reported `step_index`, so an agent resending `step_index: 0`
+  never exhausted it. An unreadable ledger is `UNOBSERVED`, never `ALLOW`.
+- **Digests are recomputed from the body.** A body could arrive paired with an
+  unrelated digest; digest-only mode then dropped the body and kept the lie.
+- **`event_id` reuse is refused.** Same id with identical content is idempotent;
+  same id with different content is a conflict.
+- **Shipped `blocked_path_globs` examples now match.** `**/.env` never matched a
+  repository-root `.env`, so all four patterns in the FDE example policy were
+  inert.
+- **Workflow input is bound through `env:`.** `inputs.tag` was interpolated into
+  the release script before shell execution, ahead of its own validation.
+- **A crashed secret scanner is not clean.** `gitleaks`/`trufflehog` return codes
+  were ignored, so a dead scanner produced an `info`-level "no secrets found"
+  that `--strict` let through.
+- **Raw-body storage is operator consent.** MCP clients could set
+  `full_body=True` themselves; it now requires `hyodo mcp stdio
+  --allow-full-body`, and a denied request is reported, not silently downgraded.
+- **BYOG command sets are fingerprinted.** A `.hyodo/gates.toml` that changes its
+  commands after first use is `SKIP` (never `PASS`) non-interactively, or shown
+  for approval interactively. `HYODO_GATES_TRUST_ALL=1` pre-approves for CI.
+
+### Fixed
+
+- **`hyodo safe` reads new files, not just their names.** Without a path argument
+  the fallback corpus scanned `git status` output as text — and `git diff HEAD`
+  is empty exactly when the only changes are untracked files. Untracked
+  directories are expanded too.
+- **An unreadable ledger no longer reports as zero events.** `read_agent_events`
+  returns `None` for unreadable, and the report prints `UNOBSERVED`.
+- **`hyodo eval` runs in `--root`** and records provenance (working directory,
+  git HEAD, dirty flag). `git_dirty` is `None` when git could not be consulted —
+  never a false "clean".
+- **Unresolved `$ref` exits 2 instead of raising.** Reference resolution fails
+  inside `iter_errors`, which was outside the error guard, so `--json` consumers
+  received a traceback.
+- **`hyodo_safe` accepts `max_files`** so an MCP client can scan past the
+  directory cap.
+- **Out-of-range pillar scores fail.** `-t 9` (a typo for `-t 0.9`) was clamped
+  to a perfect `1.0` while the table displayed `9`.
+
+### Changed
+
+- `referencing` is now a declared dependency: `hyodo.schema` imports it directly.
+- `CONTRIBUTING.md` describes the review process that actually runs. A security
+  tool should not overstate its own governance.
+
 ## [4.8.1] - 2026-07-21
 
 ### Added
