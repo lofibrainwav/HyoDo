@@ -23,7 +23,8 @@ quality, surface risk, and decide whether to fix, escalate, or merge.
 - Is security posture honest?
   - `SECURITY.md`, `docs/SECURITY_SURFACE.md`, `hyodo safe`
 - Are runtime dependencies thin?
-  - `pyproject.toml` — `typer` + `rich` only
+  - `pyproject.toml` — `jsonschema`, `typer`, `rich`, plus conditional
+    `tomli` for Python 3.10
 
 ## Why the CLI is the model-agnostic surface
 
@@ -57,10 +58,11 @@ Actions runs, inspectable in the Actions tab — not slides.
 
 ## Thin runtime dependency surface
 
-`pyproject.toml` declares only `typer>=0.9.0` and `rich>=13.0.0` as runtime
-dependencies. Development/test tooling (`pytest`, `ruff`, `pyright`, etc.)
-is isolated under `[project.optional-dependencies].dev` and is not required
-to run the published `hyodo` package.
+`pyproject.toml` declares `jsonschema>=4.18,<5`, `typer>=0.9.0`, and
+`rich>=13.0.0` as runtime dependencies, plus conditional `tomli` for Python
+3.10. Development/test tooling (`pytest`, `ruff`, `pyright`, etc.) is
+isolated under `[project.optional-dependencies].dev` and is not required to
+run the published `hyodo` package.
 
 ## Safe public claims
 

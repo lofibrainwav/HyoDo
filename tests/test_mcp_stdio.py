@@ -9,6 +9,7 @@ import sys
 import uuid
 from pathlib import Path
 
+import pytest
 import tomllib
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
@@ -197,18 +198,105 @@ def test_mcp_serve_only_delegates_the_loopback_transport(tmp_path, monkeypatch):
     assert "http://127.0.0.1:8769/mcp" in result.output
 
 
-def test_mcp_serve_rejects_non_loopback_bind_dashboard_port_and_missing_root(tmp_path):
-    """M2 never broadens the listener and keeps the dashboard port separate."""
-    invalid_bind = runner.invoke(app, ["mcp", "serve", "--bind", "tailscale"])
+def test_mcp_serve_rejects_unknown_bind_dashboard_port_and_missing_root(tmp_path):
+    """The explicit listener choices retain the dashboard and root protections."""
+    invalid_bind = runner.invoke(app, ["mcp", "serve", "--bind", "public"])
     dashboard_port = runner.invoke(app, ["mcp", "serve", "--port", "8768"])
     missing_root = runner.invoke(app, ["mcp", "serve", "--root", str(tmp_path / "missing")])
 
     assert invalid_bind.exit_code == 2
-    assert "only --bind loopback is available" in invalid_bind.output
+    assert "Only --bind loopback or --bind tailscale is available" in invalid_bind.output
     assert dashboard_port.exit_code == 2
     assert "reserved for the HyoDo dashboard" in dashboard_port.output
     assert missing_root.exit_code == 2
     assert "workspace root is not a directory" in missing_root.output
+
+
+def test_mcp_tailscale_requires_token_and_delegates_only_a_tailnet_ip(tmp_path, monkeypatch):
+    """T2 validates the tailnet address and bearer before any server is started."""
+    from hyodo import mcp_server
+
+    seen = []
+    monkeypatch.setattr(
+        mcp_server,
+        "run_tailscale",
+        lambda root, *, host, port, token: seen.append((root, host, port, token)),
+    )
+
+    missing_token = runner.invoke(
+        app,
+        ["mcp", "serve", "--bind", "tailscale", "--bind-ip", "100.99.88.77"],
+    )
+    public_ip = runner.invoke(
+        app,
+        [
+            "mcp",
+            "serve",
+            "--bind",
+            "tailscale",
+            "--bind-ip",
+            "192.168.1.20",
+            "--token",
+            "test-token",
+        ],
+    )
+    successful = runner.invoke(
+        app,
+        [
+            "mcp",
+            "serve",
+            "--bind",
+            "tailscale",
+            "--bind-ip",
+            "100.99.88.77",
+            "--token",
+            "test-token",
+            "--root",
+            str(tmp_path),
+        ],
+    )
+
+    assert missing_token.exit_code == 2
+    assert "requires a non-empty bearer token" in missing_token.output
+    assert public_ip.exit_code == 2
+    assert "must be a Tailscale 100.64.0.0/10 address" in public_ip.output
+    assert successful.exit_code == 0
+    assert seen == [(tmp_path, "100.99.88.77", 8769, "test-token")]
+    assert "http://100.99.88.77:8769/mcp" in successful.output
+
+
+def test_mcp_tailscale_rejects_missing_or_blank_bind_ip_before_listen(tmp_path, monkeypatch):
+    """T2 never guesses an interface or treats whitespace as an authentication token."""
+    from hyodo import mcp_server
+
+    monkeypatch.setattr(
+        mcp_server,
+        "run_tailscale",
+        lambda root, *, host, port, token: pytest.fail("T2 must not listen"),
+    )
+
+    missing_ip = runner.invoke(
+        app,
+        ["mcp", "serve", "--bind", "tailscale", "--token", "test-token"],
+    )
+    blank_token = runner.invoke(
+        app,
+        [
+            "mcp",
+            "serve",
+            "--bind",
+            "tailscale",
+            "--bind-ip",
+            "100.99.88.77",
+            "--token",
+            "   ",
+        ],
+    )
+
+    assert missing_ip.exit_code == 2
+    assert "requires --bind-ip" in missing_ip.output
+    assert blank_token.exit_code == 2
+    assert "requires a non-empty bearer token" in blank_token.output
 
 
 def test_mcp_loopback_auth_rejects_missing_or_invalid_bearer_before_tools():

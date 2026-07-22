@@ -51,8 +51,8 @@ its implemented CLI behavior.
 
 - Public runtime deps are minimal
   - Verdict: Confirmed
-  - Evidence: `pyproject.toml` `dependencies = ["typer>=0.9.0",
-    "rich>=13.0.0"]`
+  - Evidence: `pyproject.toml` lists `jsonschema`, `typer`, and `rich`, plus
+    conditional `tomli` for Python 3.10
 - No required container/database services
   - Verdict: Confirmed for the surface in this repo
   - Evidence: Neither README nor `docs/` reference a required
@@ -118,21 +118,27 @@ this repository.
 
 - MCP support is opt-in and leaves the core runtime dependency set unchanged
   - Verdict: Confirmed
-  - Evidence: `pyproject.toml` defines `hyodo[mcp]`; the base dependency
-    list contains only `typer` and `rich`
-- The shipped MCP transport is local standard input/output only
+  - Evidence: `pyproject.toml` defines `hyodo[mcp]`; MCP remains outside the
+    base dependency list (`jsonschema`, `typer`, `rich`, and conditional
+    `tomli` for Python 3.10)
+- The shipped MCP transports are explicit local stdio, loopback, and guarded
+  private-network HTTP
   - Verdict: Confirmed
-  - Evidence: `hyodo mcp stdio` starts `hyodo/mcp_server.py` with the MCP
-    SDK `stdio` transport; no HTTP listener is created
+  - Evidence: `hyodo mcp stdio` starts `hyodo/mcp_server.py` with the MCP SDK
+    `stdio` transport. `hyodo mcp serve --bind loopback` fixes HTTP to
+    `127.0.0.1`; `--bind tailscale --bind-ip 100.x --token` validates the
+    tailnet range and refuses a missing or blank token before listening.
 - MCP tools wrap the existing CLI contracts for one locked host workspace
   - Verdict: Confirmed
   - Evidence: `hyodo/mcp_server.py` delegates `safe`, `check`, `event
     record`, and `policy check` through `hyodo.cli.main`; policy paths that
     escape the workspace return exit `2`
-- Remote access, public listeners, and automatic agent authority
+- Public listeners, unobserved second-device success, and automatic agent
+  authority
   - Verdict: Not shipped and not claimed
-  - Evidence: M1 has no `serve` command or HTTP transport; README and
-    `docs/SECURITY_SURFACE.md` limit this release to local stdio
+  - Evidence: `0.0.0.0` and public interfaces are rejected. Tailscale serves
+    the locked host workspace only; this repository has no observed
+    second-device tool call receipt.
 
 ---
 
@@ -150,7 +156,8 @@ Required attribute vs. current measured state:
   - `hyodo check` is explicitly documented and coded as
     HyoDo-checkout-only, with a three-way exit contract
 - Minimal runtime deps
-  - `typer` + `rich` only, per `pyproject.toml`
+  - `jsonschema`, `typer`, `rich`, plus conditional `tomli` for Python 3.10,
+    per `pyproject.toml`
 - Philosophy layer optional
   - HYOGOOK documented as optional and non-blocking
 - Release surface stated narrowly
@@ -172,7 +179,8 @@ Metric (2026-07-19), value, and source:
   - Source: `gh api graphql`
     `vulnerabilityAlerts(states: OPEN) { totalCount }`
 - Public runtime dependency count
-  - Value: 2 (`typer`, `rich`)
+  - Value: 3 on Python 3.11+ (`jsonschema`, `typer`, `rich`); 4 on Python
+    3.10 with conditional `tomli`
   - Source: `pyproject.toml`
 - Code scanning (CodeQL)
   - Value: not configured
@@ -228,7 +236,7 @@ Priority order implied by measurements:
 
 ```bash
 # deps and sdist scope
-rg -n "dependencies|typer|rich|only-include" pyproject.toml
+rg -n "dependencies|jsonschema|typer|rich|tomli|only-include" pyproject.toml
 
 # CI/publish/smoke mechanics
 rg -n "pip install|Trusted Publishing|check_version_sync" \

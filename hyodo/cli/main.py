@@ -18,6 +18,7 @@ Examples:
 
 from __future__ import annotations
 
+import ipaddress
 import json
 import os
 import shutil
@@ -1510,23 +1511,54 @@ def mcp_stdio(
 
 @mcp_app.command("serve")
 def mcp_serve(
-    bind: str = typer.Option("loopback", "--bind", help="M2 only supports loopback"),
-    port: int = typer.Option(8769, "--port", min=1024, max=65535, help="Loopback MCP port"),
+    bind: str = typer.Option("loopback", "--bind", help="loopback or tailscale"),
+    bind_ip: str | None = typer.Option(
+        None,
+        "--bind-ip",
+        help="Required Tailscale IPv4 address for --bind tailscale",
+    ),
+    port: int = typer.Option(8769, "--port", min=1024, max=65535, help="MCP port"),
     root: str = typer.Option(".", "--root", help="Workspace root locked for this MCP server"),
     token: str | None = typer.Option(
         None,
         "--token",
         envvar="HYODO_MCP_TOKEN",
-        help="Optional bearer token; absent means local process trust",
+        help="Optional for loopback; required and non-empty for Tailscale",
     ),
 ):
-    """Explicitly serve the optional MCP adapter on 127.0.0.1 only."""
-    if bind != "loopback":
-        console.print("[red]M2 only: only --bind loopback is available.[/red]")
+    """Explicitly serve the optional MCP adapter on loopback or Tailscale."""
+    if bind not in {"loopback", "tailscale"}:
+        console.print("[red]Only --bind loopback or --bind tailscale is available.[/red]")
+        raise typer.Exit(2)
+    if bind == "loopback" and bind_ip is not None:
+        console.print("[red]--bind-ip is only available with --bind tailscale.[/red]")
         raise typer.Exit(2)
     if port == 8768:
         console.print("[red]Port 8768 is reserved for the HyoDo dashboard.[/red]")
         raise typer.Exit(2)
+    tailscale_ip = None
+    if bind == "tailscale":
+        if bind_ip is None:
+            console.print(
+                "[red]--bind tailscale requires --bind-ip with this host's Tailscale address.[/red]"
+            )
+            raise typer.Exit(2)
+        try:
+            candidate = ipaddress.ip_address(bind_ip)
+        except ValueError:
+            candidate = None
+        if not isinstance(
+            candidate, ipaddress.IPv4Address
+        ) or candidate not in ipaddress.ip_network("100.64.0.0/10"):
+            console.print("[red]--bind-ip must be a Tailscale 100.64.0.0/10 address.[/red]")
+            raise typer.Exit(2)
+        if token is None or not token.strip():
+            console.print(
+                "[red]--bind tailscale requires a non-empty bearer token before listening.[/red]"
+            )
+            raise typer.Exit(2)
+        assert token is not None
+        tailscale_ip = str(candidate)
     try:
         import mcp.server.fastmcp  # pyright: ignore[reportMissingImports]  # noqa: F401
     except ModuleNotFoundError as exc:
@@ -1536,7 +1568,7 @@ def mcp_serve(
             raise typer.Exit(2) from exc
         raise
 
-    from hyodo.mcp_server import run_loopback
+    from hyodo.mcp_server import run_loopback, run_tailscale
 
     try:
         root_path = Path(root)
@@ -1544,14 +1576,18 @@ def mcp_serve(
         from hyodo.mcp_server import resolve_workspace_root
 
         resolve_workspace_root(root_path)
+        host = tailscale_ip or "127.0.0.1"
         console.print("HyoDo MCP connector ready")
-        console.print("  transport: loopback")
-        console.print(f"  url:       http://127.0.0.1:{port}/mcp")
+        console.print(f"  transport: {bind}")
+        console.print(f"  url:       http://{host}:{port}/mcp")
         console.print(f"  workspace: {root_path.expanduser().resolve()}")
         console.print(
             "  auth:      bearer token configured" if token else "  auth:      local process trust"
         )
-        run_loopback(root_path, port=port, token=token)
+        if bind == "tailscale":
+            run_tailscale(root_path, host=host, port=port, token=token or "")
+        else:
+            run_loopback(root_path, port=port, token=token)
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2) from exc

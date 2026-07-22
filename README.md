@@ -87,6 +87,19 @@ existing `safe`, `check`, `event record`, and `policy check` CLI contracts
 for the configured host workspace. It does not open a network listener or
 give a client access to files outside that workspace.
 
+### Optional private-network MCP
+
+```bash
+hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
+  --token "$HYODO_MCP_TOKEN" --root .
+```
+
+This explicit connector binds only to the supplied Tailscale `100.64.0.0/10`
+address and requires a non-empty bearer token before it listens. It serves the
+host workspace only; a second device must be on the same private network and
+does not gain access to its own unrelated files. Public listeners are not
+supported.
+
 ## Engineering map (branding kept, terms first)
 
 | DevSecOps label | Pillar | Measured by |
@@ -129,6 +142,7 @@ See [Quick Start](./QUICK_START.md).
 | `hyodo policy check` | Agent policy ALLOW / DENY |
 | `hyodo schema check` | Deterministic local JSON Schema validation |
 | `hyodo mcp stdio` | Optional local MCP CLI adapter |
+| `hyodo mcp serve` | Explicit loopback or authenticated Tailscale MCP adapter |
 | `hyodo score …` | Optional review signal |
 | `hyodo dashboard` | Local evidence panel |
 
@@ -158,8 +172,7 @@ python -m pip install -e ".[dev]" && ./.venv/bin/hyodo check
 ## Documentation
 
 - [Quick Start](./QUICK_START.md) · [Philosophy](./PHILOSOPHY.md)
-- [Security surface](./docs/SECURITY_SURFACE.md)
-- [FDE spine examples](./examples/fde-evidence-spine/)
+- [Security surface](./docs/SECURITY_SURFACE.md) · [FDE spine examples](./examples/fde-evidence-spine/)
 - [Changelog](./CHANGELOG.md) · [Roadmap](./ROADMAP.md)
 
 ## License
