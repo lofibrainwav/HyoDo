@@ -191,3 +191,46 @@ def test_main_wires_provenance_retry(verify: ModuleType, monkeypatch: pytest.Mon
     assert called["retries"] == 9
     assert any(n.endswith(".whl") for n in called["filenames"])
     assert any(n.endswith(".tar.gz") for n in called["filenames"])
+
+
+def test_install_smoke_never_imports_from_the_callers_cwd(
+    verify: ModuleType, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The smoke check must read the installed wheel, not whatever is next to us.
+
+    ``python -c`` puts the current directory first on sys.path. Running the verifier
+    from a HyoDo checkout therefore imported the local source tree and reported the
+    working copy's version as if it were the published one — a release verifier
+    measuring the code in hand instead of the code being shipped.
+    """
+    # A decoy package in the caller's cwd, exactly like running from a checkout.
+    decoy = tmp_path / "cwd"
+    (decoy / "hyodo").mkdir(parents=True)
+    (decoy / "hyodo" / "__init__.py").write_text('__version__ = "0.0.0-decoy"\n', encoding="utf-8")
+    monkeypatch.chdir(decoy)
+
+    seen_cwds: list[Any] = []
+
+    def fake_run(cmd: list[str], **kwargs: Any) -> None:
+        return None
+
+    def fake_check_output(cmd: list[str], **kwargs: Any) -> str:
+        cwd = kwargs.get("cwd")
+        seen_cwds.append(cwd)
+        if cmd[-1] == "--version":
+            return "HyoDo v9.9.9 - test\n"
+        # Stand in for the interpreter honouring sys.path: a cwd holding a `hyodo`
+        # package wins over site-packages, which is exactly the bug.
+        effective = Path(cwd) if cwd is not None else Path.cwd()
+        return "0.0.0-decoy\n" if (effective / "hyodo").exists() else "9.9.9\n"
+
+    monkeypatch.setattr(verify.subprocess, "run", fake_run)
+    monkeypatch.setattr(verify.subprocess, "check_output", fake_check_output)
+    monkeypatch.setattr(verify, "version_payload", lambda _v: {"urls": []})
+
+    verify.install_smoke("9.9.9", retries=1, sleep_seconds=0)
+
+    assert seen_cwds, "smoke ran no verification subprocesses"
+    for cwd in seen_cwds:
+        assert cwd is not None, "verification subprocess inherited the caller's cwd"
+        assert not (Path(cwd) / "hyodo").exists(), "verification cwd can shadow the wheel"
