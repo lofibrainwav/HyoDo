@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import shlex
 import sys
 from pathlib import Path
 
@@ -15,7 +16,9 @@ runner = CliRunner()
 
 def _write_runner(path: Path, body: str) -> str:
     path.write_text(body, encoding="utf-8")
-    return f"{sys.executable} {path}"
+    # shlex.quote handles paths with spaces (e.g. pipx venv under
+    # "~/Library/Application Support/..." on macOS).
+    return f"{shlex.quote(sys.executable)} {shlex.quote(str(path))}"
 
 
 def _write_dataset(path: Path, cases: list[dict[str, object]]) -> None:
