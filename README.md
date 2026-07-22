@@ -64,11 +64,16 @@ Malformed or zero executed gates → exit **2** (not a pass).
 hyodo event validate --file step.json
 hyodo event record --file step.json --root . --policy .hyodo/policy.toml
 hyodo policy check --file step.json --config .hyodo/policy.toml
+hyodo schema check --schema agent.schema.json --payload step.json --json
 ```
 
 Default storage is **digest-only**. DENY is recorded for audit; **the
 caller must stop the agent** — HyoDo is a gate, not a runtime
 interceptor. Examples: `examples/fde-evidence-spine/`.
+
+`schema check` validates a local JSON payload deterministically. It returns
+`0` for valid, `1` for a schema violation, and `2` when the schema or payload
+cannot be observed or trusted. `--json` emits structured reasons for tools.
 
 ### Optional local MCP stdio
 
@@ -122,6 +127,7 @@ See [Quick Start](./QUICK_START.md).
 | `hyodo check` | Absorbed gates or checkout preset |
 | `hyodo event …` | Agent event validate / record |
 | `hyodo policy check` | Agent policy ALLOW / DENY |
+| `hyodo schema check` | Deterministic local JSON Schema validation |
 | `hyodo mcp stdio` | Optional local MCP CLI adapter |
 | `hyodo score …` | Optional review signal |
 | `hyodo dashboard` | Local evidence panel |
@@ -129,6 +135,7 @@ See [Quick Start](./QUICK_START.md).
 **safe:** `0` findings · `1` high+`--strict` · `2` bad path.
 **check:** `0` all executed PASS · `1` FAIL · `2` none/malformed.
 **event/policy:** `0` ok/ALLOW · `1` invalid/DENY · `2` unobserved.
+**schema check:** `0` valid · `1` validation error · `2` unobserved input.
 
 ## Scope
 
