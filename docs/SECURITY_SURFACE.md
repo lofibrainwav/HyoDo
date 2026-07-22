@@ -131,6 +131,18 @@ hyodo safe
 Do not claim "all agent tool calls are intercepted" or "encrypted audit
 trail" unless those layers are implemented and tested separately.
 
+## MCP connector (design only until implemented)
+
+Optional MCP adapter and remote connector URLs are specified in
+[`HYODO_MCP_CONNECTOR_DESIGN.md`](HYODO_MCP_CONNECTOR_DESIGN.md). Until that
+code ships:
+
+- The public package does **not** open network MCP listeners.
+- Multi-machine access is **not** claimed.
+- When shipped: default remains stdio/local; private-net bind requires an
+  explicit token; public `0.0.0.0` is out of v1 scope; Vercel is not a gate
+  executor.
+
 ## Release pipeline: Trusted Publishing + provenance
 
 Releases to PyPI are handled by `.github/workflows/publish.yml` using PyPI

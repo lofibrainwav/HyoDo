@@ -38,12 +38,17 @@ implementation:
   (`hyodo schema check`).
 - **FDE Phase 3** — local golden-dataset eval harness (`hyodo eval`).
 - **FDE Phase 4** — executive sign-off HTML/MD report from ledger evidence.
+- **MCP Connector M1–M3** — optional MCP adapter (stdio → loopback URL →
+  private-net/Tailscale token URL). Design SSOT:
+  [docs/HYODO_MCP_CONNECTOR_DESIGN.md](./docs/HYODO_MCP_CONNECTOR_DESIGN.md).
+  Public default remains CLI-only; remote bind never `0.0.0.0` without a
+  separate security RFC.
 
-## In progress / landed (Unreleased)
+## Landed (recent)
 
-- **FDE Phase 1 Evidence Spine** — agent event ledger + policy gate + adapter
-  contract (`hyodo event` / `hyodo policy`). Digest-default; not a full
-  tool-call interceptor. Sample MCP/runtime adapters remain optional follow-ups.
+- **FDE Phase 1 Evidence Spine (v4.4.0)** — agent event ledger + policy gate
+  (`hyodo event` / `hyodo policy`). Digest-default; not a runtime interceptor.
+- **README FDE / AI agent guardrail positioning (v4.4.0)**.
 
 ## Later exploration
 
@@ -51,6 +56,7 @@ implementation:
 - A plugin API for custom gates.
 - Optional browser or service integrations outside the core CLI.
 - Optional hash-chain / at-rest encryption for agent-events (needs key story).
+- MCP Phase M4 polish (`mcp doctor`, access ledger defaults, agent-rules pack).
 
 Exploration does not imply support or a release date. The public package should
 remain useful without optional services, model providers, or agent interfaces.

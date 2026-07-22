@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **MCP connector architecture design** (`docs/HYODO_MCP_CONNECTOR_DESIGN.md`):
+  optional stdio → loopback → Tailscale/private-net MCP layers; token
+  fail-closed remote; public default remains CLI-only. Not implemented yet.
+
 ## [4.4.0] - 2026-07-21
 
 ### Changed
