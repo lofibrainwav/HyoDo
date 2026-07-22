@@ -1662,8 +1662,9 @@ def eval_command(
         console.print(f"[green]PASS[/green] eval ({summary['pass_rate']:.1%})")
     elif exit_code == 1:
         console.print("[red]FAIL[/red] eval")
-        if summary.get("runner_failure"):
-            console.print(f"  runner: {summary['runner_failure']['code']}")
+        failure = summary.get("runner_failure")
+        if isinstance(failure, dict) and isinstance(failure.get("code"), str):
+            console.print(f"  runner: {failure['code']}")
     else:
         console.print(f"[red]UNOBSERVED[/red] eval: {summary['reason']}")
     raise typer.Exit(exit_code)
