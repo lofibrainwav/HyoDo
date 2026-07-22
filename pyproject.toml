@@ -46,6 +46,11 @@ classifiers = [
 requires-python = ">=3.10"
 dependencies = [
     "jsonschema>=4.18,<5",
+    # hyodo.schema catches referencing.exceptions.Unresolvable directly, so this is a
+    # direct dependency even though jsonschema>=4.18 already pulls it in. Declare what
+    # you import: relying on someone else's transitive dep breaks at import time if
+    # they ever drop it.
+    "referencing>=0.28.4",
     "typer>=0.9.0",
     "rich>=13.0.0",
     # hyodo.gates (Bring-Your-Own-Gates) parses .hyodo/gates.toml with stdlib

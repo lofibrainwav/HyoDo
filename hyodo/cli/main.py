@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import ipaddress
 import json
+import math
 import os
 import shutil
 import subprocess
@@ -1268,6 +1269,26 @@ def _resolve_score_pillars(
 
     effective_benevolence = benevolence if benevolence is not None else serenity
     effective_hyo = hyo if hyo is not None else eternity
+
+    # Pillars are unit-interval values. The scoring function clamps, so "-t 9" (a very
+    # easy typo for "-t 0.9") used to become a silent perfect 1.0 while the table still
+    # printed 9. A typo must fail, not award full marks.
+    for label, value in (
+        ("--benevolence/-i", effective_benevolence),
+        ("--truth/-t", truth),
+        ("--goodness/-g", goodness),
+        ("--hyo/-c", effective_hyo),
+        ("--beauty/-b", beauty),
+    ):
+        if value is None:
+            continue
+        if not math.isfinite(value):
+            console.print(f"[red]{label} must be a finite number, got {value}.[/red]")
+            raise typer.Exit(2)
+        if not 0.0 <= value <= 1.0:
+            console.print(f"[red]{label} must be between 0.0 and 1.0, got {value}.[/red]")
+            console.print("[dim]Pillars are unit-interval values, e.g. 0.9 — not 9.[/dim]")
+            raise typer.Exit(2)
 
     missing: list[str] = []
     if effective_benevolence is None:

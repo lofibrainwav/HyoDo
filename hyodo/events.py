@@ -361,15 +361,23 @@ def count_run_events(root: Path, run_id: str) -> int | None:
     return count
 
 
-def read_agent_events(root: Path) -> tuple[list[dict[str, Any]], int]:
-    """Read the agent ledger. Returns ``(events, corrupt_line_count)``."""
+def read_agent_events(root: Path) -> tuple[list[dict[str, Any]] | None, int]:
+    """Read the agent ledger. Returns ``(events, corrupt_line_count)``.
+
+    ``events`` is ``None`` when the ledger exists but could not be read. That is a
+    different fact from an empty ledger and callers must render it differently — both
+    used to come back as ``([], 0)``, so "I could not look" was indistinguishable from
+    "there is nothing there". Returning ``None`` makes the difference impossible to
+    ignore: code that forgets to handle it fails loudly instead of reporting zero.
+    A ledger file that does not exist yet is an honest empty list.
+    """
     path = root / AGENT_EVENTS_RELATIVE_PATH
     if not path.exists():
         return [], 0
     try:
         lines = path.read_text(encoding="utf-8").splitlines()
-    except OSError:
-        return [], 0
+    except (OSError, UnicodeDecodeError):
+        return None, 0
     events: list[dict[str, Any]] = []
     corrupt = 0
     for line in lines:

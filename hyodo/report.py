@@ -46,9 +46,18 @@ def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, A
             return block
         return {}
 
+    # A ledger we could not read is not an empty ledger. Saying "Events: 0" for both
+    # turns a broken observation into a clean bill of health on the sign-off document.
+    ledger_unreadable = events is None
+    events = events or []
     allow = sum(_measured(event).get("decision") == "ALLOW" for event in events)
     deny = sum(_measured(event).get("decision") == "DENY" for event in events)
     unevaluated = len(events) - sum(bool(_measured(event)) for event in events)
+    spine_line = (
+        "Events: UNOBSERVED (ledger exists but could not be read) — this is not zero events"
+        if ledger_unreadable
+        else f"Events: {len(events)} (ALLOW: {allow}, DENY: {deny})"
+    )
     policy, policy_error = try_load_policy(root / POLICY_RELATIVE_PATH)
     eval_text, _ = _eval_summary(root)
     policy_text = (
@@ -66,7 +75,7 @@ def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, A
         f"Policy: {policy_text}" + (f" ({policy_error})" if policy_error else ""),
         "",
         "## Evidence spine",
-        f"Events: {len(events)} (ALLOW: {allow}, DENY: {deny})",
+        spine_line,
         f"Unevaluated by HyoDo (caller-asserted or no policy run): {unevaluated}",
         f"Corrupt event lines: {corrupt}",
         "",

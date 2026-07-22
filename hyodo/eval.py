@@ -121,11 +121,12 @@ def run_evaluation(
         "runner": command,
         "min_pass_rate": min_pass_rate,
         "ledger_path": EVAL_LEDGER_RELATIVE_PATH.as_posix(),
+        "provenance": _collect_provenance(root),
         "cases": [],
     }
 
     for case in cases:
-        actual, failure = _run_case(command, case, timeout_seconds)
+        actual, failure = _run_case(command, case, root, timeout_seconds)
         if failure is not None:
             result["status"] = "FAIL"
             result["runner_failure"] = {"case_id": case.case_id, **failure}
@@ -152,7 +153,7 @@ def run_evaluation(
 
 
 def _run_case(
-    command: list[str], case: EvalCase, timeout_seconds: int
+    command: list[str], case: EvalCase, root: Path, timeout_seconds: int
 ) -> tuple[Any, dict[str, Any] | None]:
     request = json.dumps({"id": case.case_id, "input": case.input_value}, sort_keys=True)
     try:
@@ -162,6 +163,7 @@ def _run_case(
             capture_output=True,
             text=True,
             timeout=timeout_seconds,
+            cwd=str(root),
             check=False,
         )
     except subprocess.TimeoutExpired:
@@ -251,6 +253,56 @@ def _json_path(value: Any, path: str) -> tuple[bool, Any]:
             current = current[index]
         position = match.end()
     return True, current
+
+
+def _collect_provenance(root: Path) -> dict[str, Any]:
+    """Capture the code state a run executed against, so a result can be tied
+    back to a specific commit rather than trusted on its author's word.
+
+    Git fields are ``None`` — never a silently-empty string or a false
+    "clean" — when ``root`` is not a readable git repository; ``git_reason``
+    then explains what was unobserved instead of pretending it is absent.
+    """
+    provenance: dict[str, Any] = {
+        "run_cwd": str(root),
+        "git_head_sha": None,
+        "git_dirty": None,
+        "git_reason": None,
+    }
+    try:
+        head = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(root),
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        provenance["git_reason"] = f"git unavailable: {exc}"
+        return provenance
+    if head.returncode != 0 or not head.stdout.strip():
+        provenance["git_reason"] = (head.stderr or "not a git repository").strip()[:200]
+        return provenance
+    provenance["git_head_sha"] = head.stdout.strip()
+
+    try:
+        status = subprocess.run(
+            ["git", "status", "--porcelain"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            cwd=str(root),
+            check=False,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
+        provenance["git_reason"] = f"git status unavailable: {exc}"
+        return provenance
+    if status.returncode != 0:
+        provenance["git_reason"] = (status.stderr or "git status failed").strip()[:200]
+        return provenance
+    provenance["git_dirty"] = bool(status.stdout.strip())
+    return provenance
 
 
 def _persist_result(
