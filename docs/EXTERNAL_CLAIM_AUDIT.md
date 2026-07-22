@@ -120,19 +120,24 @@ this repository.
   - Verdict: Confirmed
   - Evidence: `pyproject.toml` defines `hyodo[mcp]`; the base dependency
     list contains only `typer` and `rich`
-- The shipped MCP transport is local standard input/output only
+- The shipped MCP transports are explicit local stdio, loopback, and guarded
+  private-network HTTP
   - Verdict: Confirmed
-  - Evidence: `hyodo mcp stdio` starts `hyodo/mcp_server.py` with the MCP
-    SDK `stdio` transport; no HTTP listener is created
+  - Evidence: `hyodo mcp stdio` starts `hyodo/mcp_server.py` with the MCP SDK
+    `stdio` transport. `hyodo mcp serve --bind loopback` fixes HTTP to
+    `127.0.0.1`; `--bind tailscale --bind-ip 100.x --token` validates the
+    tailnet range and refuses a missing or blank token before listening.
 - MCP tools wrap the existing CLI contracts for one locked host workspace
   - Verdict: Confirmed
   - Evidence: `hyodo/mcp_server.py` delegates `safe`, `check`, `event
     record`, and `policy check` through `hyodo.cli.main`; policy paths that
     escape the workspace return exit `2`
-- Remote access, public listeners, and automatic agent authority
+- Public listeners, unobserved second-device success, and automatic agent
+  authority
   - Verdict: Not shipped and not claimed
-  - Evidence: M1 has no `serve` command or HTTP transport; README and
-    `docs/SECURITY_SURFACE.md` limit this release to local stdio
+  - Evidence: `0.0.0.0` and public interfaces are rejected. Tailscale serves
+    the locked host workspace only; this repository has no observed
+    second-device tool call receipt.
 
 ---
 

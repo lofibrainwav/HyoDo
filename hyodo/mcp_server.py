@@ -203,10 +203,15 @@ class _BearerTokenMiddleware:
         await self.app(scope, receive, send)
 
 
+def _create_http_app(root: Path, host: str, token: str | None, *, port: int) -> Any:
+    """Build one authenticated streamable-HTTP MCP app for a validated host."""
+    app: Any = create_server(root, host=host, port=port).streamable_http_app()
+    return _BearerTokenMiddleware(app, token) if token else app
+
+
 def create_loopback_app(root: Path, token: str | None = None, *, port: int = 8769) -> Any:
     """Build the official streamable-HTTP MCP app for one loopback workspace."""
-    app: Any = create_server(root, host=_LOOPBACK_HOST, port=port).streamable_http_app()
-    return _BearerTokenMiddleware(app, token) if token else app
+    return _create_http_app(root, _LOOPBACK_HOST, token, port=port)
 
 
 def run_loopback(root: Path, *, port: int, token: str | None) -> None:
@@ -216,6 +221,18 @@ def run_loopback(root: Path, *, port: int, token: str | None) -> None:
     uvicorn.run(
         create_loopback_app(root, token, port=port),
         host=_LOOPBACK_HOST,
+        port=port,
+        log_level="warning",
+    )
+
+
+def run_tailscale(root: Path, *, host: str, port: int, token: str) -> None:
+    """Serve authenticated MCP only on one caller-validated Tailscale address."""
+    import uvicorn
+
+    uvicorn.run(
+        _create_http_app(root, host, token, port=port),
+        host=host,
         port=port,
         log_level="warning",
     )

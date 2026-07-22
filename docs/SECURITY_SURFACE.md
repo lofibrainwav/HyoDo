@@ -131,21 +131,25 @@ hyodo safe
 Do not claim "all agent tool calls are intercepted" or "encrypted audit
 trail" unless those layers are implemented and tested separately.
 
-## Optional MCP stdio adapter
+## Optional MCP adapter
 
-The optional `hyodo[mcp]` extra provides `hyodo mcp stdio --root PATH`. It
-starts a standard-input/output MCP process that delegates to the existing
-HyoDo CLI. The core `pip install hyodo` dependency set does not include the
-MCP SDK.
+The optional `hyodo[mcp]` extra provides local stdio and explicit HTTP MCP
+transports that delegate to the existing HyoDo CLI. The core `pip install
+hyodo` dependency set does not include the MCP SDK.
 
-- The M1 adapter does **not** open any network listener.
+- `hyodo mcp stdio --root PATH` creates no network listener.
+- `hyodo mcp serve --bind loopback` listens only on `127.0.0.1`.
+- `hyodo mcp serve --bind tailscale --bind-ip 100.x.x.x --token TOKEN` accepts
+  only a supplied address in `100.64.0.0/10`. A missing or blank token refuses
+  before the server starts; authenticated requests require exact bearer
+  matching.
 - Tools are locked to the configured host workspace; relative policy paths
   cannot escape it.
 - `safe`, `check`, `event record`, and `policy check` retain their CLI exit
   contracts; a policy that cannot be observed remains exit `2`.
-- Loopback and private-network connectors are not shipped in M1. Public
-  `0.0.0.0`, a Vercel gate executor, and multi-machine access remain out of
-  scope until separately implemented and tested.
+- No public `0.0.0.0` listener is supported. A Vercel gate executor remains
+  out of scope. Second-device tailnet operation is an operator dogfood step,
+  not a package claim until observed.
 
 ## Release pipeline: Trusted Publishing + provenance
 
