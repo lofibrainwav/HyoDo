@@ -243,7 +243,7 @@ def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) 
     the wheel URL from the version JSON (still files.pythonhosted.org).
     Refresh the wheel URL each attempt so a late-published wheel is picked up.
     """
-    last_err: Exception | None = None
+    last_err: BaseException | None = None
     with tempfile.TemporaryDirectory(prefix="hyodo-pypi-smoke-") as tmp:
         venv = Path(tmp) / "venv"
         subprocess.run([sys.executable, "-m", "venv", str(venv)], check=True)

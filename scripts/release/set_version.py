@@ -19,7 +19,10 @@ SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+(-(alpha|beta|rc)\.\d+)?$")
 
 def validate_semver(version: str) -> None:
     if not SEMVER_RE.match(version):
-        print(f"ERROR: '{version}' is not valid semver (X.Y.Z or X.Y.Z-{alpha,beta,rc}.N)", file=sys.stderr)
+        print(
+            f"ERROR: '{version}' is not valid semver (X.Y.Z or X.Y.Z-{{alpha,beta,rc}}.N)",
+            file=sys.stderr,
+        )
         sys.exit(1)
 
 
