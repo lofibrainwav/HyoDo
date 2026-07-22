@@ -45,32 +45,6 @@ hyodo safe --json          # machine-readable findings for CI
 
 `hyodo safe` is an early-warning scanner, not a full security audit.
 
-### Auditable local scan exceptions (optional)
-
-Private legal or financial working material may be outside a repository's
-product-code validation boundary. Put narrow, reviewed exceptions in
-`.hyodo/scan-exceptions.toml`; the file requires a schema, workspace-relative
-path, and non-empty reason. General syntax exceptions apply by path only.
-Safety exceptions require both the path and one exact `category/label` rule,
-so they cannot hide another finding in the same file.
-
-```toml
-schema = "hyodo.scan-exceptions/v1"
-
-[[general_exceptions]]
-path = "private/legal/**"
-reason = "private legal working material"
-
-[[safety_exceptions]]
-path = "fixtures/**"
-rule = "dangerous_command/git_push_force"
-reason = "detection fixture"
-```
-
-Malformed exception files make `hyodo check --general` and `hyodo safe` exit
-`2`; they are never treated as a clean scan. Exceptions are reported in CLI
-and JSON output when they suppress a safety finding.
-
 ### Bring your own gates (optional)
 
 ```bash

@@ -25,6 +25,7 @@ language-agnostic.
 | [../RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) | Release readiness |
 | [DEMO_SCRIPT_3_MIN.md](./DEMO_SCRIPT_3_MIN.md) | Recording script (after verify) |
 | [DEMO_READY_CHECKLIST.md](./DEMO_READY_CHECKLIST.md) | Pre-record gates |
+| [SCAN_EXCEPTIONS.md](./SCAN_EXCEPTIONS.md) | Auditable local scan exceptions |
 | [../scripts/demo-dry-run.sh](../scripts/demo-dry-run.sh) | Local demo receipt script |
 
 ## Optional
