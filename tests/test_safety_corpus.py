@@ -4,7 +4,7 @@ import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
 
-from hyodo.safety import collect_scan_corpus
+from hyodo.safety import collect_scan_corpus, run_safety_scan
 
 GIT_MARKER = "GIT_INTERNAL_MARKER_SHOULD_BE_EXCLUDED"
 BINARY_MARKER = "PNG_BINARY_MARKER_SHOULD_BE_SKIPPED"
@@ -97,3 +97,26 @@ def test_collect_scan_corpus_default_git_timeout(tmp_path):
 
     assert corpus == ""
     assert source == "empty-corpus"
+
+
+def test_safety_exception_suppresses_only_matching_path_and_rule(tmp_path):
+    hyodo_dir = tmp_path / ".hyodo"
+    hyodo_dir.mkdir()
+    (hyodo_dir / "scan-exceptions.toml").write_text(
+        """schema = "hyodo.scan-exceptions/v1"
+
+[[safety_exceptions]]
+path = "fixtures/**"
+rule = "dangerous_command/git_push_force"
+reason = "detection fixture"
+""",
+        encoding="utf-8",
+    )
+    target = tmp_path / "fixtures" / "force-push.sh"
+    target.parent.mkdir()
+    target.write_text("git push --force\n", encoding="utf-8")
+
+    result = run_safety_scan(path=str(target), strict=True, cwd=tmp_path)
+
+    assert result["exceptions_applied"] == 1
+    assert not [finding for finding in result["findings"] if finding.severity == "high"]
