@@ -11,6 +11,8 @@ Exit contract (PRD):
 from __future__ import annotations
 
 import json
+import stat
+import sys
 import uuid
 from pathlib import Path
 
@@ -148,6 +150,19 @@ def test_append_and_read_agent_events(tmp_path: Path):
     lines = ledger.read_text(encoding="utf-8").strip().splitlines()
     assert len(lines) == 1
     json.loads(lines[0])
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX file mode bits only")
+def test_ledger_file_is_owner_only_readable(tmp_path: Path):
+    """The agent-event ledger holds sensitive prompt/response digests (and,
+    opt-in, full bodies) — it must never be group/world readable regardless
+    of the process umask."""
+    event = validate_event(_valid_event())[2]
+    assert event is not None
+    assert append_agent_event(tmp_path, event) is True
+    ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    mode = stat.S_IMODE(ledger.stat().st_mode)
+    assert mode == 0o600, f"ledger mode is {oct(mode)}, expected 0o600"
 
 
 def test_append_unwritable_returns_false(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):

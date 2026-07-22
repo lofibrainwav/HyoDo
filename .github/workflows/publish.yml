@@ -70,9 +70,10 @@ jobs:
 
       - name: Validate tag / VERSION / main ancestry
         id: meta
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
         run: |
           set -euo pipefail
-          TAG="${{ steps.ref.outputs.tag }}"
           VERSION="$(tr -d '[:space:]' < VERSION)"
           EXPECTED="v${VERSION}"
           if [ "$TAG" != "$EXPECTED" ]; then

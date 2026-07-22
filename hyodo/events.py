@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import re
+import stat
 from pathlib import Path
 from typing import Any
 
@@ -321,12 +323,20 @@ def check_event_id(root: Path, event: dict[str, Any]) -> str:
 
 
 def append_agent_event(root: Path, event: dict[str, Any]) -> bool:
-    """Append one normalized event to the agent ledger. Never raises."""
+    """Append one normalized event to the agent ledger. Never raises.
+
+    The ledger may hold sensitive prompt/response digests (and, opt-in, full
+    bodies), so its file mode is pinned to ``0o600`` (owner read/write only)
+    on every write — both on first creation and on pre-existing files that
+    predate this guard.
+    """
     path = root / AGENT_EVENTS_RELATIVE_PATH
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n")
+        if stat.S_IMODE(path.stat().st_mode) != 0o600:
+            os.chmod(path, 0o600)
         return True
     except OSError:
         return False
