@@ -277,12 +277,18 @@ def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) 
                         capture_output=True,
                         text=True,
                     )
-                    out = subprocess.check_output([str(hyodo), "--version"], text=True)
+                    # Run the checks from the throwaway temp dir, never the caller's cwd.
+                    # ``python -c`` puts the current directory first on sys.path, so
+                    # running this from a HyoDo checkout imported the local source tree
+                    # instead of the wheel we just installed — the release verifier was
+                    # measuring the code in hand rather than the code being shipped.
+                    out = subprocess.check_output([str(hyodo), "--version"], text=True, cwd=tmp)
                     if version not in out:
                         raise SystemExit(f"hyodo --version mismatch: {out!r}")
                     code = subprocess.check_output(
                         [str(python), "-c", "import hyodo; print(hyodo.__version__)"],
                         text=True,
+                        cwd=tmp,
                     ).strip()
                     if code != version:
                         raise SystemExit(f"import version mismatch: {code!r}")
