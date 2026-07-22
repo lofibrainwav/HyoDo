@@ -1,6 +1,6 @@
 # External Claim Audit (Measured)
 
-**Date:** 2026-07-19
+**Date:** 2026-07-21
 **Repo:** `lofibrainwav/HyoDo`
 **Surface under audit:** public package only (`hyodo/`, root
 `pyproject.toml`, `tests/`, `scripts/`, `.github/workflows/`)
@@ -113,6 +113,26 @@ this repository.
   - Verdict: Supported
   - Evidence: README: "Scores support review; they never replace
     tests, security checks, or human approval"
+
+### 2.4 Optional local MCP adapter
+
+- MCP support is opt-in and leaves the core runtime dependency set unchanged
+  - Verdict: Confirmed
+  - Evidence: `pyproject.toml` defines `hyodo[mcp]`; the base dependency
+    list contains only `typer` and `rich`
+- The shipped MCP transport is local standard input/output only
+  - Verdict: Confirmed
+  - Evidence: `hyodo mcp stdio` starts `hyodo/mcp_server.py` with the MCP
+    SDK `stdio` transport; no HTTP listener is created
+- MCP tools wrap the existing CLI contracts for one locked host workspace
+  - Verdict: Confirmed
+  - Evidence: `hyodo/mcp_server.py` delegates `safe`, `check`, `event
+    record`, and `policy check` through `hyodo.cli.main`; policy paths that
+    escape the workspace return exit `2`
+- Remote access, public listeners, and automatic agent authority
+  - Verdict: Not shipped and not claimed
+  - Evidence: M1 has no `serve` command or HTTP transport; README and
+    `docs/SECURITY_SURFACE.md` limit this release to local stdio
 
 ---
 

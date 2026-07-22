@@ -87,8 +87,14 @@ policy_app = typer.Typer(
     help="Local policy gate for agent events (ALLOW|DENY; unobserved ≠ ALLOW)",
     add_completion=False,
 )
+mcp_app = typer.Typer(
+    name="mcp",
+    help="Optional local MCP adapter for the HyoDo CLI",
+    add_completion=False,
+)
 app.add_typer(event_app, name="event")
 app.add_typer(policy_app, name="policy")
+app.add_typer(mcp_app, name="mcp")
 console = Console()
 
 
@@ -1469,6 +1475,29 @@ def safe(
     if strict and high_only:
         raise typer.Exit(1)
     raise typer.Exit(0)
+
+
+@mcp_app.command("stdio")
+def mcp_stdio(
+    root: str = typer.Option(".", "--root", help="Workspace root locked for this MCP process"),
+):
+    """Run the optional local MCP adapter over standard input/output."""
+    try:
+        import mcp.server.fastmcp  # pyright: ignore[reportMissingImports]  # noqa: F401
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.startswith("mcp"):
+            console.print("[red]MCP support is not installed.[/red]")
+            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            raise typer.Exit(2) from exc
+        raise
+
+    from hyodo.mcp_server import run_stdio
+
+    try:
+        run_stdio(Path(root))
+    except ValueError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(2) from exc
 
 
 def _load_event_payload(

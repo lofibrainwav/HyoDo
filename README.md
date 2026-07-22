@@ -70,6 +70,18 @@ Default storage is **digest-only**. DENY is recorded for audit; **the
 caller must stop the agent** — HyoDo is a gate, not a runtime
 interceptor. Examples: `examples/fde-evidence-spine/`.
 
+### Optional local MCP stdio
+
+```bash
+pip install 'hyodo[mcp]'
+hyodo mcp stdio --root .
+```
+
+This starts a local standard-input/output MCP process only. It wraps the
+existing `safe`, `check`, `event record`, and `policy check` CLI contracts
+for the configured host workspace. It does not open a network listener or
+give a client access to files outside that workspace.
+
 ## Engineering map (branding kept, terms first)
 
 | DevSecOps label | Pillar | Measured by |
@@ -110,6 +122,7 @@ See [Quick Start](./QUICK_START.md).
 | `hyodo check` | Absorbed gates or checkout preset |
 | `hyodo event …` | Agent event validate / record |
 | `hyodo policy check` | Agent policy ALLOW / DENY |
+| `hyodo mcp stdio` | Optional local MCP CLI adapter |
 | `hyodo score …` | Optional review signal |
 | `hyodo dashboard` | Local evidence panel |
 
