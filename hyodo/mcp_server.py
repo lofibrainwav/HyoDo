@@ -137,9 +137,18 @@ def create_server(
         }
 
     @server.tool()
-    def hyodo_safe() -> dict[str, Any]:
-        """Run ``hyodo safe --json`` against the configured host workspace."""
-        return _run_cli(workspace, ["safe", "--json", str(workspace)])
+    def hyodo_safe(max_files: int | None = None) -> dict[str, Any]:
+        """Run ``hyodo safe --json`` against the configured host workspace.
+
+        ``max_files`` overrides the directory scan cap (``0`` = unlimited). Without it
+        the CLI default applies, and on a large repository everything past that many
+        files — in sorted order — is simply never looked at. The client had no way to
+        ask for a full scan before this parameter existed.
+        """
+        args = ["safe", "--json", str(workspace)]
+        if max_files is not None:
+            args.extend(["--max-files", str(max_files)])
+        return _run_cli(workspace, args)
 
     @server.tool()
     def hyodo_check() -> dict[str, Any]:

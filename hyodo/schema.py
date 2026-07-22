@@ -9,6 +9,7 @@ from pathlib import Path
 from jsonschema import ValidationError
 from jsonschema.exceptions import SchemaError
 from jsonschema.validators import validator_for
+from referencing.exceptions import Unresolvable
 
 JsonValue = str | int | float | bool | None | list["JsonValue"] | dict[str, "JsonValue"]
 
@@ -65,14 +66,17 @@ def validate_schema_payload(
     except SchemaError as exc:
         return False, 2, [{"code": "invalid_schema", "message": exc.message}]
 
-    errors = sorted(
-        validator.iter_errors(payload),
-        key=lambda error: (
-            tuple(str(part) for part in error.absolute_path),
-            tuple(str(part) for part in error.absolute_schema_path),
-            error.validator or "",
-        ),
-    )
+    try:
+        errors = sorted(
+            validator.iter_errors(payload),
+            key=lambda error: (
+                tuple(str(part) for part in error.absolute_path),
+                tuple(str(part) for part in error.absolute_schema_path),
+                error.validator or "",
+            ),
+        )
+    except Unresolvable as exc:
+        return False, 2, [{"code": "invalid_schema", "message": str(exc)}]
     if not errors:
         return True, 0, []
 

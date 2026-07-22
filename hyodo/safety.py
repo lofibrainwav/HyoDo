@@ -110,6 +110,10 @@ _BINARY_SNIFF_BYTES = 8_000
 #: wording humans already read in the message, so there is one string and not two.
 NOT_INSTALLED = "not installed"
 
+#: Default ceiling on how many files a corpus sweep reads. Anything past it, in sorted
+#: order, is never examined — so the number is a coverage statement, not a detail.
+_DEFAULT_SCAN_CAP = 40
+
 
 def _looks_binary(path: Path, sniff_bytes: int = _BINARY_SNIFF_BYTES) -> bool:
     """Return True when *path* holds binary data (a NUL byte in its head).
@@ -198,7 +202,7 @@ def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tup
                 except OSError:
                     return "", f"error:read:{file_path}"
                 count += 1
-                if count >= 40:
+                if count >= _DEFAULT_SCAN_CAP:
                     break
             return "\n".join(chunks), f"dir:{target} ({count} files)"
         return "", f"missing:{target}"
@@ -224,11 +228,69 @@ def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tup
             check=False,
         )
         if status.returncode == 0:
-            return status.stdout or "", "git status (no diff against HEAD)"
+            listing = status.stdout or ""
+            bodies, read_count = _read_working_tree_files(root, listing)
+            source = "git status (no diff against HEAD)"
+            if read_count:
+                source += f" + {read_count} working-tree file(s)"
+            return listing + ("\n" + bodies if bodies else ""), source
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         pass
 
     return "", "empty-corpus"
+
+
+def _porcelain_paths(listing: str) -> list[str]:
+    """Extract the paths from ``git status --porcelain`` output.
+
+    Handles the ``XY path`` shape and the ``XY orig -> new`` rename shape, taking the
+    destination for renames since that is the file present on disk.
+    """
+    paths: list[str] = []
+    for line in listing.splitlines():
+        if len(line) < 4:
+            continue
+        entry = line[3:].strip()
+        if " -> " in entry:
+            entry = entry.split(" -> ", 1)[1]
+        entry = entry.strip().strip('"')
+        if entry:
+            paths.append(entry)
+    return paths
+
+
+def _read_working_tree_files(root: Path, listing: str) -> tuple[str, int]:
+    """Read the contents of files named in *listing*. Returns ``(text, files_read)``.
+
+    ``git diff HEAD`` is empty exactly when the only changes are untracked files, so
+    without this the default corpus saw ``?? .env.local`` and never the key inside it —
+    the most dangerous case got the shallowest look.
+    """
+    chunks: list[str] = []
+    count = 0
+    resolved_root = root.resolve()
+    for entry in _porcelain_paths(listing):
+        if count >= _DEFAULT_SCAN_CAP:
+            break
+        candidate = (root / entry).resolve()
+        try:
+            candidate.relative_to(resolved_root)
+        except ValueError:
+            continue  # never follow a path out of the workspace
+        # git collapses a wholly untracked directory into one "?? dir/" line, so
+        # expanding it is what reaches the files inside a newly created folder.
+        targets = sorted(candidate.rglob("*")) if candidate.is_dir() else [candidate]
+        for target in targets:
+            if count >= _DEFAULT_SCAN_CAP:
+                break
+            if not is_scannable_file(target):
+                continue
+            try:
+                chunks.append(_read_text_file(target))
+            except OSError:
+                continue
+            count += 1
+    return "\n".join(chunks), count
 
 
 def scan_text(text: str, *, path: str | None = None) -> list[Finding]:

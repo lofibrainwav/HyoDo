@@ -11,18 +11,37 @@ This module is intentionally standalone: it has no dependency on
 future automation without pulling in Typer/Rich. Every result is an honest,
 directly-observed subprocess outcome -- a missing binary is reported as
 ``SKIP``, never silently upgraded to ``PASS``.
+
+A checkout's ``.hyodo/gates.toml`` can define arbitrary commands, so
+`run_user_gates` records the command set it executes and refuses to run a
+changed one silently (see `resolve_gate_trust`): the first set seen for a
+checkout becomes its baseline in ``.hyodo/gates-trust.json``, and any later
+fingerprint is ``SKIP`` (never ``PASS``) non-interactively, or shown to an
+operator for approval interactively.
+
+**What this does and does not cover.** It catches *drift* — a repository that
+changes what it runs after you started trusting it. It does **not** vet a
+repository you have never run before: the first command set is trusted
+automatically, because refusing it would mean every clone and every CI job
+stops until someone clicks. Running ``hyodo check`` on an unreviewed checkout
+executes that checkout's commands, exactly like ``make`` or ``npm test``
+would. Read ``.hyodo/gates.toml`` before running HyoDo on code you do not
+trust; this module narrows the window, it does not close it.
 """
 
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import os
 import re
 import shlex
 import shutil
 import subprocess
+import sys
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -42,6 +61,15 @@ VALID_PILLARS = frozenset({"truth", "goodness", "beauty", "benevolence", "hyo", 
 DEFAULT_TIMEOUT_SECONDS = 120
 GATES_CONFIG_RELATIVE_PATH = Path(".hyodo") / "gates.toml"
 GATE_MESSAGE_TAIL_CHARS = 200
+
+# Trust-on-first-use receipt for the BYOG command set (see module docstring).
+GATES_TRUST_RELATIVE_PATH = Path(".hyodo") / "gates-trust.json"
+GATES_TRUST_SCHEMA_ID = "hyodo.gates-trust/v1"
+# Escape hatch for automation that already trusts its own checkout (CI
+# operators reviewed the repo out-of-band, e.g. via normal PR review) --
+# pre-approves the current command set without an interactive prompt.
+GATES_TRUST_ENV_VAR = "HYODO_GATES_TRUST_ALL"
+_TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 
 # A leading token shaped like ``KEY=VALUE`` (POSIX env-prefix assignment) that
 # must be separated from the executable when running with shell=False.
@@ -186,8 +214,160 @@ def _tail(text: str | None) -> str:
     return (text or "").strip()[-GATE_MESSAGE_TAIL_CHARS:]
 
 
+@dataclass(frozen=True)
+class GateTrustDecision:
+    """Outcome of `resolve_gate_trust` for one `.hyodo/gates.toml` command set."""
+
+    approved: bool
+    fingerprint: str
+    reason: str
+
+
+def _fingerprint_payload(config: GatesConfig) -> list[dict[str, list[str]]]:
+    """Return the executable-content view of *config* used for hashing.
+
+    Only ``command`` and its leading ``env`` prefix are included -- they are
+    what actually runs. ``name`` and ``pillar`` are labels, not behavior, so
+    renaming a gate without touching its command does not force
+    re-approval. Sorted so TOML key reordering never changes the hash.
+    """
+    entries = [{"command": list(gate.command), "env": list(gate.env)} for gate in config.gates]
+    entries.sort(key=lambda entry: (entry["command"], entry["env"]))
+    return entries
+
+
+def compute_gate_set_fingerprint(config: GatesConfig) -> str:
+    """Stable sha256 hex digest over the command set *config* would execute."""
+    encoded = json.dumps(_fingerprint_payload(config), separators=(",", ":")).encode("utf-8")
+    return hashlib.sha256(encoded).hexdigest()
+
+
+def _env_truthy(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in _TRUTHY_ENV_VALUES
+
+
+def _is_noninteractive() -> bool:
+    """Best-effort detection of an automated (CI / no-terminal) environment.
+
+    ``CI`` is the near-universal marker automation platforms set (GitHub
+    Actions, GitLab, CircleCI, Travis, ...). A non-TTY stdin/stdout is the
+    stronger structural signal and also covers being driven from an MCP
+    server subprocess, which has no terminal to prompt at all.
+    """
+    if _env_truthy("CI"):
+        return True
+    try:
+        return not (sys.stdin.isatty() and sys.stdout.isatty())
+    except (AttributeError, ValueError):
+        return True
+
+
+def _load_gate_trust_store(root: Path) -> dict[str, Any]:
+    path = root / GATES_TRUST_RELATIVE_PATH
+    if path.exists():
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            data = None
+        approved = data.get("approved") if isinstance(data, dict) else None
+        if isinstance(approved, dict):
+            return {"schema": GATES_TRUST_SCHEMA_ID, "approved": approved}
+    return {"schema": GATES_TRUST_SCHEMA_ID, "approved": {}}
+
+
+def _save_gate_trust_store(root: Path, store: dict[str, Any]) -> None:
+    path = root / GATES_TRUST_RELATIVE_PATH
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(store, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError:
+        # Best-effort receipt only: a read-only checkout still gets the
+        # already-decided approval for this run, it just cannot remember it
+        # for the next one.
+        pass
+
+
+def _remember_gate_trust(root: Path, store: dict[str, Any], fingerprint: str, *, via: str) -> None:
+    store["approved"][fingerprint] = {
+        "approved_at": datetime.now(timezone.utc).isoformat(),
+        "via": via,
+    }
+    _save_gate_trust_store(root, store)
+
+
+def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
+    """Show the exact commands about to run and ask an operator to approve.
+
+    Uses plain ``print``/``input`` (no Rich/Typer) to keep this module
+    standalone -- see the module docstring.
+    """
+    print("HyoDo Bring-Your-Own-Gates: .hyodo/gates.toml command set changed or is new.")
+    for gate in config.gates:
+        env_prefix = " ".join(gate.env) + " " if gate.env else ""
+        print(f"  [{gate.pillar}] {gate.name}: {env_prefix}{' '.join(gate.command)}")
+    print(f"  fingerprint: {fingerprint}")
+    try:
+        answer = input("Trust and run this command set now? [y/N] ")
+    except EOFError:
+        return False
+    return answer.strip().lower() in {"y", "yes"}
+
+
+def resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
+    """Decide whether *config*'s command set may execute against *root*.
+
+    Trust-on-first-use: the first command-set fingerprint ever recorded for
+    *root* becomes its trusted baseline (nothing to compare against yet, so
+    there is nothing to silently smuggle past a reviewer). Any later
+    fingerprint that does not match a previously approved one is drift --
+    never executed silently:
+    - non-interactively (CI, or no attached terminal) it is refused unless
+      `GATES_TRUST_ENV_VAR` pre-approves it.
+    - interactively, the operator is shown the exact commands and asked.
+    """
+    fingerprint = compute_gate_set_fingerprint(config)
+    store = _load_gate_trust_store(root)
+    approved = store["approved"]
+
+    if fingerprint in approved:
+        return GateTrustDecision(True, fingerprint, "previously approved command set")
+
+    if not approved:
+        _remember_gate_trust(root, store, fingerprint, via="first-use")
+        return GateTrustDecision(True, fingerprint, "trusted on first use")
+
+    if _env_truthy(GATES_TRUST_ENV_VAR):
+        _remember_gate_trust(root, store, fingerprint, via=f"env:{GATES_TRUST_ENV_VAR}")
+        return GateTrustDecision(True, fingerprint, f"pre-approved via {GATES_TRUST_ENV_VAR}")
+
+    if _is_noninteractive():
+        return GateTrustDecision(
+            False,
+            fingerprint,
+            "gates.toml command set changed and is unapproved in a non-interactive "
+            f"environment -- set {GATES_TRUST_ENV_VAR}=1 to pre-approve or run "
+            "`hyodo check` interactively once to review and record trust",
+        )
+
+    if _prompt_gate_trust(config, fingerprint):
+        _remember_gate_trust(root, store, fingerprint, via="prompt")
+        return GateTrustDecision(True, fingerprint, "approved interactively")
+
+    return GateTrustDecision(False, fingerprint, "declined interactively")
+
+
 def run_user_gates(config: GatesConfig, root: Path, verbose: bool = False) -> list[UserGateResult]:
-    """Execute every gate in *config* against *root* and report honest outcomes."""
+    """Execute every gate in *config* against *root* and report honest outcomes.
+
+    The command set is gated by `resolve_gate_trust` first -- an unapproved
+    (new-drifted) set never reaches `subprocess.run`; every gate in *config*
+    is reported ``SKIP`` with the trust reason instead, never ``PASS``.
+    """
+    trust = resolve_gate_trust(config, root)
+    if not trust.approved:
+        return [
+            UserGateResult(gate.name, gate.pillar, "SKIP", trust.reason) for gate in config.gates
+        ]
     return [_run_one_gate(gate, root, verbose=verbose) for gate in config.gates]
 
 
