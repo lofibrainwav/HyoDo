@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Dashboard evidence now names why a safety risk score is absent. `risk_score`
+  is still omitted when there is nothing to scan (an empty change set must not
+  read as "score 0, therefore safe"), but a single `null` could not tell
+  "the scan never ran" apart from "the scan ran and found nothing to measure".
+  A consumer read it the wrong way and rendered a scan that had actually run as
+  unobserved. `safety.risk_score_state` now carries `measured` or
+  `no_scan_target` alongside it. Additive field — existing consumers are
+  unaffected, and `safety.source` remains the reliable "did a scan run" signal.
+
+### Changed
+
+- The "Public language: English only" rule in `CLAUDE.md` is now enforced by a
+  test instead of being a line nobody checked. Tracked `.py` and `.md` files may
+  contain Korean only as the six trilingual virtue labels; everything else is
+  English. Accumulated Korean comments and docstrings were translated, and a
+  handoff doc that told agents the opposite was corrected.
+  Commit messages and PR title/body are covered by a `public-language` CI job,
+  since a test cannot read them. Attribution states the model in
+  `Co-Authored-By` rather than a Korean authorship line.
+
+
 ## [4.8.2] - 2026-07-22
 
 Security and observability release. An external review found fifteen ways the

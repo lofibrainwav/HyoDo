@@ -1,6 +1,6 @@
 # Codex handoff — HyoDo FDE + MCP continuation
 
-**For:** Codex (or any implementer) continuing after Grok 자룡 session  
+**For:** Codex (or any implementer) continuing after the previous agent session  
 **Date:** 2026-07-22  
 **Repo:** `lofibrainwav/HyoDo` · path `/Users/brnestrm/HyoDo`  
 **Public now:** PyPI **hyodo 4.4.0** · main tip at handoff: `39b6dc6` (re-read `git rev-parse origin/main`)  
@@ -111,7 +111,7 @@ Do **not** reorder without Commander approval. Dependencies:
 11. **Multi-machine = host workspace** — remote LLM does not magically see client-only files.  
 12. **Do not bake** Commander Tailscale IP into package; dogfood IP is `100.109.255.2` (re-measure).  
 13. **Tests + ruff + ruff format --check + pyright** before PR; version SSOT 3+1 only on release.  
-14. **Commit/PR messages:** honest; Korean OK for kingdom style if hooks allow; no identity spoofing.  
+14. **Commit/PR messages:** English (this repo is public — see `CLAUDE.md`); honest; no identity spoofing.  
 15. **Single-file ownership** — do not edit same branch files as another agent without isolation.
 
 ---

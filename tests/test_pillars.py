@@ -210,7 +210,7 @@ def test_yeong_ledger_round_trip_streak_and_corruption(tmp_path):
 
 
 def test_yeong_skip_gates_do_not_block_all_pass(tmp_path):
-    """SKIP is unobserved, not failed: executed gates decide all-PASS (제6조 10항).
+    """SKIP is unobserved, not failed: executed gates decide all-PASS.
 
     A gate that never runs (e.g. sbom tool not installed) must not permanently
     pin the all-PASS rate to 0%, and must stay visible as a skipped-gate count.

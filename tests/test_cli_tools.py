@@ -96,6 +96,24 @@ def test_dashboard_marks_safety_risk_not_measured_for_an_empty_change_set(tmp_pa
     ):
         evidence = collect_dashboard_evidence(tmp_path)
     assert evidence["safety"]["risk_score"] is None
+    # A bare None cannot be told apart from "the scan never ran" - name the state.
+    assert evidence["safety"]["risk_score_state"] == "no_scan_target"
+    assert evidence["safety"]["source"] == "git status (no diff against HEAD)"
+
+
+def test_dashboard_marks_safety_risk_measured_when_a_corpus_was_scanned(tmp_path):
+    ok = GateResult(GateStatus.PASS, "ok")
+    safety = {"risk_score": 5, "source": "git diff HEAD", "findings": []}
+    with (
+        patch("hyodo.cli.main.run_pyright_check", return_value=ok),
+        patch("hyodo.cli.main.run_ruff_check", return_value=ok),
+        patch("hyodo.cli.main.run_pytest_check", return_value=ok),
+        patch("hyodo.cli.main.run_sbom_check", return_value=ok),
+        patch("hyodo.cli.main.run_safety_scan", return_value=safety),
+    ):
+        evidence = collect_dashboard_evidence(tmp_path)
+    assert evidence["safety"]["risk_score"] == 5
+    assert evidence["safety"]["risk_score_state"] == "measured"
 
 
 def test_run_pytest_check_uses_python_m_pytest(tmp_path):

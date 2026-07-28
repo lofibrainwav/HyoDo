@@ -440,11 +440,12 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
             }
     safety = run_safety_scan(cwd=root)
     safety_source = str(safety["source"])
-    safety_risk: int | None = (
-        safety["risk_score"]
-        if "empty" not in safety_source and "no diff" not in safety_source
-        else None
-    )
+    # An empty change set gets no risk_score: reporting 0 would read as "scanned, safe".
+    # But a bare None cannot tell "the scan never ran" apart from "it ran and had
+    # nothing to measure". That ambiguity already misled a consumer, which rendered a
+    # scan that had actually run as unobserved. Name the state instead of guessing it.
+    safety_measurable = "empty" not in safety_source and "no diff" not in safety_source
+    safety_risk: int | None = safety["risk_score"] if safety_measurable else None
     evidence: dict[str, object] = {
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "target": str(root),
@@ -452,6 +453,10 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         "gates": {name: asdict(result) for name, result in gates.items()},
         "safety": {
             "risk_score": safety_risk,
+            # measured       - a real corpus was scored, risk_score is an int
+            # no_scan_target - the scan ran and its findings hold, but there was
+            #                  nothing to score, so only the number is absent
+            "risk_score_state": "measured" if safety_measurable else "no_scan_target",
             "source": safety_source,
             "findings": [asdict(finding) for finding in safety["findings"]],
         },
