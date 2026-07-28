@@ -39,5 +39,5 @@ def test_is_strong_review_signal_rejects_non_numeric_risk():
 
 
 def test_should_auto_approve_removed_in_400():
-    # 3.2.x에서 예고한 4.0.0 제거 이행 확인
+    # The removal announced in 3.2.x actually happened in 4.0.0.
     assert not hasattr(hyodo, "should_auto_approve")

@@ -11,6 +11,31 @@ surface is the public `hyodo` CLI and CI gates.
 **Python**: 3.10+  
 **Public language**: English only
 
+### What "English only" covers
+
+This repository is public. Everything a reader outside the project can see is
+English — not just CLI output:
+
+- code comments and docstrings
+- commit messages and PR titles/bodies
+- CHANGELOG, docs, issue text
+- identifiers, log lines, error messages
+
+The one deliberate exception is the six virtue labels, which ship as
+hanja/Hangul/English together (`("jin", "眞", "진", "Truth", ...)`) because the
+trilingual form *is* the label. Do not extend that exception to prose.
+
+Agents arriving from the Kingdom repos carry a Korean-first convention. It does
+not apply here, and this line is the SSOT — if another doc in this repo says
+otherwise, that doc is wrong and should be corrected.
+
+**Attribution**: state the model in `Co-Authored-By`. That is truthful and it is
+English. Do not add a Korean authorship line — the Kingdom seat name is internal
+and carries no meaning for a reader of this repository.
+
+Both halves are enforced: `tests/test_public_language.py` covers tracked files,
+and the `public-language` CI job covers commit messages and PR title/body.
+
 ## Commands
 
 ### Main commands
