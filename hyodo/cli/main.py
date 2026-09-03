@@ -1590,7 +1590,12 @@ def mcp_stdio(
 ):
     """Run the optional local MCP adapter over standard input/output."""
     try:
-        import mcp.server.fastmcp  # pyright: ignore[reportMissingImports]  # noqa: F401
+        from hyodo._mcp_compat import get_mcp_server_class
+
+        # Resolve the installed SDK major (v1 FastMCP / v2 MCPServer) up front so
+        # a missing install reports clearly and a v2 install is not misread as
+        # a broken one.
+        get_mcp_server_class()
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("mcp"):
             console.print("[red]MCP support is not installed.[/red]")
@@ -1658,7 +1663,10 @@ def mcp_serve(
         assert token is not None
         tailscale_ip = str(candidate)
     try:
-        import mcp.server.fastmcp  # pyright: ignore[reportMissingImports]  # noqa: F401
+        from hyodo._mcp_compat import get_mcp_server_class
+
+        # Same probe as `mcp stdio`: works on both SDK majors.
+        get_mcp_server_class()
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("mcp"):
             console.print("[red]MCP support is not installed.[/red]")

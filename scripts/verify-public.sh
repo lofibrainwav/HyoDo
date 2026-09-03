@@ -55,7 +55,9 @@ bash -n install_interactive.sh
 
 echo "-- package build --"
 rm -rf dist build
-$PYTHON -m pip install -q build twine
+# Upgrade explicitly: a stale local twine (<7) cannot parse Metadata-Version 2.5
+# sdist metadata produced by current hatchling and fails `twine check` spuriously.
+$PYTHON -m pip install -q --upgrade build twine
 $PYTHON -m build
 $PYTHON -m twine check dist/*
 

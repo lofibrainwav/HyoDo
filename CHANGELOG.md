@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The MCP adapter now runs on both MCP Python SDK majors. The SDK's v2.0.0
+  removed `mcp.server.fastmcp` (renamed `FastMCP` to `MCPServer` in
+  `mcp.server.mcpserver`) and moved host/port/`json_response`/
+  `streamable_http_path` from the constructor into `streamable_http_app()`,
+  which made the dependabot range-widening PR fail CI for a month. A new
+  `hyodo._mcp_compat` resolves the installed major once per process; the CLI's
+  "MCP support is not installed" probe works on both (and still fails closed
+  with exit 2 on a core install without the extra); CI now exercises the v1
+  line on a pinned job so widening the extra to `mcp>=1.27,<3` cannot silently
+  drop it.
+- `scripts/verify-public.sh` and the smoke/publish workflows now upgrade
+  `twine` to `>=7` before `twine check`. twine 6.x cannot parse the
+  Metadata-Version 2.5 sdists current hatchling emits and failed the local
+  full verify on a valid distribution.
+
 - Dashboard evidence now names why a safety risk score is absent. `risk_score`
   is still omitted when there is nothing to scan (an empty change set must not
   read as "score 0, therefore safe"), but a single `null` could not tell

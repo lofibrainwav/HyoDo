@@ -69,15 +69,19 @@ dev = [
     "ruff>=0.4",
     "pyright>=1.1",
     "build>=1.2",
-    "twine>=5.0",
+    # twine <7 cannot parse Metadata-Version 2.5 sdis that current hatchling
+    # emits; `twine check dist/*` then fails on a perfectly valid distribution.
+    "twine>=7.0",
     "PyYAML>=6.0",
-    "mcp>=1.27,<2",
+    # Both SDK majors are supported (hyodo._mcp_compat); v1 fastmcp and v2
+    # MCPServer are exercised by CI on separate pins.
+    "mcp>=1.27,<3",
     # Capped: generate_sbom.py depends on the `environment` CLI surface
     # (--output-reproducible, --pyproject, --mc-type); re-validate before a major bump.
     "cyclonedx-bom>=7.0,<9",
 ]
 mcp = [
-    "mcp>=1.27,<2",
+    "mcp>=1.27,<3",
 ]
 
 [project.scripts]

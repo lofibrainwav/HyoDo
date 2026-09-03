@@ -42,8 +42,6 @@ def test_no_expression_interpolation_inside_run_blocks():
     ``"$VAR"`` so shell metacharacters in the value cannot be interpreted.
     """
     offenders = [
-        (job_name, step_name)
-        for job_name, step_name, script in _run_blocks()
-        if "${{" in script
+        (job_name, step_name) for job_name, step_name, script in _run_blocks() if "${{" in script
     ]
     assert offenders == [], f"run: blocks with unbound ${{{{ }}}} interpolation: {offenders}"
