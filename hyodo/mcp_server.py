@@ -14,7 +14,11 @@ from pathlib import Path
 from secrets import compare_digest
 from typing import Any
 
-from mcp.server.fastmcp import FastMCP  # pyright: ignore[reportMissingImports]
+from hyodo._mcp_compat import (
+    constructor_accepts_transport_options,
+    get_mcp_server_class,
+    http_app_accepts_options,
+)
 
 _CLI_TIMEOUT_SECONDS = 120
 _LOOPBACK_HOST = "127.0.0.1"
@@ -102,7 +106,7 @@ def create_server(
     host: str = _LOOPBACK_HOST,
     port: int = 8000,
     allow_full_body: bool = False,
-) -> FastMCP:
+) -> Any:
     """Create one root-locked MCP server without owning gate logic.
 
     ``allow_full_body`` is the operator's consent to store raw prompt/output text. It
@@ -111,16 +115,25 @@ def create_server(
     ceiling simply by passing ``full_body=True``.
     """
     workspace = resolve_workspace_root(root)
-    server = FastMCP(
+    server_class = get_mcp_server_class()
+    constructor_kwargs: dict[str, Any] = {}
+    if constructor_accepts_transport_options():
+        # MCP SDK v1 (mcp.server.fastmcp.FastMCP): transport options are
+        # constructor options. v2 (MCPServer) moved them into
+        # streamable_http_app() / the transport runner, so we pass nothing here.
+        constructor_kwargs = {
+            "json_response": True,
+            "host": host,
+            "port": port,
+            "streamable_http_path": _MCP_PATH,
+        }
+    server = server_class(
         "HyoDo",
         instructions=(
             "Local HyoDo CLI adapter. Tools act only on the configured host workspace; "
             "review signals never authorize approval."
         ),
-        json_response=True,
-        host=host,
-        port=port,
-        streamable_http_path=_MCP_PATH,
+        **constructor_kwargs,
     )
 
     @server.tool()
@@ -235,7 +248,12 @@ class _BearerTokenMiddleware:
 
 def _create_http_app(root: Path, host: str, token: str | None, *, port: int) -> Any:
     """Build one authenticated streamable-HTTP MCP app for a validated host."""
-    app: Any = create_server(root, host=host, port=port).streamable_http_app()
+    server = create_server(root, host=host, port=port)
+    app_kwargs: dict[str, Any] = {}
+    if http_app_accepts_options():
+        # MCP SDK v2: transport options live on streamable_http_app().
+        app_kwargs = {"json_response": True, "streamable_http_path": _MCP_PATH}
+    app: Any = server.streamable_http_app(**app_kwargs)
     return _BearerTokenMiddleware(app, token) if token else app
 
 

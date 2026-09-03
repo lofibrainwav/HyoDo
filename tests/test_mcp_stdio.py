@@ -38,6 +38,25 @@ def _valid_event(**overrides: object) -> dict:
     return event
 
 
+async def call_hyodo_tool(server: object, name: str, arguments: dict) -> dict:
+    """Return the dict a HyoDo tool produced, on either MCP SDK major.
+
+    SDK v1 FastMCP.call_tool returns ``(content, structured_data)``; v2
+    MCPServer.call_tool returns one CallToolResult whose text block carries the
+    JSON. Both must serialize to the same CLI JSON contract.
+    """
+    outcome = await server.call_tool(name, arguments)  # type: ignore[attr-defined]
+    if isinstance(outcome, tuple):
+        data = outcome[1]
+        assert isinstance(data, dict), data
+        return data
+    for block in getattr(outcome, "content", []):
+        text = getattr(block, "text", None)
+        if text is not None:
+            return json.loads(text)
+    raise AssertionError(f"no text content block in {outcome!r}")
+
+
 def test_mcp_stdio_delegates_to_the_optional_adapter(tmp_path, monkeypatch):
     """The CLI only starts the adapter; it does not implement MCP itself."""
     assert importlib.util.find_spec("hyodo.mcp_server") is not None
@@ -116,7 +135,7 @@ def test_mcp_context_is_locked_to_the_configured_workspace(tmp_path):
     assert importlib.util.find_spec("hyodo.mcp_server") is not None
     from hyodo.mcp_server import create_server
 
-    _content, result = asyncio.run(create_server(tmp_path).call_tool("get_local_context", {}))
+    result = asyncio.run(call_hyodo_tool(create_server(tmp_path), "get_local_context", {}))
 
     assert result["root"] == str(tmp_path.resolve())
     assert result["exit_code"] == 0
@@ -130,7 +149,7 @@ def test_mcp_safe_preserves_the_cli_json_exit_contract(tmp_path):
 
     sample = tmp_path / "leaked.txt"
     sample.write_text("aws_key = AKIAABCDEFGHIJKLMNOP\n", encoding="utf-8")
-    _content, result = asyncio.run(create_server(tmp_path).call_tool("hyodo_safe", {}))
+    result = asyncio.run(call_hyodo_tool(create_server(tmp_path), "hyodo_safe", {}))
 
     payload = json.loads(result["stdout"])
     assert result["exit_code"] == payload["exit_code"] == 0
@@ -142,8 +161,8 @@ def test_mcp_event_record_preserves_digest_only_default(tmp_path):
     from hyodo.events import AGENT_EVENTS_RELATIVE_PATH
     from hyodo.mcp_server import create_server
 
-    _content, result = asyncio.run(
-        create_server(tmp_path).call_tool("hyodo_event_record", {"event": _valid_event()})
+    result = asyncio.run(
+        call_hyodo_tool(create_server(tmp_path), "hyodo_event_record", {"event": _valid_event()})
     )
 
     receipt = json.loads(result["stdout"])
@@ -157,11 +176,12 @@ def test_mcp_policy_preserves_unobserved_exit_and_rejects_path_escape(tmp_path):
     """Missing policy and client path traversal both stay explicit failures, never ALLOW."""
     from hyodo.mcp_server import create_server
 
-    _content, unobserved = asyncio.run(
-        create_server(tmp_path).call_tool("hyodo_policy_check", {"event": _valid_event()})
+    unobserved = asyncio.run(
+        call_hyodo_tool(create_server(tmp_path), "hyodo_policy_check", {"event": _valid_event()})
     )
-    _content, escaped = asyncio.run(
-        create_server(tmp_path).call_tool(
+    escaped = asyncio.run(
+        call_hyodo_tool(
+            create_server(tmp_path),
             "hyodo_policy_check",
             {"event": _valid_event(), "policy_path": "../policy.toml"},
         )
