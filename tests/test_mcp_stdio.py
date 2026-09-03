@@ -127,6 +127,7 @@ def test_mcp_server_lists_only_the_m1_tools(tmp_path):
         "hyodo_check",
         "hyodo_event_record",
         "hyodo_policy_check",
+        "hyodo_agent_rules",
     }
 
 
@@ -216,6 +217,7 @@ def test_mcp_stdio_protocol_lists_the_m1_tools(tmp_path):
         "hyodo_check",
         "hyodo_event_record",
         "hyodo_policy_check",
+        "hyodo_agent_rules",
     }
 
 

@@ -266,6 +266,16 @@ def create_server(
         _record_access("hyodo_policy_check", workspace, result["exit_code"], elapsed_ms)
         return result
 
+    @server.tool()
+    def hyodo_agent_rules() -> dict[str, Any]:
+        """Return the current agent rules for the workspace."""
+        from hyodo.agent_rules import DEFAULT_RULES, load_agent_rules
+
+        rules = load_agent_rules(workspace)
+        if not rules:
+            rules = list(DEFAULT_RULES)
+        return {"rules": [r.to_dict() for r in rules]}
+
     return server
 
 
