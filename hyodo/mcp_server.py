@@ -10,15 +10,17 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import time
 from pathlib import Path
 from secrets import compare_digest
 from typing import Any
 
-from hyodo._mcp_compat import (
-    constructor_accepts_transport_options,
-    get_mcp_server_class,
-    http_app_accepts_options,
+from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
+    constructor_accepts_transport_options,  # pyright: ignore[reportAttributeAccessIssue]
+    get_mcp_server_class,  # pyright: ignore[reportAttributeAccessIssue]
+    http_app_accepts_options,  # pyright: ignore[reportAttributeAccessIssue]
 )
+from hyodo.access_ledger import AccessEntry, record_access
 
 _CLI_TIMEOUT_SECONDS = 120
 _LOOPBACK_HOST = "127.0.0.1"
@@ -85,6 +87,37 @@ def _run_cli(
     }
 
 
+def _record_access(
+    tool_name: str,
+    root: Path,
+    exit_code: int,
+    duration_ms: int,
+    caller_id: str | None = None,
+) -> None:
+    """Best-effort: record one MCP tool invocation to the access ledger.
+
+    A write failure is logged to stderr but never propagated — the MCP
+    tool call that triggered this recording must succeed regardless.
+    """
+    from datetime import datetime, timezone
+
+    ts = datetime.now(timezone.utc).isoformat()
+    entry = AccessEntry(
+        timestamp=ts,
+        tool_name=tool_name,
+        root=str(root),
+        exit_code=exit_code,
+        duration_ms=duration_ms,
+        caller_id=caller_id,
+    )
+    try:  # noqa: SIM105
+        record_access(entry, root=root)
+    except Exception:
+        # record_access itself never raises (it catches OSError), but
+        # guard against unexpected failures so the tool call survives.
+        pass
+
+
 def _run_git(root: Path, *args: str) -> tuple[bool, str]:
     """Read a small git fact without treating an unavailable repository as green."""
     try:
@@ -139,15 +172,19 @@ def create_server(
     @server.tool()
     def get_local_context() -> dict[str, Any]:
         """Read the configured host workspace root and small git context."""
+        t0 = time.monotonic()
         status_ok, status = _run_git(workspace, "status", "--short")
         diff_ok, diff = _run_git(workspace, "diff", "--stat")
-        return {
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        result = {
             "exit_code": 0,
             "root": str(workspace),
             "git_status": status.splitlines() if status_ok else [],
             "git_diff_stat": diff.strip() if diff_ok else "",
             "git_observed": status_ok and diff_ok,
         }
+        _record_access("get_local_context", workspace, result["exit_code"], elapsed_ms)
+        return result
 
     @server.tool()
     def hyodo_safe(max_files: int | None = None) -> dict[str, Any]:
@@ -161,12 +198,20 @@ def create_server(
         args = ["safe", "--json", str(workspace)]
         if max_files is not None:
             args.extend(["--max-files", str(max_files)])
-        return _run_cli(workspace, args)
+        t0 = time.monotonic()
+        result = _run_cli(workspace, args)
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        _record_access("hyodo_safe", workspace, result["exit_code"], elapsed_ms)
+        return result
 
     @server.tool()
     def hyodo_check() -> dict[str, Any]:
         """Run ``hyodo check`` against the configured host workspace."""
-        return _run_cli(workspace, ["check", str(workspace)])
+        t0 = time.monotonic()
+        result = _run_cli(workspace, ["check", str(workspace)])
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        _record_access("hyodo_check", workspace, result["exit_code"], elapsed_ms)
+        return result
 
     @server.tool()
     def hyodo_event_record(
@@ -188,7 +233,9 @@ def create_server(
         full_body_applied = bool(full_body and allow_full_body)
         if full_body_applied:
             args.append("--full-body")
+        t0 = time.monotonic()
         result = _run_cli(workspace, args, stdin=json.dumps(event))
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
         # Surfaced even when it matches the request: a silent downgrade would let a
         # client believe raw bodies were stored when they were not.
         result["full_body_requested"] = bool(full_body)
@@ -197,6 +244,7 @@ def create_server(
             result["full_body_denied_reason"] = (
                 "server started without operator consent for full-body storage"
             )
+        _record_access("hyodo_event_record", workspace, result["exit_code"], elapsed_ms)
         return result
 
     @server.tool()
@@ -208,11 +256,15 @@ def create_server(
             config = _resolve_workspace_path(workspace, policy_path)
         except ValueError as exc:
             return {"exit_code": 2, "stdout": "", "stderr": "", "error": str(exc)}
-        return _run_cli(
+        t0 = time.monotonic()
+        result = _run_cli(
             workspace,
             ["policy", "check", "--stdin", "--config", str(config), "--json"],
             stdin=json.dumps(event),
         )
+        elapsed_ms = int((time.monotonic() - t0) * 1000)
+        _record_access("hyodo_policy_check", workspace, result["exit_code"], elapsed_ms)
+        return result
 
     return server
 

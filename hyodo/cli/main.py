@@ -1590,7 +1590,9 @@ def mcp_stdio(
 ):
     """Run the optional local MCP adapter over standard input/output."""
     try:
-        from hyodo._mcp_compat import get_mcp_server_class
+        from hyodo._mcp_compat import (
+            get_mcp_server_class,  # pyright: ignore[reportAttributeAccessIssue]
+        )
 
         # Resolve the installed SDK major (v1 FastMCP / v2 MCPServer) up front so
         # a missing install reports clearly and a v2 install is not misread as
@@ -1663,7 +1665,9 @@ def mcp_serve(
         assert token is not None
         tailscale_ip = str(candidate)
     try:
-        from hyodo._mcp_compat import get_mcp_server_class
+        from hyodo._mcp_compat import (
+            get_mcp_server_class,  # pyright: ignore[reportAttributeAccessIssue]
+        )
 
         # Same probe as `mcp stdio`: works on both SDK majors.
         get_mcp_server_class()
@@ -1713,14 +1717,16 @@ def mcp_doctor(
     """
     import socket as _socket
 
-    from hyodo._mcp_compat import get_mcp_server_class
+    from hyodo._mcp_compat import (
+        get_mcp_server_class,  # pyright: ignore[reportAttributeAccessIssue]
+    )
 
     # ── MCP SDK availability ──────────────────────────────────────────
     mcp_sdk_available = True
     mcp_sdk_version: str | None = None
     try:
         get_mcp_server_class()
-        import mcp
+        import mcp  # pyright: ignore[reportMissingImports]
 
         mcp_sdk_version = getattr(mcp, "__version__", None)
     except ModuleNotFoundError:
@@ -1815,6 +1821,61 @@ def mcp_doctor(
             console.print(f"tailscale:  [green]up[/green] ({tailscale_ip})")
         else:
             console.print("tailscale:  [dim]not connected or not installed[/dim]")
+
+    raise typer.Exit(0)
+
+
+@mcp_app.command("access-log")
+def mcp_access_log(
+    root: str = typer.Option(
+        ".", "--root", help="Workspace root that owns .hyodo/mcp-access.jsonl"
+    ),
+    limit: int = typer.Option(100, "--limit", min=1, max=10000, help="Maximum entries to show"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Display the MCP access ledger (audit trail of tool invocations)."""
+    try:
+        from hyodo._mcp_compat import (
+            get_mcp_server_class,  # pyright: ignore[reportAttributeAccessIssue]
+        )
+
+        get_mcp_server_class()
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.startswith("mcp"):
+            console.print("[red]MCP support is not installed.[/red]")
+            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            raise typer.Exit(2) from exc
+        raise
+
+    from hyodo.access_ledger import read_access_log
+
+    root_path = Path(root).expanduser().resolve()
+    entries = read_access_log(root_path, limit=limit)
+
+    if json_output:
+        from dataclasses import asdict
+
+        console.print_json(json.dumps([asdict(e) for e in entries]))
+    elif not entries:
+        console.print("[dim]No access log entries found.[/dim]")
+    else:
+        table = Table(title="MCP Access Log", show_lines=True)
+        table.add_column("Timestamp", style="dim")
+        table.add_column("Tool", style="cyan")
+        table.add_column("Root")
+        table.add_column("Exit", justify="right")
+        table.add_column("Duration (ms)", justify="right")
+        table.add_column("Caller", style="dim")
+        for entry in entries:
+            table.add_row(
+                entry.timestamp,
+                entry.tool_name,
+                entry.root,
+                str(entry.exit_code),
+                str(entry.duration_ms),
+                entry.caller_id or "",
+            )
+        console.print(table)
 
     raise typer.Exit(0)
 
