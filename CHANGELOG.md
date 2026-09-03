@@ -5,6 +5,18 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.10.0] - 2026-09-03
+
+Feature release: new `hyodo mcp doctor` diagnostic command.
+
+### Added
+
+- `hyodo mcp doctor` — read-only local MCP setup diagnostic. Reports SDK
+  availability and major version, workspace root validity, port availability
+  (and dashboard-reserved 8768), and Tailscale connectivity. Supports `--json`
+  for machine-readable output. Always exits 0; diagnoses, never blocks.
+  Fail-closed on missing `mcp` extra (exit 2, install hint).
+
 ## [4.9.0] - 2026-09-03
 
 Compatibility release: the optional MCP adapter now runs on both MCP Python

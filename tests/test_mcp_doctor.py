@@ -23,6 +23,7 @@ runner = CliRunner()
 # 1. The command exists and is wired into the ``mcp`` sub-group.
 # ---------------------------------------------------------------------------
 
+
 def test_mcp_doctor_command_is_registered():
     """``hyodo mcp doctor`` appears in the CLI help output."""
     result = runner.invoke(app, ["mcp", "--help"])
@@ -33,6 +34,7 @@ def test_mcp_doctor_command_is_registered():
 # ---------------------------------------------------------------------------
 # 2. MCP SDK availability check
 # ---------------------------------------------------------------------------
+
 
 def test_mcp_doctor_reports_mcp_sdk_present():
     """When the ``mcp`` package is importable, doctor reports it as available."""
@@ -67,6 +69,7 @@ def test_mcp_doctor_reports_mcp_sdk_missing(monkeypatch):
 # 3. Workspace root check
 # ---------------------------------------------------------------------------
 
+
 def test_mcp_doctor_reports_valid_workspace(tmp_path):
     """A valid directory root is reported as OK."""
     result = runner.invoke(app, ["mcp", "doctor", "--root", str(tmp_path)])
@@ -87,6 +90,7 @@ def test_mcp_doctor_reports_missing_workspace(tmp_path):
 # ---------------------------------------------------------------------------
 # 4. Port availability check (default 8769)
 # ---------------------------------------------------------------------------
+
 
 def test_mcp_doctor_reports_port_free():
     """When the default MCP port is free, doctor reports it as available."""
@@ -113,6 +117,7 @@ def test_mcp_doctor_reports_port_in_use():
 # 5. Dashboard port conflict (8768)
 # ---------------------------------------------------------------------------
 
+
 def test_mcp_doctor_warns_dashboard_port_conflict():
     """If port 8768 is occupied by the dashboard, doctor notes the reservation."""
     result = runner.invoke(app, ["mcp", "doctor", "--port", "8768"])
@@ -125,6 +130,7 @@ def test_mcp_doctor_warns_dashboard_port_conflict():
 # 6. Tailscale check (best-effort, may not be installed)
 # ---------------------------------------------------------------------------
 
+
 def test_mcp_doctor_includes_tailscale_section():
     """Doctor includes a tailscale section even when tailscale is unavailable."""
     result = runner.invoke(app, ["mcp", "doctor"])
@@ -135,6 +141,7 @@ def test_mcp_doctor_includes_tailscale_section():
 # ---------------------------------------------------------------------------
 # 7. JSON output
 # ---------------------------------------------------------------------------
+
 
 def test_mcp_doctor_json_output(tmp_path):
     """With ``--json``, doctor emits a valid JSON structure with all check keys."""
@@ -168,6 +175,7 @@ def test_mcp_doctor_json_port_fields(tmp_path):
 # 8. Doctor never starts a server
 # ---------------------------------------------------------------------------
 
+
 def test_mcp_doctor_never_starts_a_server(monkeypatch):
     """Doctor must not call run_stdio, run_loopback, or run_tailscale."""
     from hyodo import mcp_server
@@ -187,6 +195,7 @@ def test_mcp_doctor_never_starts_a_server(monkeypatch):
 # ---------------------------------------------------------------------------
 # 9. Exit code semantics
 # ---------------------------------------------------------------------------
+
 
 def test_mcp_doctor_exits_0_even_with_problems(tmp_path):
     """Doctor exits 0 even when problems are found; it reports, not blocks."""
