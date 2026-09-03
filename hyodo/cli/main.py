@@ -113,6 +113,12 @@ mcp_app = typer.Typer(
     help="Optional local MCP adapter for the HyoDo CLI",
     add_completion=False,
 )
+rules_app = typer.Typer(
+    name="rules",
+    help="Agent-rules opt-in declarations",
+    add_completion=False,
+)
+mcp_app.add_typer(rules_app, name="rules")
 app.add_typer(event_app, name="event")
 app.add_typer(policy_app, name="policy")
 app.add_typer(schema_app, name="schema")
@@ -1720,7 +1726,7 @@ def mcp_doctor(
     mcp_sdk_version: str | None = None
     try:
         get_mcp_server_class()
-        import mcp
+        import mcp  # pyright: ignore[reportMissingImports]
 
         mcp_sdk_version = getattr(mcp, "__version__", None)
     except ModuleNotFoundError:
@@ -1816,6 +1822,72 @@ def mcp_doctor(
         else:
             console.print("tailscale:  [dim]not connected or not installed[/dim]")
 
+    raise typer.Exit(0)
+
+
+@rules_app.command("list")
+def rules_list(
+    root: str = typer.Option(".", "--root", help="Workspace root directory"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """List active agent rules from .hyodo/agent-rules.toml (or defaults if missing)."""
+    from hyodo._mcp_compat import get_mcp_server_class
+
+    try:
+        get_mcp_server_class()
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.startswith("mcp"):
+            console.print("[red]MCP support is not installed.[/red]")
+            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            raise typer.Exit(2) from exc
+        raise
+
+    from hyodo.agent_rules import DEFAULT_RULES, load_agent_rules
+
+    root_path = Path(root).expanduser().resolve()
+    rules = load_agent_rules(root_path)
+    if not rules:
+        rules = list(DEFAULT_RULES)
+
+    if json_output:
+        console.print_json(json.dumps([r.to_dict() for r in rules]))
+    else:
+        if not rules:
+            console.print("[dim]No agent rules configured.[/dim]")
+        for rule in rules:
+            status = "[green]on[/green]" if rule.enabled else "[dim]off[/dim]"
+            scope_label = rule.scope
+            console.print(f"  {rule.name} ({scope_label}, {status})")
+            console.print(f"    {rule.description}")
+    raise typer.Exit(0)
+
+
+@rules_app.command("init")
+def rules_init(
+    root: str = typer.Option(".", "--root", help="Workspace root directory"),
+) -> None:
+    """Write default agent rules to .hyodo/agent-rules.toml (idempotent, preserves existing)."""
+    from hyodo._mcp_compat import get_mcp_server_class
+
+    try:
+        get_mcp_server_class()
+    except ModuleNotFoundError as exc:
+        if exc.name and exc.name.startswith("mcp"):
+            console.print("[red]MCP support is not installed.[/red]")
+            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            raise typer.Exit(2) from exc
+        raise
+
+    from hyodo.agent_rules import AGENT_RULES_PATH, DEFAULT_RULES, save_agent_rules
+
+    root_path = Path(root).expanduser().resolve()
+    rules_file = root_path / AGENT_RULES_PATH
+    if rules_file.exists():
+        console.print(f"[dim]Agent rules already exist at {rules_file} — skipping.[/dim]")
+        raise typer.Exit(0)
+
+    save_agent_rules(root_path, list(DEFAULT_RULES))
+    console.print(f"[green]Created[/green] {rules_file} with {len(DEFAULT_RULES)} default rules.")
     raise typer.Exit(0)
 
 

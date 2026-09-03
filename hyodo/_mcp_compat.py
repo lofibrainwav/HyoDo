@@ -15,7 +15,9 @@ from typing import Any
 
 _V2Server: type[Any] | None
 try:  # MCP SDK v2 (2026-07-28 protocol revision and later)
-    from mcp.server import mcpserver as _v2_module  # pyright: ignore[reportAttributeAccessIssue]
+    from mcp.server import (  # pyright: ignore[reportMissingImports]
+        mcpserver as _v2_module,  # pyright: ignore[reportMissingImports, reportAttributeAccessIssue]
+    )
 
     _V2Server = _v2_module.MCPServer
 except ImportError:  # SDK v1: the symbol import fails before the module lookup
@@ -29,7 +31,7 @@ def get_mcp_server_class() -> type[Any]:
     # Reachable only when the v2 module is absent (SDK v1). Under a v2 install
     # this import is statically unresolvable, which is expected — ignore both
     # missing-module and unknown-symbol reports accordingly.
-    from mcp.server.fastmcp import (
+    from mcp.server.fastmcp import (  # pyright: ignore[reportMissingImports]
         FastMCP,  # pyright: ignore[reportMissingImports, reportAttributeAccessIssue]
     )
 

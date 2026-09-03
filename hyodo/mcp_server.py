@@ -214,6 +214,27 @@ def create_server(
             stdin=json.dumps(event),
         )
 
+    @server.tool()
+    def hyodo_agent_rules() -> dict[str, Any]:
+        """Return the current agent rules loaded from the workspace.
+
+        When no ``.hyodo/agent-rules.toml`` exists, the built-in defaults are
+        returned.  Agent rules are self-imposed declarations — HyoDo records
+        and surfaces them but does NOT enforce them.
+        """
+        from hyodo.agent_rules import DEFAULT_RULES, load_agent_rules
+
+        rules = load_agent_rules(workspace)
+        if not rules:
+            rules = list(DEFAULT_RULES)
+        return {
+            "exit_code": 0,
+            "rules": [r.to_dict() for r in rules],
+            "source": "file"
+            if (workspace / ".hyodo" / "agent-rules.toml").exists()
+            else "defaults",
+        }
+
     return server
 
 
