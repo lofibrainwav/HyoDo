@@ -26,7 +26,12 @@ def get_mcp_server_class() -> type[Any]:
     """Return the installed SDK's high-level server class."""
     if _V2Server is not None:
         return _V2Server
-    from mcp.server.fastmcp import FastMCP  # pyright: ignore[reportMissingImports]
+    # Reachable only when the v2 module is absent (SDK v1). Under a v2 install
+    # this import is statically unresolvable, which is expected — ignore both
+    # missing-module and unknown-symbol reports accordingly.
+    from mcp.server.fastmcp import (
+        FastMCP,  # pyright: ignore[reportMissingImports, reportAttributeAccessIssue]
+    )
 
     return FastMCP
 
