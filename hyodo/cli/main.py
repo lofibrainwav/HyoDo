@@ -1699,6 +1699,126 @@ def mcp_serve(
         raise typer.Exit(2) from exc
 
 
+@mcp_app.command("doctor")
+def mcp_doctor(
+    root: str = typer.Option(".", "--root", help="Workspace root to validate"),
+    port: int = typer.Option(8769, "--port", min=1024, max=65535, help="MCP port to check"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Diagnose the local MCP setup without starting a server.
+
+    Checks: MCP SDK availability, workspace root, port availability,
+    dashboard port conflict, and Tailscale connectivity.  Exits 0
+    regardless of problems found — doctor reports, it never blocks.
+    """
+    import socket as _socket
+
+    from hyodo._mcp_compat import get_mcp_server_class
+
+    # ── MCP SDK availability ──────────────────────────────────────────
+    mcp_sdk_available = True
+    mcp_sdk_version: str | None = None
+    try:
+        get_mcp_server_class()
+        import mcp
+
+        mcp_sdk_version = getattr(mcp, "__version__", None)
+    except ModuleNotFoundError:
+        mcp_sdk_available = False
+
+    # ── Workspace root ────────────────────────────────────────────────
+    root_path = Path(root).expanduser().resolve()
+    workspace_ok = root_path.is_dir()
+    workspace_path = str(root_path)
+
+    # ── Port availability ────────────────────────────────────────────
+    dashboard_reserved = port == 8768
+    port_free = True
+    if not dashboard_reserved:
+        probe = _socket.socket(_socket.AF_INET, _socket.SOCK_STREAM)
+        probe.settimeout(0.5)
+        try:
+            probe.bind(("127.0.0.1", port))
+        except OSError:
+            port_free = False
+        finally:
+            probe.close()
+
+    # ── Tailscale check (best-effort) ────────────────────────────────
+    tailscale_up = False
+    tailscale_ip: str | None = None
+    try:
+        ts_result = subprocess.run(
+            ["tailscale", "status", "--json"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (FileNotFoundError, OSError):
+        ts_result = None
+    if ts_result is not None and ts_result.returncode == 0:
+        try:
+            ts_data = json.loads(ts_result.stdout)
+            tailscale_up = ts_data.get("Online", False)
+            tailscale_ip = ts_data.get("TailscaleIPs", [None])[0]
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # ── Render ───────────────────────────────────────────────────────
+    if json_output:
+        payload = {
+            "mcp_sdk": {
+                "available": mcp_sdk_available,
+                "version": mcp_sdk_version,
+            },
+            "workspace": {
+                "path": workspace_path,
+                "valid": workspace_ok,
+            },
+            "port": {
+                "number": port,
+                "free": port_free,
+                "dashboard_reserved": dashboard_reserved,
+            },
+            "tailscale": {
+                "up": tailscale_up,
+                "ip": tailscale_ip,
+            },
+        }
+        console.print_json(json.dumps(payload))
+    else:
+        # MCP SDK
+        if mcp_sdk_available:
+            label = f"[green]available[/green] ({mcp_sdk_version or 'version unknown'})"
+        else:
+            label = "[red]missing[/red] — install with: pip install 'hyodo[mcp]'"
+        console.print(f"mcp-sdk:    {label}")
+
+        # Workspace
+        if workspace_ok:
+            console.print(f"workspace:  [green]valid[/green] ({workspace_path})")
+        else:
+            console.print(f"workspace:  [red]missing[/red] — {workspace_path} is not a directory")
+
+        # Port
+        if dashboard_reserved:
+            console.print(
+                "port:       [red]reserved[/red] — 8768 is reserved for the HyoDo dashboard"
+            )
+        elif port_free:
+            console.print(f"port:       [green]available[/green] (:{port})")
+        else:
+            console.print(f"port:       [red]in use[/red] (:{port}) — another process is listening")
+
+        # Tailscale
+        if tailscale_up:
+            console.print(f"tailscale:  [green]up[/green] ({tailscale_ip})")
+        else:
+            console.print("tailscale:  [dim]not connected or not installed[/dim]")
+
+    raise typer.Exit(0)
+
+
 @schema_app.command("check")
 def schema_check(
     schema: str = typer.Option(..., "--schema", help="Path to a JSON Schema document"),
