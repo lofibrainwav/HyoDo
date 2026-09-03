@@ -5,6 +5,24 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.11.0] - 2026-09-03
+
+Feature release: MCP access ledger and agent-rules opt-in (Issue #95 M4 complete).
+
+### Added
+
+- `hyodo mcp access-log` — audit trail of MCP tool invocations. Every tool call
+  is recorded to `.hyodo/mcp-access.jsonl` (append-only, best-effort, never
+  blocks the call). Supports `--root`, `--limit`, and `--json`. Fail-closed on
+  missing `mcp` extra (exit 2, install hint).
+- `hyodo mcp rules list` — show active agent rules from
+  `.hyodo/agent-rules.toml` (or built-in defaults when absent). Supports
+  `--root` and `--json`.
+- `hyodo mcp rules init` — write default agent rules to
+  `.hyodo/agent-rules.toml` (idempotent, preserves an existing file).
+- `hyodo_agent_rules` MCP tool — returns current agent rules over the MCP
+  protocol.
+
 ## [4.10.0] - 2026-09-03
 
 Feature release: new `hyodo mcp doctor` diagnostic command.

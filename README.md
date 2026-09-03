@@ -84,8 +84,8 @@ hyodo mcp stdio --root .
 
 This starts a local standard-input/output MCP process only. It wraps the
 existing `safe`, `check`, `event record`, and `policy check` CLI contracts
-for the configured host workspace. It does not open a network listener or
-give a client access to files outside that workspace.
+for the configured host workspace. It never opens a network listener or
+exposes files outside that workspace.
 
 ### Optional private-network MCP
 
@@ -144,8 +144,8 @@ See [Quick Start](./QUICK_START.md).
 | `hyodo mcp stdio` | Optional local MCP CLI adapter |
 | `hyodo mcp serve` | Explicit loopback or authenticated Tailscale MCP adapter |
 | `hyodo mcp doctor` | Diagnose local MCP setup |
-| `hyodo score …` | Optional review signal |
-| `hyodo dashboard` | Local evidence panel |
+| `hyodo mcp access-log` / `rules` | MCP audit trail / agent rules |
+| `hyodo score …` / `dashboard` | Optional review signal / evidence panel |
 
 **safe:** `0` findings · `1` high+`--strict` · `2` bad path.
 **check:** `0` all executed PASS · `1` FAIL · `2` none/malformed.
