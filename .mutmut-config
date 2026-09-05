@@ -1,0 +1,3 @@
+[mutmut]
+paths_to_mutate=hyodo/__init__.py,hyodo/safety.py,hyodo/events.py
+runner=cd /Users/brnestrm/HyoDo/mutants && PYTHONPATH=/Users/brnestrm/HyoDo/mutants .venv/bin/python -m pytest tests/test_scoring_math.py tests/test_scoring_properties.py tests/test_safety_patterns.py tests/test_safety_property_boundaries.py tests/test_agent_events.py tests/test_ledger_durability.py -x -q --override-ini="testpaths=tests" --no-header 2>&1 | head -20
