@@ -30,7 +30,6 @@ and fail-closed exit contracts.
 ```bash
 pipx install hyodo
 cd your-project
-
 hyodo safe --strict
 hyodo init
 hyodo check
@@ -175,6 +174,7 @@ Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 - Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
 - Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 - Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+
 ## License
 
 MIT. See [`LICENSE`](./LICENSE).
