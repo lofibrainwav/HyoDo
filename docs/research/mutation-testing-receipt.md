@@ -23,45 +23,49 @@ fresh Python 3.12 virtual environment, and `uv pip install -e ".[dev,mutation]"`
 That isolation removed the editable-install ambiguity seen in the first mutmut
 attempt.
 
-### Initial legacy summary — provisional
+### Final status-aware receipt — sealed
 
-The first summarizer reported:
-
-| Measure | Initial result |
-|---------|----------------|
-| Mutations generated | 1,847 |
-| Classified as tested | 318 |
-| Classified as killed | 163 |
-| Classified as survived | 155 |
-| Legacy tested kill rate | 51.26% |
-| Legacy all-generated rate | 8.83% |
-
-**Do not treat those derived rates or the former `1,529 no-tests` label as the
-sealed mutation score yet.** A follow-up audit found two classification defects
-in the legacy summarizer:
-
-1. exit code `-24` was counted as killed, while mutmut 3.7.0's final status map
-   classifies it as `timeout`;
-2. every generated mutant outside killed/survived was collapsed into
-   `no-tests`, mixing true no-test outcomes with not-checked, timeout, skipped,
-   type-check, segfault, interrupted, and suspicious outcomes.
-
-`scripts/mutation-score.py` now preserves each mutmut 3.7.0 status separately,
-fails if any target metadata file is missing, and treats `--generated` only as
-an assertion against metadata rather than as a denominator override.
-
-### Required sealing readback
-
-Run the status-aware summarizer against the preserved or freshly generated
-`mutants/` metadata:
+The updated summarizer was run against the preserved metadata in
+`/tmp/hyodo-mutation-baseline/mutants`:
 
 ```bash
 python scripts/mutation-score.py --mutants-dir mutants --generated 1847
 ```
 
-The final receipt must copy the resulting per-status totals before this PR is
-considered mutation-score complete. Until then the initial values above are
-historical observations, not merge authority.
+The status-aware census is:
+
+| Measure | Final result |
+|---------|--------------|
+| Mutations generated | **1,847** |
+| Killed | **163** |
+| Survived | **155** |
+| No selected tests | **1,529** |
+| Timeout | **0** |
+| Not checked | **0** |
+| Skipped | **0** |
+| Caught by type check | **0** |
+| Segfault | **0** |
+| Interrupted | **0** |
+| Suspicious | **0** |
+| Tested mutation kill rate | **163/318 = 51.26%** |
+| All-generated kill rate | **163/1,847 = 8.83%** |
+
+Per-module status-aware totals:
+
+| Module | Generated | Killed | Survived | No selected tests |
+|--------|-----------|--------|----------|------------------|
+| `hyodo/__init__.py` | 139 | 73 | 48 | 18 |
+| `hyodo/safety.py` | 1,010 | 46 | 65 | 899 |
+| `hyodo/events.py` | 537 | 44 | 42 | 451 |
+| `hyodo/exceptions.py` | 161 | 0 | 0 | 161 |
+| **Total** | **1,847** | **163** | **155** | **1,529** |
+
+The old summary had two defects: it treated exit code `-24` as killed and
+collapsed every non-killed/non-survived outcome into `no-tests`. The final
+readback uses the mutmut 3.7.0 status map and preserves each status separately.
+Missing target metadata is a hard failure, and `--generated` is an assertion
+rather than a denominator override. The receipt is now sealed for this exact
+metadata set; a future mutmut or Python version requires a new receipt.
 
 ## Manual Mutation Verification (7/7 KILLED)
 
