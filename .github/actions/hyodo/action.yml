@@ -1,0 +1,51 @@
+name: HyoDo quality gates
+description: >-
+  Install HyoDo from PyPI and run fail-closed quality gates (hyodo check).
+  Exits non-zero when gates fail or when nothing measurable ran; missing
+  evidence is never reported as green.
+author: AFO Kingdom
+branding:
+  icon: shield
+  color: blue
+inputs:
+  version:
+    description: PyPI version of hyodo to install (pinned by default).
+    required: false
+    default: "4.11.0"
+  python-version:
+    description: Python interpreter version used to run hyodo.
+    required: false
+    default: "3.12"
+  args:
+    description: Extra arguments passed to `hyodo check` (e.g. "--general").
+    required: false
+    default: ""
+  upload-sarif:
+    description: >-
+      Upload the SARIF report to GitHub code scanning. Requires
+      `security-events: write` permission on the calling workflow.
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+    - name: Install HyoDo (pinned)
+      shell: bash
+      run: python -m pip install "hyodo==${{ inputs.version }}"
+    - name: Run HyoDo gates
+      shell: bash
+      run: hyodo check ${{ inputs.args }}
+    - name: Render SARIF report
+      shell: bash
+      run: |
+        mkdir -p .hyodo/reports
+        hyodo report --format sarif --root . --json
+    - name: Upload SARIF report
+      if: inputs.upload-sarif == 'true'
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: .hyodo/reports/hyodo-report.sarif

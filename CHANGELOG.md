@@ -5,6 +5,20 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `.pre-commit-hooks.yaml` — `hyodo-check` and `hyodo-safe-strict` hooks so
+  `hyodo check` runs under the pre-commit framework from any consuming repo.
+- `hyodo report --format sarif` — writes a SARIF v2.1.0 log to
+  `.hyodo/reports/hyodo-report.sarif`. Measured policy DENYs and unreadable
+  ledgers become `error` results; unmeasured evidence is never rendered as an
+  empty "no alerts" run.
+- `.github/actions/hyodo` — composite GitHub Action that installs a pinned
+  `hyodo==4.11.0` from PyPI and runs `hyodo check`, with an opt-in
+  `upload-sarif` input for the GitHub Security tab.
+
 ## [4.11.0] - 2026-09-03
 
 Feature release: MCP access ledger and agent-rules opt-in (Issue #95 M4 complete).

@@ -1,0 +1,35 @@
+# HyoDo pre-commit hook surface.
+#
+# Usage in a consuming repo's .pre-commit-config.yaml:
+#
+#   - repo: https://github.com/lofibrainwav/HyoDo
+#     rev: v4.11.0
+#     hooks:
+#       - id: hyodo-check
+#
+# `hyodo check` exits 0 only when executed gates pass, 1 on gate failure,
+# and 2 when nothing measurable ran; it never turns missing evidence green.
+#
+# Optional safety gate: `--safe-strict` appends `hyodo safe --strict`, which
+# exits 1 on any high-severity early-warning finding.
+- id: hyodo-check
+  name: HyoDo quality gates
+  description: >-
+    Run HyoDo fail-closed quality gates (hyodo check). Requires the project to
+    be initialized with `hyodo init` (a .hyodo/gates.toml), a HyoDo checkout,
+    or pass --general.
+  entry: hyodo check
+  language: python
+  types_or: [python, javascript, typescript, go, rust, shell, toml, yaml, json]
+  pass_filenames: false
+  require_serial: true
+- id: hyodo-safe-strict
+  name: HyoDo safety gate (strict)
+  description: >-
+    Block commits when the HyoDo early-warning safety scan reports a
+    high-severity finding (hyodo safe --strict).
+  entry: hyodo safe --strict
+  language: python
+  types: [file]
+  pass_filenames: false
+  require_serial: true

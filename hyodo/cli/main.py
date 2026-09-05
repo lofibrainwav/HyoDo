@@ -2025,15 +2025,17 @@ def eval_command(
 
 @app.command("report")
 def report_command(
-    report_format: str = typer.Option("md", "--format", help="Local report format: md or html"),
+    report_format: str = typer.Option(
+        "md", "--format", help="Local report format: md, html, or sarif (SARIF v2.1.0)"
+    ),
     root: str = typer.Option(".", "--root", help="Project root that owns local evidence"),
     json_output: bool = typer.Option(
         False, "--json", help="Emit a machine-readable report summary"
     ),
 ):
     """Render a local FDE sign-off report from observed evidence only."""
-    if report_format not in {"md", "html"}:
-        console.print("[red]--format must be md or html[/red]")
+    if report_format not in {"md", "html", "sarif"}:
+        console.print("[red]--format must be md, html, or sarif[/red]")
         raise typer.Exit(2)
     exit_code, summary = write_report(Path(root).resolve(), report_format)
     if json_output:

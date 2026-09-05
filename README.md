@@ -78,6 +78,13 @@ a hosted service, model provider, or remote control plane.
 - run: hyodo safe --strict --json
 ```
 
+The bundled composite action installs a pinned hyodo and runs `hyodo check`.
+Set `upload-sarif: "true"` with `security-events: write` for Security tab upload:
+
+```yaml
+- uses: lofibrainwav/HyoDo/.github/actions/hyodo@v4.11.0
+```
+
 For project-specific gates:
 
 ```bash
@@ -87,6 +94,20 @@ hyodo check
 
 `init` can absorb pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, and
 Makefile targets. Empty or malformed gate configuration exits **2**, not **0**.
+
+## Hooks and SARIF
+
+Add the pre-commit hooks from `.pre-commit-hooks.yaml`:
+
+```yaml
+- repo: https://github.com/lofibrainwav/HyoDo
+  rev: v4.11.0
+  hooks: [{id: hyodo-check}, {id: hyodo-safe-strict}]
+```
+
+`hyodo report --format sarif` writes a SARIF 2.1.0 report for
+`github/codeql-action/upload-sarif`; unmeasured evidence is never reported as
+an empty alert set.
 
 ## Optional agent evidence
 
@@ -148,24 +169,12 @@ cannot be shell-faked through `gates.toml`. See
 
 ## Install and support
 
-Python **3.10+**:
-
-```bash
-pipx install hyodo
-# or
-pip install -U hyodo
-```
+Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 
 - Quick start: [`QUICK_START.md`](./QUICK_START.md)
-- Security reporting: [`SECURITY.md`](./SECURITY.md)
-- Issues and help: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
+- Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
 - Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 - Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
-
-HyoDo is currently maintained as a small public project. The enforced merge
-gate is CI; outside contributions receive maintainer review. The exact review
-model is documented in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
-
 ## License
 
 MIT. See [`LICENSE`](./LICENSE).
