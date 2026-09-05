@@ -8,48 +8,66 @@
 
 | Tool | Version | Status |
 |------|---------|--------|
-| mutmut | 3.7.0 | Automated run completed in an isolated worktree |
-| cosmic-ray | 8.7.0 | Config and session baseline available |
-| hypothesis | 6.157.1 | Property-based test framework |
+| mutmut | 3.7.0 | Automated isolated-worktree run completed; status-aware readback required |
+| cosmic-ray | 8.7.0 | Config and independent CI automation available in PR #126 |
+| hypothesis | 6.x | Property-based test framework; explicit examples are durable regressions |
+
+The `mutation` optional dependency pins mutmut 3.7.0 and Cosmic Ray 8.7.0.
+Mutation status semantics are version-sensitive and must be revalidated before
+those pins move.
 
 ## Automated mutmut Run
 
-The run used a clean git worktree at `/tmp/hyodo-mutation-baseline`,
-afresh Python 3.12 virtual environment, and `uv pip install -e
-".[dev,mutation]"`. This avoids the original checkout's editable-install
-ambiguity.
+The initial run used a clean git worktree at `/tmp/hyodo-mutation-baseline`, a
+fresh Python 3.12 virtual environment, and `uv pip install -e ".[dev,mutation]"`.
+That isolation removed the editable-install ambiguity seen in the first mutmut
+attempt.
 
-| Measure | Result |
-|---------|--------|
+### Initial legacy summary — provisional
+
+The first summarizer reported:
+
+| Measure | Initial result |
+|---------|----------------|
 | Mutations generated | 1,847 |
-| Mutations with selected-test coverage | 318 |
-| Killed | 163 |
-| Survived | 155 |
-| No selected tests | 1,529 |
-| Kill rate of tested mutations | **163/318 = 51.26%** |
-| Kill rate of all generated mutations | **163/1,847 = 8.83%** |
+| Classified as tested | 318 |
+| Classified as killed | 163 |
+| Classified as survived | 155 |
+| Legacy tested kill rate | 51.26% |
+| Legacy all-generated rate | 8.83% |
 
-The 51.26% figure is the actionable test-suite mutation score for the
-selected target tests. The 8.83% figure is the conservative all-generated
-rate; it includes 1,529 generated mutations for which the selected test set
-had no associated tests. Neither number is a merge authority by itself.
+**Do not treat those derived rates or the former `1,529 no-tests` label as the
+sealed mutation score yet.** A follow-up audit found two classification defects
+in the legacy summarizer:
 
-### Per-module result
+1. exit code `-24` was counted as killed, while mutmut 3.7.0's final status map
+   classifies it as `timeout`;
+2. every generated mutant outside killed/survived was collapsed into
+   `no-tests`, mixing true no-test outcomes with not-checked, timeout, skipped,
+   type-check, segfault, interrupted, and suspicious outcomes.
 
-| Module | Tested | Killed | Survived | Kill rate |
-|--------|--------|--------|----------|-----------|
-| `hyodo/__init__.py` | 121 | 73 | 48 | 60.33% |
-| `hyodo/safety.py` | 111 | 46 | 65 | 41.44% |
-| `hyodo/events.py` | 86 | 44 | 42 | 51.16% |
-| `hyodo/exceptions.py` | 0 | 0 | 0 | N/A |
+`scripts/mutation-score.py` now preserves each mutmut 3.7.0 status separately,
+fails if any target metadata file is missing, and treats `--generated` only as
+an assertion against metadata rather than as a denominator override.
 
-The durable summarizer is `scripts/mutation-score.py`. It reads mutmut
-metadata without importing mutmut internals and reports both denominators.
+### Required sealing readback
+
+Run the status-aware summarizer against the preserved or freshly generated
+`mutants/` metadata:
+
+```bash
+python scripts/mutation-score.py --mutants-dir mutants --generated 1847
+```
+
+The final receipt must copy the resulting per-status totals before this PR is
+considered mutation-score complete. Until then the initial values above are
+historical observations, not merge authority.
 
 ## Manual Mutation Verification (7/7 KILLED)
 
-These mutations were manually injected and verified killed by property tests.
-This is a separate intentional sample, not the automated mutation score:
+These mutations were manually injected and verified killed by focused property
+or regression tests. This is a separate intentional sample, not the automated
+mutation score:
 
 | # | Mutation | File | Killer Test |
 |---|----------|------|-------------|
@@ -63,35 +81,40 @@ This is a separate intentional sample, not the automated mutation score:
 
 ## Boundary Assumptions Corrected (3)
 
-Three property-model / boundary assumptions were corrected during development:
+Three property-model / boundary assumptions were corrected during development.
+They are not presented as three production-code bugs.
 
 ### H1: Floating-point boundary in geometric_mean
+
 - **File**: `hyodo/__init__.py`
-- **Assumption**: Boundedness assertion assumed exact `0 ≤ S ≤ 10`
-- **Correction**: `geometric_mean([10.0]*5)` returns `10.000000000000002` due to IEEE 754 fifth-root rounding — assertion needs epsilon tolerance
-- **Fix**: Changed assertion bounds to `6.0 - 1e-9 <= F <= 60.0 + 1e-9` and `1.0 - 1e-9 <= S <= 10.0 + 1e-9`, with `@example` for all-zeros and all-ones
-- **Philosophy mapping**: 미(美) — Beauty requires mathematical rigor including floating-point limits
+- **Assumption**: Boundedness assertion assumed exact scorer bounds.
+- **Correction**: fifth-root floating-point rounding can produce a tiny epsilon above 10.
+- **Fix**: assertions use epsilon tolerance and explicit all-zero/all-one examples.
+- **Philosophy mapping**: 미(美) — mathematical claims include floating-point limits.
 
 ### H2: AWS access key regex has no end anchor
+
 - **File**: `hyodo/safety.py`
-- **Assumption**: Test expected `AKIA[0-9A-Z]{16}` to reject 17+ character strings
-- **Correction**: The regex has no `$` anchor, so 17+ chars also match (prefix matching). This is a design choice, not a bug.
-- **Fix**: Updated test boundary expectations to match actual pattern behavior (16+ chars match)
-- **Philosophy mapping**: 진(眞) — Truth requires measuring actual behavior, not assumed behavior
+- **Assumption**: the test expected `AKIA[0-9A-Z]{16}` to reject a longer suffix.
+- **Correction**: the regex intentionally prefix-matches 16 or more suffix characters.
+- **Fix**: boundary expectations now match the shipped pattern behavior.
+- **Philosophy mapping**: 진(眞) — tests measure actual contracts, not assumptions.
 
 ### H3: GitHub token charset excludes hyphens
+
 - **File**: `hyodo/safety.py`
-- **Assumption**: Test strategy generated hyphens in token body, assuming `[A-Za-z0-9_-]`
-- **Correction**: The regex `[A-Za-z0-9_]{20,}` excludes hyphens. Test strategy was generating characters outside the regex charset.
-- **Fix**: Changed hypothesis strategy from `ascii_letters + digits + "_-"` to `ascii_letters + digits + "_"`
-- **Philosophy mapping**: 진(眞) — Property generators must match actual invariants
+- **Assumption**: the generator included hyphens in the token body.
+- **Correction**: the regex body is `[A-Za-z0-9_]{20,}`.
+- **Fix**: the property generator uses the actual invariant charset.
+- **Philosophy mapping**: 진(眞) — generators match the contract they exercise.
 
 ## Cosmic Ray Status
 
-- **Session baseline**: 1,553 mutations initialized across 4 target modules.
-- **Unmutated baseline**: selected tests passed.
-- **Full mutation execution**: not used as the primary score; the mutmut run above is the measured automated baseline.
-- **Config**: `cosmic-ray.toml` with local distributor and portable `python -m pytest` command.
+- The original local session initialized 1,553 mutations across four core modules.
+- PR #126 adds a separate automated Cosmic Ray evidence lane.
+- Cosmic Ray and mutmut use different mutation operators and test-selection
+  mechanics, so their rates are complementary evidence rather than interchangeable
+  scores.
 
 ## Property Test Coverage Summary
 
@@ -104,20 +127,23 @@ Three property-model / boundary assumptions were corrected during development:
 
 ## Philosophy → Test Mapping
 
-| Virtue | Korean | Property | Test File |
-|--------|--------|----------|-----------|
-| Truth | 진(眞) | Pattern boundary discrimination | test_safety_property_boundaries.py |
-| Goodness | 선(善) | Automated mutation evidence: 51.26% of tested mutants killed | This receipt |
-| Beauty | 미(美) | Monotonicity, symmetry, boundedness | test_scoring_properties.py |
-| Benevolence | 인(仁) | JSONL corrupt recovery, None≠0 | test_ledger_durability.py |
-| Filial Piety | 효(孝) | Reproducibility (@example anchors + deterministic generation) | tests/conftest.py |
-| Eternity | 영(永) | Versioned receipt with tested/all denominators | This receipt |
+| Virtue | Korean | Property | Evidence |
+|--------|--------|----------|----------|
+| Truth | 진(眞) | Pattern boundary discrimination | safety property tests |
+| Goodness | 선(善) | Mutation outcomes classified without denominator drift | status-aware receipt |
+| Beauty | 미(美) | Monotonicity, symmetry, boundedness | scoring property tests |
+| Benevolence | 인(仁) | JSONL corrupt recovery, None≠0 | ledger durability tests |
+| Filial Piety | 효(孝) | Explicit committed regression examples | `@example` anchors |
+| Eternity | 영(永) | Version-pinned tooling + versioned receipt | this receipt |
 
 ## Verification Commands
 
 ```bash
 # Property tests
 python -m pytest tests/test_scoring_properties.py tests/test_safety_property_boundaries.py tests/test_ledger_durability.py -v
+
+# Mutation summarizer contract
+python -m pytest tests/test_mutation_score.py -v
 
 # Full suite
 python -m pytest tests/ -q --tb=short
@@ -128,7 +154,7 @@ python -m ruff check hyodo tests scripts && python -m ruff format --check hyodo 
 # Mutmut setup and run in an isolated checkout
 uv pip install -e ".[dev,mutation]"
 mutmut run
-python scripts/mutation-score.py --generated 1847
+python scripts/mutation-score.py --mutants-dir mutants --generated 1847
 
 # Cosmic Ray baseline
 cosmic-ray baseline cosmic-ray.toml
