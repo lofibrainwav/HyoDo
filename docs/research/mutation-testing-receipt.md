@@ -59,7 +59,7 @@ Three property-model / boundary assumptions were corrected during development:
 - **File**: `hyodo/safety.py`
 - **Assumption**: Test strategy generated hyphens in token body, assuming `[A-Za-z0-9_-]`
 - **Correction**: The regex `[A-Za-z0-9_]{20,}` excludes hyphens. Test strategy was generating characters outside the regex charset.
-- **Fix**: Changed hypothesis strategy from `ascii_letters + digits + "_-"` to `ascii_letters + digits + "_"`, with `@example` for canonical token format
+- **Fix**: Changed hypothesis strategy from `ascii_letters + digits + "_-"` to `ascii_letters + digits + "_"`
 - **Philosophy mapping**: 진(眞) — Property generators must match actual invariants
 
 ## Automated Mutation Testing Status
@@ -68,7 +68,7 @@ Three property-model / boundary assumptions were corrected during development:
 - **Issue**: `mutants/` worktree uses editable install from original `.venv`, so mutated source is not loaded
 - **Result**: All 1847 mutants surface as "survived" or "no tests" — the runner tests the unmutated code
 - **Workaround**: Manual injection + verification (7/7 KILLED above)
-- **Config**: `[tool.mutmut]` in pyproject.toml, targets 4 modules, 5 test files, `also_copy = [".venv"]`
+- **Config**: `[tool.mutmut]` in pyproject.toml, targets 4 modules, 5 test files, `also_copy = [".venv"]`; portable optional install target via `[project.optional-dependencies] mutation`
 
 ### cosmic-ray
 - **Status**: Session initialized with 1553 mutations across 4 target modules
@@ -80,9 +80,9 @@ Three property-model / boundary assumptions were corrected during development:
 
 | Test File | Tests | @given | @example | Assumptions Corrected |
 |-----------|-------|--------|----------|----------------------|
-| test_scoring_properties.py | 3 | 3 | 3 | 1 (H1) |
+| test_scoring_properties.py | 3 | 3 | 2 | 1 (H1) |
 | test_safety_property_boundaries.py | 6 | 5 | 1 | 2 (H2, H3) |
-| test_ledger_durability.py | 6 | 2 | 0 | 0 |
+| test_ledger_durability.py | 6 | 2 | 1 | 0 |
 | **Total** | **15** | **10** | **4** | **3** |
 
 ## Philosophy → Test Mapping

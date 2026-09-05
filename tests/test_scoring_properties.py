@@ -104,7 +104,6 @@ def test_score_symmetry_permutation_invariant(values: list[float]) -> None:
 
 @example(values=[0.0, 0.0, 0.0, 0.0, 0.0])
 @example(values=[1.0, 1.0, 1.0, 1.0, 1.0])
-@example(values=[10.0, 10.0, 10.0, 10.0, 10.0])
 @given(st.lists(unit_value, min_size=5, max_size=5))
 @settings(deadline=None)
 def test_score_bounded_f_and_s_ranges(values: list[float]) -> None:

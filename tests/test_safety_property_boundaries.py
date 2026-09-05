@@ -130,7 +130,7 @@ def _production_env_boundary() -> st.SearchStrategy[str]:
 @given(s=_aws_access_key_boundary())
 @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much], max_examples=200)
 def test_aws_access_key_boundary_property(s: str) -> None:
-    """An AKIA key of exactly 20 chars (AKIA+16) must match; 19 or 21 must not."""
+    """An AKIA key with AKIA + 16+ suffix chars must match; 15 must not."""
     findings = scan_text(s)
     expected = _aws_access_key_expected(s)
     if expected is None:
