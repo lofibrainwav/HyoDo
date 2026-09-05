@@ -8,11 +8,11 @@ Three artifacts make HyoDo installable where other tools already live:
    therefore match a console_script that the package actually ships.
 2. `hyodo report --format sarif` — writes a SARIF v2.1.0 log so results can
    appear in the GitHub Security tab via code scanning upload.
-3. `.github/actions/hyodo/action.yml` — a composite action that installs a
-   pinned hyodo from PyPI and runs `hyodo check`.
+3. `.github/actions/hyodo/action.yml` — a composite action that installs HyoDo
+   from the same pinned repository ref and runs `hyodo check`.
 
-These tests pin the *shape* of each artifact; they do not execute pre-commit
-itself or the GitHub runner.
+These tests pin the *shape* and ref integrity of each artifact; they do not
+execute pre-commit itself or the GitHub runner.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ from hyodo.report import SARIF_SCHEMA_URI
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOKS_PATH = REPO_ROOT / ".pre-commit-hooks.yaml"
 ACTION_PATH = REPO_ROOT / ".github" / "actions" / "hyodo" / "action.yml"
+README_PATH = REPO_ROOT / "README.md"
 SARIF_SCHEMA_PATH = Path(__file__).parent / "fixtures" / "sarif-schema-2.1.0.json"
 
 runner = CliRunner()
@@ -79,6 +80,14 @@ def test_pre_commit_hook_declares_non_blocking_metadata() -> None:
     # pass_filenames: false — gates run over the project, not the changed files.
     assert hook["pass_filenames"] is False
     assert hook["name"]
+
+
+def test_new_surfaces_do_not_claim_they_exist_in_v4_11_0() -> None:
+    """v4.11.0 predates both integration files; examples must not point at it."""
+    readme = README_PATH.read_text(encoding="utf-8")
+    hooks = HOOKS_PATH.read_text(encoding="utf-8")
+    assert ".github/actions/hyodo@v4.11.0" not in readme
+    assert "rev: v4.11.0" not in hooks
 
 
 # --- SARIF report surface -----------------------------------------------------
@@ -131,8 +140,8 @@ def test_sarif_report_validates_against_official_sarif_2_1_0_schema(
     log = json.loads((tmp_path / summary["result_path"]).read_text(encoding="utf-8"))
     jsonschema.validate(instance=log, schema=schema)
 
-    # An empty-evidence run (no alerts) must also validate — a Security tab
-    # upload of an empty log is valid and not a false green.
+    # An empty-evidence SARIF log is schema-valid. It is a visibility artifact,
+    # not a replacement for the fail-closed `hyodo check` command.
     empty = runner.invoke(
         app, ["report", "--root", str(tmp_path / "empty"), "--format", "sarif", "--json"]
     )
@@ -168,18 +177,16 @@ def test_composite_action_parses_and_is_composite() -> None:
     assert action["description"]
 
 
-def test_composite_action_pins_hyodo_version() -> None:
+def test_composite_action_installs_hyodo_from_same_pinned_ref() -> None:
     action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
     steps = action["runs"]["steps"]
     install_steps = [step for step in steps if "pip install" in str(step.get("run", ""))]
-    assert install_steps, "action must install hyodo from PyPI"
+    assert install_steps, "action must install HyoDo"
     run_block = install_steps[0]["run"]
-    assert "hyodo==" in run_block
-    # The default pin must be a concrete released version, not a floating range.
-    default_version = action["inputs"]["version"]["default"]
-    assert re.fullmatch(r"\d+\.\d+\.\d+", default_version), (
-        "default hyodo version must be pinned, got: " + str(default_version)
-    )
+    assert "github.action_path" in run_block
+    assert "../../.." in run_block
+    assert "hyodo==" not in run_block
+    assert "version" not in action.get("inputs", {})
 
 
 def test_composite_action_runs_hyodo_check() -> None:
@@ -188,15 +195,22 @@ def test_composite_action_runs_hyodo_check() -> None:
     assert any("hyodo check" in block for block in run_blocks)
 
 
+def test_composite_action_external_actions_are_sha_pinned() -> None:
+    action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
+    uses = [str(step["uses"]) for step in action["runs"]["steps"] if "uses" in step]
+    assert uses
+    for ref in uses:
+        assert re.fullmatch(r"[^@]+@[0-9a-f]{40}", ref), f"external action is not SHA-pinned: {ref}"
+
+
 def test_composite_action_sarif_upload_is_opt_in() -> None:
     action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
-    if "upload-sarif" not in action.get("inputs", {}):
-        return  # no upload step wired; nothing to pin
-    upload_steps = [
-        step for step in action["runs"]["steps"] if "upload-sarif" in str(step.get("uses", ""))
+    assert action["inputs"]["upload-sarif"]["default"] == "false"
+    sarif_steps = [
+        step
+        for step in action["runs"]["steps"]
+        if "SARIF" in str(step.get("name", "")) or "upload-sarif" in str(step.get("uses", ""))
     ]
-    assert upload_steps
-    for step in upload_steps:
-        # Upload must be gated by the opt-in input — callers without
-        # `security-events: write` must not fail.
+    assert len(sarif_steps) == 2
+    for step in sarif_steps:
         assert "upload-sarif" in str(step.get("if", ""))
