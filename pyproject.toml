@@ -84,8 +84,10 @@ mcp = [
     "mcp>=1.27,<3",
 ]
 mutation = [
-    "mutmut>=3.7",
-    "cosmic-ray>=8.0",
+    # Receipt semantics and status codes are version-sensitive; keep these exact
+    # until the mutation parser and configs are revalidated against an upgrade.
+    "mutmut==3.7.0",
+    "cosmic-ray==8.7.0",
 ]
 
 [project.scripts]
@@ -171,8 +173,8 @@ exclude_lines = [
     "def __repr__",
 ]
 
-# Mutation testing configuration (mutmut 3.x).
-# Run: mutmut run — targets scoring math, safety patterns, and event ledger.
+# Mutation testing configuration (mutmut 3.7.0).
+# Run in an isolated checkout: mutmut run
 [tool.mutmut]
 source_paths = ["hyodo/__init__.py", "hyodo/safety.py", "hyodo/events.py", "hyodo/exceptions.py"]
 pytest_add_cli_args_test_selection = [
@@ -182,4 +184,3 @@ pytest_add_cli_args_test_selection = [
     "tests/test_safety_property_boundaries.py",
     "tests/test_ledger_durability.py",
 ]
-also_copy = [".venv"]
