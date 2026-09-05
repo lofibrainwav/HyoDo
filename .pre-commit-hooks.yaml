@@ -1,16 +1,17 @@
 # HyoDo pre-commit hook surface.
 #
-# Usage in a consuming repo's .pre-commit-config.yaml:
+# Usage in a consuming repo's .pre-commit-config.yaml: pin a signed release tag
+# that contains these hooks. v4.11.0 predates this file.
 #
 #   - repo: https://github.com/lofibrainwav/HyoDo
-#     rev: v4.11.0
+#     rev: vX.Y.Z
 #     hooks:
 #       - id: hyodo-check
 #
 # `hyodo check` exits 0 only when executed gates pass, 1 on gate failure,
 # and 2 when nothing measurable ran; it never turns missing evidence green.
 #
-# Optional safety gate: `--safe-strict` appends `hyodo safe --strict`, which
+# Optional safety gate: `hyodo-safe-strict` runs `hyodo safe --strict`, which
 # exits 1 on any high-severity early-warning finding.
 - id: hyodo-check
   name: HyoDo quality gates
