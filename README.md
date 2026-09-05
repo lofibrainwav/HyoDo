@@ -77,11 +77,11 @@ a hosted service, model provider, or remote control plane.
 - run: hyodo safe --strict --json
 ```
 
-The bundled composite action installs a pinned hyodo and runs `hyodo check`.
-Set `upload-sarif: "true"` with `security-events: write` for Security tab upload:
+The composite action installs HyoDo from its pinned ref; use a signed release
+that contains it (not `v4.11.0`). Set `upload-sarif: "true"` with `security-events: write`:
 
 ```yaml
-- uses: lofibrainwav/HyoDo/.github/actions/hyodo@v4.11.0
+- uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
 ```
 
 For project-specific gates:
@@ -96,17 +96,17 @@ Makefile targets. Empty or malformed gate configuration exits **2**, not **0**.
 
 ## Hooks and SARIF
 
-Add the pre-commit hooks from `.pre-commit-hooks.yaml`:
+Pin a signed release containing the hooks (`v4.11.0` predates them):
 
 ```yaml
 - repo: https://github.com/lofibrainwav/HyoDo
-  rev: v4.11.0
+  rev: vX.Y.Z
   hooks: [{id: hyodo-check}, {id: hyodo-safe-strict}]
 ```
 
-`hyodo report --format sarif` writes a SARIF 2.1.0 report for
-`github/codeql-action/upload-sarif`; unmeasured evidence is never reported as
-an empty alert set.
+`hyodo report --format sarif` writes a SARIF 2.1.0 visibility report.
+Measured DENY and unreadable-ledger conditions become alerts; `hyodo check`
+remains the fail-closed gate for missing or unmeasured quality evidence.
 
 ## Optional agent evidence
 
