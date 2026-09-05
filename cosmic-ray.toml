@@ -1,6 +1,6 @@
 [cosmic-ray]
 module-path = ["hyodo/__init__.py", "hyodo/safety.py", "hyodo/events.py", "hyodo/exceptions.py"]
-test-command = ".venv/bin/python -m pytest tests/test_scoring_math.py tests/test_scoring_properties.py tests/test_safety_patterns.py tests/test_safety_property_boundaries.py tests/test_agent_events.py tests/test_ledger_durability.py -x -q"
+test-command = "python -m pytest tests/test_scoring_math.py tests/test_scoring_properties.py tests/test_safety_patterns.py tests/test_safety_property_boundaries.py tests/test_agent_events.py tests/test_ledger_durability.py -x -q"
 timeout = 30
 
 [cosmic-ray.distributor]

@@ -6,8 +6,9 @@ Philosophy mapping:
   - Yeong (永): Eternity of measurement — an unreadable ledger must never be
     reported as empty (that would be fake green).  None ≠ 0.
 
-These are *properties*, not examples.  Hypothesis generates arbitrary malformed
-lines, interleavings, and edge cases that examples would miss.
+These are *properties*, not examples.  Hypothesis generates examples via
+random sampling, targeted edge-case exploration, and automatic shrinking;
+explicit @example decorators anchor the key boundary cases for reproducibility.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ import os
 import threading
 from pathlib import Path
 
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
 from hyodo.events import (
@@ -57,6 +58,18 @@ arbitrary_corrupt_line = st.one_of(
 # ---------------------------------------------------------------------------
 
 
+@example(
+    good_events=[
+        {
+            "run_id": "00000000-0000-0000-0000-000000000001",
+            "pillar": "safety",
+            "score": 0.5,
+            "timestamp": "2026-01-01T00:00:00Z",
+        }
+    ],
+    corrupt_lines=["{bad json"],
+    corrupt_position=0,
+)
 @given(
     good_events=st.lists(valid_event, min_size=1, max_size=5),
     corrupt_lines=st.lists(arbitrary_corrupt_line, min_size=0, max_size=3),

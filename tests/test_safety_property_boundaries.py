@@ -14,7 +14,7 @@ from __future__ import annotations
 
 import string
 
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
 from hyodo.safety import (
@@ -126,6 +126,7 @@ def _production_env_boundary() -> st.SearchStrategy[str]:
 # ---------------------------------------------------------------------------
 
 
+@example(s="AKIAIOSFODNN7EXAMPLE")
 @given(s=_aws_access_key_boundary())
 @settings(deadline=None, suppress_health_check=[HealthCheck.filter_too_much], max_examples=200)
 def test_aws_access_key_boundary_property(s: str) -> None:

@@ -83,6 +83,10 @@ dev = [
 mcp = [
     "mcp>=1.27,<3",
 ]
+mutation = [
+    "mutmut>=3.7",
+    "cosmic-ray>=8.0",
+]
 
 [project.scripts]
 hyodo = "hyodo.cli.main:app"

@@ -1,7 +1,7 @@
 # Mutation Testing Receipt — HyoDo v4.11.0
 
 **Date**: 2026-09-05
-**Commits**: b8042fe, ee41b0e (squashed from f03f6b9 + 4f88516)
+**Commits**: b8042fe, ee41b0e
 **Operators**: Hermes (GLM-5.1)
 
 ## Tools
@@ -24,7 +24,8 @@
 
 ## Manual Mutation Verification (7/7 KILLED)
 
-These mutations were manually injected and verified killed by property tests:
+These mutations were manually injected and verified killed by property tests.
+This is a **sample kill rate**, not a full automated mutation score:
 
 | # | Mutation | File | Killer Test |
 |---|----------|------|-------------|
@@ -36,65 +37,64 @@ These mutations were manually injected and verified killed by property tests:
 | M6 | Pillar permutation (asymmetry) | __init__.py | `test_score_symmetry_permutation_invariant` |
 | M7 | `to_10_scale` monotonicity violation | __init__.py | `test_score_monotonicity_raising_one_pillar_never_lowers_score` |
 
-## Hypothesis-Discovered Regressions (3)
+## Boundary Assumptions Corrected (3)
 
-Three real bugs were found by property tests during development:
+Three property-model / boundary assumptions were corrected during development:
 
 ### H1: Floating-point boundary in geometric_mean
 - **File**: `hyodo/__init__.py`
-- **Bug**: `geometric_mean([10.0]*5)` returns `10.000000000000002` due to IEEE 754 fifth-root rounding
-- **Impact**: Boundedness assertion `0 ≤ S ≤ 10` could fail without epsilon tolerance
-- **Fix**: Changed assertion to `assert 0.0 <= s <= 10.0 + 1e-9` in `test_scoring_properties.py`
+- **Assumption**: Boundedness assertion assumed exact `0 ≤ S ≤ 10`
+- **Correction**: `geometric_mean([10.0]*5)` returns `10.000000000000002` due to IEEE 754 fifth-root rounding — assertion needs epsilon tolerance
+- **Fix**: Changed assertion bounds to `6.0 - 1e-9 <= F <= 60.0 + 1e-9` and `1.0 - 1e-9 <= S <= 10.0 + 1e-9`, with `@example` for all-zeros, all-ones, all-tens
 - **Philosophy mapping**: 미(美) — Beauty requires mathematical rigor including floating-point limits
 
 ### H2: AWS access key regex has no end anchor
 - **File**: `hyodo/safety.py`
-- **Bug**: `AKIA[0-9A-Z]{16}` matches 17+ character strings because `{16}` has no `$` anchor
-- **Impact**: False negatives in key detection (over-matching)
-- **Fix**: Updated test boundary expectations to match actual pattern behavior (17+ chars match)
-- **Note**: The regex behavior is intentional (prefix matching in context); test was wrong, not code
+- **Assumption**: Test expected `AKIA[0-9A-Z]{16}` to reject 17+ character strings
+- **Correction**: The regex has no `$` anchor, so 17+ chars also match (prefix matching). This is a design choice, not a bug.
+- **Fix**: Updated test boundary expectations to match actual pattern behavior (16+ chars match)
 - **Philosophy mapping**: 진(眞) — Truth requires measuring actual behavior, not assumed behavior
 
 ### H3: GitHub token charset excludes hyphens
 - **File**: `hyodo/safety.py`
-- **Bug**: Test strategy generated hyphens in token body, but `[A-Za-z0-9_]` excludes hyphens
-- **Impact**: False test failures from strategy/code mismatch
-- **Fix**: Changed hypothesis strategy from `string.ascii_letters + string.digits + "_-"` to `string.ascii_letters + string.digits + "_"`
+- **Assumption**: Test strategy generated hyphens in token body, assuming `[A-Za-z0-9_-]`
+- **Correction**: The regex `[A-Za-z0-9_]{20,}` excludes hyphens. Test strategy was generating characters outside the regex charset.
+- **Fix**: Changed hypothesis strategy from `ascii_letters + digits + "_-"` to `ascii_letters + digits + "_"`, with `@example` for canonical token format
 - **Philosophy mapping**: 진(眞) — Property generators must match actual invariants
 
-## Automated Mutation Testing Limitations
+## Automated Mutation Testing Status
 
 ### mutmut
 - **Issue**: `mutants/` worktree uses editable install from original `.venv`, so mutated source is not loaded
 - **Result**: All 1847 mutants surface as "survived" or "no tests" — the runner tests the unmutated code
 - **Workaround**: Manual injection + verification (7/7 KILLED above)
-- **Config**: `[tool.mutmut]` in pyproject.toml with `also_copy = [".venv"]` and `pytest_add_cli_args_test_selection`
+- **Config**: `[tool.mutmut]` in pyproject.toml, targets 4 modules, 5 test files, `also_copy = [".venv"]`
 
 ### cosmic-ray
 - **Status**: Session initialized with 1553 mutations across 4 target modules
 - **Baseline**: Tests pass unmutated (verified)
-- **Full execution**: Pending — cosmic-ray runs mutations sequentially; estimated ~30min for 1553 mutations
+- **Full execution**: Pending — cosmic-ray runs mutations sequentially
 - **Config**: `cosmic-ray.toml` with local distributor
 
 ## Property Test Coverage Summary
 
-| Test File | Tests | Hypothesis @given | Bugs Found |
-|-----------|-------|-------------------|-----------|
-| test_scoring_properties.py | 3 | 3 | 1 (H1) |
-| test_safety_property_boundaries.py | 6 | 5 | 2 (H2, H3) |
-| test_ledger_durability.py | 6 | 4 | 0 |
-| **Total** | **15** | **12** | **3** |
+| Test File | Tests | @given | @example | Assumptions Corrected |
+|-----------|-------|--------|----------|----------------------|
+| test_scoring_properties.py | 3 | 3 | 3 | 1 (H1) |
+| test_safety_property_boundaries.py | 6 | 5 | 1 | 2 (H2, H3) |
+| test_ledger_durability.py | 6 | 2 | 0 | 0 |
+| **Total** | **15** | **10** | **4** | **3** |
 
 ## Philosophy → Test Mapping
 
 | Virtue | Korean | Property | Test File |
 |--------|--------|----------|-----------|
 | Truth | 진(眞) | Pattern boundary discrimination | test_safety_property_boundaries.py |
-| Goodness | 선(善) | Mutation killing | Manual + mutmut/cosmic-ray |
+| Goodness | 선(善) | Mutation evidence receipt (7/7 sample) | This receipt |
 | Beauty | 미(美) | Monotonicity, symmetry, boundedness | test_scoring_properties.py |
 | Benevolence | 인(仁) | JSONL corrupt recovery, None≠0 | test_ledger_durability.py |
-| Filial Piety | 효(孝) | Reproducibility (hypothesis DB) | .hypothesis/ |
-| Eternity | 영(永) | Mutation score as review signal | This receipt |
+| Filial Piety | 효(孝) | Reproducibility (@example anchors + hypothesis DB) | All property files |
+| Eternity | 영(永) | Mutation evidence receipt; automated mutation score not yet measured | This receipt |
 
 ## Verification Commands
 

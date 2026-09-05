@@ -13,12 +13,13 @@ Three invariants flow directly from the philosophy document (PHILOSOPHY.md):
    Permuting inputs must produce the same F and S — no pillar is privileged
    by position.
 
-3. **Boundedness (Eternity):** F ∈ [7, 60], S ∈ [0, 10].
-   The geometric mean collapses to 0 if any axis is 0 (fail-closed), and
-   the arithmetic sum + geometric mean of five values in [1,10] is bounded.
+3. **Boundedness (Eternity):** F ∈ [6, 60], S ∈ [1, 10].
+   The to_10_scale maps raw 0 → 1, so S never collapses to 0 (fail-closed
+   through floor, not zero). The bounds are exact at the extremes.
 
-These are *properties*, not examples. Hypothesis exercises the full input
-space; failures reveal real bugs, not unlucky examples.
+These are *properties*, not examples. Hypothesis generates examples via
+random sampling, targeted edge-case exploration, and automatic shrinking;
+failures reveal real boundary assumptions, not unlucky examples.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from __future__ import annotations
 from itertools import permutations
 
 import pytest
-from hypothesis import HealthCheck, given, settings
+from hypothesis import HealthCheck, example, given, settings
 from hypothesis import strategies as st
 
 from hyodo import calculate_hygook_v5_score
@@ -97,26 +98,27 @@ def test_score_symmetry_permutation_invariant(values: list[float]) -> None:
 
 
 # ---------------------------------------------------------------------------
-# 3. Boundedness — F ∈ [7, 60], S ∈ [0, 10]
+# 3. Boundedness — F ∈ [6, 60], S ∈ [1, 10]
 # ---------------------------------------------------------------------------
 
 
+@example(values=[0.0, 0.0, 0.0, 0.0, 0.0])
+@example(values=[1.0, 1.0, 1.0, 1.0, 1.0])
+@example(values=[10.0, 10.0, 10.0, 10.0, 10.0])
 @given(st.lists(unit_value, min_size=5, max_size=5))
 @settings(deadline=None)
 def test_score_bounded_f_and_s_ranges(values: list[float]) -> None:
-    """F must lie in [7, 60] and S in [0, 10] for all unit-interval inputs.
+    """F must lie in [6, 60] and S in [1, 10] for all unit-interval inputs.
 
     This is the mathematical expression of Eternity: the review signal is
-    always a finite, well-bounded number.  F minimum of 7 comes from all five
-    pillars at floor (1 each = 5 + ⁵√1 = 6, but 0-inputs scale to 1 on the
-    1-10 range, so minimum sum is 5*1 + 1 = 6; with any 0-input, S collapses
-    to 0 but sum terms stay ≥ 1, giving F ≥ 5).  F maximum is 5*10 + 10 = 60.
-    S is a geometric mean of values in [1,10], so ∈ [1,10], except when any
-    input is 0, where S = 0 (fail-closed).
+    always a finite, well-bounded number. The to_10_scale maps raw 0 → 1,
+    so S never collapses to 0. F minimum is 5*1 + 1 = 6 (all pillars at
+    floor); F maximum is 5*10 + 10 = 60 (all pillars at ceiling).
+    S is a geometric mean of values in [1,10], so ∈ [1,10].
     """
     f, s = calculate_hygook_v5_score(*values)
 
     # Floating-point tolerance: the geometric mean of five 10.0s can produce
     # 10.000000000000002 due to rounding in the fifth root.  Use a small epsilon.
-    assert 5.0 - 1e-9 <= f <= 60.0 + 1e-9, f"F out of bounds: {f}"
-    assert 0.0 <= s <= 10.0 + 1e-9, f"S out of bounds: {s}"
+    assert 6.0 - 1e-9 <= f <= 60.0 + 1e-9, f"F out of bounds: {f}"
+    assert 1.0 - 1e-9 <= s <= 10.0 + 1e-9, f"S out of bounds: {s}"
