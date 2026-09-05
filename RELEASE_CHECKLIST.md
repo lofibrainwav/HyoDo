@@ -64,28 +64,37 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
    The signing identity must be associated with the GitHub account so GitHub
    displays the annotated tag as **Verified**. The publish workflow independently
    checks the GitHub tag object and refuses lightweight, unsigned, invalid, nested,
-   or unexpectedly-targeted tags.
+   or unexpectedly-targeted tags. Tag push alone does not publish to PyPI.
 
-3. Create GitHub Release `v$VERSION` with notes from its `CHANGELOG.md` section.
+3. Create GitHub Release `v$VERSION` as a **draft** and add reviewed notes from
+   the matching `CHANGELOG.md` section. Do not publish the draft yet.
 
-4. **PyPI publish = Trusted Publishing only** (OIDC; no long-lived API token):
+4. Run **HyoDo Release Evidence** for `v$VERSION`.
 
-   - One-time setup: `docs/PYPI_TRUSTED_PUBLISHING.md`
-     (PyPI publisher: `lofibrainwav` / `HyoDo` / `publish.yml` / env `pypi`)
-   - Tag push triggers `.github/workflows/publish.yml`
-   - The build job requires the tag to be GitHub-verified before artifacts can publish
-   - Approve GitHub Environment **`pypi`** deployment if required
-   - Job verifies provenance + install smoke automatically
-   - Manual measure (optional):
+   - The workflow re-verifies the exact signed tag before generating evidence.
+   - It generates the CycloneDX SBOM plus portable SHA-256 receipt from that tag.
+   - It attaches assets only while the release is still a draft; existing complete
+     assets are verified without replacement, and partial evidence fails closed.
+   - It downloads the durable assets and verifies byte equality plus the checksum.
+   - A successful run intentionally leaves the release in draft state.
 
-   ```bash
-   python scripts/release/verify-pypi-release.py \
-     --version "$(tr -d '[:space:]' < VERSION)" \
-     --require-provenance \
-     --install-smoke
-   ```
+   This draft-first sequence remains compatible with GitHub immutable releases,
+   which do not allow assets to be added or replaced after publication.
 
-5. Demo recording uses `docs/DEMO_READY_CHECKLIST.md` **after** this checklist is green.
+5. **Publish the draft GitHub Release manually** after the evidence run is green.
+   The human publication event is intentional: Actions performed with the repository
+   `GITHUB_TOKEN` do not recursively trigger ordinary downstream workflows.
+
+6. The `release: published` event starts **PyPI Trusted Publishing** automatically.
+
+   - The build job re-verifies the signed tag and main ancestry.
+   - It requires the published GitHub Release to contain both durable SBOM assets.
+   - It downloads the assets and checks the SHA-256 receipt before building.
+   - PyPI publication uses OIDC only; no long-lived token is stored.
+   - The post-publish job verifies provenance and an install smoke test.
+   - Manual `workflow_dispatch` is recovery-only and enforces the same Release gate.
+
+7. Demo recording uses `docs/DEMO_READY_CHECKLIST.md` **after** this checklist is green.
 
 ## Decision log
 
@@ -97,13 +106,15 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 | 2026-07-16 | 3.1.6 | Truth Patch on GitHub + tag `v3.1.6` + PyPI 3.1.6 (false-green gates removed) |
 | 2026-07-16 | 3.1.7 | format gate + safe scan exit 2 + path-stable tests; tag/PyPI 3.1.7 |
 | 2026-07-16 | 3.1.8 | Supply-chain seal: Trusted Publishing workflow + provenance verify path |
-| 2026-07-19 | 3.2.0 | safe --json (outward CI) + check honesty hardening (SBOM exception split, N/M gates ran) |
-| 2026-07-20 | 3.2.1 | Pyright interpreter pin (venv false missing-import fix) |
-| 2026-07-20 | 3.3.0 | Philosophy V6: `hyo` pillar restored; `loyalty` deprecated alias until 4.0.0 |
-| 2026-07-20 | 4.0.0 | Philosophy V6 complete: `loyalty` alias + `should_auto_approve` removed |
-| 2026-07-20 | 4.0.1 | Score honesty: required pillars, legacy flag conflicts, safe path/line |
+| 2026-07-19 | 3.2.0 | safe --json + check honesty hardening; SBOM exception split |
+| 2026-07-20 | 3.2.1 | Pyright interpreter pin for venv import stability |
+| 2026-07-20 | 3.3.0 | Philosophy V6: `hyo` restored; `loyalty` deprecated until 4.0.0 |
+| 2026-07-20 | 4.0.0 | Philosophy V6 complete: legacy approval surfaces removed |
+| 2026-07-20 | 4.0.1 | Score honesty: required pillars, flag conflicts, safe path/line |
 | 2026-09-03 | 4.11.0 | MCP access ledger + agent-rules opt-in (M4 complete, Issue #95) |
 | 2026-09-03 | 4.10.0 | `hyodo mcp doctor` diagnostic command (M4 slice 1) |
-| 2026-09-03 | 4.9.0 | MCP SDK v1/v2 dual-major compatibility + pinned v1 CI gate; twine>=7 build-tooling fix |
+| 2026-09-03 | 4.9.0 | MCP v1/v2 dual-major compatibility + v1 CI gate; twine>=7 fix |
 
-Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + verified annotated tag/notes published + (if claiming pip) Trusted Publishing success with non-null provenance.
+Release readiness is **measured green when**: local verification passes, main CI and smoke are green,
+the verified tag has durable release SBOM evidence, the GitHub Release is published, and any PyPI
+claim has Trusted Publishing success with non-null provenance.

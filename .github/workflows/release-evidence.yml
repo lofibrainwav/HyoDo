@@ -1,0 +1,179 @@
+name: HyoDo Release Evidence
+
+"on":
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing GitHub-verified release tag, e.g. v4.12.0
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-evidence-${{ inputs.tag }}
+  cancel-in-progress: false
+
+jobs:
+  build-evidence:
+    name: Build exact-tag SBOM evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      tag: ${{ steps.ref.outputs.tag }}
+
+    steps:
+      - name: Resolve release tag
+        id: ref
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          case "$TAG" in
+            v[0-9]*.[0-9]*.[0-9]*) ;;
+            *)
+              echo "Tag must look like vX.Y.Z, got: $TAG"
+              exit 1
+              ;;
+          esac
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout exact release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ steps.ref.outputs.tag }}
+          fetch-depth: 0
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Verify annotated tag trust
+        env:
+          TAG: ${{ steps.ref.outputs.tag }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          COMMIT="$(git rev-parse HEAD)"
+          python scripts/release/verify_git_tag.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$TAG" \
+            --expected-commit "$COMMIT"
+
+      - name: Install public verification dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]"
+
+      - name: Generate exact-tag public-surface SBOM
+        run: python scripts/generate_sbom.py -o dist/sbom.cyclonedx.json
+
+      - name: Verify SBOM scope and reproducibility
+        env:
+          HYODO_SBOM_INTEGRATION: "1"
+        run: python -m pytest tests/test_sbom.py -q -k end_to_end
+
+      - name: Write and verify portable SBOM digest receipt
+        run: |
+          set -euo pipefail
+          cd dist
+          sha256sum sbom.cyclonedx.json > sbom.cyclonedx.json.sha256
+          sha256sum -c sbom.cyclonedx.json.sha256
+
+      - name: Upload Actions evidence
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-sbom-${{ steps.ref.outputs.tag }}
+          path: |
+            dist/sbom.cyclonedx.json
+            dist/sbom.cyclonedx.json.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  attach-assets:
+    name: Attach and verify draft Release SBOM assets
+    needs: build-evidence
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Download validated Actions evidence
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-sbom-${{ needs.build-evidence.outputs.tag }}
+          path: dist
+
+      - name: Inspect release and attach missing evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build-evidence.outputs.tag }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "ERROR: create a draft GitHub Release for $TAG before running release evidence"
+            exit 1
+          fi
+
+          IS_DRAFT="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+          ASSETS="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          HAS_SBOM=0
+          HAS_DIGEST=0
+          if grep -Fxq "sbom.cyclonedx.json" <<<"$ASSETS"; then HAS_SBOM=1; fi
+          if grep -Fxq "sbom.cyclonedx.json.sha256" <<<"$ASSETS"; then HAS_DIGEST=1; fi
+
+          case "$HAS_SBOM:$HAS_DIGEST" in
+            0:0)
+              if [ "$IS_DRAFT" != "true" ]; then
+                echo "ERROR: published release is missing durable SBOM assets; refusing post-publish mutation"
+                exit 1
+              fi
+              gh release upload "$TAG" \
+                dist/sbom.cyclonedx.json \
+                dist/sbom.cyclonedx.json.sha256 \
+                --repo "$GITHUB_REPOSITORY"
+              ;;
+            1:1)
+              echo "Release evidence assets already exist; verifying without replacement"
+              ;;
+            *)
+              echo "ERROR: partial release evidence exists; refusing destructive repair"
+              exit 1
+              ;;
+          esac
+
+      - name: Download and verify durable assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build-evidence.outputs.tag }}
+        run: |
+          set -euo pipefail
+          rm -rf release-readback
+          mkdir release-readback
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "sbom.cyclonedx.json*" \
+            --dir release-readback
+          test -f release-readback/sbom.cyclonedx.json
+          test -f release-readback/sbom.cyclonedx.json.sha256
+          cmp -s dist/sbom.cyclonedx.json release-readback/sbom.cyclonedx.json
+          cmp -s dist/sbom.cyclonedx.json.sha256 release-readback/sbom.cyclonedx.json.sha256
+          cd release-readback
+          sha256sum -c sbom.cyclonedx.json.sha256
+
+      - name: Confirm release remains draft for human publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.build-evidence.outputs.tag }}
+        run: |
+          set -euo pipefail
+          IS_DRAFT="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+          if [ "$IS_DRAFT" != "true" ]; then
+            echo "ERROR: evidence preparation expects an unpublished draft Release"
+            exit 1
+          fi
+          echo "Draft Release evidence is sealed for $TAG; publish the Release to start PyPI"
