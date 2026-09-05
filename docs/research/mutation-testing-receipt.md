@@ -45,7 +45,7 @@ Three property-model / boundary assumptions were corrected during development:
 - **File**: `hyodo/__init__.py`
 - **Assumption**: Boundedness assertion assumed exact `0 ≤ S ≤ 10`
 - **Correction**: `geometric_mean([10.0]*5)` returns `10.000000000000002` due to IEEE 754 fifth-root rounding — assertion needs epsilon tolerance
-- **Fix**: Changed assertion bounds to `6.0 - 1e-9 <= F <= 60.0 + 1e-9` and `1.0 - 1e-9 <= S <= 10.0 + 1e-9`, with `@example` for all-zeros, all-ones, all-tens
+- **Fix**: Changed assertion bounds to `6.0 - 1e-9 <= F <= 60.0 + 1e-9` and `1.0 - 1e-9 <= S <= 10.0 + 1e-9`, with `@example` for all-zeros and all-ones
 - **Philosophy mapping**: 미(美) — Beauty requires mathematical rigor including floating-point limits
 
 ### H2: AWS access key regex has no end anchor
