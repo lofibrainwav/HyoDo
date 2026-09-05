@@ -8,6 +8,7 @@ This checklist blocks a public release until the package, CLI, and workflow path
 - Public package path only — the sdist ships only the `hyodo` package
 - Truth contracts (v3.1.7+): `check` zero-gates → exit 2; `safe --strict` high → exit 1
 - Supply-chain (v3.1.8+): PyPI via Trusted Publishing only — see `docs/PYPI_TRUSTED_PUBLISHING.md`
+- Release-tag trust: new public releases require an annotated tag that GitHub reports as verified
 
 ## Pre-release gates (local)
 
@@ -50,13 +51,20 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 
 1. Confirm Actions are enabled and latest main runs are green.
 
-2. Tag and push the synchronized version (immutable annotated tag; do not retag):
+2. Create and locally verify the synchronized release tag. New release tags are
+   immutable, annotated, and signed; do not retag an existing version:
 
    ```bash
    VERSION="$(tr -d '[:space:]' < VERSION)"
-   git tag -a "v$VERSION" -m "HyoDo v$VERSION"
+   git tag -s "v$VERSION" -m "HyoDo v$VERSION"
+   git tag -v "v$VERSION"
    git push origin "v$VERSION"
    ```
+
+   The signing identity must be associated with the GitHub account so GitHub
+   displays the annotated tag as **Verified**. The publish workflow independently
+   checks the GitHub tag object and refuses lightweight, unsigned, invalid, nested,
+   or unexpectedly-targeted tags.
 
 3. Create GitHub Release `v$VERSION` with notes from its `CHANGELOG.md` section.
 
@@ -65,6 +73,7 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
    - One-time setup: `docs/PYPI_TRUSTED_PUBLISHING.md`
      (PyPI publisher: `lofibrainwav` / `HyoDo` / `publish.yml` / env `pypi`)
    - Tag push triggers `.github/workflows/publish.yml`
+   - The build job requires the tag to be GitHub-verified before artifacts can publish
    - Approve GitHub Environment **`pypi`** deployment if required
    - Job verifies provenance + install smoke automatically
    - Manual measure (optional):
@@ -97,4 +106,4 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 | 2026-09-03 | 4.10.0 | `hyodo mcp doctor` diagnostic command (M4 slice 1) |
 | 2026-09-03 | 4.9.0 | MCP SDK v1/v2 dual-major compatibility + pinned v1 CI gate; twine>=7 build-tooling fix |
 
-Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + tag/notes published + (if claiming pip) Trusted Publishing success with non-null provenance.
+Release readiness is **measured green when**: local `verify-public` PASS + GitHub CI green + GitHub smoke green + verified annotated tag/notes published + (if claiming pip) Trusted Publishing success with non-null provenance.
