@@ -88,3 +88,8 @@ docs/DEMO_DRY_RUN_LATEST.md
 
 # Local measurement ledger (append-only receipts; machine-local, never shipped)
 .hyodo/
+
+# Mutation testing
+cosmic-ray.session
+mutants/
+.mutmut-cache
