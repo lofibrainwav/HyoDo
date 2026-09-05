@@ -124,7 +124,7 @@ policy engine. MCP SDK v1 and v2 are both exercised in CI.
 
 | Command | Contract |
 | --- | --- |
-| `safe` | `0` report complete · `1` high finding with `--strict` · `2` bad path |
+| `safe` | `0` report · `1` strict high finding · `2` bad path |
 | `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
 | `event` / `policy` | `0` valid/ALLOW · `1` invalid/DENY · `2` unobserved |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
