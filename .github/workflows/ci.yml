@@ -447,9 +447,45 @@ jobs:
   trinity-score:
     name: "HYOGOOK V5 Score"
     runs-on: ubuntu-latest
-    needs: [truth-gate, truth-gate-mcp-v1, goodness-gate, beauty-gate]
+    needs: [truth-gate, truth-gate-mcp-v1, goodness-gate, beauty-gate, public-language]
+    if: ${{ always() }}
 
     steps:
+      - name: Verify required upstream jobs
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          TRUTH_RESULT: ${{ needs['truth-gate'].result }}
+          MCP_V1_RESULT: ${{ needs['truth-gate-mcp-v1'].result }}
+          GOODNESS_RESULT: ${{ needs['goodness-gate'].result }}
+          BEAUTY_RESULT: ${{ needs['beauty-gate'].result }}
+          PUBLIC_LANGUAGE_RESULT: ${{ needs['public-language'].result }}
+        run: |
+          set -euo pipefail
+
+          check_success() {
+            name="$1"
+            result="$2"
+            if [ "$result" != "success" ]; then
+              echo "::error::$name did not succeed (result=$result)"
+              exit 1
+            fi
+          }
+
+          check_success "Truth Gate matrix" "$TRUTH_RESULT"
+          check_success "MCP SDK v1 gate" "$MCP_V1_RESULT"
+          check_success "Goodness Gate" "$GOODNESS_RESULT"
+          check_success "Beauty Gate" "$BEAUTY_RESULT"
+
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            check_success "Public language gate" "$PUBLIC_LANGUAGE_RESULT"
+          elif [ "$PUBLIC_LANGUAGE_RESULT" != "skipped" ] && \
+               [ "$PUBLIC_LANGUAGE_RESULT" != "success" ]; then
+            echo "::error::Public language gate had unexpected result=$PUBLIC_LANGUAGE_RESULT"
+            exit 1
+          fi
+
+          echo "All required upstream jobs succeeded."
+
       - name: Calculate HYOGOOK V5 Score
         run: |
           echo "============================================"
@@ -459,13 +495,15 @@ jobs:
           echo "Public OSS Release readiness (see VERSION)"
           echo ""
           echo "Validated release blockers:"
-          echo "  - Public package lint/type checks"
-          echo "  - HYOGOOK V5 public API smoke checks"
-          echo "  - Documentation consistency"
+          echo "  - Python 3.10-3.14 lint/type/package checks"
+          echo "  - MCP SDK v1 compatibility"
+          echo "  - Public package tests and CLI orchestration"
+          echo "  - Documentation lint and external-first guards"
+          echo "  - PR public-language check when applicable"
           echo "  - Required release files present"
           echo ""
           echo "Advisory checks:"
-          echo "  - Markdown lint remains advisory"
+          echo "  - Public-surface SBOM remains advisory"
           echo ""
           echo "============================================"
           echo "     Status: READY_FOR_RELEASE_REVIEW"
