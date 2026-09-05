@@ -21,7 +21,7 @@
     or pass --general.
   entry: hyodo check
   language: python
-  types_or: [python, javascript, typescript, go, rust, shell, toml, yaml, json]
+  types_or: [python, javascript, ts, tsx, go, rust, shell, toml, yaml, json]
   pass_filenames: false
   require_serial: true
 - id: hyodo-safe-strict
