@@ -116,9 +116,14 @@ They are not presented as three production-code bugs.
 
 - The original local session initialized 1,553 mutations across four core modules.
 - PR #126 adds a separate automated Cosmic Ray evidence lane.
-- Cosmic Ray and mutmut use different mutation operators and test-selection
-  mechanics, so their rates are complementary evidence rather than interchangeable
-  scores.
+- Remote run `33995726387` completed the scoring-core lane with **345 total jobs**:
+  **150 killed**, **195 survived**, **43.48% kill rate**.
+- The uploaded evidence artifact is `9978277639`; its `cr-rate` value `56.52`
+  is the survival rate, not the kill rate.
+- This lane remains advisory. Cosmic Ray and mutmut use different mutation
+  operators and test-selection mechanics, so their rates are complementary
+  evidence rather than interchangeable scores. No mutation threshold is a
+  merge or deployment authority.
 
 ## Property Test Coverage Summary
 
