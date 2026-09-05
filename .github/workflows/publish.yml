@@ -4,19 +4,19 @@
 #   2) PyPI Trusted Publisher: owner=lofibrainwav repo=HyoDo
 #      workflow=publish.yml environment=pypi
 #
-# Trigger: GitHub-verified annotated tag vX.Y.Z or workflow_dispatch of an
-# existing verified annotated tag.
+# Primary trigger: publishing a GitHub Release after durable SBOM evidence is
+# attached to its draft. Manual dispatch is recovery-only and enforces the same
+# published-release evidence gate.
 
 name: Publish to PyPI
 
 "on":
-  push:
-    tags:
-      - "v*.*.*"
+  release:
+    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing verified git tag to publish (e.g. v4.12.0)"
+        description: Existing published and verified release tag, e.g. v4.12.0
         required: true
         type: string
 
@@ -24,7 +24,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: pypi-publish-${{ github.ref }}
+  group: pypi-publish-${{ github.event.release.tag_name || inputs.tag || github.ref }}
   cancel-in-progress: false
 
 jobs:
@@ -40,12 +40,17 @@ jobs:
         id: ref
         env:
           INPUT_TAG: ${{ inputs.tag }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
+          set -euo pipefail
           if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             TAG="$INPUT_TAG"
+          elif [ "$EVENT_NAME" = "release" ]; then
+            TAG="$RELEASE_TAG"
           else
-            TAG="${GITHUB_REF_NAME}"
+            echo "Unsupported publish event: $EVENT_NAME"
+            exit 1
           fi
           case "$TAG" in
             v[0-9]*.[0-9]*.[0-9]*) ;;
@@ -98,6 +103,31 @@ jobs:
           echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
           echo "Publishing verified candidate: $TAG @ $COMMIT"
 
+      - name: Verify published durable Release evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.ref.outputs.tag }}
+        run: |
+          set -euo pipefail
+          IS_DRAFT="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+          if [ "$IS_DRAFT" != "false" ]; then
+            echo "ERROR: PyPI publication requires a published GitHub Release"
+            exit 1
+          fi
+          ASSETS="$(gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets --jq '.assets[].name')"
+          grep -Fx "sbom.cyclonedx.json" <<<"$ASSETS"
+          grep -Fx "sbom.cyclonedx.json.sha256" <<<"$ASSETS"
+          rm -rf release-evidence
+          mkdir release-evidence
+          gh release download "$TAG" \
+            --repo "$GITHUB_REPOSITORY" \
+            --pattern "sbom.cyclonedx.json*" \
+            --dir release-evidence
+          test -f release-evidence/sbom.cyclonedx.json
+          test -f release-evidence/sbom.cyclonedx.json.sha256
+          cd release-evidence
+          sha256sum -c sbom.cyclonedx.json.sha256
+
       - name: Install build tooling
         run: |
           python -m pip install --upgrade pip
@@ -139,7 +169,6 @@ jobs:
       name: pypi
       url: https://pypi.org/p/hyodo
     permissions:
-      # Mandatory for Trusted Publishing / OIDC
       id-token: write
       contents: read
     steps:
@@ -152,8 +181,6 @@ jobs:
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
-          # Trusted Publishing provides short-lived OIDC credentials and
-          # integrity attestations. No long-lived PyPI token is stored.
           verbose: true
           print-hash: true
 
@@ -179,10 +206,6 @@ jobs:
           EXPECTED_VERSION: ${{ needs.build.outputs.version }}
           EXPECTED_COMMIT: ${{ needs.build.outputs.commit }}
         run: |
-          # Version JSON often appears before PEP 740 integrity attestations.
-          # verify-pypi-release.py polls provenance separately (integrity API +
-          # version-JSON fallback) so a single early 404 is not a false red.
-          # 30 x 10s ≈ 5 min provenance budget (observed 4.0.1 CDN lag).
           python scripts/release/verify-pypi-release.py \
             --version "$EXPECTED_VERSION" \
             --require-provenance \
