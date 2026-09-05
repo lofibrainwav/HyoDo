@@ -4,7 +4,8 @@
 #   2) PyPI Trusted Publisher: owner=lofibrainwav repo=HyoDo
 #      workflow=publish.yml environment=pypi
 #
-# Trigger: annotated tag vX.Y.Z (preferred) or workflow_dispatch of an existing tag.
+# Trigger: GitHub-verified annotated tag vX.Y.Z or workflow_dispatch of an
+# existing verified annotated tag.
 
 name: Publish to PyPI
 
@@ -15,7 +16,7 @@ name: Publish to PyPI
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing git tag to publish (e.g. v3.1.8)"
+        description: "Existing verified git tag to publish (e.g. v4.12.0)"
         required: true
         type: string
 
@@ -68,10 +69,11 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
 
-      - name: Validate tag / VERSION / main ancestry
+      - name: Validate tag / VERSION / main ancestry / tag trust
         id: meta
         env:
           TAG: ${{ steps.ref.outputs.tag }}
+          GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           VERSION="$(tr -d '[:space:]' < VERSION)"
@@ -87,10 +89,14 @@ jobs:
             echo "Tagged commit $COMMIT is not an ancestor of origin/main"
             exit 1
           fi
+          python scripts/release/verify_git_tag.py \
+            --repository "$GITHUB_REPOSITORY" \
+            --tag "$TAG" \
+            --expected-commit "$COMMIT"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
-          echo "Publishing candidate: $TAG @ $COMMIT"
+          echo "Publishing verified candidate: $TAG @ $COMMIT"
 
       - name: Install build tooling
         run: |
@@ -144,11 +150,10 @@ jobs:
           path: dist/
 
       - name: Publish package distributions to PyPI
-        # Pin to v1.13.0 commit (Trusted Publishing + attestations)
         uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33 # v1.14.2
         with:
-          # Prefer attestations when the publisher supports them.
-          # Action defaults already enable attestations for trusted publishers.
+          # Trusted Publishing provides short-lived OIDC credentials and
+          # integrity attestations. No long-lived PyPI token is stored.
           verbose: true
           print-hash: true
 
