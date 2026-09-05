@@ -77,8 +77,8 @@ a hosted service, model provider, or remote control plane.
 - run: hyodo safe --strict --json
 ```
 
-The composite action installs HyoDo from its pinned ref; use a signed release
-that contains it (not `v4.11.0`). Set `upload-sarif: "true"` with `security-events: write`:
+The composite action installs HyoDo from its pinned ref. Pin a signed release
+that contains it (not `v4.11.0`); SARIF upload needs `security-events: write`.
 
 ```yaml
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
