@@ -1,11 +1,10 @@
 # HyoDo
 
-**Local AI agent guardrails for FDE work and CI — audit evidence,
-policy DENY, fail-closed quality gates.**
+**Honest local guardrails for AI-assisted development.**
 
-Not a pre-commit clone. HyoDo helps Forward Deployed Engineers and
-AI-assisted teams **prove what ran**, **block unauthorized tools**, and
-**absorb your existing tests/linters** without replacing them.
+HyoDo is a model-agnostic Python CLI that helps teams prove which checks ran,
+record agent actions, enforce local tool and path policy, and reuse existing
+tests and linters without turning missing evidence into a green result.
 
 Review signals never grant automatic approval. Unobserved is never green.
 
@@ -14,51 +13,82 @@ Review signals never grant automatic approval. Unobserved is never green.
 [![Python](https://img.shields.io/pypi/pyversions/hyodo)](https://pypi.org/project/hyodo/)
 [![License](https://github.com/lofibrainwav/HyoDo/blob/main/LICENSE)](./LICENSE)
 
-## Why HyoDo (vs pre-commit alone)
+## Why HyoDo exists
 
-| Need | HyoDo |
-| --- | --- |
-| Agent step audit trail | `event record` → `.hyodo/agent-events.jsonl` |
-| Tool / path / step policy | `policy check` (ALLOW / DENY; missing = exit 2) |
-| Keep existing CI tools | BYOG `init` absorbs pytest/ruff/npm/go/… |
-| Fake-green resistance | fail-closed score + SKIP ≠ PASS |
-| Air-gapped / on-prem | loopback dashboard, offline-safe design |
+AI coding tools can move quickly, but a normal green check does not always answer:
 
-`pre-commit` + ruff is still excellent for hooks. HyoDo adds **agent
-evidence + policy gates + honest measurement** for FDE deployment defense.
+- Did the check actually run?
+- Did the agent touch only approved tools and paths?
+- Was missing or unreadable evidence treated as a pass?
+- Can the project keep using its existing pytest, Ruff, npm, Go, or Rust checks?
 
-## Start here (any repository)
+HyoDo makes those boundaries explicit with local evidence, policy decisions,
+and fail-closed exit contracts.
+
+## 30-second start
 
 ```bash
 pipx install hyodo
 cd your-project
-hyodo safe                 # early-warning scan, no setup
-hyodo safe --strict        # exit 1 on high-severity findings
-hyodo safe --json          # machine-readable findings for CI
+
+hyodo safe --strict
+hyodo init
+hyodo check
 ```
 
+`safe` works immediately in any repository. `init` is optional: it detects
+tools you already use and writes `.hyodo/gates.toml`; `check` then runs those
+gates. No detected tooling means no invented green check.
+
+## What it does
+
+| Need | HyoDo surface |
+| --- | --- |
+| Early-warning safety scan | `hyodo safe` |
+| Reuse existing project checks | `hyodo init` → `hyodo check` |
+| Agent action audit trail | `hyodo event record` |
+| Tool / path / step policy | `hyodo policy check` |
+| Schema / eval / evidence report | `hyodo schema`, `eval`, `report` |
+| Local evidence panel | `hyodo dashboard --open` |
+| Optional MCP adapter | `hyodo mcp stdio` / `serve` |
+| MCP diagnostics and audit | `hyodo mcp doctor`, `access-log`, `rules` |
+
+## Honest boundaries
+
+HyoDo is deliberately narrow:
+
+- It is **not** a runtime sandbox or process interceptor.
+- `hyodo safe` is an early-warning scanner, not a full security audit.
+- A DENY result must still be enforced by the caller.
+- HYOGOOK V5 is a review signal, never an automatic approval decision.
+- The public MCP server supports loopback or authenticated Tailscale binding;
+  public `0.0.0.0` listeners are not supported.
+- Missing, unreadable, or unmeasured evidence is never reported as healthy.
+
+That scope is intentional: the tool should be useful locally without requiring
+a hosted service, model provider, or remote control plane.
+
+## Use your existing CI
+
 ```yaml
-# GitHub Actions
-- run: pipx install hyodo
+- uses: actions/setup-python@v5
+  with:
+    python-version: "3.12"
+- run: pip install hyodo
 - run: hyodo safe --strict --json
 ```
 
-`hyodo safe` is an early-warning scanner, not a full security audit.
-
-### Bring your own gates (optional)
+For project-specific gates:
 
 ```bash
-hyodo init                 # detect tools → write .hyodo/gates.toml
-hyodo check                # run absorbed gates
-hyodo dashboard --open     # local evidence panel (127.0.0.1)
+hyodo init
+hyodo check
 ```
 
-`init` reads tooling you already own (`pytest`/`ruff`/`mypy`/`pyright`,
-npm scripts, `go.mod`, `Cargo.toml`, Makefile targets). It does not
-reinvent them. Empty detection → commented starter (no guessing).
-Malformed or zero executed gates → exit **2** (not a pass).
+`init` can absorb pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, and
+Makefile targets. Empty or malformed gate configuration exits **2**, not **0**.
 
-### Agent evidence spine (opt-in FDE)
+## Optional agent evidence
 
 ```bash
 hyodo event validate --file step.json
@@ -67,114 +97,75 @@ hyodo policy check --file step.json --config .hyodo/policy.toml
 hyodo schema check --schema agent.schema.json --payload step.json --json
 ```
 
-Default storage is **digest-only**. DENY is recorded for audit; **the
-caller must stop the agent** — HyoDo is a gate, not a runtime
-interceptor. Examples: `examples/fde-evidence-spine/`.
+Default event storage is digest-only. See
+[`examples/fde-evidence-spine/`](./examples/fde-evidence-spine/) for a complete
+example.
 
-`schema check` validates a local JSON payload deterministically. It returns
-`0` for valid, `1` for a schema violation, and `2` when the schema or payload
-cannot be observed or trusted. `--json` emits structured reasons for tools.
+## Optional MCP
 
-### Optional local MCP stdio
+Local stdio:
 
 ```bash
 pip install 'hyodo[mcp]'
 hyodo mcp stdio --root .
 ```
 
-This starts a local standard-input/output MCP process only. It wraps the
-existing `safe`, `check`, `event record`, and `policy check` CLI contracts
-for the configured host workspace. It never opens a network listener or
-exposes files outside that workspace.
-
-### Optional private-network MCP
+Private-network connector:
 
 ```bash
 hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
   --token "$HYODO_MCP_TOKEN" --root .
 ```
 
-This explicit connector binds only to the supplied Tailscale `100.64.0.0/10`
-address and requires a non-empty bearer token before it listens. It serves the
-host workspace only; a second device must be on the same private network and
-does not gain access to its own unrelated files. Public listeners are not
-supported.
+The MCP adapter uses the same CLI contracts rather than creating a second
+policy engine. MCP SDK v1 and v2 are both exercised in CI.
 
-## Engineering map (branding kept, terms first)
+## Exit contracts
 
-| DevSecOps label | Pillar | Measured by |
+| Command | Contract |
+| --- | --- |
+| `safe` | `0` report complete · `1` high finding with `--strict` · `2` bad path |
+| `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
+| `event` / `policy` | `0` valid/ALLOW · `1` invalid/DENY · `2` unobserved |
+| `schema check` | `0` valid · `1` validation error · `2` unobserved input |
+
+## Engineering model
+
+HyoDo's internal review model maps six evidence areas:
+
+| Area | Pillar | Measured by |
 | --- | --- | --- |
-| Static types | Truth (眞 / 진) | Command gate (typechecker) |
+| Static types | Truth (眞 / 진) | Command gate |
 | Tests + safety | Goodness (善 / 선) | Tests + `safe` |
-| Lint / format | Beauty (美 / 미) | Command gate (linter) |
+| Lint / format | Beauty (美 / 미) | Command gate |
 | Public surface | Benevolence (仁 / 인) | Native AST scan |
 | Data privacy | Hyo (孝 / 효) | Native consent/data scan |
-| Audit trail | Yeong (永 / 영) | `.hyodo/history.jsonl` |
+| Audit trail | Yeong (永 / 영) | Local ledger |
 
-Command gates are absorbed tools. AST / ledger pillars are **never**
-shell-faked. Missing sources show `Not measured`. Fail-closed geometric
-mean (HYOGOOK V5 formula, philosophy V6 labels): any pillar at 0
-collapses the review signal. Detail: [PHILOSOPHY.md](./PHILOSOPHY.md).
+Command gates can be absorbed from existing tooling. Native evidence pillars
+cannot be shell-faked through `gates.toml`. See
+[`PHILOSOPHY.md`](./PHILOSOPHY.md) for the HYOGOOK V5 review model.
 
-## Local instrument panel
+## Install and support
 
-```bash
-hyodo dashboard --open
-# → http://127.0.0.1:8768
-```
-
-Loopback only; 15s poll of `/api/evidence`; no composite invention.
-**Measure again now** is token-protected.
-
-## Install
-
-Python 3.10+. `pip install -U hyodo` or `pipx install hyodo`.
-See [Quick Start](./QUICK_START.md).
-
-## Commands
-
-| Command | Purpose |
-| --- | --- |
-| `hyodo safe` | Safety findings (early warning) |
-| `hyodo init` | Write `.hyodo/gates.toml` (BYOG) |
-| `hyodo check` | Absorbed gates or checkout preset |
-| `hyodo event …` | Agent event validate / record |
-| `hyodo policy check` | Agent policy ALLOW / DENY |
-| `hyodo schema` / `eval` / `report` | Local validation, eval, evidence report |
-| `hyodo mcp stdio` | Optional local MCP CLI adapter |
-| `hyodo mcp serve` | Explicit loopback or authenticated Tailscale MCP adapter |
-| `hyodo mcp doctor` | Diagnose local MCP setup |
-| `hyodo mcp access-log` / `rules` | MCP audit trail / agent rules |
-| `hyodo score …` / `dashboard` | Optional review signal / evidence panel |
-
-**safe:** `0` findings · `1` high+`--strict` · `2` bad path.
-**check:** `0` all executed PASS · `1` FAIL · `2` none/malformed.
-**event/policy:** `0` ok/ALLOW · `1` invalid/DENY · `2` unobserved.
-**schema check:** `0` valid · `1` validation error · `2` unobserved input.
-
-## Scope
-
-| Surface | Status |
-| --- | --- |
-| `hyodo/` package and CLI | Public release surface |
-| `tests/` and CI workflows | Release verification |
-
-Model-agnostic ≠ language-agnostic. Export PDF audit packs and full
-runtime interceptors are roadmap items — not claimed shipped.
-
-## For contributors
+Python **3.10+**:
 
 ```bash
-git clone https://github.com/lofibrainwav/HyoDo.git && cd HyoDo
-python -m venv .venv && source .venv/bin/activate
-python -m pip install -e ".[dev]" && ./.venv/bin/hyodo check
+pipx install hyodo
+# or
+pip install -U hyodo
 ```
 
-## Documentation
+- Quick start: [`QUICK_START.md`](./QUICK_START.md)
+- Security reporting: [`SECURITY.md`](./SECURITY.md)
+- Issues and help: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
+- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
-- [Quick Start](./QUICK_START.md) · [Philosophy](./PHILOSOPHY.md) · [Changelog](./CHANGELOG.md)
-- [Security surface](./docs/SECURITY_SURFACE.md) · [FDE spine examples](./examples/fde-evidence-spine/)
+HyoDo is currently maintained as a small public project. The enforced merge
+gate is CI; outside contributions receive maintainer review. The exact review
+model is documented in [`CONTRIBUTING.md`](./CONTRIBUTING.md).
 
 ## License
 
-HyoDo is available under the [MIT License](./LICENSE).
+MIT. See [`LICENSE`](./LICENSE).
