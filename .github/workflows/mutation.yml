@@ -1,0 +1,163 @@
+name: HyoDo Mutation Evidence
+
+"on":
+  pull_request:
+    branches: [main]
+    paths:
+      - "hyodo/**"
+      - "tests/**"
+      - "cosmic-ray*.toml"
+      - "pyproject.toml"
+      - "docs/research/mutation-testing-receipt.md"
+      - ".github/workflows/mutation.yml"
+  schedule:
+    - cron: "17 9 * * 1"
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Mutation scope to execute
+        required: true
+        default: scoring
+        type: choice
+        options:
+          - scoring
+          - full
+          - both
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mutation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  scoring-mutation:
+    name: "Mutation Evidence - Scoring (advisory)"
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.scope == 'scoring' || inputs.scope == 'both'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install mutation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" "cosmic-ray==8.7.0"
+
+      - name: Baseline scoring tests
+        run: cosmic-ray baseline cosmic-ray.scoring.toml
+
+      - name: Initialize scoring mutation session
+        run: cosmic-ray init cosmic-ray.scoring.toml cosmic-ray-scoring.session
+
+      - name: Execute scoring mutations
+        run: cosmic-ray exec cosmic-ray.scoring.toml cosmic-ray-scoring.session
+
+      - name: Build mutation evidence
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          cr-report cosmic-ray-scoring.session --no-show-output --no-show-diff > cosmic-ray-scoring-report.txt
+          cr-rate --no-estimate cosmic-ray-scoring.session > cosmic-ray-scoring-rate.txt
+          cr-xml cosmic-ray-scoring.session > cosmic-ray-scoring.xml
+          {
+            echo "## Cosmic Ray scoring mutation evidence"
+            echo
+            echo "This lane is advisory until a measured baseline is reviewed and a threshold is explicitly adopted."
+            echo
+            echo '```text'
+            cat cosmic-ray-scoring-rate.txt
+            tail -n 8 cosmic-ray-scoring-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload scoring mutation receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cosmic-ray-scoring-${{ github.sha }}
+          path: |
+            cosmic-ray-scoring.session
+            cosmic-ray-scoring-report.txt
+            cosmic-ray-scoring-rate.txt
+            cosmic-ray-scoring.xml
+          if-no-files-found: error
+          retention-days: 14
+
+  full-core-mutation:
+    name: "Mutation Evidence - Core Full Run (advisory)"
+    if: >-
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.scope == 'full' || inputs.scope == 'both'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install mutation dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" "cosmic-ray==8.7.0"
+
+      - name: Baseline core mutation tests
+        run: cosmic-ray baseline cosmic-ray.toml
+
+      - name: Initialize full core mutation session
+        run: cosmic-ray init cosmic-ray.toml cosmic-ray-core.session
+
+      - name: Execute full core mutations
+        run: cosmic-ray exec cosmic-ray.toml cosmic-ray-core.session
+
+      - name: Build full-core mutation evidence
+        if: ${{ always() }}
+        run: |
+          set -euo pipefail
+          cr-report cosmic-ray-core.session --no-show-output --no-show-diff > cosmic-ray-core-report.txt
+          cr-rate --no-estimate cosmic-ray-core.session > cosmic-ray-core-rate.txt
+          cr-xml cosmic-ray-core.session > cosmic-ray-core.xml
+          {
+            echo "## Cosmic Ray full-core mutation evidence"
+            echo
+            echo "Scheduled/manual evidence lane. It does not block releases until a reviewed threshold is adopted."
+            echo
+            echo '```text'
+            cat cosmic-ray-core-rate.txt
+            tail -n 8 cosmic-ray-core-report.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload full-core mutation receipt
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: cosmic-ray-core-${{ github.sha }}
+          path: |
+            cosmic-ray-core.session
+            cosmic-ray-core-report.txt
+            cosmic-ray-core-rate.txt
+            cosmic-ray-core.xml
+          if-no-files-found: error
+          retention-days: 30

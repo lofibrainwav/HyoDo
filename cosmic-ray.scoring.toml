@@ -1,0 +1,7 @@
+[cosmic-ray]
+module-path = ["hyodo/__init__.py"]
+test-command = "python -m pytest tests/test_scoring_math.py tests/test_scoring_properties.py -x -q"
+timeout = 30
+
+[cosmic-ray.distributor]
+name = "local"
