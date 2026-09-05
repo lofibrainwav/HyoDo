@@ -1,7 +1,7 @@
 # HyoDo Quick Start
 
-Local AI agent guardrails for FDE and CI. Adopters first;
-contributors second.
+Get useful local guardrails in an existing repository without replacing its
+tests, linters, or CI.
 
 ## 1. Install
 
@@ -11,24 +11,18 @@ pipx install hyodo
 hyodo --version
 ```
 
-From source (contributors / dogfood):
+Python 3.10+ is supported.
 
-```bash
-git clone https://github.com/lofibrainwav/HyoDo.git
-cd HyoDo
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -e ".[dev]"
-```
-
-## 2. Immediate value — `safe` (any repo)
+## 2. Scan any repository
 
 ```bash
 cd your-project
-hyodo safe                 # print findings, exit 0
+hyodo safe                 # report findings
 hyodo safe --strict        # exit 1 on high-severity findings
-hyodo safe --json          # CI-friendly JSON
+hyodo safe --json          # machine-readable output
 ```
+
+`safe` is an early-warning scanner, not a full security audit.
 
 ### Minimal GitHub Actions
 
@@ -40,80 +34,113 @@ hyodo safe --json          # CI-friendly JSON
 - run: hyodo safe --strict --json
 ```
 
-`safe` is an early-warning scanner, not a penetration test.
-
-## 3. Bring-Your-Own-Gates (any project)
+## 3. Reuse the checks you already have
 
 ```bash
-hyodo init                 # detect tools, write .hyodo/gates.toml
-hyodo check                # runs the absorbed gates
-hyodo dashboard --open     # view the evidence
+hyodo init
+hyodo check
 ```
 
-Measured contracts (v4.2.0):
+`init` detects supported project tooling and writes `.hyodo/gates.toml`.
+It can absorb pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, and
+Makefile targets.
 
-- `hyodo init` refuses an existing `.hyodo/gates.toml` (exit **1**)
-  unless you pass `--force`.
-- No tooling detected → honest starter template (commented examples),
-  not a guessed linter.
-- Starter with zero defined gates → `hyodo check` exit **2**
-  (`This is not a validation pass`).
-- With gates present, `check` runs **user** gates before any checkout
-  preset.
+Important contracts:
 
-### Six pillars, two kinds of evidence
+- Existing `.hyodo/gates.toml` → `init` exits **1** unless `--force` is used.
+- No supported tooling detected → a commented starter is written, not a guess.
+- Zero executable gates → `check` exits **2**. This is not a validation pass.
+- A failing gate → `check` exits **1**.
+- At least one executed gate and all pass → `check` exits **0**.
 
-| Pillar (Hanja/Korean/English) | Measured by |
-| --- | --- |
-| 眞 / 진 / Truth | Command gate (type checker) |
-| 善 / 선 / Goodness | Command gate (test runner) |
-| 美 / 미 / Beauty | Command gate (linter/formatter) |
-| 仁 / 인 / Benevolence | Native AST scan |
-| 孝 / 효 / Filial Piety | Native consent/data posture |
-| 永 / 영 / Eternity | `.hyodo/history.jsonl` ledger |
+## 4. Optional local evidence panel
 
-Benevolence / Hyo / Eternity are never command gates — `init` cannot
-absorb them, and no `gates.toml` entry can fake them green.
+```bash
+hyodo dashboard --open
+```
 
-## 4. Optional review score
+The dashboard binds to loopback and displays measured evidence. Missing sources
+remain unmeasured rather than being converted into a healthy score.
+
+## 5. Optional agent evidence and policy
+
+```bash
+hyodo event validate --file step.json
+hyodo event record --file step.json --root . --policy .hyodo/policy.toml
+hyodo policy check --file step.json --config .hyodo/policy.toml
+hyodo schema check --schema agent.schema.json --payload step.json --json
+```
+
+Event storage is digest-only by default. A DENY result is recorded, but the
+caller is responsible for stopping the agent.
+
+## 6. Optional MCP adapter
+
+Install the MCP extra:
+
+```bash
+pip install 'hyodo[mcp]'
+```
+
+Local stdio:
+
+```bash
+hyodo mcp stdio --root .
+```
+
+Private Tailscale connector:
+
+```bash
+hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
+  --token "$HYODO_MCP_TOKEN" --root .
+```
+
+Useful MCP operations:
+
+```bash
+hyodo mcp doctor
+hyodo mcp access-log --root .
+hyodo mcp rules list --root .
+```
+
+The adapter reuses HyoDo's CLI contracts. It does not create a separate policy
+engine or expose a public listener.
+
+## 7. Optional review signal
 
 ```bash
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
   --benevolence 0.9 --hyo 0.9
 ```
 
-| Signal | Meaning |
-| --- | --- |
-| REVIEW_SIGNAL_STRONG (90+) | Strong; human review still required |
-| REVIEW_SIGNAL_CAUTION (70–89) | Review before proceeding |
-| REVIEW_SIGNAL_BLOCK (&lt;70) | Improve before merge |
+HYOGOOK V5 is a review aid only. It never grants automatic approval, and
+unmeasured pillars do not silently become green.
 
-Geometric mean is **fail-closed** (any pillar 0 → whole signal 0). See
-[PHILOSOPHY.md](./PHILOSOPHY.md). All five pillars required unless
-`--partial` (confidence-weak; no silent STRONG).
-
-## 5. HyoDo contributors — dogfood `check`
-
-Without `.hyodo/gates.toml`, `check` uses the HyoDo checkout preset:
-
-```bash
-./.venv/bin/hyodo check
-```
-
-Use the venv binary when `pipx`/global installs shadow PATH.
-
-## Honesty contracts
+## Command exit summary
 
 | Command | Contract |
 | --- | --- |
-| `safe` | Default never blocks; `--strict` → 1 on high; bad path → 2 |
-| `check` | Exit 0 if ≥1 gate ran and all passed; empty/bad toml → 2 |
-| `init` | Existing config → 1 unless `--force` |
-| `score` | Review signal only — never auto-approve |
+| `safe` | `0` report complete · `1` strict high finding · `2` bad path |
+| `init` | `0` config written · `1` existing config without `--force` |
+| `check` | `0` executed gates passed · `1` failed · `2` none/malformed |
+| `event` / `policy` | `0` valid/ALLOW · `1` invalid/DENY · `2` unobserved |
+| `schema check` | `0` valid · `1` validation error · `2` unobserved input |
+
+## Contributors
+
+```bash
+git clone https://github.com/lofibrainwav/HyoDo.git
+cd HyoDo
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -e ".[dev]"
+bash scripts/verify-public.sh
+```
 
 ## Next
 
-- Product overview: [README.md](./README.md)
-- Pillar map: [PHILOSOPHY.md](./PHILOSOPHY.md)
-- Provider proof: [docs/PROVIDER_PROOF.md](./docs/PROVIDER_PROOF.md)
-- Demo script: [docs/DEMO_SCRIPT_3_MIN.md](./docs/DEMO_SCRIPT_3_MIN.md)
+- Product overview: [`README.md`](./README.md)
+- Security model: [`SECURITY.md`](./SECURITY.md)
+- Evidence model: [`PHILOSOPHY.md`](./PHILOSOPHY.md)
+- MCP design: [`docs/HYODO_MCP_CONNECTOR_DESIGN.md`](./docs/HYODO_MCP_CONNECTOR_DESIGN.md)
+- Release history: [`CHANGELOG.md`](./CHANGELOG.md)
