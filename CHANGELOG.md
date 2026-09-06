@@ -5,6 +5,55 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.12.0] - 2026-09-05
+
+Release-trust and external-consumption seal after the 4.11.0 MCP access-ledger
+release.
+
+### Added
+
+- CI-only Hypothesis reproducibility profile that keeps local Hypothesis
+  exploration and local example databases intact.
+- Status-aware mutmut 3.7.0 mutation receipt parser and sealed full-core
+  mutation census.
+- Cosmic Ray scoring mutation automation with advisory PR feedback and
+  scheduled/manual full-core execution.
+- Pre-commit discoverability hooks for `hyodo check` and `hyodo safe --strict`.
+- Same-ref composite GitHub Action for external consumers.
+- SARIF 2.1.0 report output for measured HyoDo findings.
+- Consumer smoke tests for pre-commit and the composite action.
+- Verified annotated release-tag gate before PyPI publication.
+- Immutable-release-safe exact-tag SBOM evidence workflow.
+
+### Changed
+
+- PyPI publication no longer starts from tag push alone. The primary publish
+  trigger is now `release: published` after durable Release evidence is present.
+- PyPI publication now requires a published GitHub Release with durable
+  `sbom.cyclonedx.json` and `sbom.cyclonedx.json.sha256` assets.
+- The PyPI build independently downloads and verifies the release SBOM checksum
+  before building distributions.
+- Mutation workflow PR triggers are narrowed to scoring-relevant surfaces so
+  release/docs-only PRs do not pay the expensive advisory mutation run.
+
+### Fixed
+
+- Hypothesis CI reproducibility no longer disables local exploratory behavior.
+- Mutation scoring no longer collapses timeout, skipped, not-checked, no-test,
+  interrupted, segfault, type-check, and suspicious outcomes into a fake
+  denominator.
+- Release evidence publication avoids destructive `--clobber` behavior.
+- Published releases missing durable evidence fail closed instead of being
+  mutated after publication.
+
+### Evidence
+
+- mutmut 3.7.0 full-core census: 1,847 generated / 163 killed / 155 survived /
+  1,529 no selected tests; tested kill rate 51.26%; all-generated kill rate
+  8.83%.
+- Cosmic Ray scoring-core advisory evidence: 345 total / 150 killed /
+  195 survived; kill rate 43.48%; fresh automation artifact `9979111436`.
+
 ## [4.11.0] - 2026-09-03
 
 Feature release: MCP access ledger and agent-rules opt-in (Issue #95 M4 complete).
@@ -76,7 +125,6 @@ SDK majors, and release tooling stops failing on valid distributions.
   Commit messages and PR title/body are covered by a `public-language` CI job,
   since a test cannot read them. Attribution states the model in
   `Co-Authored-By` rather than a Korean authorship line.
-
 
 ## [4.8.2] - 2026-07-22
 
@@ -170,7 +218,7 @@ at as clean. Every finding was reproduced before and after the fix.
 
 - M4 polish (`mcp doctor`, access ledger, and agent-rule opt-in) is deferred.
 - Tailscale bind and token rejection are tested; a second-device MCP tool call
-  has not been measured and is not claimed as completed.
+  has not been been measured and is not claimed as completed.
 
 ## [4.4.0] - 2026-07-21
 
