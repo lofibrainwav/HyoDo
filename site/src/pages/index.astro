@@ -1,0 +1,418 @@
+---
+import '../styles/tokens.css';
+
+const pypiUrl = 'https://pypi.org/project/hyodo/';
+const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
+const installCommand = 'pipx install hyodo';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>HyoDo — Honest local guardrails for AI-assisted development</title>
+		<meta
+			name="description"
+			content="HyoDo is a model-agnostic quality-gate kit for AI-assisted development. Unobserved is never green."
+		/>
+		<style>
+			:root {
+				--bg: #0a0b0d;
+				--bg-raised: #131519;
+				--border: #24272e;
+				--text: #eef0f3;
+				--text-dim: #9aa1ac;
+				--accent: #6ee7b7;
+				--accent-dim: #1f3d33;
+				font-synthesis: none;
+			}
+
+			* {
+				box-sizing: border-box;
+			}
+
+			html,
+			body {
+				margin: 0;
+				padding: 0;
+			}
+
+			body {
+				background: var(--bg);
+				color: var(--text);
+				font-family:
+					-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial,
+					sans-serif;
+				line-height: 1.55;
+			}
+
+			a {
+				color: var(--accent);
+			}
+
+			.wrap {
+				max-width: 860px;
+				margin: 0 auto;
+				padding: 0 1.5rem;
+			}
+
+			.eyebrow {
+				display: inline-block;
+				font-size: 0.8rem;
+				letter-spacing: 0.08em;
+				text-transform: uppercase;
+				color: var(--accent);
+				margin-bottom: 1.25rem;
+			}
+
+			h1 {
+				font-size: clamp(1.8rem, 4.5vw, 2.75rem);
+				line-height: 1.2;
+				margin: 0 0 1rem;
+			}
+
+			.subline {
+				font-size: 1.1rem;
+				color: var(--text-dim);
+				max-width: 44rem;
+				margin: 0 0 2rem;
+			}
+
+			.install-block {
+				display: flex;
+				align-items: center;
+				gap: 0.75rem;
+				flex-wrap: wrap;
+				background: var(--bg-raised);
+				border: 1px solid var(--border);
+				border-radius: 0.5rem;
+				padding: 0.9rem 1.1rem;
+				max-width: fit-content;
+			}
+
+			.install-block code {
+				font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+				font-size: 0.95rem;
+				color: var(--text);
+			}
+
+			.copy-btn {
+				background: var(--accent-dim);
+				color: var(--accent);
+				border: 1px solid var(--accent);
+				border-radius: 0.35rem;
+				padding: 0.3rem 0.7rem;
+				font-size: 0.8rem;
+				cursor: pointer;
+			}
+
+			.copy-btn:hover {
+				background: var(--accent);
+				color: #06231a;
+			}
+
+			main {
+				padding: 3rem 0;
+			}
+
+			section.layer {
+				padding: 2.25rem 0;
+				border-bottom: 1px solid var(--border);
+			}
+
+			section.layer:last-of-type {
+				border-bottom: none;
+			}
+
+			section.layer h2 {
+				font-size: 1.3rem;
+				margin: 0 0 0.6rem;
+			}
+
+			section.layer p {
+				color: var(--text-dim);
+				margin: 0 0 0.9rem;
+				max-width: 42rem;
+			}
+
+			.layer a.docs-link {
+				font-size: 0.95rem;
+				text-decoration: none;
+				border-bottom: 1px solid var(--accent);
+			}
+
+			.layer a.docs-link:hover {
+				opacity: 0.85;
+			}
+
+			footer {
+				border-top: 1px solid var(--border);
+				padding: 2.5rem 0 3.5rem;
+				color: var(--text-dim);
+				font-size: 0.9rem;
+			}
+
+			footer .links {
+				display: flex;
+				gap: 1.5rem;
+				flex-wrap: wrap;
+			}
+
+			footer a {
+				color: var(--text-dim);
+			}
+
+			footer a:hover {
+				color: var(--accent);
+			}
+
+			.navbar {
+				position: fixed;
+				top: 0;
+				left: 0;
+				right: 0;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 1rem 1.5rem;
+				background: rgba(10, 11, 13, 0.85);
+				backdrop-filter: blur(6px);
+				border-bottom: 1px solid var(--border);
+				transition: transform 300ms ease-out;
+			}
+
+			.navbar.nav-hidden {
+				transform: translateY(-100%);
+			}
+
+			.navbar .brand {
+				font-size: 0.95rem;
+				font-weight: 600;
+				color: var(--text);
+				text-decoration: none;
+			}
+
+			.navbar .nav-links {
+				display: flex;
+				gap: 1.25rem;
+				font-size: 0.9rem;
+			}
+
+			.navbar .nav-links a {
+				color: var(--text-dim);
+				text-decoration: none;
+			}
+
+			.navbar .nav-links a:hover {
+				color: var(--accent);
+			}
+
+			/*
+			 * Full-viewport hero: min-height is a fixed CSS value (100svh),
+			 * known before any content or script runs, so this reserves its
+			 * layout box with zero CLS. The canvas/poster layer is an
+			 * absolutely positioned full-bleed background; the copy overlays
+			 * it, anchored to the bottom of the section.
+			 */
+			header.hero {
+				position: relative;
+				min-height: 100svh;
+				overflow: hidden;
+				border-bottom: 1px solid var(--border);
+			}
+
+			.hero-canvas-wrap {
+				position: absolute;
+				inset: 0;
+				z-index: 0;
+				background: var(--bg);
+			}
+
+			.hero-canvas-wrap canvas,
+			.hero-canvas-wrap img {
+				position: absolute;
+				inset: 0;
+				width: 100%;
+				height: 100%;
+				display: block;
+				object-fit: cover;
+			}
+
+			.hero-canvas-wrap canvas {
+				z-index: 1;
+			}
+
+			.hero-canvas-wrap img {
+				/*
+				 * The poster stays on top of the canvas until mount.ts
+				 * confirms a frame has rendered, then hides itself. This
+				 * also means the canvas keeps a layout box the whole time
+				 * (no `hidden`/display:none on it), so IntersectionObserver
+				 * can see it and trigger the lazy import.
+				 */
+				z-index: 2;
+			}
+
+			.hero-canvas-wrap img[hidden] {
+				/*
+				 * Author-origin `display: block` above would otherwise beat
+				 * the user-agent stylesheet's `[hidden] { display: none }`,
+				 * since normal author rules always win over UA rules in the
+				 * cascade regardless of specificity. State it explicitly.
+				 */
+				display: none;
+			}
+
+			.hero-scrim {
+				position: absolute;
+				inset: 0;
+				z-index: 3;
+				background: linear-gradient(
+					to top,
+					rgba(10, 11, 13, 0.92) 0%,
+					rgba(10, 11, 13, 0.6) 32%,
+					rgba(10, 11, 13, 0) 65%
+				);
+				pointer-events: none;
+			}
+
+			.hero-content {
+				position: absolute;
+				left: 0;
+				right: 0;
+				bottom: 4rem;
+				z-index: 4;
+			}
+
+			.hero-word {
+				display: inline-block;
+			}
+		</style>
+	</head>
+	<body>
+		<nav class="navbar" data-hero-navbar>
+			<a class="brand" href="/">HyoDo</a>
+			<div class="nav-links">
+				<a href="/docs/quickstart/">Docs</a>
+				<a href={githubUrl}>GitHub</a>
+			</div>
+		</nav>
+
+		<header class="hero">
+			<div class="hero-canvas-wrap" id="hero-canvas-wrap">
+				<img
+					class="hero-poster"
+					data-hero-poster
+					src="/hero-poster.svg"
+					alt="A dim grid of tiles with a few observed tiles glowing green"
+				/>
+				<canvas id="hero-canvas"></canvas>
+				<div class="hero-scrim"></div>
+			</div>
+			<div class="wrap hero-content">
+				<span class="eyebrow">HyoDo</span>
+				<h1 data-hero-headline>
+					When your AI says "done," HyoDo tells you whether that is true.
+				</h1>
+				<p class="subline">
+					Honest local guardrails for AI-assisted development. Unobserved is never
+					green.
+				</p>
+				<div class="install-block">
+					<code id="install-cmd">{installCommand}</code>
+					<button class="copy-btn" id="copy-btn" type="button">Copy</button>
+				</div>
+			</div>
+		</header>
+
+		<main>
+			<div class="wrap">
+				<section class="layer">
+					<h2>For people who build with AI but cannot read code</h2>
+					<p>
+						You cannot check the code yourself, so you need something that will
+						tell you honestly whether a check ran — not a green light that shows
+						up whenever nothing was measured.
+					</p>
+					<a class="docs-link" href="/docs/why-hyodo/">Why HyoDo →</a>
+				</section>
+
+				<section class="layer">
+					<h2>For developers</h2>
+					<p>
+						Reuse the pytest, Ruff, mypy, npm, Go, or Cargo checks you already
+						have. HyoDo absorbs them into a gate list instead of inventing a
+						second, competing toolchain.
+					</p>
+					<a class="docs-link" href="/docs/quickstart/">Quickstart →</a>
+				</section>
+
+				<section class="layer">
+					<h2>For teams that must show evidence</h2>
+					<p>
+						An audit trail, a policy gate, and exit codes that distinguish
+						"passed," "failed," and "not measured" — so a review signal never
+						quietly stands in for a decision a human has to make.
+					</p>
+					<a class="docs-link" href="/docs/trust/">Trust →</a>
+				</section>
+			</div>
+		</main>
+
+		<footer>
+			<div class="wrap">
+				<div class="links">
+					<a href={githubUrl}>GitHub</a>
+					<a href={pypiUrl}>PyPI</a>
+					<a href="/docs/quickstart/">Docs</a>
+				</div>
+			</div>
+		</footer>
+
+		<script>
+			const btn = document.getElementById('copy-btn');
+			const cmd = document.getElementById('install-cmd');
+			btn?.addEventListener('click', async () => {
+				const text = cmd?.textContent ?? '';
+				try {
+					await navigator.clipboard.writeText(text);
+					const original = btn.textContent;
+					btn.textContent = 'Copied';
+					setTimeout(() => {
+						btn.textContent = original;
+					}, 1500);
+				} catch {
+					// Clipboard API unavailable; the command is already selectable text.
+				}
+			});
+		</script>
+
+		<script>
+			// Load the hero scene only after the headline has painted and only
+			// once the canvas is actually visible. mountHero() itself decides
+			// (via shouldAnimate) whether to do anything at all.
+			const canvas = document.getElementById('hero-canvas');
+
+			if (canvas instanceof HTMLCanvasElement) {
+				const start = () => {
+					const observer = new IntersectionObserver((entries) => {
+						for (const entry of entries) {
+							if (!entry.isIntersecting) continue;
+							observer.disconnect();
+							import('../hero/mount').then((module) => module.default(canvas));
+						}
+					});
+					observer.observe(canvas);
+				};
+
+				if ('requestIdleCallback' in window) {
+					requestIdleCallback(start);
+				} else {
+					setTimeout(start, 0);
+				}
+			}
+		</script>
+	</body>
+</html>

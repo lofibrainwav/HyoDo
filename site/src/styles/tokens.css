@@ -1,0 +1,12 @@
+/* Design tokens (source of truth: site/context/05-ui-context.md).
+   Read once by src/hero/scene.ts via getComputedStyle. Keep names stable. */
+:root {
+	--color-bg: #0b0d10;
+	--color-text: #e6e8eb;
+	--color-text-dim: #8b929a;
+	--color-tile-unlit: #1a1f25;
+	--color-tile-observed: #3ddc84;
+	--color-warn: #f5b400;
+	--color-deny: #ff5c5c;
+	--color-ask: #5aa9ff;
+}
