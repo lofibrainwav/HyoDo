@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- OpenSSF Scorecard workflow (`.github/workflows/scorecard.yml`), publishing
+  results and a badge on README via the official `ossf/scorecard-action`.
+- `server.json` at the repository root, the manifest format for the official
+  MCP Registry (`io.github.lofibrainwav/hyodo`).
+- `.claude-plugin/marketplace.json`, so this repository can serve as its own
+  Claude Code plugin marketplace.
+- `.github/FUNDING.yml`.
+- `scripts/release/check_version_sync.py` now also checks `server.json` and
+  `.claude-plugin/marketplace.json`, so a version drift in either fails the
+  release gate instead of passing silently.
+
 ### Fixed
 
 - `hyodo safe` now discloses directory-scan coverage as `scanned N of M

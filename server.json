@@ -1,0 +1,37 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.lofibrainwav/hyodo",
+  "description": "Local HyoDo CLI adapter: fail-closed gates, safety scan, agent-event policy. Never grants approval.",
+  "version": "4.12.0",
+  "repository": {
+    "url": "https://github.com/lofibrainwav/HyoDo",
+    "source": "github",
+    "id": "1141409932"
+  },
+  "packages": [
+    {
+      "registryType": "pypi",
+      "registryBaseUrl": "https://pypi.org",
+      "identifier": "hyodo",
+      "version": "4.12.0",
+      "transport": {
+        "type": "stdio"
+      },
+      "packageArguments": [
+        {
+          "type": "positional",
+          "value": "mcp"
+        },
+        {
+          "type": "positional",
+          "value": "stdio"
+        },
+        {
+          "type": "named",
+          "name": "--root",
+          "value": "."
+        }
+      ]
+    }
+  ]
+}
