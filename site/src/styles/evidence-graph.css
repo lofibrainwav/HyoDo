@@ -194,7 +194,9 @@
 }
 
 .eg-page .cell {
-	height: 58px;
+	/* 64px (was 58px) gives the two-line label below room without
+	   clipping the chip above it. */
+	height: 64px;
 	border-radius: 0;
 	position: relative;
 }
@@ -256,6 +258,13 @@
 	flex: none;
 }
 
+/* The glyph is CSS-generated content (see evidence-graph.ts), not a text
+   node, so it doesn't register as a second visible label alongside
+   .node-label for assistive tech. */
+.eg-page .chip::before {
+	content: attr(data-glyph);
+}
+
 .eg-page .chip.decision {
 	border-radius: 50%;
 }
@@ -296,14 +305,27 @@
 }
 
 .eg-page .node-label {
-	font-size: 9px;
-	color: var(--color-text-dim);
+	/* Contrast fix: 9px var(--color-text-dim) (#8b929a) measured 3.0-3.6:1
+	   on the tinted decision-cell backgrounds (needs >=4.5:1). 11px
+	   var(--color-text) (#e6e8eb) measures >=6.1:1 on every tint
+	   (ALLOW/ASK/DENY/UNOBSERVED/event) against --color-tile-unlit — see
+	   the contrast table in the PR description for the computed values. */
+	font-size: 11px;
+	color: var(--color-text);
 	text-align: center;
 	line-height: 1.2;
 	max-width: 82px;
+	/* Labels like "path_outside_root" don't fit one line at 11px inside
+	   82px; wrap to two lines instead of clipping (overflow-wrap:anywhere
+	   breaks inside the underscore-joined identifiers, which have no
+	   space to wrap at). Line-clamp is a last-resort ellipsis backstop
+	   for any label that still doesn't fit two lines. */
+	overflow-wrap: anywhere;
+	white-space: normal;
+	display: -webkit-box;
+	-webkit-line-clamp: 2;
+	-webkit-box-orient: vertical;
 	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 }
 
 .eg-page svg.edges {
@@ -460,7 +482,9 @@
 	.eg-page aside.panel { position: sticky; top: 76px; min-width: 0; }
 }
 .eg-page.eg-embed { min-height: 0; padding-top: 2rem; }
-.eg-page .graph-wrap { min-height: 356px; }
+/* 380px (was 356px): 4 data rows grew 58px -> 64px each (+24px) for the
+   two-line label fix above; this pre-mount CLS reservation grows with it. */
+.eg-page .graph-wrap { min-height: 380px; }
 .eg-page .panel { min-height: 140px; }
 
 /* The hero uses square plane tiles; carry the same silhouette and palette. */
