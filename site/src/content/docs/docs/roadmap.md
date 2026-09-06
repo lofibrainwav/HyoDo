@@ -13,7 +13,7 @@ in the repository is the source of truth; this page summarizes it.
 
 | Stage | Name | What it covers | Status |
 | --- | --- | --- | --- |
-| 0 | Launch surface | The `hyodo` CLI and quality gates | In progress |
+| 0 | Launch surface | The `hyodo` CLI and quality gates | Live |
 | 1 | Judgment | `ASK` decisions, trust levels, evidence graph | Planned |
 | 2 | Mobilization | Research nodes under policy | Planned |
 | 3 | Reconciliation | Cross-source verification | Exploration |

@@ -10,6 +10,16 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'HyoDo',
+			customCss: ['./src/styles/starlight.css'],
+			head: [
+				{
+					// Default to the dark theme (the landing page is always dark) until
+					// the visitor picks one with the theme selector.
+					tag: 'script',
+					content:
+						"try{if(!localStorage.getItem('starlight-theme')){localStorage.setItem('starlight-theme','dark')}}catch(e){}",
+				},
+			],
 			social: [
 				{ icon: 'github', label: 'GitHub', href: 'https://github.com/lofibrainwav/HyoDo' },
 			],

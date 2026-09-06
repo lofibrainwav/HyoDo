@@ -1,0 +1,28 @@
+/* HyoDo brand tokens for Starlight, matched to src/styles/tokens.css. */
+:root {
+  --sl-font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sl-color-accent-low: #0f2a1c;
+  --sl-color-accent: #2fbf72;
+  --sl-color-accent-high: #a9f0c8;
+  --sl-color-white: #e6e8eb;
+  --sl-color-gray-1: #d6dadf;
+  --sl-color-gray-2: #b3bac2;
+  --sl-color-gray-3: #8b929a;
+  --sl-color-gray-4: #4d545c;
+  --sl-color-gray-5: #2a3038;
+  --sl-color-gray-6: #171b20;
+  --sl-color-black: #0b0d10;
+}
+:root[data-theme="light"] {
+  --sl-color-accent-low: #d8f5e5;
+  --sl-color-accent: #1f9a58;
+  --sl-color-accent-high: #0f3d25;
+  --sl-color-white: #0b0d10;
+  --sl-color-gray-1: #1a1f25;
+  --sl-color-gray-2: #2a3038;
+  --sl-color-gray-3: #4d545c;
+  --sl-color-gray-4: #8b929a;
+  --sl-color-gray-5: #d6dadf;
+  --sl-color-gray-6: #eef0f2;
+  --sl-color-black: #ffffff;
+}
