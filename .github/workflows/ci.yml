@@ -67,8 +67,9 @@ jobs:
 
       - name: Validate JSON
         run: |
+          set -euo pipefail
           echo "Validating plugin.json..."
-          cat .claude-plugin/plugin.json | jq . > /dev/null
+          jq . .claude-plugin/plugin.json > /dev/null
           echo "plugin.json is valid"
 
       - name: Validate YAML
@@ -194,7 +195,7 @@ jobs:
           set +e
           out="$(hyodo check 2>&1)"
           ec=$?
-          set -e
+          set -euo pipefail
           echo "$out"
           test "$ec" -eq 0
           echo "$out" | grep -q "All executed gates passed"
@@ -360,6 +361,7 @@ jobs:
 
       - name: Public docs external-first regression guard
         run: |
+          set -o pipefail
           echo "Public docs external-first regression guard..."
           fail=0
           DOCS="README.md QUICK_START.md SECURITY.md"

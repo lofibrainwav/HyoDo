@@ -256,7 +256,7 @@ step_finish() {
     echo -e "${CYAN}Start with the CLI (recommended):${NC}"
     echo -e "  ${GREEN}cd $INSTALL_DIR && pip install -e \".[dev]\"${NC}"
     echo -e "  ${GREEN}hyodo check${NC}"
-    echo -e "  ${GREEN}hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --loyalty 0.9${NC}"
+    echo -e "  ${GREEN}hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9${NC}"
     echo -e "  ${GREEN}hyodo safe${NC}"
     echo ""
 

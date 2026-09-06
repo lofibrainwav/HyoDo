@@ -1,88 +1,56 @@
-# HyoDo Basic Usage Examples
+# HyoDo basic usage
 
-## Quick Start
+Every command below is a real `hyodo` CLI command in the current release.
+Nothing here grants approval: scores and scan results are review signals, and
+missing evidence is reported as missing, never as green.
 
-After installing HyoDo, use these commands in Claude Code:
-
-### 1. Check Code Quality
-
-```bash
-/check
-```
-
-This runs a quick quality check on your current code.
-
-### 2. Get Trinity Score
+## 1. Scan before you trust a change
 
 ```bash
-/score
+hyodo safe --strict
 ```
 
-Displays your code's Trinity Score:
-- 90+: Safe to proceed
-- 70-89: Review needed
-- <70: Fix required
+Early-warning scan for secrets, destructive commands, and production-impact
+patterns. Exit `0` reports, `1` means a high-severity finding under `--strict`,
+`2` means the path could not be scanned. The output states how many files were
+scanned out of how many were found, so partial coverage is never hidden.
 
-### 3. Safety Check
+## 2. Reuse the checks your project already has
 
 ```bash
-/safe
+hyodo init     # detects pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, Makefile
+hyodo check    # runs the detected gates; exit 2 when nothing measurable ran
 ```
 
-Runs security and safety validation.
+`init` writes `.hyodo/gates.toml`. `check` exits `0` only when executed gates
+passed. An empty or malformed gate file exits `2`, not `0`.
 
-### 4. Cost Estimation
+## 3. Optional review score
 
 ```bash
-/cost "Add user authentication"
+hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9
 ```
 
-Estimates the cost before executing a task.
+Prints the HYOGOOK V5 F-score and its geometric mean. A single pillar at zero
+collapses the signal. The score is decision support for a human reviewer; it
+never authorizes a merge or a deploy.
 
-## Advanced Usage
-
-### 3-Strategist Analysis
+## 4. Record what an agent did
 
 ```bash
-/strategist "Optimize database queries"
+hyodo event validate --file step.json
+hyodo event record --file step.json --root . --policy .hyodo/policy.toml
+hyodo policy check --file step.json --config .hyodo/policy.toml
 ```
 
-Get analysis from all 3 strategists:
-- **Jang Yeong-sil**: Long-term implications
-- **Yi Sun-sin**: Risk assessment
-- **Shin Saimdang**: User experience
+Events are appended to `.hyodo/agent-events.jsonl` (digest-only by default).
+`policy check` exits `0` on ALLOW, `1` on DENY, `2` when the policy or ledger is
+unobservable. A DENY must be enforced by the caller; HyoDo is not a sandbox.
+See [`fde-evidence-spine/`](./fde-evidence-spine/) for a complete example.
 
-### Pre-commit Check
+## 5. Look at the evidence
 
 ```bash
-/preflight
-```
-
-Run all checks before committing.
-
-### Full Trinity Analysis
-
-```bash
-/trinity
-```
-
-Detailed breakdown of  scores.
-
-## Example Session
-
-```
-You: /check
-HyoDo: Running quality checks...
-       - Ruff: Passed (0 issues)
-       - Type Check: Passed
-       - Security: No vulnerabilities
-       Trinity Score: 92.5
-
-You: /cost "Refactor the API layer"
-HyoDo: Cost Estimate:
-       - Complexity: Medium
-       - Estimated Tokens: ~15,000
-       - Risk Level: Low
-
-       Proceed? (y/n)
+hyodo report --format md      # or html, sarif
+hyodo dashboard --open        # local loopback panel on :8768
 ```

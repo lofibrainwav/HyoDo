@@ -49,10 +49,14 @@ Each `high` finding adds 40 to the risk score, each `medium` adds 15, each
 
 ## Honest limits
 
-- **Directory scans cap at 40 files** (`hyodo/safety.py:97-123`), read in
-  sorted path order; files beyond the cap are not scanned. Files under `.git`
-  and common binary/asset suffixes (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`,
-  `.pdf`, `.zip`, `.gz`, `.whl`, `.so`, `.dylib`) are skipped.
+- **Directory scans cap at 40 files** (`hyodo/safety.py:97-123`, override with
+  `--max-files`), read in sorted path order; files beyond the cap are not
+  scanned. Files under `.git` and common binary/asset suffixes (`.png`,
+  `.jpg`, `.jpeg`, `.gif`, `.webp`, `.pdf`, `.zip`, `.gz`, `.whl`, `.so`,
+  `.dylib`) are skipped. `hyodo safe` discloses coverage, not just the
+  configured cap: it reports how many scannable files were actually read
+  against how many exist (e.g. `scanned 40 of 45 files`), so partial
+  coverage is never silent.
 - **Default corpus (no `PATH` argument)** is `git diff HEAD`; if that is empty,
   it falls back to `git status --porcelain` text. It is never the full working
   tree contents (`hyodo/safety.py:126-151`).

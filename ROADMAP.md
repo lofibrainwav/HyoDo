@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.11.0 is the current measured baseline.
+HyoDo 4.12.0 is the current measured baseline.
 
 Landed and released:
 
@@ -64,6 +64,8 @@ implementation:
 - **v4.9.0** — MCP SDK v1/v2 dual-major compatibility.
 - **v4.10.0** — `hyodo mcp doctor`.
 - **v4.11.0** — MCP access ledger + agent-rules opt-in; M4 complete.
+- **v4.12.0** — release-trust seal: verified-tag gate, SBOM evidence,
+  SARIF output, pre-commit hooks, composite GitHub Action.
 
 ## Later exploration
 

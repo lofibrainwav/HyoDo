@@ -59,7 +59,9 @@ HyoDo is deliberately narrow:
 - It is **not** a runtime sandbox or process interceptor.
 - `hyodo safe` is an early-warning scanner, not a full security audit.
 - A DENY result must still be enforced by the caller.
-- HYOGOOK V5 is a review signal, never an automatic approval decision.
+- HYOGOOK V5 (the score formula; the philosophy is V6, see
+  [`PHILOSOPHY.md`](./PHILOSOPHY.md)) is a review signal, never an automatic
+  approval decision.
 - The public MCP server supports loopback or authenticated Tailscale binding;
   public `0.0.0.0` listeners are not supported.
 - Missing, unreadable, or unmeasured evidence is never reported as healthy.
@@ -164,13 +166,15 @@ HyoDo's internal review model maps six evidence areas:
 
 Command gates can be absorbed from existing tooling. Native evidence pillars
 cannot be shell-faked through `gates.toml`. See
-[`PHILOSOPHY.md`](./PHILOSOPHY.md) for the HYOGOOK V5 review model.
+[`PHILOSOPHY.md`](./PHILOSOPHY.md) for the HYOGOOK V5 review model (formula
+V5, philosophy V6).
 
 ## Install and support
 
 Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 
 - Quick start: [`QUICK_START.md`](./QUICK_START.md)
+- Node.js projects: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
 - Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
 - Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
 - Changelog: [`CHANGELOG.md`](./CHANGELOG.md)

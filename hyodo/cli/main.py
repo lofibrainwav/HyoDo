@@ -1550,6 +1550,8 @@ def safe(
             "exit_code": exit_code,
             "findings": [asdict(f) for f in result["findings"]],
             "exceptions_applied": int(result.get("exceptions_applied", 0)),
+            "scanned_files": result.get("scanned_files"),
+            "total_scannable": result.get("total_scannable"),
         }
         console.print_json(json.dumps(payload))
         raise typer.Exit(exit_code)
@@ -1590,10 +1592,21 @@ def safe(
             )
 
     console.print(f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}")
-    cap_note = "unlimited" if max_files <= 0 else f"{max_files} files"
+    scanned_files = result.get("scanned_files")
+    total_scannable = result.get("total_scannable")
+    if isinstance(scanned_files, int) and isinstance(total_scannable, int):
+        if total_scannable > scanned_files:
+            coverage_note = (
+                f"Directory scan cap: scanned {scanned_files} of {total_scannable} files "
+                f"(cap {max_files}); raise --max-files to scan all. "
+            )
+        else:
+            coverage_note = f"Scanned {scanned_files} of {total_scannable} files. "
+    else:
+        coverage_note = ""
     console.print(
         "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit. "
-        f"Directory scan cap: {cap_note}; default corpus is git diff/status when no path.[/dim]"
+        f"{coverage_note}Default corpus is git diff/status when no path.[/dim]"
     )
 
     if strict and high_only:

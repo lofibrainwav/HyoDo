@@ -607,22 +607,30 @@ def _apply_safety_exceptions(
 
 def _scan_directory(
     target: Path, root: Path, config: ScanExceptionsConfig, max_files: int = 40
-) -> tuple[list[Finding], str, str, int]:
+) -> tuple[list[Finding], str, str, int, int, int]:
     """Per-file scan for directories (path attached).
 
     Caps at *max_files* files; ``max_files <= 0`` means unlimited.
+
+    Also reports how many scannable files exist under *target* in total, not
+    just how many were read — "unobserved is never green" means a partial
+    scan must say so, not just state the cap that produced it. Counting the
+    full list costs a directory walk plus the binary sniff already required
+    by ``is_scannable_file``; it never reads a file's full body.
     """
+    scannable_paths = [p for p in sorted(target.rglob("*")) if is_scannable_file(p)]
+    total_scannable = len(scannable_paths)
+    scan_targets = scannable_paths if max_files <= 0 else scannable_paths[:max_files]
+
     findings: list[Finding] = []
     chunks: list[str] = []
     count = 0
     suppressed_count = 0
-    for file_path in sorted(target.rglob("*")):
-        if not is_scannable_file(file_path):
-            continue
+    for file_path in scan_targets:
         try:
             text = _read_text_file(file_path)
         except OSError:
-            return [], "", f"error:read:{file_path}", 0
+            return [], "", f"error:read:{file_path}", 0, 0, 0
         scanned, suppressed = _apply_safety_exceptions(
             scan_text(text, path=str(file_path)), root, config
         )
@@ -630,12 +638,10 @@ def _scan_directory(
         suppressed_count += suppressed
         chunks.append(text)
         count += 1
-        if max_files > 0 and count >= max_files:
-            break
     corpus = "\n".join(chunks)
     findings.append(assess_rollback_signal(corpus))
     source = f"dir:{target} ({count} files)"
-    return findings, corpus, source, suppressed_count
+    return findings, corpus, source, suppressed_count, count, total_scannable
 
 
 def _risk_level_action(score: int) -> tuple[str, str]:
@@ -648,9 +654,22 @@ def _risk_level_action(score: int) -> tuple[str, str]:
 
 
 def _result_payload(
-    source: str, findings: list[Finding], strict: bool, exceptions_applied: int = 0
+    source: str,
+    findings: list[Finding],
+    strict: bool,
+    exceptions_applied: int = 0,
+    scanned_files: int | None = None,
+    total_scannable: int | None = None,
 ) -> dict:
-    """Assemble the scan result dict from findings — single source of truth."""
+    """Assemble the scan result dict from findings — single source of truth.
+
+    ``scanned_files`` / ``total_scannable`` are ``None`` for every mode that
+    scans one indivisible corpus (a single file, an external-scanner run, or
+    the default git diff/status text): no per-file coverage claim is made
+    there. Only a directory scan, where files beyond ``max_files`` are never
+    read, passes real counts so partial coverage is visible instead of being
+    hidden behind a "fully scanned" default.
+    """
     score = risk_score(findings)
     level, action = _risk_level_action(score)
     return {
@@ -661,6 +680,8 @@ def _result_payload(
         "level": level,
         "action": action,
         "exceptions_applied": exceptions_applied,
+        "scanned_files": scanned_files,
+        "total_scannable": total_scannable,
     }
 
 
@@ -735,6 +756,8 @@ def run_safety_scan(
         return _result_payload(f"error:scan-exceptions:{exc}", [], strict)
 
     exceptions_applied = 0
+    scanned_files: int | None = None
+    total_scannable: int | None = None
 
     if path:
         target = Path(path)
@@ -753,9 +776,14 @@ def run_safety_scan(
                 findings.append(assess_rollback_signal(text, path=str(target)))
                 source = f"file:{target}"
         elif target.is_dir():
-            findings, _corpus, source, exceptions_applied = _scan_directory(
-                target, root, exceptions, max_files=max_files
-            )
+            (
+                findings,
+                _corpus,
+                source,
+                exceptions_applied,
+                scanned_files,
+                total_scannable,
+            ) = _scan_directory(target, root, exceptions, max_files=max_files)
         else:
             findings = []
             source = f"missing:{target}"
@@ -764,4 +792,11 @@ def run_safety_scan(
         findings = scan_text(corpus)
         findings.append(assess_rollback_signal(corpus))
 
-    return _result_payload(source, findings, strict, exceptions_applied)
+    return _result_payload(
+        source,
+        findings,
+        strict,
+        exceptions_applied,
+        scanned_files=scanned_files,
+        total_scannable=total_scannable,
+    )
