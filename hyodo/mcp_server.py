@@ -251,7 +251,12 @@ def create_server(
     def hyodo_policy_check(
         event: dict[str, Any], policy_path: str = ".hyodo/policy.toml"
     ) -> dict[str, Any]:
-        """Evaluate one event through ``hyodo policy check`` within the locked workspace."""
+        """Evaluate one event through ``hyodo policy check`` within the locked workspace.
+
+        Exit ``0`` is ALLOW, ``1`` is DENY, ``2`` is UNOBSERVED, and ``3`` is
+        ASK. The adapter forwards that CLI contract without making a second
+        policy decision.
+        """
         try:
             config = _resolve_workspace_path(workspace, policy_path)
         except ValueError as exc:

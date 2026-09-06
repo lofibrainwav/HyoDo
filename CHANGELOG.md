@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Policy ASK and trust ladder** — policy evaluation now reports measured
+  `ASK` decisions for unlisted web domains, outside-root paths, and configured
+  discretionary tools. Operators can cap and explicitly grant trust with
+  `hyodo policy trust grant|show`; trust is stored in the untracked
+  `.hyodo/policy-trust.json` file.
 - OpenSSF Scorecard workflow (`.github/workflows/scorecard.yml`), publishing
   results and a badge on README via the official `ossf/scorecard-action`.
 - `server.json` at the repository root, the manifest format for the official
@@ -22,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `event record --policy` now returns exit `3` for `ASK` and exit `2` for
+  policy `UNOBSERVED`, instead of treating every non-DENY decision as success.
 - `hyodo safe` now discloses directory-scan coverage as `scanned N of M
   files` in text and as `scanned_files` / `total_scannable` in `--json`,
   instead of only stating the configured cap; single-corpus modes make no

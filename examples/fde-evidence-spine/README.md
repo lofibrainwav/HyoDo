@@ -30,11 +30,11 @@ hyodo event record \
 
 ## Exit codes
 
-| Command | 0 | 1 | 2 |
-| --- | --- | --- | --- |
-| `event validate` | valid | invalid | unreadable input |
-| `event record` | recorded (+ ALLOW or no policy) | invalid or DENY | unreadable / policy unobserved / append fail |
-| `policy check` | ALLOW | DENY | unobserved (missing policy or invalid event) |
+| Command | 0 | 1 | 2 | 3 |
+| --- | --- | --- | --- | --- |
+| `event validate` | valid | invalid | unreadable input | not applicable |
+| `event record` | recorded (+ ALLOW or no policy) | invalid or DENY | unreadable / policy unobserved / append fail | ASK |
+| `policy check` | ALLOW | DENY | unobserved (missing policy or invalid event) | ASK |
 
 ## Adapter sketch (caller-owned)
 
@@ -44,4 +44,13 @@ for each agent step:
   hyodo event record --file step.json --policy .hyodo/policy.toml --json
   if exit == 1 and decision == DENY: stop agent
   if exit == 2: treat as unobserved — do not pretend safe
+  if exit == 3 and decision == ASK: obtain operator decision before continuing
+```
+
+Trust is explicit and local. It is capped by `[trust].max_level` and is never
+granted by the tracked policy file alone:
+
+```bash
+hyodo policy trust grant --level 2 --root .
+hyodo policy trust show --root . --json
 ```

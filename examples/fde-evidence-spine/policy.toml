@@ -17,3 +17,20 @@ blocked_path_globs = [
   "**/secrets/**",
   "**/*credential*",
 ]
+
+# Optional discretionary web boundary. Uncomment to turn unlisted domains into
+# ASK decisions; GET/HEAD are the safe default, and credential-shaped paths are
+# denied unless explicitly enabled.
+# [web]
+# allowed_domains = ["api.example.com", "*.internal.example.com"]
+# allow_non_get = false
+# allow_credential_paths = false
+
+# Optional operator-controlled trust cap. This does not grant trust by itself;
+# use `hyodo policy trust grant --level N` to create untracked local state.
+# [trust]
+# max_level = 2
+
+# Optional discretionary tool list and annotation threshold.
+# ask_tools = ["send_email", "publish_release"]
+# ask_threshold = 1
