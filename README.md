@@ -11,7 +11,8 @@ Review signals never grant automatic approval. Unobserved is never green.
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
 [![Python](https://img.shields.io/pypi/pyversions/hyodo)](https://pypi.org/project/hyodo/)
-[![License](https://github.com/lofibrainwav/HyoDo/blob/main/LICENSE)](./LICENSE) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lofibrainwav/HyoDo/badge)](https://scorecard.dev/viewer/?uri=github.com/lofibrainwav/HyoDo)
+[![License](https://img.shields.io/github/license/lofibrainwav/HyoDo)](./LICENSE)
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lofibrainwav/HyoDo/badge)](https://scorecard.dev/viewer/?uri=github.com/lofibrainwav/HyoDo)
 
 ## Why HyoDo exists
 
@@ -172,8 +173,7 @@ Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 
 - Quick start: [`QUICK_START.md`](./QUICK_START.md); Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
 - Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
-- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md); Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
 ## License
 
