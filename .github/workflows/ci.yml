@@ -447,10 +447,10 @@ jobs:
           retention-days: 14
 
   # -------------------------------------------------------------------------
-  # Final HYOGOOK V5 Release Readiness
+  # Final HyoDo Integrity Score Release Readiness
   # -------------------------------------------------------------------------
   trinity-score:
-    name: "HYOGOOK V5 Score"
+    name: "HyoDo Integrity Score"
     runs-on: ubuntu-latest
     needs: [truth-gate, truth-gate-mcp-v1, goodness-gate, beauty-gate, public-language]
     if: ${{ always() }}
@@ -491,10 +491,11 @@ jobs:
 
           echo "All required upstream jobs succeeded."
 
-      - name: Calculate HYOGOOK V5 Score
+      - name: Calculate HyoDo Integrity Score
         run: |
           echo "============================================"
-          echo "     HyoDo HYOGOOK V5 Score Validation"
+          echo "     HyoDo Integrity Score Validation"
+          echo "     Formula lineage: HYOGOOK V5"
           echo "============================================"
           echo ""
           echo "Public OSS Release readiness (see VERSION)"
