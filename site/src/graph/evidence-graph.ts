@@ -647,7 +647,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		bottom: number;
 	}
 
-	/** Any grid cell's box (occupied or empty), in wrap-relative coordinates. */
+	/** Any grid cell's box (occupied or empty), in SVG-viewport-relative coordinates. */
 	function cellBoxAt(rowIdx: number, col: number, wrapRect: DOMRect): Box | null {
 		const elm = gridCells[rowIdx]?.[col];
 		if (!elm) return null;
@@ -773,6 +773,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		occupiedBoxes: Map<string, Box>,
 		excludeA: string,
 		excludeB: string,
+		onCollision?: (cellId: string) => void,
 	): boolean {
 		const len = pathEl.getTotalLength();
 		const steps = Math.max(1, Math.ceil(len / 4));
@@ -780,7 +781,10 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 			const pt = pathEl.getPointAtLength((i / steps) * len);
 			for (const [cellId, box] of occupiedBoxes) {
 				if (cellId === excludeA || cellId === excludeB) continue;
-				if (pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom) return true;
+				if (pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom) {
+					onCollision?.(cellId);
+					return true;
+				}
 			}
 		}
 		return false;
@@ -824,7 +828,8 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		parentEdges = [];
 		evidenceEdges = [];
 
-		const wrapRect = root.getBoundingClientRect();
+		// Use the actual SVG viewport, including its border/scroll offset.
+		const wrapRect = svgRoot.getBoundingClientRect();
 		svgRoot.setAttribute('viewBox', `0 0 ${wrapRect.width} ${wrapRect.height}`);
 
 		const defs = svgEl(doc, 'defs');
@@ -944,12 +949,17 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 
 				if (!chosenD || !chosenEl) {
 					// No bezier candidate cleared every occupied cell: fall back
-					// to the same collision-free orthogonal router used for
-					// parent edges, still drawn dashed with the evidence
-					// arrowhead.
+					// to the parent-edge orthogonal router. Keep the route
+					// even if it crosses a cell, but never silently on localhost.
 					chosenD = orthogonalRoute(refEv, ev, wrapRect);
 					chosenEl = svgEl(doc, 'path', { d: chosenD });
 					svgRoot.appendChild(chosenEl);
+					pathCrossesOccupied(chosenEl, occupiedBoxes, refEv.eventId, ev.eventId, (cellId) => {
+						const hostname = win.location?.hostname;
+						if (hostname === 'localhost' || hostname === '127.0.0.1') {
+							win.console?.warn('evidence-graph: fallback crosses cell', `${refEv.eventId}->${ev.eventId}`, cellId);
+						}
+					});
 				}
 
 				chosenEl.setAttribute('class', 'edge-evidence');
