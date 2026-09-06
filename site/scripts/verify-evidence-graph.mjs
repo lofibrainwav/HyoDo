@@ -15,15 +15,22 @@ try {
  const binary = candidates.find(c => c.includes('/') ? existsSync(c) : spawnSync('which', [c], {stdio:'ignore'}).status === 0);
  if (!binary) throw new Error('Chrome not found: set CHROME_BIN or install google-chrome/chromium.');
  profile = mkdtempSync(join(tmpdir(), 'eg-verify-'));
- let launchError;
- chrome = spawn(binary, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], {stdio:'ignore'});
+ let launchError, exited = false, exitCode = null, exitSignal = null;
+ // CI runners are slower to hand out a DevTools port and often disallow the
+ // Chrome sandbox and /dev/shm size Chrome assumes locally.
+ const chromeArgs = ['--headless=new', '--disable-gpu', '--enable-unsafe-swiftshader', '--disable-dev-shm-usage', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`];
+ if (process.env.CI) chromeArgs.push('--no-sandbox');
+ chromeArgs.push('about:blank');
+ chrome = spawn(binary, chromeArgs, {stdio:'ignore'});
  chrome.on('error', error => { launchError = error; });
+ chrome.on('exit', (code, signal) => { exited = true; exitCode = code; exitSignal = signal; });
  let port;
- for(let n=0;n<60;n++) {
-  if(launchError || chrome.exitCode !== null) break;
-  try { port = readFileSync(join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]; break; } catch { await sleep(100); }
+ const PORT_WAIT_MS = 30000, POLL_MS = 250;
+ for (let waited = 0; waited < PORT_WAIT_MS; waited += POLL_MS) {
+  if (launchError || exited) break;
+  try { port = readFileSync(join(profile,'DevToolsActivePort'),'utf8').split('\n')[0]; break; } catch { await sleep(POLL_MS); }
  }
- if(!port) throw new Error(`Chrome did not start (sandbox may prohibit launch): ${launchError?.message || (chrome.exitCode === null ? 'DevTools port unavailable after 6s' : `exit ${chrome.exitCode}`)}`);
+ if(!port) throw new Error(`Chrome did not start (sandbox may prohibit launch): ${launchError?.message || (exited ? `exited early (code ${exitCode}, signal ${exitSignal ?? 'none'})` : `DevTools port unavailable after ${PORT_WAIT_MS / 1000}s`)}`);
  const target = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, {method:'PUT',signal:AbortSignal.timeout(5000)})).json();
  ws = new WebSocket(target.webSocketDebuggerUrl);
  await new Promise((resolve,reject) => { const timer=setTimeout(()=>reject(new Error('CDP connection timed out')),5000); ws.onopen=()=>{clearTimeout(timer);resolve();}; ws.onerror=error=>{clearTimeout(timer);reject(error);}; });
