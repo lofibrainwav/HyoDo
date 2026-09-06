@@ -141,7 +141,9 @@ def prepare_release(root: Path, version: str, *, today: str | None = None) -> No
         )
     )
     changelog.write_text(
-        changelog_text.replace(CHANGELOG_HEADER_END, CHANGELOG_HEADER_END + _release_section(version, release_date), 1)
+        changelog_text.replace(
+            CHANGELOG_HEADER_END, CHANGELOG_HEADER_END + _release_section(version, release_date), 1
+        )
     )
     release_note.parent.mkdir(parents=True, exist_ok=True)
     release_note.write_text(_release_notes(version))

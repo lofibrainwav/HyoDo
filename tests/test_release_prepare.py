@@ -6,7 +6,6 @@ import pytest
 
 from scripts.release.prepare_release import ReleasePrepError, prepare_release
 
-
 HEADER = """# Changelog
 
 All notable changes to HyoDo will be documented in this file.
