@@ -34,7 +34,11 @@ def evaluate_tag_trust(
 
     target = tag_payload.get("object") or {}
     if target.get("type") != "commit":
-        return False, f"annotated tag must point directly to a commit, got {target.get('type')!r}", None
+        return (
+            False,
+            f"annotated tag must point directly to a commit, got {target.get('type')!r}",
+            None,
+        )
 
     target_sha = target.get("sha")
     if not isinstance(target_sha, str) or not target_sha:
@@ -65,7 +69,7 @@ def _get_json(url: str, token: str) -> dict[str, Any]:
             "User-Agent": "hyodo-release-tag-verifier",
         },
     )
-    with urlopen(request, timeout=20) as response:  # noqa: S310 - fixed GitHub API origin
+    with urlopen(request, timeout=20) as response:
         payload = json.load(response)
     if not isinstance(payload, dict):
         raise ValueError(f"GitHub API returned {type(payload).__name__}, expected object")
