@@ -15,3 +15,6 @@
   tracked `.md` and `.py` file for non-English prose.
 - Markdown lines stay under 80 characters except tables and URLs.
 - English only in code, comments, and copy.
+
+- Astro trims whitespace-only text nodes next to inline tags — keep `text <code>x</code> text` joins on one source line.
+- Verify pages headlessly through CDP device emulation (`Emulation.setDeviceMetricsOverride`), not `--window-size` screenshots, which do not honour the mobile viewport.

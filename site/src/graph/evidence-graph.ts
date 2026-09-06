@@ -972,6 +972,10 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 			}
 		}
 
+		for (const edge of [...parentEdges, ...evidenceEdges]) {
+			edge.el.dataset.source = edge.sourceId;
+			edge.el.dataset.target = edge.targetId;
+		}
 		selfCheckEdges();
 	}
 
