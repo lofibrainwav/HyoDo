@@ -60,3 +60,16 @@ Concept A + C combined:
   read the code* / *If you have to prove it*.
 
 - The evidence graph is embedded below the landing hero and mounted lazily within 200px of the viewport.
+- Hero-to-graph docking timing contract (`site/src/hero/motion.ts`): the
+  handoff tile pattern is fully lit by 45% of the docking scroll range;
+  the crossfade (hero canvas opacity 1→0, `.eg-embed` opacity 0→1) runs
+  between 45% and 75% of that range; the timeline itself ends no later
+  than the point where the `.eg-embed` section's top reaches 20% of the
+  viewport height. Keep the real grid visible well before the section is
+  fully in view — do not let the docking timeline reserve most of its
+  range for opaque hero tiles.
+- `.eg-embed` defaults to `opacity: 1` in CSS with no ambient dimming;
+  only the docking script (WebGPU/WebGL2 hero running, no reduced motion)
+  drives it toward 0 during the crossfade above. With JS disabled, the
+  poster fallback, or `prefers-reduced-motion: reduce`, the section stays
+  at `opacity: 1` and no docking timeline runs at all.

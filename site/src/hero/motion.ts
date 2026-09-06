@@ -34,6 +34,14 @@ export function initMotion(options: MotionOptions): () => void {
 	const graph = embed?.querySelector<HTMLElement>('.graph-wrap');
 	const originalStyle = canvasWrap.getAttribute('style');
 	const scrim = canvasWrap.querySelector<HTMLElement>('.hero-scrim');
+	// Docking timing contract (kept in sync with site/context/05-ui-context.md):
+	// the handoff tile pattern is fully lit by 45% of the scroll range, then the
+	// crossfade (canvas 1->0, .eg-embed 0->1) runs from 45% to 75%, so the real
+	// grid is fully visible well before the timeline ends. The timeline itself
+	// ends no later than the point where the .eg-embed section's top reaches
+	// 20% of the viewport height.
+	const HANDOFF_END = 0.45;
+	const FADE_END = 0.75;
 	const applyDock = (progress: number) => {
 		if (reduceMotion || !embed || !graph) return;
 		if (progress > 0) embed.dispatchEvent(new Event('eg-mount'));
@@ -46,23 +54,28 @@ export function initMotion(options: MotionOptions): () => void {
 		const rect = canvasWrap.getBoundingClientRect();
 		const target = graph.getBoundingClientRect();
 		options.setHandoff(cells, rect);
-		options.uHandoff.value = Math.min(1, progress / 0.8);
+		options.uHandoff.value = Math.min(1, progress / HANDOFF_END);
 		coherenceUniform.value = options.uHandoff.value;
-		const fade = Math.max(0, (progress - 0.8) / 0.2);
+		const fade = Math.min(1, Math.max(0, (progress - HANDOFF_END) / (FADE_END - HANDOFF_END)));
 		canvasWrap.style.opacity = String(1 - fade);
 		embed.style.opacity = String(fade);
 		if (scrim) scrim.style.opacity = String(1 - options.uHandoff.value);
-		const p = Math.min(1, progress / 0.8);
+		const p = options.uHandoff.value;
 		const left = (target.left - rect.left) * p;
 		const top = (target.top - rect.top) * p;
 		const right = rect.width + (target.right - rect.right) * p;
 		const bottom = rect.height + (target.bottom - rect.bottom) * p;
 		canvasWrap.style.clipPath = `polygon(${left}px ${top}px,${right}px ${top}px,${right}px ${bottom}px,${left}px ${bottom}px)`;
 	};
+	// End the timeline no later than the point where the .eg-embed section's
+	// top reaches 20% of the viewport height. Measured from the section
+	// itself (not the inner grid) so the boundary matches the contract above;
+	// the function is re-evaluated by ScrollTrigger.refresh(), which GSAP
+	// already calls on window resize.
 	const scrollDriver = ScrollTrigger.create({
 		trigger: document.body,
 		start: 'top top',
-		end: () => `+=${Math.max(1, (graph?.getBoundingClientRect().top ?? innerHeight) + scrollY - 80)}`,
+		end: () => `+=${Math.max(1, (embed?.getBoundingClientRect().top ?? innerHeight) + scrollY - innerHeight * 0.2)}`,
 		scrub: true,
 		invalidateOnRefresh: true,
 		onUpdate: self => applyDock(self.progress),
