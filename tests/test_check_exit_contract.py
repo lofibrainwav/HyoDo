@@ -42,6 +42,8 @@ def test_check_gate_failure_exits_1():
 
     assert result.exit_code == 1
     assert "Some gates failed" in result.output
+    assert "Failure details:" in result.output
+    assert "Next action: fix the listed gate(s) and re-run hyodo check." in result.output
     # A FAIL must never be reported as a passing run.
     assert "All executed gates passed" not in result.output
 

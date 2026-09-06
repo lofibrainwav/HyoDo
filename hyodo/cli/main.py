@@ -413,6 +413,16 @@ def _print_gate_result(result: GateResult) -> None:
         console.print(f"  [yellow]UNSUPPORTED {result.message}[/yellow]")
 
 
+def _print_failure_guidance(failures: list[tuple[str, str]]) -> None:
+    """Explain failed gates and give consumers a deterministic next action."""
+    if not failures:
+        return
+    console.print("[bold red]Failure details:[/bold red]")
+    for name, message in failures:
+        console.print(f"  - {name}: {message}")
+    console.print("[yellow]Next action: fix the listed gate(s) and re-run hyodo check.[/yellow]")
+
+
 EVIDENCE_SCHEMA_VERSION = "hyodo.dashboard-evidence/v2"
 LOOPBACK_HOST = "127.0.0.1"
 
@@ -1134,6 +1144,7 @@ def check(
                 f"[bold red]Some gates failed[/bold red] "
                 f"({len(executed)}/{len(gen_results)} gates ran)"
             )
+            _print_failure_guidance([(f"{r.language} ({r.tool})", r.message) for r in failed])
             raise typer.Exit(1)
         console.print(
             f"[bold green]All executed gates passed "
@@ -1176,6 +1187,7 @@ def check(
                 f"[bold red]Some gates failed[/bold red] "
                 f"({len(user_executed)}/{len(user_results)} gates ran)"
             )
+            _print_failure_guidance([(r.name, r.message) for r in user_failed])
             raise typer.Exit(1)
         console.print(
             f"[bold green]All executed gates passed "
@@ -1239,7 +1251,14 @@ def check(
 
     if failed:
         console.print(f"[bold red]Some gates failed[/bold red] ({ran}/{total} gates ran)")
-        console.print("[yellow]Fix failures, then re-run hyodo check[/yellow]")
+        gate_names = ("Truth (pyright)", "Beauty (ruff)", "Goodness (pytest)", "Eternity (SBOM)")
+        _print_failure_guidance(
+            [
+                (name, result.message)
+                for name, result in zip(gate_names, results, strict=True)
+                if result in failed
+            ]
+        )
         raise typer.Exit(1)
 
     console.print(f"[bold green]All executed gates passed ({ran}/{total} gates ran)[/bold green]")
