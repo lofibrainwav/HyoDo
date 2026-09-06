@@ -162,7 +162,8 @@ if(consoleMsgs.some(m=>/error:|log-error:|exception:|edge crosses cell|fallback 
 finally {
  ws?.close();
  if(chrome && chrome.exitCode===null) { chrome.kill(); await Promise.race([new Promise(r=>chrome.once('exit',r)),sleep(2000)]); if(chrome.exitCode===null && chrome.signalCode===null) { chrome.kill('SIGKILL'); await Promise.race([new Promise(r=>chrome.once('exit',r)),sleep(1000)]); } }
- if(profile) rmSync(profile,{recursive:true,force:true});
+ // Chrome may still be flushing its profile on Linux; retry, and never let cleanup mask the verdict.
+ if(profile) { try { rmSync(profile,{recursive:true,force:true,maxRetries:10,retryDelay:200}); } catch(error) { console.warn('profile cleanup skipped: '+error.message); } }
 }
 console.log(JSON.stringify({pages:reports,console:consoleMsgs,failures},null,2));
 if(failures.length) { console.error('Evidence graph verification FAILED:\n'+failures.map(f=>' - '+f).join('\n')); process.exitCode=1; }
