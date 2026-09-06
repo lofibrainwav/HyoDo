@@ -42,6 +42,8 @@ try {
  });
  const evalJs=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.result.exceptionDetails)throw new Error(JSON.stringify(r.result.exceptionDetails));return r.result.result.value;};
  await call('Runtime.enable'); await call('Log.enable'); await call('Page.enable');
+ // Headless windows are unfocused, so element.focus() would not fire focus handlers without this.
+ await call('Emulation.setFocusEmulationEnabled', { enabled: true });
  for (const route of ['/evidence-graph/', '/']) {
  const URL_ = new URL(route,base).href;
  const prefix = route==='/' ? 'embedded-' : 'full-';
