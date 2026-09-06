@@ -4,11 +4,12 @@ name: HyoDo Mutation Evidence
   pull_request:
     branches: [main]
     paths:
-      - "hyodo/**"
-      - "tests/**"
-      - "cosmic-ray*.toml"
+      - "hyodo/__init__.py"
+      - "tests/test_scoring_math.py"
+      - "tests/test_scoring_properties.py"
+      - "tests/conftest.py"
+      - "cosmic-ray.scoring.toml"
       - "pyproject.toml"
-      - "docs/research/mutation-testing-receipt.md"
       - ".github/workflows/mutation.yml"
   schedule:
     - cron: "17 9 * * 1"
