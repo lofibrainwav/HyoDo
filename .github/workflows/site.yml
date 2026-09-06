@@ -39,3 +39,29 @@ jobs:
       - name: Build
         working-directory: site
         run: npm run build
+
+      - name: Preview and verify evidence graphs
+        working-directory: site
+        env:
+          CHROME_BIN: google-chrome
+        run: |
+          npm run preview -- --port 4321 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for attempt in $(seq 1 30); do
+            if curl -sf http://localhost:4321/evidence-graph/ > /dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" = 1
+          npm run verify:evidence-graph -- http://localhost:4321 verify-output
+
+      - name: Upload evidence graph screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: evidence-graph-verification
+          path: site/verify-output/*.png
