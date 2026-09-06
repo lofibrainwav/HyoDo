@@ -33,6 +33,12 @@ export function shouldAnimate(): AnimateDecision {
 		return { ok: false, reason: 'prefers-reduced-motion' };
 	}
 
+	// `?hero=off` forces the poster path. The evidence-graph verifier uses it so a
+	// software-GL render loop on CI runners cannot starve the checks it runs.
+	if (new URLSearchParams(window.location.search).get('hero') === 'off') {
+		return { ok: false, reason: 'query-hero-off' };
+	}
+
 	const cores = navigator.hardwareConcurrency ?? MIN_USEFUL_CORES + 1;
 	if (cores <= MIN_USEFUL_CORES) {
 		return { ok: false, reason: 'low-core-count' };

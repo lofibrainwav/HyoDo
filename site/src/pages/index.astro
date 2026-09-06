@@ -1,5 +1,6 @@
 ---
 import '../styles/tokens.css';
+import '../styles/evidence-graph.css';
 
 const pypiUrl = 'https://pypi.org/project/hyodo/';
 const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
@@ -301,6 +302,7 @@ const installCommand = 'pipx install hyodo';
 			<div class="nav-links">
 				<a href="/docs/quickstart/">Docs</a>
 				<a href={githubUrl}>GitHub</a>
+				<a href={pypiUrl}>PyPI</a>
 			</div>
 		</nav>
 
@@ -330,6 +332,73 @@ const installCommand = 'pipx install hyodo';
 				</div>
 			</div>
 		</header>
+
+		<section class="eg-page eg-embed" aria-labelledby="eg-heading">
+			<div class="eg-wrap">
+				<h2 id="eg-heading">Evidence graph <span class="eg-badge">Prototype</span></h2>
+				<p class="eg-key">Rows are participants, columns are steps, cells are events; solid = <code>parent_event_id</code>, dashed = <code>evidence_refs</code>, red stub = broken link — demo fixture data, nothing is uploaded.</p>
+				<p class="eg-banner" role="note">This is demo fixture data; nothing is uploaded. The links are proposed schema fields, not shipped <code>hyodo.agent-event/v1</code> fields.</p>
+			<div class="legend" aria-hidden="false">
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-tile-observed)"
+					></span><b>ALLOW</b></span
+				>
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-ask)"></span><b
+						>ASK</b
+					></span
+				>
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-deny)"></span><b
+						>DENY</b
+					></span
+				>
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-text-dim)"></span><b
+						>UNOBSERVED</b
+					></span
+				>
+			</div>
+
+			<p id="eg-instructions" class="sr-only">
+				Tab to a cell to inspect its record. Press Escape to clear the panel
+				without losing focus. Shift+Tab moves to the previous cell.
+			</p>
+
+			<div class="eg-main">
+				<div class="graph-wrap" id="eg-root" aria-describedby="eg-instructions">
+					<div class="grid" id="eg-grid"></div>
+					<svg class="edges" id="eg-edges" aria-hidden="true"></svg>
+				</div>
+				<aside class="panel" id="eg-panel" aria-live="polite">
+					<h2>5W1H</h2>
+					<p class="placeholder">
+						Hover or focus (Tab) a cell to inspect its record — who, when,
+						what, where, how, why.
+					</p>
+				</aside>
+			</div>
+
+				<p><a href="/evidence-graph/">Open the full prototype →</a></p>
+			</div>
+		</section>
+		<script>
+			const section = document.querySelector<HTMLElement>('.eg-embed');
+			const root = section?.querySelector<HTMLElement>('.graph-wrap');
+			if (section && root) {
+				let mounting: Promise<void> | undefined;
+				const mount = () => mounting ??= import('../graph/evidence-graph').then(m => {
+					m.mountEvidenceGraph(root);
+					section.dataset.mounted = 'true';
+					section.dispatchEvent(new Event('eg-ready'));
+				});
+				section.addEventListener('eg-mount', mount);
+				const observer = new IntersectionObserver(entries => {
+					if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); void mount(); }
+				}, { rootMargin: '200px' });
+				observer.observe(section);
+			}
+		</script>
 
 		<main>
 			<div class="wrap">

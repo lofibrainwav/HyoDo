@@ -31,6 +31,7 @@ export default defineConfig({
 				{ label: 'Quickstart', slug: 'docs/quickstart' },
 				{ label: 'Why HyoDo', slug: 'docs/why-hyodo' },
 				{ label: 'Philosophy → Math → Code', slug: 'docs/philosophy' },
+				{ label: 'Evidence Graph', slug: 'docs/evidence-graph' },
 				{ label: 'Roadmap', slug: 'docs/roadmap' },
 				{ label: 'Trust', slug: 'docs/trust' },
 			],

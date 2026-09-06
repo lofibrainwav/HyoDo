@@ -1,0 +1,133 @@
+---
+import '../styles/tokens.css';
+import '../styles/evidence-graph.css';
+
+const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
+const pypiUrl = 'https://pypi.org/project/hyodo/';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<title>HyoDo Evidence Graph — prototype</title>
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<link rel="icon" href="/favicon.ico" sizes="32x32" />
+		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+		<meta name="theme-color" content="#0b0d10" />
+		<meta
+			name="description"
+			content="A public, browser-only prototype of the HyoDo evidence graph, rendered from fixed demo data. Shows which agent-event fields are shipped today and which are proposed."
+		/>
+		<style>
+			/* Duplicated from index.astro's navbar/footer CSS on purpose — this
+			   page does not share a layout component with the landing page yet. */
+			.navbar {
+				position: sticky;
+				top: 0;
+				z-index: 10;
+				display: flex;
+				align-items: center;
+				justify-content: space-between;
+				padding: 1rem 1.5rem;
+				background: rgba(10, 11, 13, 0.85);
+				backdrop-filter: blur(6px);
+				border-bottom: 1px solid #24272e;
+			}
+
+			.navbar .brand {
+				font-size: 0.95rem;
+				font-weight: 600;
+				color: #eef0f3;
+				text-decoration: none;
+			}
+
+			.navbar .nav-links {
+				display: flex;
+				gap: 1.25rem;
+				font-size: 0.9rem;
+			}
+
+			.navbar .nav-links a {
+				color: #9aa1ac;
+				text-decoration: none;
+			}
+
+			.navbar .nav-links a:hover {
+				color: #6ee7b7;
+			}
+		</style>
+	</head>
+	<body class="eg-page">
+		<nav class="navbar">
+			<a class="brand" href="/">HyoDo</a>
+			<div class="nav-links">
+				<a href="/docs/quickstart/">Docs</a>
+				<a href={githubUrl}>GitHub</a>
+				<a href={pypiUrl}>PyPI</a>
+			</div>
+		</nav>
+
+		<div class="eg-wrap">
+			<h1>HyoDo Evidence Graph <span class="eg-badge">Prototype</span></h1>
+
+			<p class="eg-banner" role="note"><strong>Prototype.</strong> This is demo fixture data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below are proposed schema fields; they are not yet part of the shipped <code>hyodo.agent-event/v1</code> ledger. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
+
+			<p class="eg-key">Rows are participants, columns are step index, cells are events. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
+
+			<div class="legend" aria-hidden="false">
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-tile-observed)"
+					></span><b>ALLOW</b></span
+				>
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-ask)"></span><b
+						>ASK</b
+					></span
+				>
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-deny)"></span><b
+						>DENY</b
+					></span
+				>
+				<span class="lg-item"
+					><span class="lg-dot" style="background:var(--color-text-dim)"></span><b
+						>UNOBSERVED</b
+					></span
+				>
+			</div>
+
+			<p id="eg-instructions" class="sr-only">
+				Tab to a cell to inspect its record. Press Escape to clear the panel
+				without losing focus. Shift+Tab moves to the previous cell.
+			</p>
+
+			<div class="eg-main">
+				<div class="graph-wrap" id="eg-root" aria-describedby="eg-instructions">
+					<div class="grid" id="eg-grid"></div>
+					<svg class="edges" id="eg-edges" aria-hidden="true"></svg>
+				</div>
+				<aside class="panel" id="eg-panel" aria-live="polite">
+					<h2>5W1H</h2>
+					<p class="placeholder">
+						Hover or focus (Tab) a cell to inspect its record — who, when,
+						what, where, how, why.
+					</p>
+				</aside>
+			</div>
+
+			<noscript>
+				<p class="eg-key">The interactive grid needs JavaScript; the fixture and field meanings are documented at <a href="/docs/evidence-graph/">/docs/evidence-graph/</a>.</p>
+			</noscript>
+
+			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> (event_id, run_id, ts, kind, actor, step_index, tool, policy). <code>parent_event_id</code> and <code>evidence_refs</code> are proposed fields, shown here as fixture-only. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
+		</div>
+
+		<script>
+			import { mountEvidenceGraph } from '../graph/evidence-graph';
+			const root = document.getElementById('eg-root');
+			if (root) mountEvidenceGraph(root);
+		</script>
+	</body>
+</html>

@@ -78,6 +78,26 @@
   Caught 3 real type errors this way; `npm run build` alone did not surface
   them since esbuild strips types without checking them.
 
+## Evidence graph prototype (`/evidence-graph/`)
+
+- `src/pages/evidence-graph.astro` is a standalone page (not under
+  Starlight, not sharing a layout with `index.astro` — navbar/footer CSS
+  is duplicated inline on purpose). It imports `src/graph/evidence-graph.ts`
+  for a client-side `mountEvidenceGraph(root)` call from an inline
+  `<script type="module">`.
+- `src/graph/evidence-graph.ts` owns both the fixed 14-event demo fixture
+  and the SVG-overlay-on-CSS-grid renderer. No `fetch`, no storage, no
+  top-level DOM access (all `document`/`window` use is inside
+  `mountEvidenceGraph`), so the module is SSR-safe to import.
+- Honesty boundary: `parentEventId` and `evidenceRefs` on `EvidenceEvent`
+  are marked as PROPOSED fields — they do not exist in the shipped
+  `hyodo.agent-event/v1` schema (`hyodo/events.py`). The page banner and
+  `src/content/docs/docs/evidence-graph.md` both state this; do not let
+  either drift from `hyodo/events.py` as the schema evolves.
+- Styles live in `src/styles/evidence-graph.css`, scoped under `.eg-page`,
+  consuming `tokens.css` variables plus two page-local tokens
+  (`--eg-card`, `--eg-border`).
+
 ## Boundaries
 
 - Content SSOT lives in the repository root (`README.md`, `PHILOSOPHY.md`,
