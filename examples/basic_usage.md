@@ -31,9 +31,10 @@ passed. An empty or malformed gate file exits `2`, not `0`.
 hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9
 ```
 
-Prints the HYOGOOK V5 F-score and its geometric mean. A single pillar at zero
-collapses the signal. The score is decision support for a human reviewer; it
-never authorizes a merge or a deploy.
+Prints the HyoDo Integrity Score from the Six-Virtue Model and its geometric
+mean. Trinity Gates is the structured subset; HYOGOOK V5 is the formula
+lineage. A single pillar at zero collapses the signal. The score is decision
+support for a human reviewer; it never authorizes a merge or a deploy.
 
 ## 4. Record what an agent did
 

@@ -103,13 +103,13 @@ this repository.
     success"; `hyodo check` exit `2` = "path is missing or no
     applicable gate ran"
 
-### 2.3 Optional review score (HYOGOOK V5)
+### 2.3 Optional HyoDo Integrity Score (HYOGOOK V5 lineage)
 
-- HYOGOOK is optional, not required for the practical CLI path
+- The Integrity Score is optional, not required for the practical CLI path
   - Verdict: Supported
   - Evidence: README: "The practical CLI works without this
     optional philosophy layer"
-- HYOGOOK output is advisory, not an approval gate
+- Integrity Score output is advisory, not an approval gate
   - Verdict: Supported
   - Evidence: README: "Scores support review; they never replace
     tests, security checks, or human approval"

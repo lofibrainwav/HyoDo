@@ -151,6 +151,16 @@ def test_score_output_mentions_review_signal():
     assert "V6" in result.output or "philosophy" in result.output.lower()
 
 
+def test_score_output_uses_public_integrity_score_labels():
+    result = runner.invoke(app, _uniform_score_args(0.95, short=False))
+    assert result.exit_code == 0
+    assert "HyoDo Integrity Score" in result.output
+    assert "Six-Virtue Model" in result.output
+    assert "Trinity Gates" in result.output
+    assert "HYOGOOK V5" in result.output
+    assert "HYOGOOK F-score Review Signal" not in result.output
+
+
 def test_dashboard_html_uses_raw_evidence_and_never_invents_ux_score():
     evidence = {
         "target": "/tmp/HyoDo",

@@ -9,9 +9,11 @@ Philosophy branding is intentional. Every public label pairs with a
 ## Philosophy version
 
 - **Philosophy:** V6 (Hyo supersedes one-sided Loyalty).
-- **Score formula:** optional **HYOGOOK V5** F-score (geometric mean).
-- CLI may say “HYOGOOK F-score (philosophy V6)” — formula ≠ philosophy
-  version numbers on purpose.
+- **Public name:** HyoDo Integrity Score.
+- **Model:** Six-Virtue Model.
+- **Subset:** Trinity Gates.
+- **Formula lineage:** HYOGOOK V5 (geometric mean).
+- Formula lineage and philosophy version are separate identifiers on purpose.
 
 The `loyalty=` alias was removed in 4.0.0. Legacy
 `calculate_trinity_score()` stays frozen for historical reproducibility.

@@ -113,8 +113,9 @@ hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 \
   --benevolence 0.9 --hyo 0.9
 ```
 
-HYOGOOK V5 is a review aid only. It never grants automatic approval, and
-unmeasured pillars do not silently become green.
+The HyoDo Integrity Score uses the Six-Virtue Model and Trinity Gates subset;
+its formula lineage is HYOGOOK V5. It is a review aid only, never grants
+automatic approval, and unmeasured pillars do not silently become green.
 
 ## Command exit summary
 

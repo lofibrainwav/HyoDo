@@ -32,6 +32,16 @@ Command gates (Truth, Goodness, Beauty) run tools the project already owns —
 (Benevolence, Hyo, Yeong) are never replaced by a shell command; when they
 are unavailable, they are reported as "Not measured," not silently skipped.
 
+### Public score naming
+
+- **Public name:** HyoDo Integrity Score.
+- **Model:** Six-Virtue Model.
+- **Subset:** Trinity Gates.
+- **Formula lineage:** HYOGOOK V5.
+
+The name is the operator-facing label. `HYOGOOK V5` remains the formula
+lineage needed for reproducibility, not a competing public product name.
+
 ## 3. The mathematics
 
 Optional `hyodo score` combines five pillar scores with a **geometric mean**,
