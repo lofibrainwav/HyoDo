@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.13.0] - 2026-09-06
 
-Policy ASK, trust-ladder, and release-surface hygiene preparation.
+Policy ASK, score identity, and release-surface hygiene preparation.
 
 ### Added
 
@@ -24,6 +24,11 @@ Policy ASK, trust-ladder, and release-surface hygiene preparation.
   sources together: VERSION, package metadata, Dockerfile, and distribution
   manifests.
 - The release preparation and version-setting scripts share one update path.
+- The public score label is **HyoDo Integrity Score**, using the
+  **Six-Virtue Model** and **Trinity Gates** subset, with **HYOGOOK V5**
+  retained as formula lineage.
+- The GitHub required score check context is now **HyoDo Integrity Score**;
+  the formula lineage remains visible in its workflow output.
 
 ### Fixed
 
@@ -37,17 +42,11 @@ Policy ASK, trust-ladder, and release-surface hygiene preparation.
 ### Evidence
 
 - Policy ASK implementation merged through PR #149.
+- Public score identity merged through PR #151.
+- Public GitHub score check context merged through PR #152.
 - Post-merge CI and install smoke passed on the main merge commit.
 - This is cycle preparation only; no tag, GitHub Release, or PyPI publication
   is performed by this change.
-
-## [Unreleased]
-
-### Changed
-
-- Renamed the public score label to **HyoDo Integrity Score**, defined its
-  **Six-Virtue Model** and **Trinity Gates** subset, and retained **HYOGOOK V5**
-  as the formula lineage for reproducibility.
 
 ## [4.12.0] - 2026-09-05
 
