@@ -515,7 +515,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 
 	const gridRootOrNull = root.querySelector<HTMLDivElement>('.grid');
 	const svgRootOrNull = root.querySelector<SVGSVGElement>('svg.edges');
-	const panel = doc.getElementById('eg-panel');
+	const panel = root.closest('.eg-main')?.querySelector<HTMLElement>('.panel');
 	if (!gridRootOrNull || !svgRootOrNull) return () => {};
 	const gridRoot: HTMLDivElement = gridRootOrNull;
 	const svgRoot: SVGSVGElement = svgRootOrNull;

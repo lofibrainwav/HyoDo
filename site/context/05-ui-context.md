@@ -58,3 +58,5 @@ Concept A + C combined:
 - Install: `pipx install hyodo`
 - Layer titles: *If you build with AI but cannot read the code* / *If you
   read the code* / *If you have to prove it*.
+
+- The evidence graph is embedded below the landing hero and mounted lazily within 200px of the viewport.

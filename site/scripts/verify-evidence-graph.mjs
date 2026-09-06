@@ -42,7 +42,7 @@ try {
  });
  const evalJs=async expression=>{const r=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});if(r.result.exceptionDetails)throw new Error(JSON.stringify(r.result.exceptionDetails));return r.result.result.value;};
  await call('Runtime.enable'); await call('Log.enable'); await call('Page.enable');
- for (const route of ['/evidence-graph/']) {
+ for (const route of ['/evidence-graph/', '/']) {
  const URL_ = new URL(route,base).href;
  const prefix = route==='/' ? 'embedded-' : 'full-';
  const check=(ok,name)=>{if(!ok) failures.push(`${route}: ${name}`);};
@@ -164,4 +164,4 @@ finally {
 }
 console.log(JSON.stringify({pages:reports,console:consoleMsgs,failures},null,2));
 if(failures.length) { console.error('Evidence graph verification FAILED:\n'+failures.map(f=>' - '+f).join('\n')); process.exitCode=1; }
-else console.log('Evidence graph verification passed: prototype page, keyboard, motion, geometry, mobile and console.');
+else console.log('Evidence graph verification passed: both pages, keyboard, motion, geometry, mobile and console.');
