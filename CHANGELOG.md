@@ -5,6 +5,37 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- `hyodo safe` now discloses directory-scan coverage as `scanned N of M
+  files` in text and as `scanned_files` / `total_scannable` in `--json`,
+  instead of only stating the configured cap; single-corpus modes make no
+  per-file claim (`null`).
+- `install_interactive.sh` suggested `hyodo score --loyalty`, a flag removed
+  in 4.0.0; it now uses `--hyo`.
+- `examples/basic_usage.md` rewritten to use only real CLI commands and to
+  stop presenting a score band as "safe to proceed"; `CLAUDE.md` no longer
+  lists slash commands that do not ship in this repository.
+- README now states that HYOGOOK V5 is the formula version (philosophy V6)
+  and links the Node.js onboarding guide; ROADMAP baseline bumped to 4.12.0.
+- `Dockerfile` `LABEL version` had drifted to `4.0.1` while every other
+  source read `4.12.0`; it is now kept in sync.
+- `scripts/release/check_version_sync.py` now also checks the `Dockerfile`
+  `LABEL version` and the `.claude-plugin/plugin.json` `"version"` field,
+  so a drift in either source fails the release gate instead of passing
+  silently.
+- Restored `.claude-plugin/plugin.json`, deleted in a previous commit while
+  the CI "Validate JSON" step still referenced it. The step had been passing
+  silently because it piped `cat` into `jq` without `pipefail`, so a missing
+  file never failed the job; it now reads the file directly with `jq` under
+  `set -euo pipefail`.
+- Added `pipefail` to the other CI `run:` steps that pipe command output
+  (the `hyodo check` orchestration assertions and the public-docs
+  regression guard) so an upstream command failure in a pipe can no longer
+  be masked by the exit status of the last command.
+
 ## [4.12.0] - 2026-09-05
 
 Release-trust and external-consumption seal after the 4.11.0 MCP access-ledger

@@ -1,0 +1,17 @@
+{
+  "name": "hyodo",
+  "version": "4.12.0",
+  "description": "Model-agnostic local quality gates and agent-event/policy evidence for AI-assisted development. Review signals never authorize approval.",
+  "author": {
+    "name": "AFO Kingdom",
+    "url": "https://github.com/lofibrainwav"
+  },
+  "repository": "https://github.com/lofibrainwav/HyoDo",
+  "license": "MIT",
+  "mcpServers": {
+    "hyodo": {
+      "command": "hyodo",
+      "args": ["mcp", "stdio", "--root", "."]
+    }
+  }
+}

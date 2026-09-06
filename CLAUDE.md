@@ -40,12 +40,13 @@ and the `public-language` CI job covers commit messages and PR title/body.
 
 ### Main commands
 
-- `hyodo start` / `/start` - onboarding
-- `hyodo check` / `/check` - quality gates
-- `hyodo score` / `/score` - review signal (not auto-approval)
-- `hyodo safe` / `/safe` - safety early-warning scan
-- `hyodo trinity` / `/trinity` - structured review checklist
-- `/cost "task"` - cost routing signal
+- `hyodo start` - onboarding
+- `hyodo check` - quality gates
+- `hyodo score` - review signal (not auto-approval)
+- `hyodo safe` - safety early-warning scan
+- `hyodo trinity` - structured review checklist
+- `hyodo event` / `hyodo policy` - agent evidence and policy decisions
+- `hyodo mcp` - optional MCP adapter (no slash commands ship in this repo)
 
 ### Development commands
 
