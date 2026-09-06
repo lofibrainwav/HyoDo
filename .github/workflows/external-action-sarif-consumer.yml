@@ -1,0 +1,22 @@
+name: Temporary external HyoDo SARIF consumer
+
+on:
+  pull_request:
+    types: [opened]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  external-sarif:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out consumer repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Run released HyoDo composite action with SARIF
+        uses: lofibrainwav/HyoDo/.github/actions/hyodo@v4.12.0
+        with:
+          python-version: "3.12"
+          args: "--general"
+          upload-sarif: "true"
