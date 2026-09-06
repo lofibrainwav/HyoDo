@@ -16,7 +16,7 @@ try {
  if (!binary) throw new Error('Chrome not found: set CHROME_BIN or install google-chrome/chromium.');
  profile = mkdtempSync(join(tmpdir(), 'eg-verify-'));
  let launchError;
- chrome = spawn(binary, ['--headless=new', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], {stdio:'ignore'});
+ chrome = spawn(binary, ['--headless=new', '--disable-gpu', '--hide-scrollbars', '--remote-debugging-port=0', `--user-data-dir=${profile}`, 'about:blank'], {stdio:'ignore'});
  chrome.on('error', error => { launchError = error; });
  let port;
  for(let n=0;n<60;n++) {
@@ -36,7 +36,7 @@ try {
   else if(m.method==='Log.entryAdded' && m.params.entry.level==='error') consoleMsgs.push('log-error: '+m.params.entry.text);
  };
  const call=(method,params={})=>new Promise((resolve,reject)=>{
-  const i=++id; const timer=setTimeout(()=>{pending.delete(i);reject(new Error(`${method} timed out`));},10000);
+  const i=++id; const timer=setTimeout(()=>{pending.delete(i);reject(new Error(`${method} timed out${method==='Runtime.evaluate'?': '+String(params.expression||'').replace(/\s+/g,' ').slice(0,120):''}`));},30000);
   pending.set(i,m=>{clearTimeout(timer);m.error?reject(new Error(JSON.stringify(m.error))):resolve(m);});
   ws.send(JSON.stringify({id:i,method,params}));
  });
