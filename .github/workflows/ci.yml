@@ -49,15 +49,15 @@ jobs:
 
       - name: Ruff Lint Check - Public Package
         run: |
-          echo "Ruff lint check for public package..."
-          ruff check hyodo/ --output-format=concise
-          echo "Public package lint check passed"
+          echo "Ruff lint check for package, tests, and release scripts..."
+          ruff check hyodo tests scripts --output-format=concise
+          echo "Repository Ruff lint check passed"
 
       - name: Ruff Format Check - Public Package
         run: |
-          echo "Ruff format check for public package..."
-          ruff format --check hyodo/
-          echo "Public package format check passed"
+          echo "Ruff format check for package, tests, and release scripts..."
+          ruff format --check hyodo tests scripts
+          echo "Repository Ruff format check passed"
 
       - name: Pyright Type Check - Public Package
         run: |
