@@ -5,7 +5,8 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.12.0 is the current measured baseline.
+HyoDo 4.12.0 is the latest published release. Main is preparing the 4.13.0
+development cycle.
 
 Landed and released:
 
@@ -42,6 +43,12 @@ evidence is not converted into a pass.
 - Preserve fail-closed handling for unreadable ledgers and invalid inputs.
 - Keep default agent-event storage digest-only unless an operator explicitly
   permits more.
+
+### 4.13.0 development cycle
+
+- Policy ASK and the trust ladder are live on main, with explicit operator
+  grants and fail-closed `UNOBSERVED` handling.
+- Keep the seven version-bearing sources synchronized during release prep.
 
 ## Next candidates
 

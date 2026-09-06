@@ -72,7 +72,7 @@ in use:
 | --- | --- |
 | `safe` | `0` report · `1` strict high finding · `2` bad path |
 | `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
-| `event` / `policy` | `0` valid/ALLOW · `1` invalid/DENY · `2` unobserved |
+| `event` / `policy` | `0` valid/ALLOW · `1` invalid/DENY · `2` unobserved · `3` ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
 
 The policy gate speaks in four decision words, documented directly in
@@ -90,10 +90,10 @@ HyoDo emits a decision object; the agent runtime must enforce DENY.
 decision: str  # ALLOW | DENY | ASK | UNOBSERVED
 ```
 
-Honestly: `ASK` is declared in that vocabulary today but not yet emitted by
-any evaluation path in the current release. `ALLOW`, `DENY`, and
-`UNOBSERVED` are live; `ASK` is reserved for judgment work that has not
-shipped yet (see [Roadmap](/docs/roadmap/), stage 1).
+`ASK` is now emitted when policy evaluation observes an external variable that
+needs an operator decision. `ALLOW`, `DENY`, and `UNOBSERVED` remain live, and
+trust grants are capped by the tracked policy configuration. See the
+[Roadmap](/docs/roadmap/) for the 4.13.0 development cycle.
 
 ## Next
 

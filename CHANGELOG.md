@@ -5,56 +5,45 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.13.0] - 2026-09-06
+
+Policy ASK, trust-ladder, and release-surface hygiene preparation.
 
 ### Added
 
-- **Policy ASK and trust ladder** — policy evaluation now reports measured
-  `ASK` decisions for unlisted web domains, outside-root paths, and configured
-  discretionary tools. Operators can cap and explicitly grant trust with
-  `hyodo policy trust grant|show`; trust is stored in the untracked
-  `.hyodo/policy-trust.json` file.
-- OpenSSF Scorecard workflow (`.github/workflows/scorecard.yml`), publishing
-  results and a badge on README via the official `ossf/scorecard-action`.
-- `server.json` at the repository root, the manifest format for the official
-  MCP Registry (`io.github.lofibrainwav/hyodo`).
-- `.claude-plugin/marketplace.json`, so this repository can serve as its own
-  Claude Code plugin marketplace.
-- `.github/FUNDING.yml`.
-- `scripts/release/check_version_sync.py` now also checks `server.json` and
-  `.claude-plugin/marketplace.json`, so a version drift in either fails the
-  release gate instead of passing silently.
+- Policy evaluation now reports measured `ASK` decisions for unlisted web
+  domains, outside-root paths, and configured discretionary tools. Operators can
+  cap and explicitly grant trust with `hyodo policy trust grant|show`.
+- Trust grants are stored in the untracked `.hyodo/policy-trust.json` file.
+- OpenSSF Scorecard, MCP Registry, Claude Code marketplace, and funding
+  distribution surfaces.
+
+### Changed
+
+- Version preparation now validates and updates all seven version-bearing
+  sources together: VERSION, package metadata, Dockerfile, and distribution
+  manifests.
+- The release preparation and version-setting scripts share one update path.
 
 ### Fixed
 
 - `event record --policy` now returns exit `3` for `ASK` and exit `2` for
   policy `UNOBSERVED`, instead of treating every non-DENY decision as success.
-- `hyodo safe` now discloses directory-scan coverage as `scanned N of M
-  files` in text and as `scanned_files` / `total_scannable` in `--json`,
-  instead of only stating the configured cap; single-corpus modes make no
-  per-file claim (`null`).
-- `install_interactive.sh` suggested `hyodo score --loyalty`, a flag removed
-  in 4.0.0; it now uses `--hyo`.
-- `examples/basic_usage.md` rewritten to use only real CLI commands and to
-  stop presenting a score band as "safe to proceed"; `CLAUDE.md` no longer
-  lists slash commands that do not ship in this repository.
-- README now states that HYOGOOK V5 is the formula version (philosophy V6)
-  and links the Node.js onboarding guide; ROADMAP baseline bumped to 4.12.0.
-- `Dockerfile` `LABEL version` had drifted to `4.0.1` while every other
-  source read `4.12.0`; it is now kept in sync.
-- `scripts/release/check_version_sync.py` now also checks the `Dockerfile`
-  `LABEL version` and the `.claude-plugin/plugin.json` `"version"` field,
-  so a drift in either source fails the release gate instead of passing
-  silently.
-- Restored `.claude-plugin/plugin.json`, deleted in a previous commit while
-  the CI "Validate JSON" step still referenced it. The step had been passing
-  silently because it piped `cat` into `jq` without `pipefail`, so a missing
-  file never failed the job; it now reads the file directly with `jq` under
-  `set -euo pipefail`.
-- Added `pipefail` to the other CI `run:` steps that pipe command output
-  (the `hyodo check` orchestration assertions and the public-docs
-  regression guard) so an upstream command failure in a pipe can no longer
-  be masked by the exit status of the last command.
+- Release preparation now rejects divergence in any extended version source,
+  not only VERSION, pyproject.toml, and `hyodo/__init__.py`.
+- `hyodo safe` now discloses directory-scan coverage and the interactive
+  installer uses the current `--hyo` flag.
+
+### Evidence
+
+- Policy ASK implementation merged through PR #149.
+- Post-merge CI and install smoke passed on the main merge commit.
+- This is cycle preparation only; no tag, GitHub Release, or PyPI publication
+  is performed by this change.
+
+## [Unreleased]
+
+No unreleased changes.
 
 ## [4.12.0] - 2026-09-05
 

@@ -1,6 +1,6 @@
 {
   "name": "hyodo",
-  "version": "4.12.0",
+  "version": "4.13.0",
   "description": "Model-agnostic local quality gates and agent-event/policy evidence for AI-assisted development. Review signals never authorize approval.",
   "author": {
     "name": "AFO Kingdom",
@@ -11,7 +11,12 @@
   "mcpServers": {
     "hyodo": {
       "command": "hyodo",
-      "args": ["mcp", "stdio", "--root", "."]
+      "args": [
+        "mcp",
+        "stdio",
+        "--root",
+        "."
+      ]
     }
   }
 }

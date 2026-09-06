@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,29 @@ Previous release.
 - Existing history must stay intact.
 """
 
+PLUGIN_JSON = """{
+  "name": "hyodo",
+  "version": "{version}"
+}
+"""
+
+SERVER_JSON = """{
+  "name": "io.github.lofibrainwav/hyodo",
+  "version": "{version}",
+  "packages": [
+    {"identifier": "hyodo", "version": "{version}"}
+  ]
+}
+"""
+
+MARKETPLACE_JSON = """{
+  "name": "hyodo",
+  "plugins": [
+    {"name": "hyodo", "version": "{version}"}
+  ]
+}
+"""
+
 
 def write_minimal_repo(root: Path, version: str = "4.11.0") -> None:
     (root / "hyodo").mkdir()
@@ -41,6 +65,13 @@ version = "{version}"
 __version__ = "{version}"
 """
     )
+    (root / "Dockerfile").write_text(f'LABEL version="{version}"\n')
+    (root / ".claude-plugin").mkdir()
+    (root / ".claude-plugin" / "plugin.json").write_text(PLUGIN_JSON.replace("{version}", version))
+    (root / "server.json").write_text(SERVER_JSON.replace("{version}", version))
+    (root / ".claude-plugin" / "marketplace.json").write_text(
+        MARKETPLACE_JSON.replace("{version}", version)
+    )
     (root / "CHANGELOG.md").write_text(HEADER + HISTORY)
 
 
@@ -52,6 +83,15 @@ def test_prepare_release_updates_all_version_sources(tmp_path: Path) -> None:
     assert (tmp_path / "VERSION").read_text() == "4.12.0\n"
     assert 'version = "4.12.0"' in (tmp_path / "pyproject.toml").read_text()
     assert '__version__ = "4.12.0"' in (tmp_path / "hyodo" / "__init__.py").read_text()
+    assert 'version="4.12.0"' in (tmp_path / "Dockerfile").read_text()
+    assert (
+        json.loads((tmp_path / ".claude-plugin" / "plugin.json").read_text())["version"] == "4.12.0"
+    )
+    server = json.loads((tmp_path / "server.json").read_text())
+    assert server["version"] == "4.12.0"
+    assert server["packages"][0]["version"] == "4.12.0"
+    marketplace = json.loads((tmp_path / ".claude-plugin" / "marketplace.json").read_text())
+    assert marketplace["plugins"][0]["version"] == "4.12.0"
 
 
 def test_prepare_release_inserts_changelog_section_after_header(tmp_path: Path) -> None:
@@ -117,6 +157,14 @@ def test_prepare_release_refuses_duplicate_changelog_section(tmp_path: Path) -> 
 def test_prepare_release_fails_when_version_sources_are_already_divergent(tmp_path: Path) -> None:
     write_minimal_repo(tmp_path)
     (tmp_path / "pyproject.toml").write_text('[project]\nname = "hyodo"\nversion = "4.10.0"\n')
+
+    with pytest.raises(ReleasePrepError, match="version sources are not synchronized"):
+        prepare_release(tmp_path, "4.12.0", today="2026-09-05")
+
+
+def test_prepare_release_rejects_divergent_extended_version_source(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+    (tmp_path / "server.json").write_text(SERVER_JSON.replace("{version}", "4.10.0"))
 
     with pytest.raises(ReleasePrepError, match="version sources are not synchronized"):
         prepare_release(tmp_path, "4.12.0", today="2026-09-05")
