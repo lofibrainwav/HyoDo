@@ -396,7 +396,7 @@ const installCommand = 'pipx install hyodo';
 				section.addEventListener('eg-mount', mount);
 				const observer = new IntersectionObserver(entries => {
 					if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); void mount(); }
-				}, { rootMargin: '200px' });
+				}, { rootMargin: '100% 0px' });
 				observer.observe(section);
 			}
 		</script>

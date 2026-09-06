@@ -4,8 +4,8 @@
 // returned dispose().
 import { WebGPURenderer } from 'three/webgpu';
 import { createHeroScene } from './scene';
-import { initMotion } from './motion';
 import { shouldAnimate } from './fallback';
+import type { MotionOptions } from './motion';
 
 const DPR_CAP = 1.5; // cap device pixel ratio to bound fill-rate cost
 const MOBILE_QUERY = '(max-width: 768px)';
@@ -56,14 +56,52 @@ export default async function mountHero(canvas: HTMLCanvasElement): Promise<() =
 	const resizeObserver = new ResizeObserver(applySize);
 	resizeObserver.observe(container);
 
-	const stopMotion = initMotion({
+	// Docking (GSAP + ScrollTrigger + SplitText + Lenis, ~280 KiB gzip) is
+	// not needed for the hero's first frame — only once the visitor starts
+	// scrolling toward the embedded evidence graph. Load it lazily so it
+	// never rides along in the initial hero chunk: on the first scroll, or
+	// as soon as `.eg-embed` is within one viewport of the screen
+	// (rootMargin: '100% 0px', matching the trigger index.astro uses to
+	// import the graph module itself), whichever fires first.
+	const motionOptions: MotionOptions = {
 		coherenceUniform: hero.coherenceUniform,
 		uHandoff: hero.uHandoff,
 		setHandoff: hero.setHandoff,
 		canvasWrap: container,
 		headline: document.querySelector<HTMLElement>('[data-hero-headline]'),
 		navbar: document.querySelector<HTMLElement>('[data-hero-navbar]'),
-	});
+	};
+	let stopMotion: (() => void) | null = null;
+	let motionLoading: Promise<void> | undefined;
+	const startMotion = (): Promise<void> =>
+		(motionLoading ??= import('./motion').then(({ initMotion }) => {
+			stopMotion = initMotion(motionOptions);
+		}));
+
+	let motionTriggered = false;
+	const triggerMotion = () => {
+		if (motionTriggered) return;
+		motionTriggered = true;
+		cleanupMotionTriggers();
+		void startMotion();
+	};
+	const onFirstScroll = () => triggerMotion();
+	window.addEventListener('scroll', onFirstScroll, { passive: true });
+	const embedEl = document.querySelector<HTMLElement>('.eg-embed');
+	const motionObserver =
+		embedEl && 'IntersectionObserver' in window
+			? new IntersectionObserver(
+					(entries) => {
+						if (entries.some((entry) => entry.isIntersecting)) triggerMotion();
+					},
+					{ rootMargin: '100% 0px' },
+				)
+			: null;
+	motionObserver?.observe(embedEl!);
+	function cleanupMotionTriggers() {
+		window.removeEventListener('scroll', onFirstScroll);
+		motionObserver?.disconnect();
+	}
 
 	let lastFrame = performance.now();
 	const animate = (now: number) => {
@@ -94,7 +132,12 @@ export default async function mountHero(canvas: HTMLCanvasElement): Promise<() =
 		window.removeEventListener('pointermove', onPointerMove);
 		document.removeEventListener('visibilitychange', onVisibility);
 		resizeObserver.disconnect();
-		stopMotion();
+		cleanupMotionTriggers();
+		// Motion may still be mid-import (dynamic `import('./motion')` is
+		// in flight) when this fires; wait for it so stopMotion() always
+		// runs once it exists, instead of a no-op no one awaits.
+		if (motionLoading) void motionLoading.then(() => stopMotion?.());
+		else stopMotion?.();
 		hero.dispose();
 		renderer.dispose();
 		if (poster) poster.hidden = false;
