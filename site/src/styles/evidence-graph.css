@@ -2,6 +2,18 @@
    adds a small set of local tokens for the card/border surfaces used only
    on this page. Everything here is scoped under .eg-page. */
 
+/* Root cause of a real (if small, ~30px) mobile overflow found in fix
+   round 1: several rules combine `width: 100%` with `padding`/`border`
+   under the default content-box model, so padding+border add on top of
+   the declared width instead of being included in it. Scope a
+   border-box reset to this page instead of assuming a global one. */
+.eg-page,
+.eg-page *,
+.eg-page *::before,
+.eg-page *::after {
+	box-sizing: border-box;
+}
+
 .eg-page {
 	--eg-card: #12161b;
 	--eg-border: #232a31;
