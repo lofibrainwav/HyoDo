@@ -5,6 +5,8 @@ import starlight from '@astrojs/starlight';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://hyodo.app',
+	// Ship source maps: the hero bundle is large and the repository is public.
+	vite: { build: { sourcemap: true } },
 	integrations: [
 		starlight({
 			title: 'HyoDo',
