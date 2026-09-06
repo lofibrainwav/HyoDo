@@ -288,7 +288,7 @@ at as clean. Every finding was reproduced before and after the fix.
   `gates.toml` exits `2` with the parse/schema error instead of silently
   skipping the user's gates. The checkout-only guidance now points to
   `hyodo init` when neither a user config nor a HyoDo checkout is found.
-- **`hyodo dashboard` measures `.hyodo/gates.toml` gates when present` —
+- **`hyodo dashboard` measures `.hyodo/gates.toml` gates when present** —
   `evidence.gates` is built from the user's own gate names instead of the
   fixed `typecheck`/`lint_format`/`tests`/`sbom` keys; falls back to the
   built-in checkout gates otherwise. Benevolence/Hyo/Eternity stay native
