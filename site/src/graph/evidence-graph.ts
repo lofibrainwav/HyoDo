@@ -687,7 +687,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 	 * through row gaps, so the route never enters a cell other than its own
 	 * two endpoints — see the judge fix-round-1 brief for the case table.
 	 */
-	function orthogonalRoute(sourceEv: EvidenceEvent, targetEv: EvidenceEvent, wrapRect: DOMRect): string {
+	function orthogonalRoute(sourceEv: EvidenceEvent, targetEv: EvidenceEvent, wrapRect: DOMRect, nextLane = false): string {
 		const sourceRect = cellRect(sourceEv.eventId);
 		const targetRect = cellRect(targetEv.eventId);
 		if (!sourceRect || !targetRect) return '';
@@ -699,6 +699,16 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		const forward = cs <= ct;
 		const p1 = port(sourceRect, forward ? 'right' : 'left', wrapRect);
 		const p2 = port(targetRect, forward ? 'left' : 'right', wrapRect);
+
+		if (nextLane) {
+			// One row gap beyond the nearest lane, with unchanged endpoint ports.
+			const nearest = rt > rs ? rt - 1 : rt;
+			const next = rt >= rs ? Math.min(ROW_ORDER.length - 1, nearest + 1) : Math.max(-1, nearest - 1);
+			const y = rowGapY(next, wrapRect);
+			const x1 = colGapX(forward ? cs : cs - 1, wrapRect);
+			const x2 = colGapX(forward ? ct - 1 : ct, wrapRect);
+			return roundedElbow([p1, { x: x1, y: p1.y }, { x: x1, y }, { x: x2, y }, { x: x2, y: p2.y }, p2]);
+		}
 
 		if (rs === rt) {
 			if (Math.abs(ct - cs) <= 1) return roundedElbow([p1, p2]);
@@ -767,7 +777,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 	];
 	const EVIDENCE_BOW_OFFSETS: readonly number[] = [0, 12, 24, 36, -12, -24, -36];
 
-	/** True if any ~4px sample along `pathEl` lands inside an occupied cell other than the two named endpoints. */
+	/** True if any ~2px sample along `pathEl` lands inside an occupied cell other than the two named endpoints. */
 	function pathCrossesOccupied(
 		pathEl: SVGPathElement,
 		occupiedBoxes: Map<string, Box>,
@@ -775,13 +785,14 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		excludeB: string,
 		onCollision?: (cellId: string) => void,
 	): boolean {
+		const margin = (parseFloat(win.getComputedStyle(pathEl).strokeWidth) || 1.6) / 2;
 		const len = pathEl.getTotalLength();
-		const steps = Math.max(1, Math.ceil(len / 4));
+		const steps = Math.max(1, Math.ceil(len / 2));
 		for (let i = 0; i <= steps; i++) {
 			const pt = pathEl.getPointAtLength((i / steps) * len);
 			for (const [cellId, box] of occupiedBoxes) {
 				if (cellId === excludeA || cellId === excludeB) continue;
-				if (pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom) {
+				if (pt.x >= box.left - margin && pt.x <= box.right + margin && pt.y >= box.top - margin && pt.y <= box.bottom + margin) {
 					onCollision?.(cellId);
 					return true;
 				}
@@ -809,17 +820,8 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 			...evidenceEdges,
 		];
 		for (const edge of all) {
-			const len = edge.el.getTotalLength();
-			const steps = Math.max(1, Math.ceil(len / 4));
-			for (let i = 0; i <= steps; i++) {
-				const pt = edge.el.getPointAtLength((i / steps) * len);
-				for (const [cellId, box] of occupiedBoxes) {
-					if (cellId === edge.sourceId || cellId === edge.targetId) continue;
-					if (pt.x >= box.left && pt.x <= box.right && pt.y >= box.top && pt.y <= box.bottom) {
-						win.console?.warn('evidence-graph: edge crosses cell', `${edge.sourceId}->${edge.targetId}`, cellId);
-					}
-				}
-			}
+			pathCrossesOccupied(edge.el, occupiedBoxes, edge.sourceId, edge.targetId,
+				(cellId) => win.console?.warn('evidence-graph: edge crosses cell', `${edge.sourceId}->${edge.targetId}`, cellId));
 		}
 	}
 
@@ -845,17 +847,17 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		svgRoot.appendChild(gEvidence);
 		svgRoot.appendChild(gBroken);
 
-		// Occupied-cell boxes (shrunk 2px) for collision testing below —
+		// Occupied-cell boxes (inset 1px; sampler adds half the stroke width) for collision testing below —
 		// rebuilt every redraw since cell positions can change on resize.
 		occupiedBoxes = new Map();
 		for (const ev of EVENTS) {
 			const r = cellRect(ev.eventId);
 			if (!r) continue;
 			occupiedBoxes.set(ev.eventId, {
-				left: r.left - wrapRect.left + 2,
-				right: r.right - wrapRect.left - 2,
-				top: r.top - wrapRect.top + 2,
-				bottom: r.bottom - wrapRect.top - 2,
+				left: r.left - wrapRect.left + 1,
+				right: r.right - wrapRect.left - 1,
+				top: r.top - wrapRect.top + 1,
+				bottom: r.bottom - wrapRect.top - 1,
 			});
 		}
 
@@ -875,6 +877,9 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 					'marker-end': 'url(#arrow-parent)',
 				});
 				gParent.appendChild(path);
+				if (pathCrossesOccupied(path, occupiedBoxes, parentEv.eventId, ev.eventId)) {
+					path.setAttribute('d', orthogonalRoute(parentEv, ev, wrapRect, true));
+				}
 				parentEdges.push({ sourceId: parentEv.eventId, targetId: ev.eventId, el: path, broken: false });
 				parentTargets.add(ev.eventId);
 				continue;
@@ -923,7 +928,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 
 				// Search candidate port pairs x bow offsets, in priority order,
 				// for the first route that does not cross an unrelated
-				// occupied cell (sampled every ~4px along the curve).
+				// occupied cell (sampled every ~2px along the curve).
 				let chosenD: string | null = null;
 				let chosenEl: SVGPathElement | null = null;
 				searchLoop: for (const [sideA, sideB] of EVIDENCE_PORT_PAIRS) {
@@ -936,7 +941,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 							p2 = { x: p2.x, y: p2.y + 6 };
 						}
 						const d = curvePath(p1.x, p1.y, p2.x, p2.y, bowBase + offset);
-						const test = svgEl(doc, 'path', { d });
+						const test = svgEl(doc, 'path', { d, class: 'edge-evidence' });
 						svgRoot.appendChild(test);
 						if (!pathCrossesOccupied(test, occupiedBoxes, refEv.eventId, ev.eventId)) {
 							chosenD = d;
@@ -952,14 +957,12 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 					// to the parent-edge orthogonal router. Keep the route
 					// even if it crosses a cell, but never silently on localhost.
 					chosenD = orthogonalRoute(refEv, ev, wrapRect);
-					chosenEl = svgEl(doc, 'path', { d: chosenD });
+					chosenEl = svgEl(doc, 'path', { d: chosenD, class: 'edge-evidence' });
 					svgRoot.appendChild(chosenEl);
-					pathCrossesOccupied(chosenEl, occupiedBoxes, refEv.eventId, ev.eventId, (cellId) => {
-						const hostname = win.location?.hostname;
-						if (hostname === 'localhost' || hostname === '127.0.0.1') {
-							win.console?.warn('evidence-graph: fallback crosses cell', `${refEv.eventId}->${ev.eventId}`, cellId);
-						}
-					});
+					if (pathCrossesOccupied(chosenEl, occupiedBoxes, refEv.eventId, ev.eventId)) {
+						chosenD = orthogonalRoute(refEv, ev, wrapRect, true);
+						chosenEl.setAttribute('d', chosenD);
+					}
 				}
 
 				chosenEl.setAttribute('class', 'edge-evidence');
