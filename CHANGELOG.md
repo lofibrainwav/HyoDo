@@ -5,6 +5,17 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- Surface trust level 2+ ledger obligations and recording outcomes in CLI receipts;
+  show ASK and UNOBSERVED event decisions in yellow.
+
+### Added
+
+- Document trust ladder, grants, and ASK exit code 3 in CLI help.
+
 ## [4.13.0] - 2026-09-06
 
 Policy ASK, score identity, and release-surface hygiene preparation.

@@ -182,3 +182,30 @@ def test_policy_check_missing_policy_remains_unobserved_exit_two(tmp_path: Path)
     )
     assert result.exit_code == 2
     assert json.loads(result.output)["decision"] == "UNOBSERVED"
+
+
+def test_policy_check_json_includes_ledger_write_required_at_trust_level_2(tmp_path: Path):
+    from hyodo.policy_trust import grant_policy_trust
+
+    _write_policy(
+        tmp_path, 'schema = "hyodo.policy/v1"\nask_tools = ["send_email"]\n[trust]\nmax_level = 3\n'
+    )
+    grant_policy_trust(tmp_path, 2, by="human:test")
+    event = _write_event(tmp_path, _event({"name": "send_email", "args_digest": None, "paths": []}))
+    args = ["policy", "check", "--file", str(event), "--root", str(tmp_path)]
+    result = runner.invoke(app, [*args, "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["decision"] == "ALLOW"
+    assert payload["ledger_write_required"] is True
+    assert payload["ledger_written"] is False
+    text_result = runner.invoke(app, args)
+    assert "trust level 2+ requires the decision to be recorded" in text_result.output
+    assert "hyodo event record --policy" in " ".join(text_result.output.split())
+    assert not (tmp_path / ".hyodo" / "agent-events.jsonl").exists()
+
+
+def test_policy_check_help_documents_ask_exit():
+    result = runner.invoke(app, ["policy", "check", "--help"])
+    assert result.exit_code == 0
+    assert "3 ASK" in result.output

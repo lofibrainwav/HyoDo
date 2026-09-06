@@ -2225,7 +2225,8 @@ def event_record(
 
     With --policy: evaluate policy, stamp policy.* on the event, always try to
     append (including DENY) for audit continuity. Exit 1 on DENY or invalid
-    event; exit 2 when input/policy path is unreadable or policy is unobserved.
+    event; exit 2 when input/policy path is unreadable or policy is unobserved;
+    exit 3 on ASK (operator decision required).
 
     HyoDo is a gate, not an agent runtime — callers must enforce DENY.
     """
@@ -2256,6 +2257,7 @@ def event_record(
         normalized = strip_full_bodies(normalized)
 
     decision_label = None
+    ledger_obligation: dict[str, bool] = {}
     if policy is not None:
         cfg, policy_err = try_load_policy(Path(policy))
         if cfg is None:
@@ -2280,6 +2282,8 @@ def event_record(
         decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
         normalized = apply_decision_to_event(normalized, decision)
         decision_label = decision.decision
+        if decision.trust_level >= 2:
+            ledger_obligation = {"ledger_write_required": True, "ledger_written": False}
 
     # Idempotency on event_id, checked against the *final* event so a genuine replay
     # (same id, same content incl. the policy stamp) is a no-op, while reusing an id
@@ -2300,6 +2304,7 @@ def event_record(
                         "reasons": [reason],
                         "exit_code": 2,
                         "ledger": str(root_path / AGENT_EVENTS_RELATIVE_PATH),
+                        **ledger_obligation,
                     }
                 )
             )
@@ -2316,6 +2321,8 @@ def event_record(
 
     exit_code = {None: 0, "ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision_label]
     ledger = str(root_path / AGENT_EVENTS_RELATIVE_PATH)
+    if ledger_obligation:
+        ledger_obligation["ledger_written"] = True
     if json_output:
         console.print_json(
             json.dumps(
@@ -2326,6 +2333,7 @@ def event_record(
                     "decision": decision_label,
                     "ledger": ledger,
                     "full_body": full_body,
+                    **ledger_obligation,
                 }
             )
         )
@@ -2333,7 +2341,7 @@ def event_record(
         console.print(f"[green]RECORDED[/green] {normalized['event_id']}")
         console.print(f"ledger: {ledger}")
         if decision_label is not None:
-            color = "red" if decision_label == "DENY" else "green"
+            color = {"ALLOW": "green", "DENY": "red"}.get(decision_label, "yellow")
             console.print(f"policy: [{color}]{decision_label}[/{color}]")
             if decision_label == "DENY":
                 console.print(
@@ -2472,7 +2480,8 @@ def policy_check(
     """
     Evaluate one event against a local policy.toml.
 
-    Exit: 0 ALLOW · 1 DENY · 2 unobserved (missing/invalid policy or event).
+    Exit: 0 ALLOW · 1 DENY · 2 unobserved (missing/invalid policy or event) ·
+    3 ASK (operator decision required).
     Does not write the ledger (use ``hyodo event record --policy`` for that).
     """
     root_path = Path(root).resolve()
@@ -2541,6 +2550,9 @@ def policy_check(
     if json_output:
         payload = decision.as_dict()
         payload["exit_code"] = exit_code
+        if decision.trust_level >= 2:
+            payload["ledger_write_required"] = True
+            payload["ledger_written"] = False
         console.print_json(json.dumps(payload))
     else:
         color = "green" if decision.decision == "ALLOW" else "red"
@@ -2549,6 +2561,11 @@ def policy_check(
             console.print(f"rule_id: {decision.rule_id}")
         if decision.reason:
             console.print(f"reason: {decision.reason}")
+        if decision.trust_level >= 2:
+            console.print(
+                "[yellow]trust level 2+ requires the decision to be recorded — "
+                "use `hyodo event record --policy`[/yellow]"
+            )
     raise typer.Exit(exit_code)
 
 

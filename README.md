@@ -120,7 +120,7 @@ hyodo schema check --schema agent.schema.json --payload step.json --json
 
 Default event storage is digest-only. See
 [`examples/fde-evidence-spine/`](./examples/fde-evidence-spine/) for a complete
-example.
+example. Policy trust levels are documented in [docs/POLICY_TRUST.md](docs/POLICY_TRUST.md).
 
 ## Optional MCP
 

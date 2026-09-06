@@ -565,3 +565,49 @@ def test_cli_event_record_missing_file_exit_2(tmp_path: Path):
         ],
     )
     assert result.exit_code == 2
+
+
+@pytest.mark.parametrize("level", [2, 3])
+@pytest.mark.parametrize("append_ok", [True, False])
+def test_event_record_json_includes_ledger_obligation_at_trust_level_2(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, level: int, append_ok: bool
+):
+    from hyodo.policy_trust import grant_policy_trust
+
+    policy = _write_policy(
+        tmp_path, 'schema = "hyodo.policy/v1"\nask_tools = ["send_email"]\n[trust]\nmax_level = 3\n'
+    )
+    grant_policy_trust(tmp_path, level, by="human:test")
+    if not append_ok:
+        monkeypatch.setattr("hyodo.cli.main.append_agent_event", lambda *_: False)
+    event = tmp_path / "event.json"
+    event.write_text(
+        json.dumps(_valid_event(tool={"name": "send_email", "args_digest": None, "paths": []})),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--file",
+            str(event),
+            "--root",
+            str(tmp_path),
+            "--policy",
+            str(policy),
+            "--json",
+        ],
+    )
+    assert result.exit_code == (0 if append_ok else 2), result.output
+    payload = json.loads(result.output)
+    assert payload["ledger_write_required"] is True
+    assert payload["ledger_written"] is append_ok
+    if not append_ok:
+        assert payload["reasons"] == ["append_failed"]
+        assert not (tmp_path / AGENT_EVENTS_RELATIVE_PATH).exists()
+        return
+    events, corrupt = read_agent_events(tmp_path)
+    assert corrupt == 0
+    assert len(events) == 1
+    assert events[0]["event_id"] == payload["event_id"]
