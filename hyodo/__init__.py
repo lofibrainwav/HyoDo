@@ -2,7 +2,7 @@
 
 The Way of Devotion: Philosophy-driven code review for AI-assisted development.
 
-Built with the Six Pillars (HYOGOOK F-score, philosophy V6):
+Built with the Six-Virtue Model (HyoDo Integrity Score, philosophy V6):
 - Benevolence: Developer experience and user serenity
 - Truth: Technical accuracy
 - Goodness: Security and stability
@@ -11,7 +11,8 @@ Built with the Six Pillars (HYOGOOK F-score, philosophy V6):
 - Beauty: Code clarity and UX
 - Eternity: Geometric mean of harmony (calculated)
 
-HYOGOOK F-score formula (SSOT; formula lineage label V5, philosophy V6):
+HyoDo Integrity Score formula (SSOT; Trinity Gates subset; formula lineage
+HYOGOOK V5; philosophy V6):
   F = sum(five pillars on 1–10 scale) + geometric_mean
   S = geometric_mean
 Review-emphasis percentages are philosophical labels only — not F weights.
@@ -23,9 +24,13 @@ __version__ = "4.13.0"
 __philosophy_version__ = "V6"
 __author__ = "AFO Kingdom"
 __license__ = "MIT"
+SCORE_PUBLIC_NAME = "HyoDo Integrity Score"
+SCORE_MODEL_NAME = "Six-Virtue Model"
+SCORE_SUBSET_NAME = "Trinity Gates"
+SCORE_FORMULA_LINEAGE = "HYOGOOK V5"
 
 # Legacy compatibility weights (WEIGHTED_V1 / calculate_trinity_score legacy path).
-# Not used by the HYOGOOK F-score. Sum is normalized at use site.
+# Not used by the HyoDo Integrity Score. Sum is normalized at use site.
 # Key name "loyalty" is frozen for historical score reproducibility.
 TRINITY_WEIGHTS = {
     "benevolence": 0.25,  # Developer/user experience (legacy)
@@ -67,7 +72,9 @@ def calculate_hygook_v5_score(
     hyo: float,
     beauty: float,
 ) -> tuple[float, float]:
-    """Calculate HYOGOOK V5 F score and S (Eternity) value.
+    """Calculate the HyoDo Integrity Score formula and S (Eternity) value.
+
+    The formula lineage is HYOGOOK V5.
 
     F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
     S = ⁵√(T × G × In × B × C)
@@ -105,7 +112,10 @@ def calculate_trinity_score(
     benevolence: float | None = None,
     loyalty: float | None = None,
 ) -> float:
-    """Calculate Trinity Score from pillar values (HYOGOOK V5 compatible).
+    """Calculate the legacy Trinity Gates score from pillar values.
+
+    The V5 mode remains available for historical compatibility with the
+    HyoDo Integrity Score formula lineage.
 
     Legacy mode: Uses weighted compatibility if benevolence/loyalty are not provided.
     V5 mode: Uses HYOGOOK V5 formula if all V5 pillars are provided.
@@ -120,7 +130,7 @@ def calculate_trinity_score(
         loyalty: SSOT compliance (0-1), optional for V5 mode
 
     Returns:
-        Trinity Score as percentage (0-100)
+        Trinity Gates score as percentage (0-100)
     """
     if benevolence is not None and loyalty is not None:
         f_score, _ = calculate_hygook_v5_score(benevolence, truth, goodness, loyalty, beauty)
@@ -148,7 +158,7 @@ def is_strong_review_signal(trinity_score: float, risk_score: float = 0) -> bool
     Humans remain the final gate.
 
     Args:
-        trinity_score: Trinity Score (0-100), numeric
+        trinity_score: Trinity Gates score (0-100), numeric
         risk_score: Risk score (0-100), lower is better; must be numeric
             (level strings such as ``"low"`` / ``"high"`` are rejected)
 
@@ -170,6 +180,10 @@ def is_strong_review_signal(trinity_score: float, risk_score: float = 0) -> bool
 
 __all__ = [
     "LEGACY_TRINITY_WEIGHTS",
+    "SCORE_FORMULA_LINEAGE",
+    "SCORE_MODEL_NAME",
+    "SCORE_PUBLIC_NAME",
+    "SCORE_SUBSET_NAME",
     "TRINITY_WEIGHTS",
     "__author__",
     "__license__",

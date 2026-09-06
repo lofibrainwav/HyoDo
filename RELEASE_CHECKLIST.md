@@ -24,7 +24,7 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 
 - [ ] `README.md` leads with model-agnostic quality gate (CLI + CI) and honest check scope
 - [ ] `CHANGELOG.md` has a section for the target version
-- [ ] `QUICK_START.md` / `CONTRIBUTING.md` use HYOGOOK V5 + review-signal language
+- [ ] `QUICK_START.md` / `CONTRIBUTING.md` use Integrity Score + formula-lineage language
 - [ ] `SECURITY.md` + `docs/SECURITY_SURFACE.md` document the public package security surface
 - [ ] No public claim language that implies automatic merge/write authority
 - [ ] Exit-code contracts for `check` / `safe` documented in README or quick start

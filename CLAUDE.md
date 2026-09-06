@@ -65,7 +65,7 @@ hyodo safe
 
 The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`.
 
-### Optional HYOGOOK V5 review signal
+### Optional HyoDo Integrity Score
 
 | Pillar | Weight | Focus |
 |--------|--------|-------|
@@ -76,7 +76,9 @@ The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`
 | Beauty | 15% | Clarity and UX |
 | Eternity | geometric mean | Long-term harmony |
 
-Scores are decision support only. They do not authorize merge/deploy.
+The score uses the Six-Virtue Model and Trinity Gates subset; HYOGOOK V5 is the
+formula lineage. Scores are decision support only and do not authorize
+merge/deploy.
 
 ### Directory structure
 

@@ -1,6 +1,7 @@
 """Property-based tests for the scoring math — invariants derived from philosophy.
 
-Philosophy version V6 defines the HYOGOOK F-score:
+Philosophy version V6 defines the HyoDo Integrity Score with HYOGOOK V5
+formula lineage:
   F = Σ(five pillars on 1-10 scale) + ⁵√(Π of those five)
   S = ⁵√(Π)
 

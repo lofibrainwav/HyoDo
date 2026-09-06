@@ -41,7 +41,13 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 
-from hyodo import __version__
+from hyodo import (
+    SCORE_FORMULA_LINEAGE,
+    SCORE_MODEL_NAME,
+    SCORE_PUBLIC_NAME,
+    SCORE_SUBSET_NAME,
+    __version__,
+)
 from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
 from hyodo.eval import EvalInputError, run_evaluation
 from hyodo.events import (
@@ -1412,7 +1418,9 @@ def score(
     ),
 ):
     """
-    Compute HYOGOOK F-score review signal (philosophy V6).
+    Compute the HyoDo Integrity Score review signal.
+
+    Model: Six-Virtue Model. Subset: Trinity Gates. Formula lineage: HYOGOOK V5.
 
     F = sum(five pillars on 1–10 scale) + geometric_mean
     S = geometric_mean
@@ -1440,8 +1448,12 @@ def score(
     F, S = calculate_hygook_v5_score(effective_benevolence, truth, goodness, effective_hyo, beauty)
     score_value = ((F - 6) / (60 - 6)) * 100
 
+    console.print(
+        f"[dim]Model: {SCORE_MODEL_NAME} · Subset: {SCORE_SUBSET_NAME} · "
+        f"Formula lineage: {SCORE_FORMULA_LINEAGE}[/dim]"
+    )
     table = Table(
-        title="HYOGOOK F-score Review Signal (philosophy V6)",
+        title=SCORE_PUBLIC_NAME,
         show_header=True,
     )
     table.add_column("Pillar", style="cyan")
@@ -1473,7 +1485,8 @@ def score(
     console.print(table)
     console.print(
         "[dim]Review emphasis is not used in the F formula "
-        "(F = sum(1–10 pillars) + geometric mean). Formula lineage V5 · philosophy V6.[/dim]"
+        f"(F = sum(1–10 pillars) + geometric mean). Formula lineage "
+        f"{SCORE_FORMULA_LINEAGE} · philosophy V6.[/dim]"
     )
 
     if score_value >= 90:
@@ -2552,7 +2565,7 @@ Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
 
 [bold cyan]Core commands:[/bold cyan]
   • [bold]check[/bold]  - HyoDo checkout release gates (ruff/pyright/pytest)
-  • [bold]score[/bold]  - HYOGOOK F-score review signal, philosophy V6 (not auto-approval)
+  • [bold]score[/bold]  - HyoDo Integrity Score, Six-Virtue Model (not auto-approval)
   • [bold]safe[/bold]   - lightweight safety early-warning scan
   • [bold]safe --strict[/bold] - exit 1 on high-severity findings
   • [bold]event[/bold]  - agent event ledger (opt-in FDE evidence spine)

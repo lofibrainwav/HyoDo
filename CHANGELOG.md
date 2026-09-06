@@ -43,7 +43,11 @@ Policy ASK, trust-ladder, and release-surface hygiene preparation.
 
 ## [Unreleased]
 
-No unreleased changes.
+### Changed
+
+- Renamed the public score label to **HyoDo Integrity Score**, defined its
+  **Six-Virtue Model** and **Trinity Gates** subset, and retained **HYOGOOK V5**
+  as the formula lineage for reproducibility.
 
 ## [4.12.0] - 2026-09-05
 
