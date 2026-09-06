@@ -154,6 +154,8 @@ def test_cli_check_general_syntax_error_exit_1(tmp_path: Path):
 
     assert result.exit_code == 1
     assert "Some gates failed" in result.output
+    assert "Failure details:" in result.output
+    assert "Next action: fix the listed gate(s) and re-run hyodo check." in result.output
 
 
 def test_cli_check_general_empty_dir_exit_2(tmp_path: Path):

@@ -82,6 +82,32 @@ def test_pre_commit_hook_declares_non_blocking_metadata() -> None:
     assert hook["name"]
 
 
+def test_composite_action_exposes_actionable_gate_failure_summary() -> None:
+    action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
+    steps = action["runs"]["steps"]
+    run_step = next(step for step in steps if step["name"] == "Run HyoDo gates")
+    failure_step = next(step for step in steps if step["name"] == "Summarize gate failure")
+
+    assert run_step["id"] == "run_gates"
+    assert failure_step["if"] == "failure() && steps.run_gates.outcome == 'failure'"
+    assert "GITHUB_STEP_SUMMARY" in failure_step["run"]
+    assert "Failure reason:" in failure_step["run"]
+    assert "Next action:" in failure_step["run"]
+
+
+def test_composite_action_fails_closed_with_actionable_sarif_upload_summary() -> None:
+    action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
+    steps = action["runs"]["steps"]
+    upload_step = next(step for step in steps if step["name"] == "Upload SARIF report")
+    failure_step = next(step for step in steps if step["name"] == "Summarize SARIF upload failure")
+
+    assert upload_step["id"] == "upload_sarif"
+    assert failure_step["if"] == "failure() && steps.upload_sarif.outcome == 'failure'"
+    assert "GITHUB_STEP_SUMMARY" in failure_step["run"]
+    assert "SARIF" in failure_step["run"]
+    assert "Next action:" in failure_step["run"]
+
+
 def test_new_surfaces_do_not_claim_they_exist_in_v4_11_0() -> None:
     """v4.11.0 predates both integration files; examples must not point at it."""
     readme = README_PATH.read_text(encoding="utf-8")
@@ -209,7 +235,7 @@ def test_composite_action_sarif_upload_is_opt_in() -> None:
     sarif_steps = [
         step
         for step in action["runs"]["steps"]
-        if "SARIF" in str(step.get("name", "")) or "upload-sarif" in str(step.get("uses", ""))
+        if step.get("name") in {"Render SARIF report", "Upload SARIF report"}
     ]
     assert len(sarif_steps) == 2
     for step in sarif_steps:

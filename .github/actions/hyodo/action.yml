@@ -33,8 +33,39 @@ runs:
       shell: bash
       run: python -m pip install "${{ github.action_path }}/../../.."
     - name: Run HyoDo gates
+      id: run_gates
       shell: bash
-      run: hyodo check ${{ inputs.args }}
+      run: |
+        set +e
+        hyodo check ${{ inputs.args }} 2>&1 | tee "$RUNNER_TEMP/hyodo-check.log"
+        status=${PIPESTATUS[0]}
+        set -e
+        exit "$status"
+    - name: Summarize gate failure
+      if: failure() && steps.run_gates.outcome == 'failure'
+      shell: bash
+      run: |
+        summary="${GITHUB_STEP_SUMMARY:-}"
+        if [[ -z "$summary" ]]; then
+          echo "GitHub step summary is unavailable; gate failure remains failed." >&2
+          exit 0
+        fi
+        {
+          echo "## HyoDo quality gate failure"
+          echo
+          echo "Failure reason: hyodo check exited non-zero."
+          echo
+          echo "### Gate output"
+          echo '```text'
+          if [[ -f "$RUNNER_TEMP/hyodo-check.log" ]]; then
+            tail -n 80 "$RUNNER_TEMP/hyodo-check.log"
+          else
+            echo "The gate log was not produced."
+          fi
+          echo '```'
+          echo
+          echo "Next action: fix the listed gate failure, then re-run the workflow."
+        } >> "$summary"
     - name: Render SARIF report
       if: inputs.upload-sarif == 'true'
       shell: bash
@@ -43,6 +74,24 @@ runs:
         hyodo report --format sarif --root . --json
     - name: Upload SARIF report
       if: inputs.upload-sarif == 'true'
+      id: upload_sarif
       uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
       with:
         sarif_file: .hyodo/reports/hyodo-report.sarif
+    - name: Summarize SARIF upload failure
+      if: failure() && steps.upload_sarif.outcome == 'failure'
+      shell: bash
+      run: |
+        summary="${GITHUB_STEP_SUMMARY:-}"
+        if [[ -z "$summary" ]]; then
+          echo "GitHub step summary is unavailable; SARIF failure remains failed." >&2
+          exit 0
+        fi
+        {
+          echo "## HyoDo SARIF upload failure"
+          echo
+          echo "Failure reason: the SARIF report was missing or GitHub rejected the upload."
+          echo "Expected artifact: .hyodo/reports/hyodo-report.sarif"
+          echo
+          echo "Next action: verify report generation and security-events: write permission."
+        } >> "$summary"
