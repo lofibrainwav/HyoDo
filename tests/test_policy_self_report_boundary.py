@@ -72,6 +72,38 @@ def test_caller_assertion_is_preserved_for_audit():
     }
 
 
+def test_caller_asserted_ask_is_not_a_decision():
+    ok, reasons, normalized = validate_event(
+        _event(policy={"decision": "ASK", "reason": "trust me, ask later"})
+    )
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["policy"]["decision"] is None
+    assert normalized["policy"]["evaluated_by"] is None
+    assert normalized["policy"]["claimed"] == {
+        "decision": "ASK",
+        "rule_id": None,
+        "reason": "trust me, ask later",
+    }
+
+
+def test_caller_asserted_unobserved_is_not_a_decision():
+    """UNOBSERVED must be assertable-and-quarantined exactly like ALLOW/DENY/ASK —
+    a caller cannot claim its own unobservedness into a measured decision either."""
+    ok, reasons, normalized = validate_event(
+        _event(policy={"decision": "UNOBSERVED", "reason": "i could not tell"})
+    )
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["policy"]["decision"] is None
+    assert normalized["policy"]["evaluated_by"] is None
+    assert normalized["policy"]["claimed"] == {
+        "decision": "UNOBSERVED",
+        "rule_id": None,
+        "reason": "i could not tell",
+    }
+
+
 def test_measured_decision_carries_provenance():
     policy = PolicyConfig(
         schema=POLICY_SCHEMA_ID, max_steps=None, allowed_tools=None, blocked_path_globs=()

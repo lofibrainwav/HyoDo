@@ -35,7 +35,7 @@ EVENT_KINDS = frozenset(
     }
 )
 ACTORS = frozenset({"agent", "human", "hyodo"})
-POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK"})
+POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK", "UNOBSERVED"})
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{12}$")
 
