@@ -742,6 +742,20 @@ key-level (`mcpServers.hyodo`, one `hooks.PreToolUse[]` entry, one
 a whole-file overwrite — and the first write to any file `connect` did not
 create itself produces a `.bak` alongside it.
 
+### Shadow mode (owner decision, 2026-09-06)
+
+`hyodo connect --shadow` installs the same hooks in *shadow* mode: the
+pre-action hook evaluates policy and records the decision it *would* have
+returned (`ALLOW`, `ASK`, `DENY`, `UNOBSERVED`) to the ledger, but always
+exits 0 so nothing is blocked. Shadow mode is the on-ramp for trust level 0
+and the dry run of governance itself: the operator keeps working undisturbed
+while the evidence graph fills with the decisions the gate would have made.
+Dry run answers "what would happen" before an action (time); a sandbox
+contains what does happen (space); shadow mode is a dry run of the gate
+running alongside real work. Leaving shadow mode is an explicit
+`hyodo connect --write` without `--shadow`; shadow decisions are stamped
+`policy.shadow: true` so they are never mistaken for enforced ones.
+
 ### Claude Code hooks: from post-hoc report to pre-action gate
 
 This is the change that answers the "HyoDo is a passive observer" critique
