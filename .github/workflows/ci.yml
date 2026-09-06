@@ -71,6 +71,9 @@ jobs:
           echo "Validating plugin.json..."
           jq . .claude-plugin/plugin.json > /dev/null
           echo "plugin.json is valid"
+          echo "Validating marketplace.json..."
+          jq . .claude-plugin/marketplace.json > /dev/null
+          echo "marketplace.json is valid"
 
       - name: Validate YAML
         run: |

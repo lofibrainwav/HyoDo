@@ -11,7 +11,7 @@ Review signals never grant automatic approval. Unobserved is never green.
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
 [![Python](https://img.shields.io/pypi/pyversions/hyodo)](https://pypi.org/project/hyodo/)
-[![License](https://github.com/lofibrainwav/HyoDo/blob/main/LICENSE)](./LICENSE)
+[![License](https://github.com/lofibrainwav/HyoDo/blob/main/LICENSE)](./LICENSE) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lofibrainwav/HyoDo/badge)](https://scorecard.dev/viewer/?uri=github.com/lofibrainwav/HyoDo)
 
 ## Why HyoDo exists
 

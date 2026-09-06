@@ -10,6 +10,24 @@ PLUGIN_JSON = """{{
 }}
 """
 
+SERVER_JSON = """{{
+  "name": "io.github.lofibrainwav/hyodo",
+  "version": "{version}",
+  "packages": [
+    {{"registryType": "pypi", "identifier": "hyodo", "version": "{version}"}}
+  ]
+}}
+"""
+
+MARKETPLACE_JSON = """{{
+  "name": "hyodo",
+  "owner": {{"name": "AFO Kingdom"}},
+  "plugins": [
+    {{"name": "hyodo", "source": "./", "version": "{version}"}}
+  ]
+}}
+"""
+
 DOCKERFILE = """# HyoDo - model-agnostic quality gates for AI-assisted development
 
 FROM python:3.12-slim
@@ -30,6 +48,10 @@ def write_synced_repo(root: Path, version: str = "4.12.0") -> None:
     )
     (root / "Dockerfile").write_text(DOCKERFILE.format(version=version))
     (root / ".claude-plugin" / "plugin.json").write_text(PLUGIN_JSON.format(version=version))
+    (root / "server.json").write_text(SERVER_JSON.format(version=version))
+    (root / ".claude-plugin" / "marketplace.json").write_text(
+        MARKETPLACE_JSON.format(version=version)
+    )
 
 
 def test_all_sources_synced_exits_zero(tmp_path: Path, capsys) -> None:
@@ -65,6 +87,34 @@ def test_plugin_manifest_mismatch_exits_one_and_names_plugin_json(tmp_path: Path
     captured = capsys.readouterr()
     assert code == 1
     assert ".claude-plugin/plugin.json" in captured.err
+    assert "4.0.1" in captured.err
+
+
+def test_server_json_mismatch_exits_one_and_names_server_json(tmp_path: Path, capsys) -> None:
+    write_synced_repo(tmp_path)
+    server_json = tmp_path / "server.json"
+    server_json.write_text(SERVER_JSON.format(version="4.0.1"))
+
+    code = main(argv=[], root=tmp_path)
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert "server.json" in captured.err
+    assert "4.0.1" in captured.err
+
+
+def test_marketplace_manifest_mismatch_exits_one_and_names_marketplace_json(
+    tmp_path: Path, capsys
+) -> None:
+    write_synced_repo(tmp_path)
+    marketplace = tmp_path / ".claude-plugin" / "marketplace.json"
+    marketplace.write_text(MARKETPLACE_JSON.format(version="4.0.1"))
+
+    code = main(argv=[], root=tmp_path)
+
+    captured = capsys.readouterr()
+    assert code == 1
+    assert ".claude-plugin/marketplace.json" in captured.err
     assert "4.0.1" in captured.err
 
 

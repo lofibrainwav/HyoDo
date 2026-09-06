@@ -8,6 +8,8 @@ Sources checked:
 - ``hyodo/__init__.py`` (``__version__ = "..."``)
 - ``Dockerfile`` (``LABEL version="..."``)
 - ``.claude-plugin/plugin.json`` (``"version"`` field)
+- ``server.json`` (``"version"`` field, the MCP Registry manifest)
+- ``.claude-plugin/marketplace.json`` (``plugins[0].version`` field)
 
 Exit 0 if every source agrees and is valid semver. Exit 1 on mismatch or
 invalid/missing format, with diagnostics on stderr.
@@ -82,6 +84,43 @@ def read_plugin_manifest_version(root: Path = ROOT) -> str:
     return str(version)
 
 
+def read_server_manifest_version(root: Path = ROOT) -> str:
+    path = root / "server.json"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise VersionSyncError(f"server.json not found at {path}") from exc
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise VersionSyncError(f"server.json is not valid JSON: {exc}") from exc
+    version = data.get("version")
+    if not version:
+        raise VersionSyncError("version field not found in server.json")
+    return str(version)
+
+
+def read_marketplace_manifest_version(root: Path = ROOT) -> str:
+    path = root / ".claude-plugin" / "marketplace.json"
+    try:
+        text = path.read_text(encoding="utf-8")
+    except FileNotFoundError as exc:
+        raise VersionSyncError(f".claude-plugin/marketplace.json not found at {path}") from exc
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError as exc:
+        raise VersionSyncError(f".claude-plugin/marketplace.json is not valid JSON: {exc}") from exc
+    plugins = data.get("plugins")
+    if not plugins or not isinstance(plugins, list):
+        raise VersionSyncError("no plugins[] entries found in .claude-plugin/marketplace.json")
+    version = plugins[0].get("version")
+    if not version:
+        raise VersionSyncError(
+            "version field not found in .claude-plugin/marketplace.json plugins[0]"
+        )
+    return str(version)
+
+
 def collect_sources(root: Path = ROOT) -> dict[str, str]:
     return {
         "VERSION": read_version_file(root),
@@ -89,6 +128,8 @@ def collect_sources(root: Path = ROOT) -> dict[str, str]:
         "hyodo/__init__.py": read_init_version(root),
         "Dockerfile": read_dockerfile_version(root),
         ".claude-plugin/plugin.json": read_plugin_manifest_version(root),
+        "server.json": read_server_manifest_version(root),
+        ".claude-plugin/marketplace.json": read_marketplace_manifest_version(root),
     }
 
 

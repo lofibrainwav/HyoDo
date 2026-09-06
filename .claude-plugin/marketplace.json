@@ -1,0 +1,15 @@
+{
+  "name": "hyodo",
+  "owner": {
+    "name": "AFO Kingdom",
+    "url": "https://github.com/lofibrainwav"
+  },
+  "plugins": [
+    {
+      "name": "hyodo",
+      "source": "./",
+      "description": "Model-agnostic local quality gates and agent-event/policy evidence for AI-assisted development. Review signals never authorize approval.",
+      "version": "4.12.0"
+    }
+  ]
+}
