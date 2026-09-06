@@ -202,6 +202,72 @@ def test_agent_events_path_separate_from_history():
     assert AGENT_EVENTS_RELATIVE_PATH.name == "agent-events.jsonl"
 
 
+def test_validate_tool_method_normalizes_case():
+    ok, reasons, normalized = validate_event(
+        _valid_event(tool={"name": "web_fetch", "args_digest": None, "paths": [], "method": "get"})
+    )
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["tool"]["method"] == "GET"
+
+
+def test_validate_tool_method_rejects_unknown_verb():
+    ok, reasons, normalized = validate_event(
+        _valid_event(
+            tool={"name": "web_fetch", "args_digest": None, "paths": [], "method": "TRACE"}
+        )
+    )
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:tool.method" in reasons
+
+
+def test_validate_tool_method_defaults_to_none():
+    ok, reasons, normalized = validate_event(_valid_event())
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["tool"]["method"] is None
+
+
+def test_validate_tool_urls_round_trip():
+    ok, reasons, normalized = validate_event(
+        _valid_event(
+            tool={
+                "name": "web_fetch",
+                "args_digest": None,
+                "paths": [],
+                "urls": [{"domain": "api.example.com", "path": "/v1/users"}],
+            }
+        )
+    )
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["tool"]["urls"] == [{"domain": "api.example.com", "path": "/v1/users"}]
+
+
+def test_validate_tool_urls_defaults_to_empty_list():
+    ok, reasons, normalized = validate_event(_valid_event())
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["tool"]["urls"] == []
+
+
+def test_validate_tool_urls_requires_domain():
+    ok, reasons, normalized = validate_event(
+        _valid_event(
+            tool={
+                "name": "web_fetch",
+                "args_digest": None,
+                "paths": [],
+                "urls": [{"path": "/v1/users"}],
+            }
+        )
+    )
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:tool.urls" in reasons
+
+
 # --------------------------------------------------------------------------- #
 # Policy unit (T1.9-T1.13)
 # --------------------------------------------------------------------------- #

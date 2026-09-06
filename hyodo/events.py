@@ -35,9 +35,10 @@ EVENT_KINDS = frozenset(
     }
 )
 ACTORS = frozenset({"agent", "human", "hyodo"})
-POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK"})
+POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK", "UNOBSERVED"})
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{12}$")
+_HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 
 #: Marker written into ``policy.reason`` when no policy was actually evaluated.
 UNEVALUATED_POLICY_REASON = "unevaluated"
@@ -151,6 +152,39 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                     tool_out["paths"] = list(paths)
             else:
                 tool_out["paths"] = []
+            method = tool_raw.get("method")
+            if method is not None:
+                normalized_method = method.strip().upper() if isinstance(method, str) else None
+                if normalized_method is None or normalized_method not in _HTTP_METHODS:
+                    reasons.append("invalid_field:tool.method")
+                else:
+                    tool_out["method"] = normalized_method
+            else:
+                tool_out["method"] = None
+            urls = tool_raw.get("urls")
+            if urls is not None:
+                if not isinstance(urls, list):
+                    reasons.append("invalid_field:tool.urls")
+                else:
+                    normalized_urls: list[dict[str, Any]] = []
+                    urls_ok = True
+                    for entry in urls:
+                        if not isinstance(entry, dict) or not _is_non_empty_str(
+                            entry.get("domain")
+                        ):
+                            urls_ok = False
+                            break
+                        url_path = entry.get("path")
+                        if url_path is not None and not isinstance(url_path, str):
+                            urls_ok = False
+                            break
+                        normalized_urls.append({"domain": entry["domain"], "path": url_path})
+                    if not urls_ok:
+                        reasons.append("invalid_field:tool.urls")
+                    else:
+                        tool_out["urls"] = normalized_urls
+            else:
+                tool_out["urls"] = []
 
     io_raw = raw.get("io")
     io_out: dict[str, Any] = {
@@ -258,7 +292,13 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
         "actor": str(raw["actor"]).strip(),
         "tool": tool_out
         if tool_out is not None
-        else {"name": None, "args_digest": None, "paths": []},
+        else {
+            "name": None,
+            "args_digest": None,
+            "paths": [],
+            "method": None,
+            "urls": [],
+        },
         "io": io_out,
         # Always unevaluated at validation time. A measured decision can only be
         # stamped later by apply_decision_to_event() after evaluate_policy() ran.

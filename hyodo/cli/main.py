@@ -84,6 +84,14 @@ from hyodo.policy import (
     evaluate_policy,
     try_load_policy,
 )
+from hyodo.policy_trust import (
+    POLICY_TRUST_RELATIVE_PATH,
+    default_granted_by,
+    effective_trust_level,
+    grant_policy_trust,
+    load_policy_trust,
+    resolve_policy_trust_grant,
+)
 from hyodo.report import write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
@@ -101,6 +109,11 @@ event_app = typer.Typer(
 policy_app = typer.Typer(
     name="policy",
     help="Local policy gate for agent events (ALLOW|DENY; unobserved ≠ ALLOW)",
+    add_completion=False,
+)
+trust_app = typer.Typer(
+    name="trust",
+    help="Explicit operator grants for policy ASK delegation",
     add_completion=False,
 )
 schema_app = typer.Typer(
@@ -121,6 +134,7 @@ rules_app = typer.Typer(
 mcp_app.add_typer(rules_app, name="rules")
 app.add_typer(event_app, name="event")
 app.add_typer(policy_app, name="policy")
+policy_app.add_typer(trust_app, name="trust")
 app.add_typer(schema_app, name="schema")
 app.add_typer(mcp_app, name="mcp")
 console = Console()
@@ -2250,7 +2264,7 @@ def event_record(
                 )
             raise typer.Exit(2)
         observed = count_run_events(root_path, normalized["run_id"])
-        decision = evaluate_policy(normalized, cfg, observed_steps=observed)
+        decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
         normalized = apply_decision_to_event(normalized, decision)
         decision_label = decision.decision
 
@@ -2287,7 +2301,7 @@ def event_record(
             console.print("[yellow]This is not a validation pass.[/yellow]")
         raise typer.Exit(2)
 
-    exit_code = 1 if decision_label == "DENY" else 0
+    exit_code = {None: 0, "ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision_label]
     ledger = str(root_path / AGENT_EVENTS_RELATIVE_PATH)
     if json_output:
         console.print_json(
@@ -2316,6 +2330,102 @@ def event_record(
     raise typer.Exit(exit_code)
 
 
+@trust_app.command("grant")
+def policy_trust_grant(
+    level: int = typer.Option(..., "--level", min=0, max=3, help="Trust level to grant (0-3)"),
+    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/policy-trust.json"),
+    by: str | None = typer.Option(
+        None, "--by", help="Human or system identity recorded in the ledger"
+    ),
+    yes: bool = typer.Option(False, "--yes", help="Confirm an explicitly approved grant"),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Record an explicit operator policy trust grant.
+
+    Grants are untracked local state and are refused in non-interactive runs
+    unless ``HYODO_POLICY_TRUST_ALL=1`` is explicitly set.
+    """
+    root_path = Path(root).resolve()
+    granted_by = by or default_granted_by()
+    decision = resolve_policy_trust_grant(level, by=granted_by, yes=yes)
+    if not decision.approved:
+        payload = {
+            "ok": False,
+            "reason": decision.reason,
+            "via": decision.via,
+            "exit_code": 2,
+        }
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]Trust grant refused:[/red] {decision.reason}")
+        raise typer.Exit(2)
+    try:
+        state = grant_policy_trust(root_path, level, by=granted_by)
+    except (OSError, ValueError) as exc:
+        print(f"policy trust grant failed: {exc}", file=sys.stderr)
+        raise typer.Exit(2) from exc
+    payload = {
+        "ok": True,
+        "granted_level": state.level,
+        "granted_by": state.granted_by,
+        "granted_at": state.granted_at,
+        "ledger": str(root_path / POLICY_TRUST_RELATIVE_PATH),
+        "via": decision.via,
+        "exit_code": 0,
+    }
+    if json_output:
+        console.print_json(json.dumps(payload))
+    else:
+        console.print(f"[green]GRANTED[/green] policy trust level {state.level}")
+        console.print(f"ledger: {payload['ledger']}")
+    raise typer.Exit(0)
+
+
+@trust_app.command("show")
+def policy_trust_show(
+    root: str = typer.Option(".", "--root", help="Project root that owns local policy state"),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Show the current local trust grant and its policy cap."""
+    root_path = Path(root).resolve()
+    state, trust_error = load_policy_trust(root_path)
+    policy_path = root_path / POLICY_RELATIVE_PATH
+    cfg, policy_error = try_load_policy(policy_path)
+    if policy_error is not None and policy_path.exists():
+        payload = {"ok": False, "reason": policy_error, "exit_code": 2}
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]Policy unobserved ({policy_error}).[/red]")
+        raise typer.Exit(2)
+    cap = cfg.trust.max_level if cfg is not None and cfg.trust is not None else 3
+    effective = effective_trust_level(cap, state)
+    payload = {
+        "ok": state is not None,
+        "granted_level": state.level if state is not None else None,
+        "granted_by": state.granted_by if state is not None else None,
+        "granted_at": state.granted_at if state is not None else None,
+        "history": [
+            {"level": item.level, "granted_at": item.granted_at, "granted_by": item.granted_by}
+            for item in (state.history if state is not None else ())
+        ],
+        "trust_file": str(root_path / POLICY_TRUST_RELATIVE_PATH),
+        "trust_error": trust_error,
+        "cap": cap,
+        "effective_level": effective,
+        "exit_code": 0 if state is not None else 2,
+    }
+    if json_output:
+        console.print_json(json.dumps(payload))
+    elif state is None:
+        console.print(f"[yellow]UNOBSERVED[/yellow] {trust_error}; effective level: {effective}")
+    else:
+        console.print(f"[green]TRUST[/green] granted={state.level} cap={cap} effective={effective}")
+        console.print(f"ledger: {payload['trust_file']}")
+    raise typer.Exit(payload["exit_code"])
+
+
 @policy_app.command("check")
 def policy_check(
     file: str | None = typer.Option(
@@ -2333,7 +2443,12 @@ def policy_check(
         None,
         "--config",
         "-c",
-        help="policy.toml path (default: ./.hyodo/policy.toml)",
+        help="policy.toml path (default: <root>/.hyodo/policy.toml)",
+    ),
+    root: str = typer.Option(
+        ".",
+        "--root",
+        help="Project root used for ledger counting and trust state",
     ),
     json_output: bool = typer.Option(
         False,
@@ -2347,6 +2462,7 @@ def policy_check(
     Exit: 0 ALLOW · 1 DENY · 2 unobserved (missing/invalid policy or event).
     Does not write the ledger (use ``hyodo event record --policy`` for that).
     """
+    root_path = Path(root).resolve()
     file_path = Path(file) if file else None
     data, err = _load_event_payload(file_path, stdin_flag)
     if err is not None:
@@ -2385,9 +2501,7 @@ def policy_check(
                 console.print(f"  - {reason}")
         raise typer.Exit(2)
 
-    policy_path = (
-        Path(config).resolve() if config else (Path.cwd() / POLICY_RELATIVE_PATH).resolve()
-    )
+    policy_path = Path(config).resolve() if config else (root_path / POLICY_RELATIVE_PATH).resolve()
     cfg, policy_err = try_load_policy(policy_path)
     if cfg is None:
         if json_output:
@@ -2406,13 +2520,11 @@ def policy_check(
         raise typer.Exit(2)
 
     # Step budget is counted from the working-tree ledger, never from the
-    # caller-supplied step_index. (Same cwd basis as the default policy lookup.)
-    observed = count_run_events(Path.cwd(), normalized["run_id"])
-    decision = evaluate_policy(normalized, cfg, observed_steps=observed)
-    # 0 = ALLOW, 1 = DENY, 2 = unobserved. UNOBSERVED must not exit like a plain DENY.
-    exit_code = (
-        0 if decision.decision == "ALLOW" else (2 if decision.decision == "UNOBSERVED" else 1)
-    )
+    # caller-supplied step_index. (Same root basis as the default policy lookup.)
+    observed = count_run_events(root_path, normalized["run_id"])
+    decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
+    # 0 = ALLOW, 1 = DENY, 2 = UNOBSERVED, 3 = ASK.
+    exit_code = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision.decision]
     if json_output:
         payload = decision.as_dict()
         payload["exit_code"] = exit_code
