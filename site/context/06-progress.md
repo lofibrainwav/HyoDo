@@ -402,3 +402,13 @@ problem.
   three.js WebGPU; GSAP + Lenis for motion; plain `.md` only.
 - Next: implement `src/hero/` (scene, motion, fallback, mount), then replace
   the placeholder hero in `index.astro`, then Vercel project and domain.
+
+## 2026-09-06 — Evidence graph follow-up
+
+- Hardened routing first: a colliding orthogonal route retries the next row gap; shared collision sampling uses 2px steps, 1px cell inset and half-stroke margin.
+- Added the dependency-free repository CDP verifier and CI preview/artifact steps for both `/evidence-graph/` and `/`, including independent path sampling and endpoint measurements.
+- Docked the 5W1H panel beside the graph at 1280px; embedded the graph below the hero with a lazy mount and Docs/GitHub/PyPI navigation.
+- Matched square hero tiles and decision colors; the scroll-driven clip and final-20% crossfade use measured graph geometry and a 14-instance handoff. Reserved graph height and unchanged poster/reduced-motion entry paths avoid introducing a mount-time layout jump by design.
+- Verification actually run: `npx astro check` (11 files, 0 errors/warnings/hints), `npm run build` (9 pages), `node --check scripts/verify-evidence-graph.mjs`, `git diff --check`, and generated local documentation-link checks passed. Hero entry chunk grew 773 bytes gzip versus the pre-handoff build, below 2KB.
+- Browser verification exited 1: Chrome could not expose a DevTools port in the sandbox. Preview on 4326 also exited before readiness; the owned preview process was stopped. No screenshots were produced or inspected. Keyboard, mobile overflow, live edge violations and endpoint deviation were NOT measured. CI was configured, not executed here. Lighthouse: not run (not on PATH); LCP/CLS remain unmeasured.
+- Manual check pending outside the sandbox: handoff pattern lights 14 tiles at scroll end, with ALLOW green / ASK blue / DENY red / UNOBSERVED grey; inspect immediately before canvas opacity reaches zero. Check wide/mobile grid clipping, resize and reverse scroll on WebGPU and WebGL2. Exact pixel docking remains unverified; the implementation crossfades into a measured fixture mesh rather than morphing each original hero instance into a graph tile.

@@ -12,6 +12,7 @@ import {
 	MeshBasicNodeMaterial,
 	Object3D,
 	Color,
+	Vector4,
 } from 'three/webgpu';
 import {
 	uniform,
@@ -78,6 +79,8 @@ export interface HeroScene {
 	scene: Scene;
 	camera: OrthographicCamera;
 	coherenceUniform: { value: number };
+	uHandoff: { value: number };
+	setHandoff(cells: HTMLElement[], canvasRect: DOMRect): void;
 	setPointer(ndcX: number, ndcY: number): void;
 	update(dt: number): void;
 	resize(width: number, height: number): void;
@@ -158,6 +161,19 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 	const unlitColor = uniform(readColor('--color-tile-unlit', '#1a1f25'));
 	const observedColor = uniform(readColor('--color-tile-observed', '#3ddc84'));
 	const coherenceUniform = uniform(0);
+	const uHandoff = uniform(0);
+	// Pixel origin and pitch bridge measured DOM layout to both render backends.
+	const handoffLayout = uniform(new Vector4());
+	const handoffMaterial = new MeshBasicNodeMaterial();
+	handoffMaterial.transparent = true;
+	handoffMaterial.opacityNode = uHandoff;
+	const handoff = new InstancedMesh(geometry, handoffMaterial, 14);
+	handoff.count = 0;
+	handoff.frustumCulled = false;
+	scene.add(handoff);
+	material.transparent = true;
+	material.opacityNode = float(1).sub(uHandoff);
+
 
 	// Explicit type arguments: without them TS widens the 'float' literal to
 	// `string`, which drops the .mul()/.add() node-arithmetic overloads.
@@ -179,7 +195,7 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 	const tilePhase = tileHashNode.mul(TWO_PI);
 	const phase = mix(tilePhase, regionPhase, coherenceUniform);
 	const amplitude = mix(float(REST_AMPLITUDE), float(COHERENT_AMPLITUDE), coherenceUniform);
-	const breathing = sin(time.mul(regionRate).add(phase)).mul(amplitude);
+	const breathing = sin(time.mul(regionRate).add(phase)).mul(amplitude).mul(float(1).sub(uHandoff));
 	// No additive floor: at intensity 0 and breathing's trough (clamped at
 	// 0), visibleIntensity is exactly 0 and colorNode resolves to
 	// unlitColor untouched — nothing here adds a constant baseline.
@@ -192,6 +208,31 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 		scene,
 		camera,
 		coherenceUniform,
+		uHandoff,
+		setHandoff(cells, rect) {
+			if (cells.length !== 14 || !rect.height) { handoff.count = 0; return; }
+			const first = cells[0].getBoundingClientRect();
+			const grid = cells[0].parentElement!;
+			const gap = parseFloat(getComputedStyle(grid).gap) || 14;
+			handoffLayout.value.set(first.left - rect.left, first.top - rect.top, first.width + gap, first.height + gap);
+			const origin = handoffLayout.value;
+			const all = [...grid.querySelectorAll<HTMLElement>('.cell')];
+			cells.forEach((cell, i) => {
+				const index = all.indexOf(cell);
+				const x = origin.x + (index % 8) * origin.z + first.width / 2;
+				const y = origin.y + Math.floor(index / 8) * origin.w + first.height / 2;
+				dummy.position.set((x / rect.width * 2 - 1) * camera.right, 1 - y / rect.height * 2, 0.1);
+				dummy.scale.set(first.width / rect.height * 2 / TILE_FILL, first.height / rect.height * 2 / TILE_FILL, 1);
+				dummy.updateMatrix();
+				handoff.setMatrixAt(i, dummy.matrix);
+				const lit = getComputedStyle(cell).getPropertyValue('--tile-light').trim();
+				const color = readColor('--color-tile-unlit', '#1a1f25').lerp(new Color(lit || '#3ddc84'), cell.dataset.decision === 'event' ? 0.18 : 0.34);
+				handoff.setColorAt(i, color);
+			});
+			handoff.count = cells.length;
+			handoff.instanceMatrix.needsUpdate = true;
+			if (handoff.instanceColor) handoff.instanceColor.needsUpdate = true;
+		},
 		setPointer(ndcX, ndcY) {
 			pointerGrid.x = ndcX * camera.right;
 			pointerGrid.y = ndcY * camera.top;
@@ -232,6 +273,7 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 		dispose() {
 			geometry.dispose();
 			material.dispose();
+			handoffMaterial.dispose();
 		},
 	};
 }

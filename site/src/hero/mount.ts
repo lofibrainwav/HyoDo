@@ -58,6 +58,8 @@ export default async function mountHero(canvas: HTMLCanvasElement): Promise<() =
 
 	const stopMotion = initMotion({
 		coherenceUniform: hero.coherenceUniform,
+		uHandoff: hero.uHandoff,
+		setHandoff: hero.setHandoff,
 		canvasWrap: container,
 		headline: document.querySelector<HTMLElement>('[data-hero-headline]'),
 		navbar: document.querySelector<HTMLElement>('[data-hero-navbar]'),

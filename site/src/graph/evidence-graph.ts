@@ -569,6 +569,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 			btn.type = 'button';
 			btn.className = 'cell node';
 			btn.dataset.eventId = ev.eventId;
+			btn.dataset.decision = ev.policy?.decision ?? 'event';
 			btn.setAttribute('aria-label', describeEvent(ev));
 
 			const chip = el('span', `chip ${ev.schemaKind}`);

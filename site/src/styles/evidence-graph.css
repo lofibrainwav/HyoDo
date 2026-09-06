@@ -195,7 +195,7 @@
 
 .eg-page .cell {
 	height: 58px;
-	border-radius: 8px;
+	border-radius: 0;
 	position: relative;
 }
 
@@ -232,14 +232,7 @@
 	box-shadow: 0 0 0 2px rgba(230, 232, 235, 0.55);
 }
 
-/* Subtle interaction-only lift — no ambient motion, no 3D tilt. Entirely
-   absent (not just un-transitioned) under reduced motion. */
-@media (prefers-reduced-motion: no-preference) {
-	.eg-page .cell.node:hover,
-	.eg-page .cell.node:focus-visible {
-		transform: translateY(-1px);
-	}
-}
+/* Keep cell ports stationary during keyboard and pointer inspection. */
 
 .eg-page .cell.node.is-active {
 	border-color: var(--color-text);
@@ -469,3 +462,12 @@
 .eg-page.eg-embed { min-height: 0; padding-top: 2rem; }
 .eg-page .graph-wrap { min-height: 356px; }
 .eg-page .panel { min-height: 140px; }
+
+/* The hero uses square plane tiles; carry the same silhouette and palette. */
+.eg-page .cell.node { --tile-light: var(--color-tile-observed); background: color-mix(in srgb, var(--tile-light) 18%, var(--color-tile-unlit)); }
+.eg-page .cell.node[data-decision="ALLOW"] { --tile-light: var(--color-tile-observed); }
+.eg-page .cell.node[data-decision="ASK"] { --tile-light: var(--color-ask); }
+.eg-page .cell.node[data-decision="DENY"] { --tile-light: var(--color-deny); }
+.eg-page .cell.node[data-decision="UNOBSERVED"] { --tile-light: var(--color-text-dim); }
+.eg-page .cell.node[data-decision]:not([data-decision="event"]) { background: color-mix(in srgb, var(--tile-light) 34%, var(--color-tile-unlit)); }
+.eg-embed:focus-within { opacity: 1 !important; }
