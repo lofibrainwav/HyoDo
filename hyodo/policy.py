@@ -54,6 +54,14 @@ class PolicyDecision:
     decision: str  # ALLOW | DENY | ASK | UNOBSERVED
     rule_id: str | None
     reason: str | None
+    #: (observed, expected) boundary surfaces actually checked for this event.
+    #: Integers only — never a ratio, percentage, or probability.
+    coverage: tuple[int, int] = (0, 0)
+    #: rule-id-shaped identifiers of every discretionary condition this event
+    #: tripped, e.g. ("web_domain_unlisted:api.example.com",). Empty when none.
+    external_variables: tuple[str, ...] = ()
+    #: The effective trust level (min(cap, granted)) used to reach this decision.
+    trust_level: int = 1
 
     def as_dict(self) -> dict[str, Any]:
         """Serialize the decision for ledger stamping and JSON CLI output.
@@ -61,12 +69,19 @@ class PolicyDecision:
         ``evaluated_by`` marks this as a *measured* decision. A PolicyDecision can only
         come from :func:`evaluate_policy`, so its presence in the ledger is proof HyoDo
         ran the policy rather than trusting the caller.
+
+        Honesty rule: this dict may never grow a ``probability`` or ``confidence``
+        key. "How sure are we" is answered as ``coverage`` — an integer
+        ``observed / expected`` pair — never as a float.
         """
         return {
             "decision": self.decision,
             "rule_id": self.rule_id,
             "reason": self.reason,
             "evaluated_by": POLICY_SCHEMA_ID,
+            "coverage": list(self.coverage),
+            "external_variables": list(self.external_variables),
+            "trust_level": self.trust_level,
         }
 
 
