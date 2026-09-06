@@ -7,7 +7,8 @@ from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "release" / "verify_git_tag.py"
 SPEC = importlib.util.spec_from_file_location("verify_git_tag", SCRIPT)
-assert SPEC is not None and SPEC.loader is not None
+assert SPEC is not None
+assert SPEC.loader is not None
 verify_git_tag = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(verify_git_tag)
 

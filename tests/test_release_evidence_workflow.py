@@ -76,10 +76,7 @@ def test_external_actions_are_sha_pinned() -> None:
     for path in (EVIDENCE, PUBLISH):
         data = _load(path)
         uses = [
-            step["uses"]
-            for job in data["jobs"].values()
-            for step in job["steps"]
-            if "uses" in step
+            step["uses"] for job in data["jobs"].values() for step in job["steps"] if "uses" in step
         ]
         assert uses
         for action in uses:

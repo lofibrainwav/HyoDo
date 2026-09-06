@@ -103,7 +103,7 @@ Keep `trinity` as a hidden alias so existing scripts don't break.
 
 ### 3d. README stays utilitarian; philosophy in PHILOSOPHY.md (already the architecture — finish it)
 
-- README first screen: name + one-line functional description + badges + **why-table + `hyodo safe` 3-liner**. Move the "Engineering map (branding kept, terms first)" section below the fold or into docs; above the fold it still forces every reader through 6 Hanja characters before the install command. Replace with one sentence: *"Quality is measured across six dimensions (types, tests, lint, public surface, data consent, audit trail); any unmeasured or failing dimension fails closed."* Link `[How the six dimensions map to our philosophy →](PHILOSOPHY.md)`.
+- README first screen: name + one-line functional description + badges + **why-table + `hyodo safe` 3-liner**. Move the "Engineering map (branding kept, terms first)" section below the fold or into docs; above the fold it still forces every reader through 6 Hanja characters before the install command. Replace with one sentence: *"Quality is measured across six dimensions (types, tests, lint, public surface, data consent, audit trail); any unmeasured or failing dimension fails closed."* Link `[How the six dimensions map to our philosophy →](../../PHILOSOPHY.md)`.
 - PHILOSOPHY.md keeps the full 眞善美仁孝永 treatment — this is exactly where Kubernetes keeps κυβερνήτης.
 
 ### 3e. CLI surface restructure (progressive disclosure)
