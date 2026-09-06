@@ -3,6 +3,76 @@
 State of the site, newest first. Every entry names the command that proved
 it.
 
+## 2026-09-06 (layer 4: evidence graph prototype surface)
+
+Added a public, browser-only prototype of the evidence graph at
+`/evidence-graph/`, plus its docs page. New: `src/graph/evidence-graph.ts`
+(14-event fixed fixture + renderer, ~470 lines), `src/styles/evidence-graph.css`,
+`src/pages/evidence-graph.astro`, `src/content/docs/docs/evidence-graph.md`.
+Updated `astro.config.mjs` sidebar, `index.astro` nav, and `roadmap.md`
+(Stage 1 row, shipped/not-built table, "Next" list) to match v4.13.0 and
+the prototype. All fixture data is privacy-scrubbed (`human:operator`,
+`https://example.com/oncall-hook`) — no real usernames or internal hosts.
+
+Two rounds of self-review against screenshots found and fixed real defects:
+
+1. **Astro whitespace-trim bug**: a text node that is pure
+   newline+indentation immediately before/after an inline tag (`<code>`,
+   `<a>`) is trimmed to nothing rather than collapsed to a space, so
+   `network. The\n<code>` rendered as `network. Thecode` in the built
+   HTML. Fixed by keeping each such join on one source line (no line
+   break directly adjacent to an inline tag) in `evidence-graph.astro`.
+2. **Mobile column-flex overflow**: `.graph-wrap` (a flex item) computed
+   its own width via fit-content of its child `.grid` (`width:
+   max-content`, ~950px) once `.eg-main` switched to
+   `flex-direction: column` under 900px, because `align-items:
+   flex-start` sizes cross-axis to content instead of stretching —
+   pushing the whole page wider than the viewport. Fixed with `max-width:
+   100%` on `.graph-wrap`, `align-items: stretch` and explicit `width:
+   100%` in the mobile media query, plus `overflow-x: hidden` on
+   `.eg-page` as a backstop.
+3. **Evidence edges crossing decision-node text**: the `evt-p3 → evt-e2`
+   evidence edge (same column, adjacent rows) used left/right ports like
+   every other edge, so its bezier bow crossed straight over both
+   `path_inside_root` and `path_outside_root` labels. Fixed by routing
+   same-column evidence edges through top/bottom ports (the row gap)
+   instead of left/right; widened the grid gap to 14px and shrank the
+   arrowhead markers (7→6) so adjacent same-row parent edges keep a
+   visible line segment instead of rendering as a bare floating
+   arrowhead; increased the evidence-curve bow factor (0.16→0.26) so the
+   longer diagonal evidence edge arcs further from decision cells it
+   would otherwise graze.
+4. Added an interaction-only cell hover/focus lift (`translateY(-1px)`,
+   120ms), gated entirely inside `@media (prefers-reduced-motion:
+   no-preference)` so it is absent, not just un-transitioned, under
+   reduced motion.
+
+Verification: `npx astro check` → 0 errors/warnings/hints (10 files).
+`npm run build` → 9 routes (previous 7 + `/evidence-graph/` +
+`/docs/evidence-graph/`). `grep -c 'Prototype'
+dist/evidence-graph/index.html` → 1. Privacy grep
+(`brnestrm|hooks.internal|kingdom|embedding|vector`) over
+`src/graph`, the new page/docs, and their `dist/` output → no matches.
+Network-API grep (`fetch\(|XMLHttpRequest|WebSocket|localStorage`) over
+`evidence-graph.ts` → no matches. `pytest tests/test_public_language.py`
+→ 3 passed. Desktop (1440×1000) and docs (1440×1000) screenshots via
+headless Chrome `--screenshot` matched the fix in every check above.
+
+**Not verified**: the `--headless=new --window-size=375,900 --screenshot`
+CLI path was flaky in this sandbox specifically for this page — it
+reproducibly rendered as if the viewport were wider than 375px (text
+failing to wrap, right edge clipped), even after a rebuild and with
+`--force-device-scale-factor=1`/`--virtual-time-budget` added. A CDP
+session with an explicit `Emulation.setDeviceMetricsOverride({width:375,
+height:900})` and a real `Page.navigate` + wait, querying
+`document.body.scrollWidth`, confirmed no horizontal overflow at 375px
+CSS width (`bodyScrollWidth: 370` vs `innerWidth: 375`) — so the mobile
+fix is verified, but not by the exact CLI command specified for this
+task; that command's screenshot in the report should not be read at
+face value for this page. Keyboard interaction (Tab/Escape) was not
+exercised by an automated tool in this pass — left for a real-browser
+check.
+
 ## 2026-09-06 (unlit-grid fix: banding, rest brightness, time-based decay, poster)
 
 Root cause of "the whole grid reads as bright green vertical bands" (measured

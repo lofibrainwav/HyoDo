@@ -31,6 +31,25 @@ Concept A + C combined:
 - Motion: ease-out curves, 400–900 ms. Never bounce. Reduced motion means no
   motion.
 
+## Evidence graph prototype (`/evidence-graph/`)
+
+- Each event cell is a real `<button type="button" class="cell node">`
+  with an `aria-label`, not a `<div>` — focusable and activatable by
+  keyboard, not just mouse.
+- Decision fill colors reuse `tokens.css` exactly: ALLOW =
+  `--color-tile-observed`, ASK = `--color-ask`, DENY = `--color-deny`,
+  UNOBSERVED = `--color-text-dim`. No new decision colors were invented.
+- The side panel is `aria-live="polite"` and re-renders on every
+  focus/hover; `Escape` clears it back to the placeholder without moving
+  focus off the current cell.
+- Motion budget is interaction-only: a cell hover/focus lift and the
+  evidence-token animation both live entirely inside `@media
+  (prefers-reduced-motion: no-preference)` — absent, not just
+  un-transitioned, under reduced motion. Nothing animates ambiently.
+- Edge geometry carries the parent/evidence distinction by shape (rounded
+  elbow vs. bezier curve) and dash, never by color alone, so it survives
+  a static screenshot and grayscale/colorblind viewing.
+
 ## Copy
 
 - Headline: *When your AI says "done", HyoDo tells you whether that is true.*
