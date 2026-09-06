@@ -5,8 +5,6 @@ description: Why HyoDo exists, the six virtues it measures, the geometric mean t
 
 ## 1. Why this exists
 
-*Draft, owner will revise.*
-
 > I cannot read code. So when an AI told me 'it is done', I had no way to
 > know whether that was true. I believe friction in the world can be
 > measured. The six virtues are six axes of that friction, and the
