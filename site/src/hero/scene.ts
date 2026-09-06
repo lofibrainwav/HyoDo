@@ -28,12 +28,26 @@ const REGION_COUNT = 6; // one region per HyoDo virtue pillar
 const TILE_FILL = 0.82; // tile size as a fraction of its grid cell (leaves a gap)
 const OVERFILL = 1.02; // grid overfills the camera frustum by this factor so no edge bands show
 const HEADROOM = 1.4; // allocate this many times the target tile count so resize can reflow
-const DECAY = 0.94; // per-frame intensity falloff, applied once per rendered frame
+// Time-based decay: exp(-dt / DECAY_TAU) instead of a frame-based x0.94, so a
+// stationary tile fades at the same real-world rate at 60Hz and 120Hz (a
+// frame-based multiplier applied twice as often at 120Hz would decay twice as
+// fast in wall-clock time).
+const DECAY_TAU = 0.28; // seconds; matches the previous ~0.94-per-frame-at-60fps feel
 const POINTER_RADIUS = 0.22; // grid-space units the pointer glow reaches
 const POINTER_GAIN = 2.5; // intensity gained per second at the pointer center (dt-scaled)
 const CENTER_RADIUS = 0.35; // ambient "viewport center" glow radius
-const CENTER_GAIN = 0.9; // per-second gain at the exact center; settles near 0.25 at 60fps
-const BREATH_AMPLITUDE = 0.06; // whisper-quiet: well under the 0.08 ceiling
+// Per-second gain at the exact center. Tuned by Node simulation (see
+// context/06-progress.md) so the rest-state mean stays <=0.05 and at least
+// 90% of tiles stay <=0.06 across desktop and mobile aspect ratios, while the
+// center island still peaks under the 0.25 ceiling.
+const CENTER_GAIN = 0.75;
+// Breathing amplitude at coherence 0 (rest) and coherence 1 (fully
+// synchronized), mixed by coherenceUniform. Rest is whisper-quiet and well
+// under the 0.03 ceiling by construction (it IS the ceiling); the coherent
+// peak is exactly the 0.08 ceiling.
+const REST_AMPLITUDE = 0.03;
+const COHERENT_AMPLITUDE = 0.08;
+const TWO_PI = Math.PI * 2;
 const OFFSCREEN = 1000; // pointer default: far enough to touch no tile
 const SEED_RADIUS = 0.22; // matches the poster's sparse cluster, for a seamless mount
 
@@ -48,6 +62,15 @@ function readColor(varName: string, fallback: string): Color {
 // the poster instead of a flash-to-black.
 function seededNoise(i: number): number {
 	const s = Math.sin(i * 12.9898) * 43758.5453;
+	return s - Math.floor(s);
+}
+
+// A second, independent hash keyed on (row, col) rather than instance index,
+// used to give every tile its own breathing phase offset. Independent from
+// seededNoise() above (different magic constants) so the poster's sparse
+// cluster and the breathing phase never correlate into a visible pattern.
+function hash2(row: number, col: number): number {
+	const s = Math.sin(row * 12.9898 + col * 78.233) * 43758.5453;
 	return s - Math.floor(s);
 }
 
@@ -70,6 +93,7 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 	const maxCount = Math.max(1, Math.ceil(tileCount * HEADROOM));
 	const intensity = new Float32Array(maxCount);
 	const region = new Float32Array(maxCount);
+	const tileHash = new Float32Array(maxCount);
 	const positions = new Float32Array(maxCount * 2);
 
 	const dummy = new Object3D();
@@ -83,6 +107,7 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 
 	const intensityAttribute = new InstancedBufferAttribute(intensity, 1);
 	const regionAttribute = new InstancedBufferAttribute(region, 1);
+	const tileHashAttribute = new InstancedBufferAttribute(tileHash, 1);
 
 	let activeCount = 0;
 
@@ -107,6 +132,7 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 			positions[i * 2] = x;
 			positions[i * 2 + 1] = y;
 			region[i] = Math.min(REGION_COUNT - 1, Math.floor((col / cols) * REGION_COUNT));
+			tileHash[i] = hash2(row, col);
 
 			const distFromCenter = Math.hypot(x, y);
 			const noise = seededNoise(i);
@@ -123,6 +149,7 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 		activeCount = count;
 		mesh.instanceMatrix.needsUpdate = true;
 		regionAttribute.needsUpdate = true;
+		tileHashAttribute.needsUpdate = true;
 		intensityAttribute.needsUpdate = true;
 	}
 
@@ -136,15 +163,26 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 	// `string`, which drops the .mul()/.add() node-arithmetic overloads.
 	const intensityNode = instancedDynamicBufferAttribute<'float'>(intensityAttribute, 'float');
 	const regionNode = instancedBufferAttribute<'float'>(regionAttribute, 'float');
+	const tileHashNode = instancedBufferAttribute<'float'>(tileHashAttribute, 'float');
 
-	// Each region breathes at a slightly different rate and phase, drifting
-	// apart when coherence is 0 and settling in sync as coherence rises. The
-	// amplitude is deliberately tiny: this is a whisper, not a light show.
+	// Each region has its own rate and a "converged" phase. At coherence 0
+	// every tile instead uses its OWN phase, derived from a hash of its
+	// (row, col) — never the region's shared phase — so a region never reads
+	// as a solid breathing band at rest: neighboring tiles are out of step
+	// with each other by construction. As coherence rises toward 1, each
+	// tile's phase is blended toward its region's shared phase, so the
+	// region's tiles visibly fall into step together only once coherence
+	// gets there. Amplitude rises the same way: a whisper at rest, a real
+	// (but still capped) pulse once synchronized.
 	const regionRate = regionNode.mul(0.35).add(0.6);
-	const phase = regionNode.mul(2.399);
-	const breathing = sin(time.mul(regionRate).add(phase))
-		.mul(float(1).sub(coherenceUniform))
-		.mul(BREATH_AMPLITUDE);
+	const regionPhase = regionNode.mul(2.399);
+	const tilePhase = tileHashNode.mul(TWO_PI);
+	const phase = mix(tilePhase, regionPhase, coherenceUniform);
+	const amplitude = mix(float(REST_AMPLITUDE), float(COHERENT_AMPLITUDE), coherenceUniform);
+	const breathing = sin(time.mul(regionRate).add(phase)).mul(amplitude);
+	// No additive floor: at intensity 0 and breathing's trough (clamped at
+	// 0), visibleIntensity is exactly 0 and colorNode resolves to
+	// unlitColor untouched — nothing here adds a constant baseline.
 	const visibleIntensity = clamp(intensityNode.add(breathing), 0, 1);
 	material.colorNode = mix(unlitColor, observedColor, visibleIntensity);
 
@@ -159,8 +197,11 @@ export function createHeroScene(tileCount: number, initialAspect: number): HeroS
 			pointerGrid.y = ndcY * camera.top;
 		},
 		update(dt) {
+			// exp(-dt / tau): the same wall-clock fade regardless of how often
+			// update() is called, unlike a flat per-frame multiplier.
+			const decayFactor = Math.exp(-dt / DECAY_TAU);
 			for (let i = 0; i < activeCount; i += 1) {
-				let value = intensity[i] * DECAY;
+				let value = intensity[i] * decayFactor;
 
 				const px = positions[i * 2];
 				const py = positions[i * 2 + 1];

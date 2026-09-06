@@ -3,6 +3,104 @@
 State of the site, newest first. Every entry names the command that proved
 it.
 
+## 2026-09-06 (unlit-grid fix: banding, rest brightness, time-based decay, poster)
+
+Root cause of "the whole grid reads as bright green vertical bands" (measured
+on the live site, Lighthouse mobile emulation and desktop Chrome
+screenshots): breathing was keyed only on `regionNode` (one shared rate and
+phase per six-column region), so every tile in a region breathed in lock-step
+— a solid pulsing band, not a whisper. Rest-state brightness was also too
+high. Fixed entirely in `src/hero/scene.ts`:
+
+1. **Per-tile phase, not per-region phase.** Added a `tileHash` per-instance
+   `InstancedBufferAttribute`, filled by a new `hash2(row, col)` (a second,
+   independent hash from the existing index-based `seededNoise()`, so the
+   poster's seeded cluster and the breathing phase never correlate). The
+   breathing phase is now `mix(tilePhase, regionPhase, coherenceUniform)`:
+   at coherence 0 every tile uses its own hash-derived phase (no two
+   neighboring tiles in step), and only as coherence rises toward 1 does
+   each tile's phase blend toward its region's shared phase — so a region
+   only reads as a synchronized band once coherence actually gets there, per
+   the spec ("phases converge, never a solid band at rest"). Amplitude is
+   `mix(REST_AMPLITUDE, COHERENT_AMPLITUDE, coherenceUniform)` = `mix(0.03,
+   0.08, coherence)` — quiet at rest, a real (still capped) pulse once
+   synchronized. Verified the phase spread numerically (Node script,
+   `region 3`, `n=658` tiles): stddev 1.77 rad (fully scattered across
+   [0, 2π)) at coherence 0, stddev `4e-14` (== 0, floating-point noise) at
+   coherence 1 — phases genuinely converge only at full coherence.
+2. **Rest-state brightness.** Re-tuned `CENTER_GAIN` from `0.9` to `0.75` by
+   Node simulation (below) so the mean and 90th-percentile bounds hold
+   across both desktop (4,000 tiles) and mobile (1,200 tiles) aspect ratios,
+   not just the one viewport shape checked before.
+3. **Time-based decay (was frame-based).** Replaced `intensity[i] * 0.94`
+   (once per rendered frame, so decay rate depended on refresh rate) with
+   `intensity[i] * Math.exp(-dt / DECAY_TAU)`, `DECAY_TAU = 0.28` (computed
+   once per `update(dt)` call, not per tile). Pointer gain/radius are
+   unchanged (`POINTER_GAIN = 2.5`, `POINTER_RADIUS = 0.22`) — only the
+   decay multiplier changed, per the brief ("pointer glow unchanged").
+4. **No additive floor.** Confirmed (and left a comment) that
+   `material.colorNode = mix(unlitColor, observedColor, visibleIntensity)`
+   has no constant added anywhere in the chain — at `intensity = 0` and
+   breathing's trough (clamped at 0), `visibleIntensity` is exactly 0 and
+   the tile renders as `--color-tile-unlit` (`#1a1f25`), untouched.
+5. **`public/hero-poster.svg` regenerated** from the identical `layout()`
+   math (`rows = round(sqrt(tileCount/aspect))`, `cols = round(rows *
+   aspect)`, `cellSize`, `TILE_FILL = 0.82`) at the poster's own 16:9
+   reference aspect (800×450) and `tileCount = 4000` (matching
+   `DESKTOP_TILE_COUNT`), so first paint matches the live grid's tile size:
+   `rows=47, cols=84, count=3948`, tile size `8.0px` on a `9.77px` pitch.
+   Kept the sparse seeded cluster (identical `seededNoise()` +
+   `SEED_RADIUS` condition as `scene.ts`'s initial fill) — 32 lit tiles.
+   Rendering all 3,948 tiles as individual `<rect>`s (the previous approach)
+   would be roughly 350KB at this density; instead all unlit tiles share one
+   fill and are drawn as a single `<path>` (`M{x},{y}h{w}v{h}h{-w}Z` per
+   tile), with only the 32 lit tiles as individual `<rect fill-opacity=...>`
+   overlays (alpha-composited over the unlit path underneath, reproducing
+   the shader's `mix(unlit, observed, intensity)` exactly). Result: **78,633
+   bytes raw** (well under the 100KB budget), 12,499 bytes gzipped, valid
+   XML (`python3 -c "import xml.dom.minidom as m; m.parse(...)"` → OK).
+   Confirmed byte-identical between `public/hero-poster.svg` and
+   `dist/hero-poster.svg` after build.
+
+**Simulation numbers** (Node script mirroring `scene.ts`'s `layout()` +
+`update()` + breathing math exactly; steps `dt=1/60` for 3 simulated seconds
+from the seeded initial state, no pointer, `coherence=0`, then samples the
+rendered `visibleIntensity = clamp(intensity + breathing, 0, 1)` at that
+instant — the same methodology as the prior verification pass):
+
+| case (tiles, grid) | mean | frac ≤ 0.06 | center peak |
+|---|---|---|---|
+| desktop 16:9 (4000, 47×84=3948) | 0.0131 | 97.1% | 0.2029 |
+| desktop 1073/791 (4000, 54×73=3942) | 0.0140 | 96.1% | 0.2047 |
+| desktop narrow 0.563 (4000, 84×47=3948) | 0.0199 | 91.3% | 0.2088 |
+| mobile 9:16 (1200, 46×26=1196) | 0.0207 | 90.8% | 0.1969 |
+| mobile 1:2 (1200, 49×25=1225) | 0.0216 | 90.4% | 0.2163 |
+
+All cases: mean ≤ 0.05 (criterion 1, largest margin: 0.0216 vs. 0.05), at
+least 90% of tiles ≤ 0.06 (criterion 1, tightest case: mobile 1:2 at 90.4%),
+center island peak ≤ 0.25 within `CENTER_RADIUS = 0.35` (criterion 1, never
+exceeds 0.217). Re-ran the desktop/mobile cases at `dt = 1/120` — mean and
+peak shift by ≤1.5% relative to 60Hz (e.g. desktop 16:9: mean 0.0131→0.0130,
+peak 0.2029→0.1999), confirming criterion 6 (60Hz/120Hz consistency).
+Breathing amplitude bounds hold by construction (`sin()` is bounded to
+[-1, 1] and multiplied by `mix(0.03, 0.08, coherence)`), satisfying
+criterion 2's amplitude ceilings exactly. Pointer decay-from-1.0-to-0.05
+takes 0.850s at 60Hz / 0.842s at 120Hz with the new `DECAY_TAU = 0.28`
+(criterion 3/6), and a stationary pointer still settles at a non-saturated
+`0.721` (criterion 3), both close to the pre-existing verified numbers.
+
+Verification commands (all from `site/`, after `npm ci` — `node_modules` was
+not present in this worktree):
+- `npx astro check` → `0 errors, 0 warnings, 0 hints`.
+- `npm run build` → `[build] Complete!`, 7 routes (pre-existing warnings
+  about chunk size, the empty `i18n` collection, and the missing `404`
+  content entry are unrelated to this change and were present before it).
+- `npx astro preview --port 4322` + `curl -o /dev/null -w '%{http_code}'` →
+  `200` for both `/` and `/hero-poster.svg`.
+- Puppeteer is not installed in this worktree, so no real headless render
+  was captured — per the task brief, relying on the Node simulation above
+  plus the build/typecheck results instead.
+
 ## 2026-09-06 (second real-browser review: coverage, pointer, serenity)
 
 Three tuning fixes from a real-browser review (Chrome, WebGPU, viewport
