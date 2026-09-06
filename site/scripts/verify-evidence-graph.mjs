@@ -52,7 +52,8 @@ try {
  // Headless windows are unfocused, so element.focus() would not fire focus handlers without this.
  await call('Emulation.setFocusEmulationEnabled', { enabled: true });
  for (const route of ['/evidence-graph/', '/']) {
- const URL_ = new URL(route,base).href;
+ // `hero=off` takes the poster path: the verifier checks the graph, and a software-GL hero render loop starved CDP on CI.
+ const URL_ = new URL(route==='/' ? '/?hero=off' : route, base).href;
  const prefix = route==='/' ? 'embedded-' : 'full-';
  const check=(ok,name)=>{if(!ok) failures.push(`${route}: ${name}`);};
 const geometry = () => evalJs(`(async()=>{
