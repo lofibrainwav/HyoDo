@@ -1,5 +1,4 @@
-# HyoDo Agent OS — Stage 2 design: lenses, absorption, and
-ephemeral evidence
+# HyoDo Agent OS — Stage 2 design: lenses, absorption, and ephemeral evidence
 
 ## Status
 
@@ -72,7 +71,7 @@ execution into a sandbox, because discretionary calls still `ASK` one
 at a time but a hard `DENY` is enforced regardless; level 2 is
 autonomous execution *inside* the boundary the operator already
 configured, paired with the non-optional ledger obligation
-(`docs/POLICY_TRUST.md:33-36`); level 3 is autorun with a full ledger
+(`docs/POLICY_TRUST.md:39-42`); level 3 is autorun with a full ledger
 and no assumption of confinement. None of this changes
 `evaluate_policy`'s shipped ALLOW/ASK/DENY mechanics — it is a reading
 for the operator, not a new rule for the evaluator.
@@ -93,7 +92,7 @@ its own.
 Dry run's on-ramp already exists in the Phase 1-D design:
 `hyodo connect --shadow` installs the pre-action hook in a mode that
 evaluates and records every decision but always exits 0
-(`docs/superpowers/specs/2026-09-06-hyodo-agent-os-phase1-design.md:745`).
+(`docs/superpowers/specs/2026-09-06-hyodo-agent-os-phase1-design.md:749-750`).
 Shadow mode is level 0's dry run applied to governance itself, and Stage
 2 does not redefine it — every dry-run reference in this document points
 back at that section.
@@ -320,8 +319,7 @@ at ingest time.
 
 ---
 
-## Package 2-B — `feat/inspect`: `hyodo inspect` (field-deployment
-absorption)
+## Package 2-B — `feat/inspect`: `hyodo inspect` (field-deployment absorption)
 
 On arrival, HyoDo absorbs a whole environment the way a field deployment
 engineer would — a documents folder and/or a repository — into an
@@ -629,7 +627,8 @@ and proof of destruction are a pair.
 `meta.ephemeral` on the existing optional `meta` object:
 
 ```json
-{"ttl_s": 5, "phash": "a1b2c3d4e5f60718", "destroyed_at": null, "kept": false}
+{"ttl_s": 5, "phash_algo": "dct64", "phash": "a1b2c3d4e5f60718",
+ "destroyed_at": null, "kept": false}
 ```
 
 `hyodo/events.py`'s current `meta` normalization only recognizes `model`
@@ -646,7 +645,8 @@ if ephemeral_raw is not None:
     if not isinstance(ephemeral_raw, dict):
         reasons.append("invalid_field:meta.ephemeral")
     else:
-        # ttl_s: non-negative int; phash: 16 lowercase hex chars (64 bits);
+        # ttl_s: non-negative int; phash_algo: the literal "dct64";
+        # phash: 16 lowercase hex chars (64 bits);
         # destroyed_at: ISO-8601 string or None; kept: bool.
         ...
 ```
@@ -663,11 +663,11 @@ a downsampled grayscale image, thresholded against the DCT
 coefficients' median — the same construction the common `pHash`/
 `imagehash.phash` implementations use). It is deterministic: the same
 image byte-for-byte always produces the same 16-hex-character value.
-Changing the algorithm in a later phase is a schema-visible change in
-effect even though `phash` stays a plain string — a `phash` computed
-under a different algorithm is not comparable to one computed under this
-one, and the field carries no version tag of its own (see Open
-questions).
+`phash_algo` names the algorithm explicitly; Stage 2 accepts exactly one
+value, `dct64`, and validation rejects any other. A later algorithm gets
+a new literal, so two captures are comparable only when their
+`phash_algo` values match, and `hyodo eye verify` reports
+`phash_algo_mismatch` instead of a distance when they differ.
 
 `PolicyConfig` gains one more optional field, following the exact
 `WebPolicy`/`TrustPolicy` pattern (`hyodo/policy.py:40-53`):
@@ -729,7 +729,8 @@ the raw distance, never a percentage.
    `hyodo/events.py:66-76`) and the phash from the raw image bytes; the
    bytes themselves never reach the ledger. Record a `tool_result` event
    with `io.output_digest` set to the exact digest and
-   `meta.ephemeral = {ttl_s, phash, destroyed_at: null, kept: false}`.
+   `meta.ephemeral = {ttl_s, phash_algo, phash, destroyed_at: null,
+   kept: false}`.
    This is the proof of existence.
 4. Show the capture to the operator with a visible countdown of `ttl_s`
    seconds.
@@ -743,7 +744,7 @@ the raw distance, never a percentage.
    `rule_id = "eye_keep_insufficient_trust"`. At trust level >= 2 with
    `--keep`, no deletion step runs, `kept: true`, `destroyed_at: null`
    permanently, and the ledger obligation from level 2 (`policy check
-   --json`'s `ledger_write_required`, `docs/POLICY_TRUST.md:33-36`)
+   --json`'s `ledger_write_required`, `docs/POLICY_TRUST.md:39-42`)
    applies to this event the same way it applies to any other autorun
    decision.
 
@@ -867,6 +868,3 @@ Constraints:
 - Whether a skill `hyodo skills propose` writes should itself be
   ingestable as a skill in a later run, and if so, how to prevent a
   lens-of-a-lens loop from compiling rules about rules indefinitely.
-- Whether `meta.ephemeral` should carry an explicit algorithm tag (e.g.
-  `phash_algo`) so a future change to the perceptual-hash algorithm is
-  visible in the schema itself rather than only in this document's prose.
