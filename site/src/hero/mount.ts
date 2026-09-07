@@ -5,7 +5,6 @@
 import { WebGPURenderer } from 'three/webgpu';
 import { createHeroScene } from './scene';
 import { shouldAnimate } from './fallback';
-import type { MotionOptions } from './motion';
 
 const DPR_CAP = 1.5; // cap device pixel ratio to bound fill-rate cost
 const MOBILE_QUERY = '(max-width: 768px)';
@@ -20,11 +19,54 @@ export default async function mountHero(canvas: HTMLCanvasElement): Promise<() =
 	const container = canvas.parentElement;
 	if (!container) return NOOP;
 
+	// Start the docking/motion module's fetch as early as mountHero() runs,
+	// in parallel with the WebGPU/WebGL renderer's own init below (which can
+	// be genuinely slow on a cold shader cache) — not serialized after it.
+	// initMotion() itself still needs `hero`'s uniforms, which don't exist
+	// until after renderer.init() resolves, so only the network fetch +
+	// parse of the module is kicked off here; the actual initMotion() call
+	// happens once hero exists (see `startMotion` below), reusing this same
+	// in-flight import. Without this, a visitor who scroll-jumps straight
+	// to the docking point right as the hero appears could still see a
+	// noticeable delay before docking applies — not from motion.ts's own
+	// logic (see its race-guard comment), but simply because the two async
+	// chains (renderer init, then motion.ts fetch) ran one after the other
+	// instead of overlapping.
+	let motionModule: Promise<typeof import('./motion')> | undefined;
+	const preloadMotion = () => (motionModule ??= import('./motion'));
+	let motionTriggered = false;
+	let onMotionTriggeredEarly: (() => void) | null = null;
+	const triggerMotion = () => {
+		if (motionTriggered) return;
+		motionTriggered = true;
+		cleanupMotionTriggers();
+		void preloadMotion();
+		onMotionTriggeredEarly?.();
+	};
+	const onFirstScroll = () => triggerMotion();
+	window.addEventListener('scroll', onFirstScroll, { passive: true });
+	const embedEl = document.querySelector<HTMLElement>('.eg-embed');
+	const motionObserver =
+		embedEl && 'IntersectionObserver' in window
+			? new IntersectionObserver(
+					(entries) => {
+						if (entries.some((entry) => entry.isIntersecting)) triggerMotion();
+					},
+					{ rootMargin: '100% 0px' },
+				)
+			: null;
+	motionObserver?.observe(embedEl!);
+	function cleanupMotionTriggers() {
+		window.removeEventListener('scroll', onFirstScroll);
+		motionObserver?.disconnect();
+	}
+
 	const renderer = new WebGPURenderer({ canvas, antialias: true });
 	try {
 		await renderer.init();
 	} catch {
 		renderer.dispose();
+		cleanupMotionTriggers();
 		return NOOP;
 	}
 
@@ -56,52 +98,27 @@ export default async function mountHero(canvas: HTMLCanvasElement): Promise<() =
 	const resizeObserver = new ResizeObserver(applySize);
 	resizeObserver.observe(container);
 
-	// Docking (GSAP + ScrollTrigger + SplitText + Lenis, ~280 KiB gzip) is
+	// Docking (GSAP + ScrollTrigger + SplitText + Lenis, ~52 KiB gzip) is
 	// not needed for the hero's first frame — only once the visitor starts
-	// scrolling toward the embedded evidence graph. Load it lazily so it
-	// never rides along in the initial hero chunk: on the first scroll, or
-	// as soon as `.eg-embed` is within one viewport of the screen
-	// (rootMargin: '100% 0px', matching the trigger index.astro uses to
-	// import the graph module itself), whichever fires first.
-	const motionOptions: MotionOptions = {
-		coherenceUniform: hero.coherenceUniform,
-		uHandoff: hero.uHandoff,
-		setHandoff: hero.setHandoff,
-		canvasWrap: container,
-		headline: document.querySelector<HTMLElement>('[data-hero-headline]'),
-		navbar: document.querySelector<HTMLElement>('[data-hero-navbar]'),
-	};
+	// scrolling toward the embedded evidence graph. `preloadMotion`/
+	// `triggerMotion` above already started the module fetch as early as
+	// possible; here we only need to call `initMotion()` with the real
+	// `hero` uniforms once both the module and `hero` exist.
 	let stopMotion: (() => void) | null = null;
-	let motionLoading: Promise<void> | undefined;
+	let motionInit: Promise<void> | undefined;
 	const startMotion = (): Promise<void> =>
-		(motionLoading ??= import('./motion').then(({ initMotion }) => {
-			stopMotion = initMotion(motionOptions);
+		(motionInit ??= preloadMotion().then(({ initMotion }) => {
+			stopMotion = initMotion({
+				coherenceUniform: hero.coherenceUniform,
+				uHandoff: hero.uHandoff,
+				setHandoff: hero.setHandoff,
+				canvasWrap: container,
+				headline: document.querySelector<HTMLElement>('[data-hero-headline]'),
+				navbar: document.querySelector<HTMLElement>('[data-hero-navbar]'),
+			});
 		}));
-
-	let motionTriggered = false;
-	const triggerMotion = () => {
-		if (motionTriggered) return;
-		motionTriggered = true;
-		cleanupMotionTriggers();
-		void startMotion();
-	};
-	const onFirstScroll = () => triggerMotion();
-	window.addEventListener('scroll', onFirstScroll, { passive: true });
-	const embedEl = document.querySelector<HTMLElement>('.eg-embed');
-	const motionObserver =
-		embedEl && 'IntersectionObserver' in window
-			? new IntersectionObserver(
-					(entries) => {
-						if (entries.some((entry) => entry.isIntersecting)) triggerMotion();
-					},
-					{ rootMargin: '100% 0px' },
-				)
-			: null;
-	motionObserver?.observe(embedEl!);
-	function cleanupMotionTriggers() {
-		window.removeEventListener('scroll', onFirstScroll);
-		motionObserver?.disconnect();
-	}
+	if (motionTriggered) void startMotion();
+	else onMotionTriggeredEarly = () => void startMotion();
 
 	let lastFrame = performance.now();
 	const animate = (now: number) => {
@@ -135,8 +152,13 @@ export default async function mountHero(canvas: HTMLCanvasElement): Promise<() =
 		cleanupMotionTriggers();
 		// Motion may still be mid-import (dynamic `import('./motion')` is
 		// in flight) when this fires; wait for it so stopMotion() always
-		// runs once it exists, instead of a no-op no one awaits.
-		if (motionLoading) void motionLoading.then(() => stopMotion?.());
+		// runs once it exists, instead of a no-op no one awaits. `motionInit`
+		// covers the normal case (initMotion() already scheduled); the
+		// `motionModule` fallback covers triggerMotion() having fired (and
+		// preloadMotion() having started) before `hero` existed, in the rare
+		// case dispose() runs in that same narrow window.
+		if (motionInit) void motionInit.then(() => stopMotion?.());
+		else if (motionModule) void motionModule.then(() => stopMotion?.());
 		else stopMotion?.();
 		hero.dispose();
 		renderer.dispose();
