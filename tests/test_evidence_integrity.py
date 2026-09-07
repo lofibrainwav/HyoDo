@@ -152,8 +152,14 @@ def installed_scanner(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(safety.shutil, "which", lambda binary: f"/usr/bin/{binary}")
 
 
-def _fake_run(returncode: int, stdout: str):
-    def run(*_args, **_kwargs):
+def _fake_run(returncode: int, stdout: str, version_stdout: str = "9.9.9"):
+    """gitleaks now answers a `version` positive control before the scan call;
+    keep that call succeeding by default so these fixtures still exercise the
+    scan-result path they were written for."""
+
+    def run(cmd, *_args, **_kwargs):
+        if isinstance(cmd, (list, tuple)) and "version" in cmd:
+            return types.SimpleNamespace(returncode=0, stdout=version_stdout, stderr="")
         return types.SimpleNamespace(returncode=returncode, stdout=stdout, stderr="")
 
     return run

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- `hyodo safe --scan gitleaks`: adapter used the removed `--format` flag
+  (gitleaks 8.x exits 126); now `--report-format json --report-path -` plus
+  a `version` positive control; regression test with a fake binary.
+
 ## [4.15.0] - 2026-09-07
 
 Stage 2 of the HyoDo Agent OS design on the source line: skill lens, folder
