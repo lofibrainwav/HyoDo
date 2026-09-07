@@ -146,7 +146,8 @@ def _json_payloads(args: list[str]) -> dict[str, tuple[int, dict]]:
     return out
 
 
-def _assert_payloads_identical_minus_audience(payloads: dict[str, tuple[int, dict]]):
+def _payloads_identical_minus_audience(payloads: dict[str, tuple[int, dict]]) -> bool:
+    """Return True only when every profile agrees on exit code and payload minus audience."""
     codes = {code for code, _ in payloads.values()}
     assert len(codes) == 1, payloads
     baseline = dict(payloads["engineer"][1])
@@ -156,19 +157,20 @@ def _assert_payloads_identical_minus_audience(payloads: dict[str, tuple[int, dic
         stripped = dict(payload)
         stripped.pop("audience", None)
         assert stripped == baseline, (profile, payload)
+    return True
 
 
 def test_check_json_payload_identical_across_profiles(monkeypatch, tmp_path: Path):
     monkeypatch.setattr(cli, "find_repo_root", lambda target: tmp_path)
     for name in ("run_pyright_check", "run_ruff_check", "run_pytest_check", "run_sbom_check"):
         monkeypatch.setattr(cli, name, lambda *args: cli.GateResult(cli.GateStatus.PASS, "test"))
-    _assert_payloads_identical_minus_audience(_json_payloads(["check", str(tmp_path)]))
+    assert _payloads_identical_minus_audience(_json_payloads(["check", str(tmp_path)]))
 
 
 def test_safe_json_payload_identical_across_profiles(tmp_path: Path):
     target = tmp_path / "danger.py"
     target.write_text('import os\nos.system("rm -rf /")\n')
-    _assert_payloads_identical_minus_audience(_json_payloads(["safe", str(target)]))
+    assert _payloads_identical_minus_audience(_json_payloads(["safe", str(target)]))
 
 
 def test_policy_check_json_payload_identical_across_profiles(tmp_path: Path):
@@ -183,7 +185,7 @@ def test_policy_check_json_payload_identical_across_profiles(tmp_path: Path):
         "--root",
         str(tmp_path),
     ]
-    _assert_payloads_identical_minus_audience(_json_payloads(args))
+    assert _payloads_identical_minus_audience(_json_payloads(args))
 
 
 # --------------------------------------------------------------------------- #
