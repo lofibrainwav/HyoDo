@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+No unreleased changes.
+
+## [4.14.0] - 2026-09-07
+
+Phase 1 closeout: test integrity, `hyodo connect`, the local
+evidence-graph viewer, audience profiles, and the M5-B local bridge
+complete Phase 1 packages 1-A through 1-E.
+
 ### Fixed
 
 - Surface trust level 2+ ledger obligations and recording outcomes in CLI receipts;

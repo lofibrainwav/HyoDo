@@ -2,9 +2,8 @@
 
 ## Status
 
-Draft for owner review; nothing here is implemented; depends on Phase 1
-packages 1-B through 1-E. Package 1-A (`ASK` decisions and the trust
-ladder) is the only Phase 1 package that has shipped, in v4.13.0. Every
+Draft for owner review; nothing here is implemented. Phase 1 packages
+1-A through 1-E are on main as of 4.14.0 preparation. Every
 citation below to `hyodo/policy.py`, `hyodo/events.py`, `hyodo/gates.py`,
 and `hyodo/safety.py` points at code that exists today; every citation to
 `docs/superpowers/specs/2026-09-06-hyodo-agent-os-phase1-design.md`

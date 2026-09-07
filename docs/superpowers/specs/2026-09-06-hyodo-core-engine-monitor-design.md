@@ -2,9 +2,10 @@
 
 ## Status
 
-Draft for owner review; nothing here is implemented. The current `hyodo
-dashboard` (`hyodo/dashboard.py`, six raw-metric cards, no composite score)
-and the public `/evidence-graph/` prototype (fixture data,
+Draft for owner review; rollout step (b) shipped server-rendered, later
+steps unimplemented. The current `hyodo dashboard` (`hyodo/dashboard.py`,
+six raw-metric cards, no composite score) and the public `/evidence-graph/`
+prototype (fixture data,
 `site/src/graph/evidence-graph.ts`) are the starting points. The local viewer
 this design describes depends on Phase 1-B's `hyodo report --format graph`
 output, `.hyodo/reports/hyodo-report.graph.json`

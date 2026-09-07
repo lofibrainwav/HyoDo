@@ -28,20 +28,22 @@ report from the agent-event ledger, but the public page is not an installed
 browser viewer and does not read a real ledger. See
 [its documentation](/docs/evidence-graph/) for the exact boundary.
 
-`hyodo connect` and Stage 2's bring-your-own-model support are not built yet.
+Stage 2's bring-your-own-model support is not built yet.
 
 ## Shipped today vs. not built yet
 
 | Shipped today | Not built yet |
 | --- | --- |
-| `hyodo safe` scans | `hyodo connect` |
-| `hyodo init` and `hyodo check` gates | Installed browser graph viewer |
-| FDE evidence spine and policy checks | Research nodes under policy |
-| `ASK` decisions and trust levels | Bring-your-own-model support |
-| Schema validation and local eval runs | Full folder semantic onboarding |
-| Source-line graph JSON report export | RAG or embeddings in public HyoDo |
-| MCP stdio, Tailscale serve, doctor | Cross-source verification loop |
-| PyPI Trusted Publishing, SBOM, SARIF | Stage 4 intent loop |
+| `hyodo safe` scans | Research nodes under policy |
+| `hyodo init` and `hyodo check` gates | Bring-your-own-model support |
+| FDE evidence spine and policy checks | Full folder semantic onboarding |
+| `ASK` decisions and trust levels | RAG or embeddings in public HyoDo |
+| Schema validation and local eval runs | Cross-source verification loop |
+| Source-line graph JSON report export | Stage 4 intent loop |
+| MCP stdio, Tailscale serve, doctor | |
+| PyPI Trusted Publishing, SBOM, SARIF | |
+| `hyodo connect` (dry-run by default; `cursor`/`codex` report UNOBSERVED) | |
+| Local graph viewer (`hyodo dashboard` → `/graph`, reads the real ledger) | |
 
 A public [evidence-graph prototype](/evidence-graph/) shows the intended shape
 using demo fixture data. See [its documentation](/docs/evidence-graph/) for the
