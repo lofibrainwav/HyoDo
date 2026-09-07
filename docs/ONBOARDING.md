@@ -98,7 +98,10 @@ Once one host is connected, connect a second one the same way (`hyodo mcp
 config <host>` or a paired bridge via `hyodo mcp pair`) and run
 `hyodo mcp continuity --root <workspace>` to see both hosts sharing the same
 local evidence — no second truth store, ChatGPT/remote honestly `UNOBSERVED`.
-See `docs/M5_REMOTE_CONNECTOR_CONTRACT.md`'s M5-D section.
+READY means integrity READY and coverage OBSERVED; run it before either host
+connects and it reports `UNOBSERVED` (0/2 hosts observed), never a false
+READY on an empty workspace. See `docs/M5_REMOTE_CONNECTOR_CONTRACT.md`'s
+M5-D section.
 
 ## Advanced paths (unchanged, still available)
 
