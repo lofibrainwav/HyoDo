@@ -50,9 +50,13 @@ export interface EvidenceEvent {
 	stepIndex: number;
 	tool: { name: string; paths: string[]; urls: string[] } | null;
 	policy: { decision: Decision; ruleId: string | null; reason: string | null } | null;
-	/** PROPOSED field — not in the shipped hyodo.agent-event/v1 schema yet. */
+	/** Shipped on the source line by Phase 1-B (hyodo.agent-event/v1 optional
+	 * field); not yet in a published release. This page still renders fixture
+	 * data. */
 	parentEventId: string | null;
-	/** PROPOSED field — not in the shipped hyodo.agent-event/v1 schema yet. */
+	/** Shipped on the source line by Phase 1-B (hyodo.agent-event/v1 optional
+	 * field); not yet in a published release. This page still renders fixture
+	 * data. */
 	evidenceRefs: string[];
 	/** Prototype-only narrative used for the "why" field when policy.reason is absent. */
 	note: string;
