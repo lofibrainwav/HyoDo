@@ -4180,11 +4180,21 @@ def skills_lens(
                 }
                 for pillar in result.pillars
             ],
+            "unclassified": {
+                "pillar": result.unclassified.pillar,
+                "expected": result.unclassified.expected,
+                "observed": result.unclassified.observed,
+                "passed": result.unclassified.passed,
+                "provenance": [
+                    {"rule_id": rid, "skill": skill, "status": status}
+                    for rid, skill, status in result.unclassified.provenance
+                ],
+            },
             "unobserved": result.unobserved,
         }
         console.print_json(json.dumps(payload))
     else:
-        for pillar in result.pillars:
+        for pillar in [*result.pillars, result.unclassified]:
             console.print(
                 f"[bold]{pillar.pillar}[/bold]: "
                 f"{pillar.observed}/{pillar.expected} observed, "

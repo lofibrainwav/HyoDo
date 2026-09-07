@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Test integrity (1-E) no longer flags a test as `no_assertion` when it
+  delegates its assertions to a same-module helper function (checked
+  transitively up to three call hops); a helper defined in another module is
+  still unresolved and the test stays flagged. See `docs/TEST_INTEGRITY.md`.
+- `hyodo skills lens` now reports a seventh `unclassified` row/JSON key for
+  compiled rules that carry no `[pillars: ...]` tag and match no keyword, so
+  every compiled rule is visible in exactly one lens row. See
+  `docs/SKILLS.md`.
+
 ### Added
 
 - `hyodo skills ingest|lens|propose` (Stage 2 package 2-A, the "skill
