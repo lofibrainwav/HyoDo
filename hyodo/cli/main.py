@@ -1455,6 +1455,13 @@ def check(
                 f"{test_integrity_report.total_tests} tests assert nothing",
             )
             results[0] = pyright_result
+            # The live "[1/4] Truth" line above already said PASS; say plainly
+            # that the strict test-integrity check amended it.
+            console.print(
+                "[bold red][1/4] Truth - amended to FAIL by --strict-tests:[/bold red] "
+                f"{test_integrity_report.vacuous_tests}/{test_integrity_report.total_tests} "
+                "tests assert nothing"
+            )
         _print_test_integrity_line(test_integrity_report)
         verdict_state["test_integrity"] = _test_integrity_payload(test_integrity_report)
 
