@@ -7,7 +7,10 @@ UNOBSERVED until a later phase provides and probes the service.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
+
+from hyodo.pairing import load_pairing, pairing_state
 
 CONNECTOR_SCHEMA_VERSION = "hyodo.connector-contract/v1"
 REMOTE_CONNECTOR_URL = "https://mcp.hyodo.app/mcp"
@@ -31,16 +34,59 @@ PAIRING_STATES = (
 )
 
 
-def build_connector_contract() -> dict[str, Any]:
-    """Return the machine-readable M5-A connector contract.
+def _measure_bridge(root: Path | None) -> dict[str, Any]:
+    """Measure the M5-B local bridge state for *root*, or report it unmeasured.
 
-    ``CONTRACT_ONLY`` and ``UNOBSERVED`` are intentional. They prevent this
-    declaration from being mistaken for a deployed remote MCP service.
+    ``root=None`` is the pure-default case (no workspace was named): the
+    bridge is reported as ``UNPAIRED`` without touching the filesystem, so
+    :func:`build_connector_contract` stays a pure function when called with
+    no arguments. Passing a real *root* is the only way to observe a local
+    pairing; remote availability is never probed here.
     """
+    if root is None:
+        return {
+            "pairing": "UNPAIRED",
+            "workspace_id": None,
+            "root": None,
+            "listener": "none",
+            "last_seen_at": None,
+        }
+    state = pairing_state(root)
+    record = load_pairing(root)
+    return {
+        "pairing": state.value,
+        "workspace_id": record.workspace_id if record is not None else None,
+        "root": record.root if record is not None else None,
+        # A local socket probe would risk a false positive from an unrelated
+        # process on the same port, and the pairing record does not persist
+        # which listener it was created for. Reporting "loopback" exactly
+        # when paired keeps this deterministic and matches the only bridge
+        # transport M5-B measures end to end; tailscale is never claimed
+        # without a dedicated live probe.
+        "listener": "loopback" if state.value == "PAIRED" else "none",
+        "last_seen_at": record.last_seen_at if record is not None else None,
+    }
+
+
+def build_connector_contract(root: Path | None = None) -> dict[str, Any]:
+    """Return the machine-readable M5 connector contract.
+
+    ``CONTRACT_ONLY`` and ``UNOBSERVED`` remote availability are intentional.
+    They prevent this declaration from being mistaken for a deployed remote
+    MCP service. Passing *root* additionally measures the M5-B local bridge
+    (pairing lifecycle) for that workspace; ``status`` becomes
+    ``PAIRED_LOCAL`` only when that local pairing is ``PAIRED`` — remote
+    ``availability`` stays ``UNOBSERVED`` either way, because this call never
+    probes DNS, OAuth, or routing.
+    """
+    bridge = _measure_bridge(root)
+    status = "PAIRED_LOCAL" if bridge["pairing"] == "PAIRED" else "CONTRACT_ONLY"
     return {
         "schema_version": CONNECTOR_SCHEMA_VERSION,
-        "status": "CONTRACT_ONLY",
+        "status": status,
         "availability": "UNOBSERVED",
+        "reasons": ["remote_not_probed"],
+        "bridge": bridge,
         "connector": {
             "url": REMOTE_CONNECTOR_URL,
             "transport": "streamable-http",

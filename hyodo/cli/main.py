@@ -83,6 +83,14 @@ from hyodo.gates import (
     render_gates_toml,
     run_user_gates,
 )
+from hyodo.pairing import (
+    PAIRING_RELATIVE_PATH,
+    PairingState,
+    create_pairing,
+    load_pairing,
+    pairing_state,
+    revoke_pairing,
+)
 from hyodo.pillars import (
     append_history_receipt,
     collect_hyo_evidence,
@@ -143,7 +151,13 @@ rules_app = typer.Typer(
     help="Agent-rules opt-in declarations",
     add_completion=False,
 )
+pairing_app = typer.Typer(
+    name="pairing",
+    help="Read-only pairing status for the M5-B loopback/tailscale bridge",
+    add_completion=False,
+)
 mcp_app.add_typer(rules_app, name="rules")
+mcp_app.add_typer(pairing_app, name="pairing")
 app.add_typer(event_app, name="event")
 app.add_typer(policy_app, name="policy")
 policy_app.add_typer(trust_app, name="trust")
@@ -1773,12 +1787,16 @@ def safe(
 
 @mcp_app.command("contract")
 def mcp_contract(
+    root: str = typer.Option(
+        ".", "--root", help="Workspace root to measure the local M5-B bridge state for"
+    ),
     json_output: bool = typer.Option(
         False, "--json", help="Print the machine-readable M5 connector contract"
     ),
 ):
     """Show the M5 remote-connector contract without claiming it is live."""
-    contract = build_connector_contract()
+    root_path = Path(root).expanduser().resolve()
+    contract = build_connector_contract(root_path)
     if json_output:
         console.print_json(json.dumps(contract))
         return
@@ -1788,7 +1806,135 @@ def mcp_contract(
     console.print(f"  availability: {contract['availability']}")
     console.print(f"  url:          {contract['connector']['url']}")
     console.print(f"  auth:         {contract['connector']['auth']}")
+    console.print(
+        f"  bridge:       pairing={contract['bridge']['pairing']} "
+        f"listener={contract['bridge']['listener']}"
+    )
     console.print("[yellow]Contract only: the remote connector is not claimed live yet.[/yellow]")
+
+
+@mcp_app.command("pair")
+def mcp_pair(
+    root: str = typer.Option(".", "--root", help="Workspace root to pair for the M5-B bridge"),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Create (or replace) a pairing for this workspace and print the bearer token once.
+
+    The token is never written to disk — only its sha256 digest is. This is
+    the only time the token is shown; it cannot be recovered later.
+    """
+    root_path = Path(root).expanduser().resolve()
+    if not root_path.is_dir():
+        reason = f"workspace root is not a directory: {root_path}"
+        payload = {"ok": False, "reasons": [reason], "exit_code": 2}
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]{reason}[/red]")
+        raise typer.Exit(2)
+
+    record, token = create_pairing(root_path)
+    pairing_file = root_path / PAIRING_RELATIVE_PATH
+    if json_output:
+        payload = {
+            "ok": True,
+            "reasons": [],
+            "exit_code": 0,
+            "workspace_id": record.workspace_id,
+            "device_id": record.device_id,
+            "root": record.root,
+            "pairing_file": str(pairing_file),
+            "token": token,
+        }
+        console.print_json(json.dumps(payload))
+    else:
+        console.print("[green]PAIRED[/green]")
+        console.print(f"  workspace_id: {record.workspace_id}")
+        console.print(f"  root:         {record.root}")
+        console.print(f"  pairing_file: {pairing_file}")
+        console.print(f"  token:        {token}")
+        console.print(
+            "[yellow]This token is shown once and is never stored — save it now. "
+            "Use it as the bearer token against `hyodo mcp serve --paired`.[/yellow]"
+        )
+    raise typer.Exit(0)
+
+
+def _mcp_revoke(
+    root: str = typer.Option(".", "--root", help="Workspace root to revoke pairing for"),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Revoke the current pairing; the bridge stops accepting its token immediately."""
+    root_path = Path(root).expanduser().resolve()
+    state = pairing_state(root_path)
+    if state in (PairingState.UNPAIRED, PairingState.UNOBSERVED):
+        reason = "pairing_missing" if state is PairingState.UNPAIRED else "pairing_invalid"
+        payload = {"ok": False, "reasons": [reason], "state": state.value, "exit_code": 2}
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]{state.value}[/red] — nothing to revoke ({reason})")
+        raise typer.Exit(2)
+
+    record = revoke_pairing(root_path)
+    assert record is not None  # state was PAIRED or REVOKED, so a valid record exists
+    payload = {
+        "ok": True,
+        "reasons": [],
+        "state": "REVOKED",
+        "workspace_id": record.workspace_id,
+        "revoked_at": record.revoked_at,
+        "exit_code": 0,
+    }
+    if json_output:
+        console.print_json(json.dumps(payload))
+    else:
+        console.print("[green]REVOKED[/green]")
+        console.print(f"  workspace_id: {record.workspace_id}")
+        console.print(f"  revoked_at:   {record.revoked_at}")
+    raise typer.Exit(0)
+
+
+# Registered under both names: `revoke` is the primary verb used in the M5-B
+# receipts, `unpair` is the more familiar counterpart to `pair`. Both run the
+# same idempotent revoke.
+mcp_app.command("unpair")(_mcp_revoke)
+mcp_app.command("revoke")(_mcp_revoke)
+
+
+@pairing_app.command("show")
+def mcp_pairing_show(
+    root: str = typer.Option(".", "--root", help="Workspace root to inspect pairing state for"),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Show the current pairing state for this workspace. Never prints the token."""
+    root_path = Path(root).expanduser().resolve()
+    state = pairing_state(root_path)
+    record = load_pairing(root_path)
+    payload = {
+        "ok": state is PairingState.PAIRED,
+        "state": state.value,
+        "workspace_id": record.workspace_id if record is not None else None,
+        "device_id": record.device_id if record is not None else None,
+        "root": record.root if record is not None else None,
+        "created_at": record.created_at if record is not None else None,
+        "revoked_at": record.revoked_at if record is not None else None,
+        "last_seen_at": record.last_seen_at if record is not None else None,
+        "pairing_file": str(root_path / PAIRING_RELATIVE_PATH),
+        "exit_code": 0 if state is PairingState.PAIRED else 2,
+    }
+    if json_output:
+        console.print_json(json.dumps(payload))
+    else:
+        color = {"PAIRED": "green", "REVOKED": "yellow", "UNPAIRED": "yellow"}.get(
+            state.value, "red"
+        )
+        console.print(f"[{color}]{state.value}[/{color}]")
+        if record is not None:
+            console.print(f"  workspace_id: {record.workspace_id}")
+            console.print(f"  root:         {record.root}")
+            console.print(f"  last_seen_at: {record.last_seen_at}")
+    raise typer.Exit(payload["exit_code"])
 
 
 @mcp_app.command("stdio")
@@ -1841,7 +1987,16 @@ def mcp_serve(
         None,
         "--token",
         envvar="HYODO_MCP_TOKEN",
-        help="Optional for loopback; required and non-empty for Tailscale",
+        help="Optional for loopback; required and non-empty for Tailscale (ignored with --paired)",
+    ),
+    paired: bool = typer.Option(
+        False,
+        "--paired",
+        help=(
+            "Verify the caller's bearer token against `.hyodo/pairing.json` instead of a "
+            "static --token; every request re-reads the pairing so a revoke takes effect "
+            "immediately"
+        ),
     ),
 ):
     """Explicitly serve the optional MCP adapter on loopback or Tailscale."""
@@ -1853,6 +2008,12 @@ def mcp_serve(
         raise typer.Exit(2)
     if port == 8768:
         console.print("[red]Port 8768 is reserved for the HyoDo dashboard.[/red]")
+        raise typer.Exit(2)
+    if paired and token is not None:
+        console.print(
+            "[red]--paired verifies the bearer token against `.hyodo/pairing.json`; "
+            "do not also pass --token.[/red]"
+        )
         raise typer.Exit(2)
     tailscale_ip = None
     if bind == "tailscale":
@@ -1870,12 +2031,11 @@ def mcp_serve(
         ) or candidate not in ipaddress.ip_network("100.64.0.0/10"):
             console.print("[red]--bind-ip must be a Tailscale 100.64.0.0/10 address.[/red]")
             raise typer.Exit(2)
-        if token is None or not token.strip():
+        if not paired and (token is None or not token.strip()):
             console.print(
                 "[red]--bind tailscale requires a non-empty bearer token before listening.[/red]"
             )
             raise typer.Exit(2)
-        assert token is not None
         tailscale_ip = str(candidate)
     try:
         from hyodo._mcp_compat import get_mcp_server_class
@@ -1902,13 +2062,18 @@ def mcp_serve(
         console.print(f"  transport: {bind}")
         console.print(f"  url:       http://{host}:{port}/mcp")
         console.print(f"  workspace: {root_path.expanduser().resolve()}")
-        console.print(
-            "  auth:      bearer token configured" if token else "  auth:      local process trust"
-        )
-        if bind == "tailscale":
-            run_tailscale(root_path, host=host, port=port, token=token or "")
+        if paired:
+            console.print("  auth:      paired (bearer token verified against pairing record)")
         else:
-            run_loopback(root_path, port=port, token=token)
+            console.print(
+                "  auth:      bearer token configured"
+                if token
+                else "  auth:      local process trust"
+            )
+        if bind == "tailscale":
+            run_tailscale(root_path, host=host, port=port, token=token or "", paired=paired)
+        else:
+            run_loopback(root_path, port=port, token=token, paired=paired)
     except ValueError as exc:
         console.print(f"[red]{exc}[/red]")
         raise typer.Exit(2) from exc

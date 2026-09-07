@@ -14,6 +14,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- M5-B local bridge: an untracked `.hyodo/pairing.json` pairing lifecycle
+  (`hyodo mcp pair` / `unpair` / `revoke` / `pairing show`), a `--paired`
+  option on `hyodo mcp serve` that verifies the caller's bearer token against
+  that pairing on every request (a revoke takes effect immediately, never a
+  static token comparison), and a `bridge` object in
+  `hyodo mcp contract --json` reporting the measured local pairing state —
+  remote `availability` stays `UNOBSERVED` (#163).
 - Measured summary verdicts and deterministic `--explain` / `--quiet`
   presentation for check, safe, and policy check.
 - `hyodo check --json` receipts and verdict fields in safe and policy JSON.

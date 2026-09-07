@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from hyodo.cli.main import app
 from hyodo.connector_contract import MCP_CAPABILITIES, build_connector_contract
+from hyodo.pairing import PAIRING_RELATIVE_PATH, create_pairing, revoke_pairing
 
 runner = CliRunner()
 
@@ -101,3 +102,75 @@ def test_connector_contract_targets_hardened_oauth_discovery() -> None:
     assert auth["client_registration"] == "cimd_preferred"
     assert auth["issuer_validation"] == "rfc9207"
     assert auth["refresh_tokens_for_persistent_hosts"] is True
+
+
+# ── M5-B: bridge object reflects measured local pairing state ──────────────
+
+
+def test_connector_contract_bare_call_stays_pure_and_unpaired() -> None:
+    """Calling with no root touches no filesystem and never claims a pairing."""
+    contract = build_connector_contract()
+
+    assert contract["status"] == "CONTRACT_ONLY"
+    assert contract["availability"] == "UNOBSERVED"
+    assert "remote_not_probed" in contract["reasons"]
+    assert contract["bridge"] == {
+        "pairing": "UNPAIRED",
+        "workspace_id": None,
+        "root": None,
+        "listener": "none",
+        "last_seen_at": None,
+    }
+
+
+def test_connector_contract_reports_paired_local_when_measured(tmp_path) -> None:
+    record, _token = create_pairing(tmp_path)
+
+    contract = build_connector_contract(tmp_path)
+
+    assert contract["status"] == "PAIRED_LOCAL"
+    assert contract["availability"] == "UNOBSERVED"
+    assert "remote_not_probed" in contract["reasons"]
+    assert contract["bridge"]["pairing"] == "PAIRED"
+    assert contract["bridge"]["workspace_id"] == record.workspace_id
+    assert contract["bridge"]["listener"] == "loopback"
+
+
+def test_connector_contract_revoked_pairing_stays_contract_only(tmp_path) -> None:
+    create_pairing(tmp_path)
+    revoke_pairing(tmp_path)
+
+    contract = build_connector_contract(tmp_path)
+
+    assert contract["bridge"]["pairing"] == "REVOKED"
+    assert contract["status"] == "CONTRACT_ONLY"
+
+
+def test_connector_contract_unpaired_workspace_stays_contract_only(tmp_path) -> None:
+    contract = build_connector_contract(tmp_path)
+
+    assert contract["bridge"]["pairing"] == "UNPAIRED"
+    assert contract["bridge"]["workspace_id"] is None
+    assert contract["status"] == "CONTRACT_ONLY"
+
+
+def test_connector_contract_corrupt_pairing_file_is_unobserved(tmp_path) -> None:
+    path = tmp_path / PAIRING_RELATIVE_PATH
+    path.parent.mkdir(parents=True)
+    path.write_text("{not json", encoding="utf-8")
+
+    contract = build_connector_contract(tmp_path)
+
+    assert contract["bridge"]["pairing"] == "UNOBSERVED"
+    assert contract["status"] == "CONTRACT_ONLY"
+
+
+def test_mcp_contract_cli_measures_the_given_root(tmp_path) -> None:
+    record, _token = create_pairing(tmp_path)
+
+    result = runner.invoke(app, ["mcp", "contract", "--root", str(tmp_path), "--json"])
+
+    assert result.exit_code == 0
+    payload = json.loads(result.output)
+    assert payload["status"] == "PAIRED_LOCAL"
+    assert payload["bridge"]["workspace_id"] == record.workspace_id

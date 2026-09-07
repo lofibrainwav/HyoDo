@@ -75,6 +75,56 @@ requires explicit operator consent.
 An unreachable or revoked workspace is `UNOBSERVED`, never PASS. HyoDo policy
 signals remain evidence for the host/user; they never become human approval.
 
+## M5-B — local bridge
+
+M5-B proves the *local half* of the route described above: a paired,
+root-locked workspace served over an authenticated loopback (or Tailscale)
+route, whose revoke/disconnect states are measured and reported honestly.
+It does not stand up `https://mcp.hyodo.app/mcp` — that address is still not
+live, and `availability` in the machine contract stays `UNOBSERVED`.
+
+What is measured:
+
+- **Pairing lifecycle.** `hyodo mcp pair --root <workspace>` creates an
+  untracked `.hyodo/pairing.json` record (`hyodo.pairing/v1`) and prints a
+  32-byte urlsafe bearer token exactly once. Only the token's sha256 digest
+  is ever written to disk. `hyodo mcp revoke` (alias `unpair`) and
+  `hyodo mcp pairing show` read and update that same file.
+- **Paired serving.** `hyodo mcp serve --bind loopback --paired` (and
+  `--bind tailscale --paired`) verifies every request's bearer token against
+  the pairing record instead of a static `--token`. The record is re-read on
+  every request, so a revoke takes effect on the very next call — no restart
+  required. A revoked pairing returns `401 {"state": "REVOKED"}`, no pairing
+  file returns `401 {"state": "UNPAIRED"}`, and a present-but-unreadable file
+  fails closed as `503 {"state": "UNOBSERVED"}` — never a silent PASS. The
+  existing `HYODO_MCP_TOKEN` / `--token` path keeps working unchanged when
+  `--paired` is not passed.
+- **Contract reflection.** `hyodo mcp contract --root <workspace> --json`
+  adds a `bridge` object — `{"pairing", "workspace_id", "root", "listener",
+  "last_seen_at"}` — computed from that workspace's pairing file. `status`
+  becomes `PAIRED_LOCAL` only when `bridge.pairing == "PAIRED"`; otherwise it
+  stays `CONTRACT_ONLY`. Calling `build_connector_contract()` with no root
+  stays a pure function and reports `bridge.pairing == "UNPAIRED"` without
+  touching the filesystem.
+
+What stays `UNOBSERVED`:
+
+- Remote `availability` — DNS, OAuth, and routing for
+  `https://mcp.hyodo.app/mcp` are not probed by this slice. The contract
+  carries a `reasons` entry, `remote_not_probed`, to say so explicitly.
+- `bridge.listener` reports `"loopback"` exactly when `bridge.pairing` is
+  `PAIRED`, and `"none"` otherwise. This is a deterministic function of the
+  local pairing state, not a live socket probe — the pairing record does not
+  persist which listener it was created for, and a live probe on a fixed
+  port risks a false positive from an unrelated local process. A dedicated
+  live-reachability probe (loopback and Tailscale) is future work, not part
+  of this contract's semantics today.
+
+No new tool was added, no served tool runs a shell or reads/writes an
+arbitrary path, and no second policy or gate engine was introduced — every
+served tool still shells out to the `hyodo` CLI exactly as before. Digest-only
+evidence remains the default.
+
 ## Current capabilities
 
 The contract advertises only the tools already served by the local adapter:
