@@ -1,7 +1,9 @@
 """Deterministic presentation of measured command outcomes."""
 
 
-def render_verdict_line(decision: str, observed: int, expected: int, unit: str, detail: str) -> str:
+def render_verdict_line(
+    decision: str, observed: int, expected: int | str, unit: str, detail: str
+) -> str:
     """Return one plain verdict line without changing a decision."""
     return f"HYODO {decision} — {observed}/{expected} {unit} observed, {detail}"
 
@@ -227,6 +229,26 @@ EXPLANATIONS: dict[tuple[str, str, str | None], str] = {
         "UNOBSERVED",
         "trust_grant_unobserved",
     ): "The required trust grant is missing or unreadable. Restore an explicit operator grant and reevaluate.",
+    (
+        "policy check",
+        "UNOBSERVED",
+        "policy_missing",
+    ): "The policy file is missing. Restore the policy and reevaluate; this is not a validation pass.",
+    (
+        "policy check",
+        "UNOBSERVED",
+        "policy_invalid",
+    ): "The policy file could not be loaded. Correct the policy and reevaluate; this is not a validation pass.",
+    (
+        "event record --policy",
+        "UNOBSERVED",
+        "policy_missing",
+    ): "The policy file is missing. Restore the policy and reevaluate; this is not a validation pass.",
+    (
+        "event record --policy",
+        "UNOBSERVED",
+        "policy_invalid",
+    ): "The policy file could not be loaded. Correct the policy and reevaluate; this is not a validation pass.",
 }
 
 

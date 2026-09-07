@@ -26,7 +26,16 @@ def test_rule_coverage():
                 for n in ast.walk(node.value)
                 if isinstance(n, ast.Constant) and isinstance(n.value, str)
             )
-    rules.add("trust_grant_unobserved")
+        if isinstance(node, ast.Return) and node.value is not None:
+            for value in ast.walk(node.value):
+                if isinstance(value, ast.Tuple):
+                    rules.update(
+                        item.value
+                        for item in value.elts
+                        if isinstance(item, ast.Constant)
+                        and isinstance(item.value, str)
+                        and item.value.isidentifier()
+                    )
     for command in ("policy check", "event record --policy"):
         assert rules <= {rule for cmd, _, rule in EXPLANATIONS if cmd == command}
         for decision in ("ALLOW", "ASK", "DENY", "UNOBSERVED"):

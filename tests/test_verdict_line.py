@@ -30,13 +30,16 @@ def test_checkout_modes_preserve_exit(monkeypatch, tmp_path, status, code):
 def assert_modes(args, code):
     baseline = runner.invoke(cli.app, args)
     assert baseline.exit_code == code, baseline.output
-    assert baseline.output.startswith("HYODO ")
+    assert baseline.output.splitlines()[-1].startswith("HYODO ")
     for flags in (["--quiet"], ["--explain"], ["--quiet", "--explain"]):
         first = runner.invoke(cli.app, args + flags)
         second = runner.invoke(cli.app, args + flags)
         assert first.exit_code == baseline.exit_code
         assert first.output == second.output
-        assert first.output.splitlines()[0] == baseline.output.splitlines()[0]
+        assert (
+            first.output.splitlines()[-2 if "--explain" in flags else -1]
+            == baseline.output.splitlines()[-1]
+        )
         if "--quiet" in flags:
             assert len(first.output.splitlines()) == (2 if "--explain" in flags else 1)
         for forbidden in ("probability", "confidence"):
@@ -44,7 +47,7 @@ def assert_modes(args, code):
     machine = runner.invoke(cli.app, [*args, "--json"])
     payload = json.loads(machine.output)
     assert machine.exit_code == payload["exit_code"] == code
-    assert payload["verdict"] == baseline.output.splitlines()[0]
+    assert payload["verdict"] == baseline.output.splitlines()[-1]
 
 
 @pytest.mark.parametrize(("strict", "code"), [(False, 0), (True, 1)])
@@ -54,7 +57,7 @@ def test_safe_advisory_and_strict(tmp_path, strict, code):
     args = ["safe", str(target)] + (["--strict"] if strict else [])
     assert_modes(args, code)
     if not strict:
-        assert "advisory; --strict blocks" in runner.invoke(cli.app, args).output.splitlines()[0]
+        assert "advisory; --strict blocks" in runner.invoke(cli.app, args).output.splitlines()[-1]
 
 
 def test_unobserved_inputs(tmp_path):
@@ -77,8 +80,8 @@ def test_policy_sample(tmp_path):
     ]
     baseline = runner.invoke(cli.app, args)
     assert_modes(args, baseline.exit_code)
-    assert "trust=" in baseline.output.splitlines()[0]
-    assert "surfaces observed" in baseline.output.splitlines()[0]
+    assert "trust=" in baseline.output.splitlines()[-1]
+    assert "surfaces observed" in baseline.output.splitlines()[-1]
 
 
 @pytest.mark.parametrize(
@@ -153,3 +156,23 @@ def test_user_gate_modes(monkeypatch, tmp_path, status, code):
         ],
     )
     assert_modes(["check", str(tmp_path)], code)
+
+
+def test_default_check_streams_before_gate_finishes(monkeypatch, tmp_path):
+    import io
+
+    from rich.console import Console
+
+    output = io.StringIO()
+    monkeypatch.setattr(cli, "console", Console(file=output, color_system=None))
+    monkeypatch.setattr(cli, "find_repo_root", lambda target: tmp_path)
+
+    def gate(*args):
+        assert "Type checking" in output.getvalue()
+        return cli.GateResult(cli.GateStatus.PASS, "test")
+
+    monkeypatch.setattr(cli, "run_pyright_check", gate)
+    for name in ("run_ruff_check", "run_pytest_check", "run_sbom_check"):
+        monkeypatch.setattr(cli, name, lambda *args: cli.GateResult(cli.GateStatus.PASS, "test"))
+    result = runner.invoke(cli.app, ["check", str(tmp_path)])
+    assert result.exit_code == 0, result.exception

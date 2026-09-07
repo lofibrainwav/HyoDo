@@ -28,7 +28,7 @@ import sys
 import threading
 import webbrowser
 from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
@@ -1111,8 +1111,8 @@ def _print_general_results(results: list[GeneralGateResult], root: Path) -> None
 def _verdict_output(
     command: str, state: dict[str, Any], quiet: bool, explain: bool, json_output: bool
 ) -> Iterator[None]:
-    """Buffer presentation only; propagate the original command exit unchanged."""
-    with console.capture() as captured:
+    """Stream default details; propagate the original command exit unchanged."""
+    with console.capture() if quiet or json_output else nullcontext() as captured:
         try:
             yield
         except typer.Exit as exc:
@@ -1138,6 +1138,7 @@ def _verdict_output(
                 "exit_code": exit_code,
             }
         else:
+            assert captured is not None
             payload = json.loads(captured.get())
         payload["verdict"] = verdict
         console.print_json(json.dumps(payload))
@@ -1145,8 +1146,6 @@ def _verdict_output(
         typer.echo(verdict)
         if explain:
             typer.echo("Explanation: " + explain_decision(command, decision, state.get("rule_id")))
-        if not quiet:
-            console.print(captured.get(), end="", markup=False, highlight=False)
     raise typer.Exit(exit_code)
 
 
@@ -1671,7 +1670,7 @@ def safe(
         total = result.get("total_scannable")
         verdict_state.update(
             observed=scanned if isinstance(scanned, int) else 0,
-            expected=total if isinstance(total, int) else 0,
+            expected=total if isinstance(total, int) and total else "unknown",
             detail=f"{len(high_only)} high findings"
             + (" (advisory; --strict blocks)" if high_only and not strict else "")
             + ("; file coverage UNOBSERVED" if scanned is None or total is None else ""),
@@ -1742,10 +1741,20 @@ def safe(
         scanned_files = result.get("scanned_files")
         total_scannable = result.get("total_scannable")
         if isinstance(scanned_files, int) and isinstance(total_scannable, int):
-            if total_scannable > scanned_files:
+            if (
+                source.startswith("dir:")
+                and max_files > 0
+                and scanned_files >= max_files
+                and total_scannable > scanned_files
+            ):
                 coverage_note = (
                     f"Directory scan cap: scanned {scanned_files} of {total_scannable} files "
                     f"(cap {max_files}); raise --max-files to scan all. "
+                )
+            elif total_scannable > scanned_files:
+                coverage_note = (
+                    f"Scanned {scanned_files} of {total_scannable} files; "
+                    "skipped or unreadable file contents remain UNOBSERVED. "
                 )
             else:
                 coverage_note = f"Scanned {scanned_files} of {total_scannable} files. "

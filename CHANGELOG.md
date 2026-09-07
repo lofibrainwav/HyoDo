@@ -14,10 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- First-line measured verdicts and deterministic `--explain` / `--quiet`
+- Measured summary verdicts and deterministic `--explain` / `--quiet`
   presentation for check, safe, and policy check.
 - `hyodo check --json` receipts and verdict fields in safe and policy JSON.
-
 - Graph edges and `hyodo report --format graph` (#160).
 - Anti-gaming AST visitor, not yet wired into a CLI command (#161).
 - Digest-only `tool.urls`, `gate:` evidence refs, `require_mission_prompt`,

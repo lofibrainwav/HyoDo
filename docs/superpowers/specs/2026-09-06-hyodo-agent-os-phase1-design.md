@@ -704,9 +704,10 @@ Unchanged from 1-A/existing contracts — `render_verdict_line` and
 ### Backward compatibility
 
 - Commands behave exactly as today when `--explain`/`--quiet`/`--json` are
-  not passed; the verdict line is a new *first line* of output, not a
-  replacement for the existing gate-by-gate detail lines (those still print
-  unless `--quiet` is given).
+  not passed; gate-by-gate details stream live so slow gates show progress.
+  The verdict replaces the final summary as the last line in default mode
+  and is the only line under `--quiet`. `--explain` appends its explanation
+  after the verdict.
 - `check`'s existing exit codes (0/1/2) are unchanged; `--json` only adds a
   machine-readable mirror of what text mode already communicates.
 
