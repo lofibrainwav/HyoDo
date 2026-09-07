@@ -26,15 +26,16 @@ except ImportError:  # pragma: no cover - exercised only in the base lane
     uvicorn = None  # type: ignore[assignment]
     streamablehttp_client = None  # type: ignore[assignment]
 
-needs_http_bridge = pytest.mark.skipif(
-    httpx is None or uvicorn is None or streamablehttp_client is None,
-    reason="httpx, uvicorn, and the streamable HTTP client are required",
-)
 from typer.testing import CliRunner
 
 from hyodo.access_ledger import read_access_log
 from hyodo.cli.main import app
 from hyodo.pairing import PAIRING_RELATIVE_PATH, create_pairing, revoke_pairing
+
+needs_http_bridge = pytest.mark.skipif(
+    httpx is None or uvicorn is None or streamablehttp_client is None,
+    reason="httpx, uvicorn, and the streamable HTTP client are required",
+)
 
 runner = CliRunner()
 
