@@ -60,3 +60,9 @@ When neither path nor digest is supplied, `digest` is `null`.
 With the default credential boundary, a true shape means `DENY`, a missing
 shape without a legacy path means `UNOBSERVED`, and false continues normal
 policy evaluation. Paths remain absent from default ledgers and graphs.
+
+`credential_shaped_path` (`hyodo/events.py`) matches case-insensitively against
+a path-marker list and a query-marker list: paths containing `/.git/`, `/.env`,
+`/wp-admin/`, `/.aws/`, `/.ssh/`, `/.netrc`, `/.kube/`, `credentials`, `id_rsa`,
+`.pem`, or `/etc/shadow`, or queries containing `token=`, `api_key=`, `secret=`,
+`password=`, `access_token=`, `apikey=`, `auth=`, or `sig=`.

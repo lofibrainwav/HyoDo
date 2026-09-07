@@ -14,6 +14,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Test integrity (Phase 1-E): `hyodo check` now runs a native, model-free AST
+  scan of the project's own tests (`hyodo/test_integrity.py`, reusing
+  `hyodo/safe/anti_gaming.py`'s HYO-SAFE-010/011/012 rule ids) alongside its
+  four existing gates, reporting how many tests assert nothing observable
+  (`check --json`'s `test_integrity` object). `check --strict-tests` fails the
+  Truth gate when pyright passes but vacuous tests are found. See
+  `docs/TEST_INTEGRITY.md`.
+- Widened credential-shaped URL detection (`hyodo/events.py`): `/.aws/`,
+  `/.ssh/`, `/.netrc`, `/.kube/`, `credentials`, `id_rsa`, `.pem`, and
+  `/etc/shadow` path markers; `password=`, `access_token=`, `apikey=`,
+  `auth=`, and `sig=` query markers. See `docs/POLICY_TRUST.md`.
 - Local evidence-graph viewer: `hyodo dashboard` now serves `GET /graph`
   (server-rendered five-column virtue layout plus the core-engine-pulse orb)
   and `GET /api/graph` (live `hyodo.evidence-graph/v1` JSON, mirroring

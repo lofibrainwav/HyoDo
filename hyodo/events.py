@@ -64,8 +64,29 @@ def unevaluated_policy(claimed: dict[str, Any] | None = None) -> dict[str, Any]:
     return out
 
 
-_CREDENTIAL_PATH_MARKERS = ("/.git/", "/.env", "/wp-admin/")
-_CREDENTIAL_QUERY_MARKERS = ("token=", "api_key=", "secret=")
+_CREDENTIAL_PATH_MARKERS = (
+    "/.git/",
+    "/.env",
+    "/wp-admin/",
+    "/.aws/",
+    "/.ssh/",
+    "/.netrc",
+    "/.kube/",
+    "credentials",
+    "id_rsa",
+    ".pem",
+    "/etc/shadow",
+)
+_CREDENTIAL_QUERY_MARKERS = (
+    "token=",
+    "api_key=",
+    "secret=",
+    "password=",
+    "access_token=",
+    "apikey=",
+    "auth=",
+    "sig=",
+)
 
 
 def credential_shaped_path(path: str | None) -> bool:
