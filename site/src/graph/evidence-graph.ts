@@ -347,7 +347,19 @@ function shortLabel(ev: EvidenceEvent): string {
 function describeEvent(ev: EvidenceEvent): string {
 	const decisionSuffix =
 		ev.schemaKind === 'decision' && ev.policy ? ` — ${ev.policy.decision}` : '';
-	return `${ev.displayKind}${decisionSuffix} by ${ev.actor} at step ${ev.stepIndex}`;
+	return `${ev.schemaKind}${decisionSuffix} by ${ev.actor} at step ${ev.stepIndex}`;
+}
+
+/**
+ * Accessible name for a cell button. WCAG 2.5.3 (label-content-name-mismatch)
+ * requires the accessible name to start with the visible text — so this
+ * leads with the same string the `.node-label` span shows, then appends the
+ * schema/decision/actor/step detail from describeEvent(). For decision
+ * cells, describeEvent()'s decisionSuffix keeps the decision (ASK/ALLOW/…)
+ * in the name even though the visible label is the rule id.
+ */
+function accessibleCellName(ev: EvidenceEvent): string {
+	return `${shortLabel(ev)} — ${describeEvent(ev)}`;
 }
 
 function fieldWhat(ev: EvidenceEvent): string {
@@ -570,13 +582,23 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 			btn.className = 'cell node';
 			btn.dataset.eventId = ev.eventId;
 			btn.dataset.decision = ev.policy?.decision ?? 'event';
-			btn.setAttribute('aria-label', describeEvent(ev));
+			btn.setAttribute('aria-label', accessibleCellName(ev));
 
 			const chip = el('span', `chip ${ev.schemaKind}`);
 			if (ev.schemaKind === 'decision' && ev.policy) {
 				chip.classList.add('decision', ev.policy.decision);
 			}
-			chip.textContent = chipGlyph(ev);
+			// Rendered as a `::before { content: attr(data-glyph) }` (see
+			// evidence-graph.css), not `chip.textContent` — a real text node
+			// here is a second "visible text label" alongside .node-label,
+			// and axe's label-content-name-mismatch rule reads visible-on-
+			// screen text (aria-hidden does not exempt it: the rule ignores
+			// the accessibility tree by design). CSS-generated content isn't
+			// part of the DOM/accessibility tree at all, so it renders the
+			// same glyph without becoming a second label the aria-label text
+			// (which already covers the same information) would need to repeat.
+			chip.dataset.glyph = chipGlyph(ev);
+			chip.setAttribute('aria-hidden', 'true');
 			btn.appendChild(chip);
 
 			const label = el('span', 'node-label');

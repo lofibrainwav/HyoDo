@@ -71,11 +71,14 @@ export function initMotion(options: MotionOptions): () => void {
 	// top reaches 20% of the viewport height. Measured from the section
 	// itself (not the inner grid) so the boundary matches the contract above;
 	// the function is re-evaluated by ScrollTrigger.refresh(), which GSAP
-	// already calls on window resize.
+	// already calls on window resize. Pulled into a named function (was
+	// inline in `end` below) so the race-guard below can reuse the exact
+	// same formula instead of risking the two drifting apart.
+	const dockEnd = () => Math.max(1, (embed?.getBoundingClientRect().top ?? innerHeight) + scrollY - innerHeight * 0.2);
 	const scrollDriver = ScrollTrigger.create({
 		trigger: document.body,
 		start: 'top top',
-		end: () => `+=${Math.max(1, (embed?.getBoundingClientRect().top ?? innerHeight) + scrollY - innerHeight * 0.2)}`,
+		end: () => `+=${dockEnd()}`,
 		scrub: true,
 		invalidateOnRefresh: true,
 		onUpdate: self => applyDock(self.progress),
@@ -83,6 +86,23 @@ export function initMotion(options: MotionOptions): () => void {
 	});
 	const onReady = () => { ScrollTrigger.refresh(); applyDock(scrollDriver.progress); };
 	embed?.addEventListener('eg-ready', onReady);
+
+	// Race guard: initMotion() is now loaded lazily (hero/mount.ts dynamic
+	// import), so the graph module can already have mounted and dispatched
+	// 'eg-ready' *before* the listener above was attached — and
+	// ScrollTrigger's own initial refresh is not guaranteed to run
+	// synchronously (GSAP may defer it a tick or more), so a visitor who
+	// jumps straight to the docking point in one scroll (rather than a
+	// gradual multi-tick scroll) could see the WebGL canvas fully opaque
+	// over the already-fully-mounted graph for up to ~1.7s until GSAP's
+	// own deferred refresh happens to fix it. Compute the current dock
+	// progress ourselves, synchronously, with the identical formula `end`
+	// uses above, and apply it immediately: applyDock() itself already
+	// no-ops until the graph has actually mounted (14 `button.cell`s) and
+	// under prefers-reduced-motion, so this is safe to call unconditionally
+	// on every init, whether or not the page happens to already be
+	// scrolled into the docking range.
+	applyDock(Math.min(1, Math.max(0, scrollY / dockEnd())));
 
 	let splitInstance: SplitText | null = null;
 	if (headline) {

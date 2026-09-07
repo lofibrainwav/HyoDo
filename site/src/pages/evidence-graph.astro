@@ -69,7 +69,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 			</div>
 		</nav>
 
-		<div class="eg-wrap">
+		<main class="eg-wrap">
 			<h1>HyoDo Evidence Graph <span class="eg-badge">Prototype</span></h1>
 
 			<p class="eg-banner" role="note"><strong>Prototype.</strong> This is demo fixture data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below are proposed schema fields; they are not yet part of the shipped <code>hyodo.agent-event/v1</code> ledger. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
@@ -122,7 +122,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 			</noscript>
 
 			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> (event_id, run_id, ts, kind, actor, step_index, tool, policy). <code>parent_event_id</code> and <code>evidence_refs</code> are proposed fields, shown here as fixture-only. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
-		</div>
+		</main>
 
 		<script>
 			import { mountEvidenceGraph } from '../graph/evidence-graph';
