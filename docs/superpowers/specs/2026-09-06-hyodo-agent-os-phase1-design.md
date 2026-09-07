@@ -932,6 +932,9 @@ the idempotency case), 1 if any per-harness confirmation was declined and
 
 ## Package 1-E — `feat/test-integrity`: a native, unshellable signal for the Truth pillar
 
+Status: Implemented in `feat/test-integrity` (`hyodo/test_integrity.py`,
+`check --strict-tests`). See `docs/TEST_INTEGRITY.md`.
+
 `hyodo/safe/anti_gaming.py` (PR #161) is the AST visitor 1-E will consume.
 
 ### Why this is the honest form of "semantic test quality"

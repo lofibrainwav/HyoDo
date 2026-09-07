@@ -1,5 +1,6 @@
 """Building block for the Phase 1-E test-integrity signal (see the Phase 1 design
-spec); not yet invoked by any `hyodo` command.
+spec); consumed by `hyodo.test_integrity.scan_test_integrity`, which `hyodo check`
+runs as its report-only test-integrity computation (`--strict-tests` to enforce).
 
 AST-based inspection to prevent AI agents from gaming quality gates."""
 

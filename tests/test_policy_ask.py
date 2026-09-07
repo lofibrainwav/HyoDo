@@ -192,6 +192,23 @@ def test_credential_shaped_paths():
     assert not credential_shaped_path(None)
 
 
+def test_credential_shaped_paths_widened_markers():
+    """Phase 1-E: widened `_CREDENTIAL_PATH_MARKERS`/`_CREDENTIAL_QUERY_MARKERS`
+    (see `docs/POLICY_TRUST.md`'s URL credential observations section)."""
+    assert credential_shaped_path("/.aws/credentials")
+    assert credential_shaped_path("/home/user/.ssh/id_rsa")
+    assert credential_shaped_path("/.netrc")
+    assert credential_shaped_path("/.kube/config")
+    assert credential_shaped_path("/etc/shadow")
+    assert credential_shaped_path("/certs/server.pem")
+    assert credential_shaped_path("/v1/users?access_token=abc")
+    assert credential_shaped_path("/v1/users?password=abc")
+    assert credential_shaped_path("/v1/users?apikey=abc")
+    assert credential_shaped_path("/v1/users?auth=abc")
+    assert credential_shaped_path("/v1/users?sig=abc")
+    assert not credential_shaped_path("/docs/index.html")
+
+
 def test_compute_coverage_counts_applicable_surfaces():
     policy = _bare_policy(allowed_tools=("search",), max_steps=10)
     assert _compute_coverage(
