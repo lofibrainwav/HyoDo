@@ -116,8 +116,11 @@ hand-off, and the M5-C/M5-D onboarding and continuity receipts.
 
 ### Evidence
 
-- Release receipt: `docs/releases/4.15.0.md` (chain boxes are checked as each
-  step is measured).
+- Signed tag `v4.15.0` (object `7b40d401`, commit `4cd571c0`, GitHub
+  verification valid); release evidence run `34152948925` attached the
+  CycloneDX SBOM and its SHA-256; publish run `34153047735` published to
+  PyPI via OIDC with provenance for the wheel and the sdist. Receipt:
+  `docs/releases/4.15.0.md`.
 
 ## [4.14.0] - 2026-09-07
 

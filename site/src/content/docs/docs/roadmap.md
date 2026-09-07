@@ -28,7 +28,7 @@ report from the agent-event ledger, but the public page is not an installed
 browser viewer and does not read a real ledger. See
 [its documentation](/docs/evidence-graph/) for the exact boundary.
 
-Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo eye`) exist on the source development line and are not yet in a published release. They record digests, hashes, and receipts only; embeddings, model calls, and capture tools remain external.
+Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo eye`) ship in HyoDo 4.15.0. They record digests, hashes, and receipts only; embeddings, model calls, and capture tools remain external.
 
 ## Shipped today vs. not built yet
 
@@ -45,12 +45,12 @@ Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo 
 | PyPI Trusted Publishing, SBOM, SARIF | |
 | `hyodo connect` (dry-run by default; `cursor`/`codex` report UNOBSERVED) | |
 | Local graph viewer (`hyodo dashboard` → `/graph`, reads the real ledger) | |
-| Audience profiles (`--audience vibe`/`engineer`/`professional`) — on the source line, published in 4.15.0 once released | |
-| `hyodo skills` lens (ingest/lens/propose, no model or embeddings) — on the source line, published in 4.15.0 once released | |
-| `hyodo inspect` field-deployment folder absorption — on the source line, published in 4.15.0 once released | |
-| `hyodo graph export` evidence-graph bridge — on the source line, published in 4.15.0 once released | |
-| `hyodo eye capture`/`verify` ephemeral visual evidence — on the source line, published in 4.15.0 once released | |
-| `actor_id` nesting and per-actor rings in the local graph viewer — on the source line, published in 4.15.0 once released | |
+| Audience profiles (`--audience vibe`/`engineer`/`professional`) (4.15.0) | |
+| `hyodo skills` lens (ingest/lens/propose, no model or embeddings) (4.15.0) | |
+| `hyodo inspect` field-deployment folder absorption (4.15.0) | |
+| `hyodo graph export` evidence-graph bridge (4.15.0) | |
+| `hyodo eye capture`/`verify` ephemeral visual evidence (4.15.0) | |
+| `actor_id` nesting and per-actor rings in the local graph viewer (4.15.0) | |
 
 A public [evidence-graph prototype](/evidence-graph/) shows the intended shape
 using demo fixture data. See [its documentation](/docs/evidence-graph/) for the
