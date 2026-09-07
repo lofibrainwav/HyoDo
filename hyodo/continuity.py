@@ -10,6 +10,14 @@ What this module proves is host-independence, not a live ChatGPT/Claude
 handshake: two distinct MCP callers against the *same* workspace (the stdio
 adapter and the paired loopback HTTP bridge) write into the same four fixed
 local files. See ``docs/M5_REMOTE_CONNECTOR_CONTRACT.md``'s M5-D section.
+
+A host does not have to be an MCP caller to count: a harness wired through
+Claude Code hooks (``hyodo connect claude-code``) writes straight to the
+agent-event ledger via ``hyodo event record`` and never touches the MCP
+access ledger at all. Every distinct ``actor_id`` recorded there — including
+one recorded only under ``--shadow`` — is counted as its own observed host,
+grouped under identity ``hook:<actor_id>``, alongside whatever the access
+ledger observed.
 """
 
 from __future__ import annotations
@@ -103,6 +111,60 @@ def _caller_identity(caller_id: str | None) -> str:
     return f"paired:{caller_id}"
 
 
+def _hook_identity(actor_id: str) -> str:
+    """Return the distinct observed identity label for a hook-recorded actor."""
+    return f"hook:{actor_id}"
+
+
+def _hook_hosts(events: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
+    """Group agent-events ledger entries into distinct hook-recorded host identities.
+
+    A host wired through Claude Code hooks (or any harness that stamps
+    ``actor_id`` on its own recorded events) never appears in the MCP access
+    ledger — it writes straight to the agent-event ledger via
+    ``hyodo event record``. Every event with ``actor == "agent"`` and a
+    non-empty string ``actor_id`` counts as one call from that host; events
+    without an ``actor_id`` (older ledgers, or non-hook callers) contribute
+    no host. ``shadow`` is derived from each event's ``policy.shadow`` flag:
+    ``True`` when every counted event was shadow-stamped, ``False`` when
+    none were, ``"mixed"`` when the host has both.
+    """
+    buckets: dict[str, dict[str, Any]] = {}
+    for event in events or []:
+        if not isinstance(event, dict) or event.get("actor") != "agent":
+            continue
+        actor_id = event.get("actor_id")
+        if not isinstance(actor_id, str) or not actor_id:
+            continue
+        identity = _hook_identity(actor_id)
+        bucket = buckets.setdefault(
+            identity,
+            {"identity": identity, "actor_id": actor_id, "calls": 0, "shadow_values": set()},
+        )
+        bucket["calls"] += 1
+        policy = event.get("policy")
+        shadow_flag = bool(isinstance(policy, dict) and policy.get("shadow") is True)
+        bucket["shadow_values"].add(shadow_flag)
+
+    hosts: list[dict[str, Any]] = []
+    for bucket in sorted(buckets.values(), key=lambda b: str(b["identity"])):
+        shadow_values: set[bool] = bucket["shadow_values"]
+        if len(shadow_values) > 1:
+            shadow: bool | str = "mixed"
+        else:
+            shadow = next(iter(shadow_values), False)
+        hosts.append(
+            {
+                "identity": bucket["identity"],
+                "actor_id": bucket["actor_id"],
+                "source": "hook",
+                "calls": bucket["calls"],
+                "shadow": shadow,
+            }
+        )
+    return hosts
+
+
 @dataclass(frozen=True)
 class StoreFact:
     """One measured truth-store file: whether it exists, is readable, and its digest."""
@@ -142,11 +204,13 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
       A wholly empty workspace has perfect integrity — there is nothing to
       be corrupt — so an empty root is ``integrity_status: READY``.
     - ``coverage_status`` is ``OBSERVED`` when at least ``expected_hosts``
-      distinct callers were observed in the access ledger *and* the
-      agent-event ledger and the access ledger are both present and
-      readable; ``UNOBSERVED`` when zero hosts were observed and none of
-      the four stores exist yet; and ``PARTIAL`` for everything in between
-      (some signal, but not full coverage).
+      distinct hosts were observed — from either the access ledger's
+      callers *or* the agent-event ledger's hook-recorded ``actor_id``
+      values, or both combined — *and* the agent-event ledger is present
+      and readable *and* (the access ledger is present and readable, or at
+      least one hook host was observed); ``UNOBSERVED`` when zero hosts
+      were observed and none of the four stores exist yet; and ``PARTIAL``
+      for everything in between (some signal, but not full coverage).
     - ``status`` (kept for backward compatibility) is ``READY`` only when
       ``integrity_status`` is ``READY`` *and* ``coverage_status`` is
       ``OBSERVED``; otherwise it is ``UNOBSERVED``. An empty workspace is
@@ -156,6 +220,22 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
     Exit code 0 means overall ``status`` is ``READY``; exit code 2 means it
     is ``UNOBSERVED``, whether that is because a store is corrupt or because
     coverage was never observed.
+
+    ``reasons`` is the ``status`` driver: any entry means ``UNOBSERVED``.
+    Once coverage reaches ``OBSERVED`` through hook-only hosts, the
+    store-absence facts (``access_ledger_absent``, ``pairing_absent``,
+    ``policy_absent``, ``agent_events_absent``) stop being appended to
+    ``reasons`` — a hook-observed root must still be able to reach
+    ``READY``. Those same facts are never dropped, though: ``notes`` is a
+    separate, always-present list that carries every store-absence fact
+    whenever that store is genuinely absent, regardless of
+    ``coverage_status``, plus ``hook_only_observation`` when every observed
+    host came from the agent-events ledger and none from the MCP access
+    ledger. When ``coverage_status`` is not ``OBSERVED``, the same absence
+    fact appears in both ``reasons`` and ``notes`` — that duplication is
+    intended: ``reasons`` explains the non-``READY`` verdict, ``notes`` is
+    the durable "what's actually absent" inventory that never disappears
+    just because coverage was satisfied without it.
     """
     resolved = root.expanduser().resolve()
     reasons: list[str] = []
@@ -235,16 +315,25 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
         if isinstance(tool_name, str) and tool_name:
             bucket["tools"].add(tool_name)
 
-    caller_list = [
+    mcp_caller_list = [
         {
             "identity": bucket["identity"],
             "caller_id": bucket["caller_id"],
+            "source": "mcp",
             "calls": bucket["calls"],
             "tools": sorted(bucket["tools"]),
         }
         for bucket in sorted(buckets.values(), key=lambda b: str(b["identity"]))
     ]
-    hosts_observed = len(caller_list)
+
+    # --- distinct hook-recorded actors observed in the agent-events ledger ---
+    hook_caller_list = _hook_hosts(events)
+
+    caller_list = sorted(
+        [*mcp_caller_list, *hook_caller_list], key=lambda caller: str(caller["identity"])
+    )
+    hosts_observed = len(mcp_caller_list) + len(hook_caller_list)
+    hosts_by_source = {"mcp": len(mcp_caller_list), "hook": len(hook_caller_list)}
 
     # --- do different callers' hyodo_event_record calls land in the one ledger? ---
     event_record_calls_per_caller = {
@@ -271,11 +360,11 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
         or access_store.exists
         or pairing_store.exists
     )
+    access_ledger_ready = access_store.exists and access_store.readable
     required_stores_ready = (
         agent_events_store.exists
         and agent_events_store.readable
-        and access_store.exists
-        and access_store.readable
+        and (access_ledger_ready or len(hook_caller_list) > 0)
     )
     if hosts_observed >= expected_hosts and required_stores_ready:
         coverage_status = "OBSERVED"
@@ -299,6 +388,28 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
         if not policy_store.exists:
             reasons.append("policy_absent")
 
+    # --- notes: non-blocking facts, always present regardless of coverage ---
+    # `reasons` drives `status` (any entry means UNOBSERVED), so once
+    # coverage reaches OBSERVED through hook-only hosts the absence facts
+    # above stop being appended there — a hook-observed root must still be
+    # able to reach READY. `notes` carries the same store-absence facts
+    # unconditionally, so a reader never loses "the access ledger doesn't
+    # exist" just because coverage was satisfied without it. When coverage
+    # is not OBSERVED, the same fact appears in both `reasons` and `notes`
+    # — that duplication is intended: `reasons` explains the non-READY
+    # verdict, `notes` is the durable inventory of what's absent.
+    notes: list[str] = []
+    if not agent_events_store.exists:
+        notes.append("agent_events_absent")
+    if not access_store.exists:
+        notes.append("access_ledger_absent")
+    if not pairing_store.exists:
+        notes.append("pairing_absent")
+    if not policy_store.exists:
+        notes.append("policy_absent")
+    if hosts_observed > 0 and len(mcp_caller_list) == 0 and len(hook_caller_list) > 0:
+        notes.append("hook_only_observation")
+
     status = (
         "READY" if integrity_status == "READY" and coverage_status == "OBSERVED" else "UNOBSERVED"
     )
@@ -310,6 +421,7 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
         "integrity_status": integrity_status,
         "coverage_status": coverage_status,
         "reasons": reasons,
+        "notes": notes,
         "root": str(resolved),
         "stores": {
             "agent_events": agent_events_store.to_dict(),
@@ -322,6 +434,7 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
             "observed": hosts_observed,
             "expected": expected_hosts,
             "label": f"hosts observed: {hosts_observed}/{expected_hosts} expected",
+            "by_source": hosts_by_source,
         },
         "continuity": {
             "same_ledger": same_ledger,

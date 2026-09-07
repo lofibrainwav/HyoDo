@@ -151,14 +151,24 @@ the read-only receipt:
   pairing file (both optional — absence is not a failure), each with a
   `sha256:` digest so two reads of the same workspace can be compared
   byte-for-byte.
-- **Caller identities.** Grouped from `.hyodo/mcp-access.jsonl`'s
-  `caller_id` field. The stdio transport never sets one (`create_server`'s
-  default, `run_stdio` never passes one), so every stdio session groups
-  under the literal label `stdio (no pairing)`. A paired HTTP bridge caller
-  always carries its pairing's `workspace_id` (`_create_http_app` passes it
-  as `caller_id` when `paired=True`), grouped as `paired:<workspace_id>`.
-  These are the only two shapes the access ledger can hold today. Each
-  identity's receipt row lists the distinct tool names it called.
+- **Caller identities — two sources.** `source: "mcp"` rows are grouped
+  from `.hyodo/mcp-access.jsonl`'s `caller_id` field. The stdio transport
+  never sets one (`create_server`'s default, `run_stdio` never passes one),
+  so every stdio session groups under the literal label
+  `stdio (no pairing)`. A paired HTTP bridge caller always carries its
+  pairing's `workspace_id` (`_create_http_app` passes it as `caller_id`
+  when `paired=True`), grouped as `paired:<workspace_id>`. These are the
+  only two shapes the access ledger can hold today; each identity's
+  receipt row lists the distinct tool names it called. `source: "hook"`
+  rows are grouped from `.hyodo/agent-events.jsonl`'s `actor_id` field
+  instead: any event with `actor: "agent"` and a non-empty `actor_id` —
+  the shape `hyodo connect claude-code` installs — counts as its own
+  host, labeled `hook:<actor_id>`, even though it never touches the
+  access ledger at all. Its row carries `calls` and `shadow`
+  (`true`/`false`/`"mixed"`, from that event's `policy.shadow` flag) in
+  place of `tools`. A shadow-mode event still counts the host as
+  observed — nothing was enforced, but the host was seen. `hosts.by_source`
+  reports the split as `{"mcp": N, "hook": M}`.
 - **Cross-caller continuity.** Whether `hyodo_event_record` calls from
   different callers land in the one agent-event ledger — a per-caller call
   count next to the ledger's single digest, so "two callers, one file" is
@@ -179,11 +189,15 @@ connected":
   An empty workspace has nothing to be corrupt, so it is `integrity_status:
   READY`.
 - **`coverage_status`** is `OBSERVED` when at least the expected number of
-  distinct hosts were seen in the access ledger *and* the agent-event
-  ledger and the access ledger are both present and readable; `PARTIAL`
-  when some but not all of that holds (one host observed, or one of those
-  two stores present); `UNOBSERVED` when zero hosts were observed and none
-  of the four stores exist yet.
+  distinct hosts were seen — combining `mcp` and `hook` sources — *and* the
+  agent-event ledger is present and readable *and* either the access
+  ledger is present and readable or at least one `hook` host was observed;
+  `PARTIAL` when some but not all of that holds (one host observed, or a
+  required store missing); `UNOBSERVED` when zero hosts were observed and
+  none of the four stores exist yet. A workspace observed only through
+  Claude Code hooks — no MCP caller ever ran — can therefore still reach
+  `OBSERVED` once it has `expected_hosts` distinct `actor_id`s, without an
+  access ledger existing at all.
 - **`status`** (kept for compatibility) is `READY` only when
   `integrity_status` is `READY` **and** `coverage_status` is `OBSERVED`.
   **READY means integrity READY and coverage OBSERVED; an empty root is
@@ -194,6 +208,20 @@ connected":
   `hosts_unobserved`, `hosts_partial`, `agent_events_absent`,
   `access_ledger_absent`, `pairing_absent`, or `policy_absent` applies, in
   addition to the corrupt/invalid reasons above.
+- **`notes`** — always present, never gated on `coverage_status`. `reasons`
+  is the `status` driver (any entry there forces `UNOBSERVED`), so once
+  coverage reaches `OBSERVED` through hook-only hosts, the store-absence
+  facts above stop appearing in `reasons` — a hook-observed root must still
+  be able to reach `READY`. Those facts are never actually lost, though:
+  `notes` carries `access_ledger_absent`, `pairing_absent`,
+  `policy_absent`, and `agent_events_absent` whenever that store is
+  genuinely absent, regardless of coverage, plus `hook_only_observation`
+  when every observed host came from hooks and none from the MCP access
+  ledger. When `coverage_status` is not `OBSERVED`, the same fact appears
+  in both `reasons` and `notes` — that duplication is intended: `reasons`
+  explains the non-`READY` verdict, `notes` is the durable "what's
+  actually absent" inventory that a reader can trust even on a `READY`
+  receipt.
 
 Exit `0` means overall `status` is `READY`. Exit `2` means `UNOBSERVED`,
 whether that is because a store is corrupt (`integrity_status: CORRUPT`) or
