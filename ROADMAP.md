@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.12.0 is the latest published release. Main is preparing the 4.13.0
+HyoDo 4.13.0 is the latest published release. Main is preparing the 4.14.0
 development cycle.
 
 Landed and released:
@@ -44,13 +44,28 @@ evidence is not converted into a pass.
 - Keep default agent-event storage digest-only unless an operator explicitly
   permits more.
 
-### 4.13.0 development cycle
+### 4.13.0 (released)
 
 - Machine-readable `hyodo check` results for CI consumers landed on main.
 
 - Policy ASK and the trust ladder are live on main, with explicit operator
   grants and fail-closed `UNOBSERVED` handling.
 - Keep the seven version-bearing sources synchronized during release prep.
+
+### 4.14.0 development cycle
+
+- Phase 1 packages 1-B through 1-E (graph edges, digest-only URLs, mission
+  detection, test integrity) landed on main.
+- Local evidence-graph viewer: `hyodo dashboard` serves `/graph`, reading the
+  real agent-event ledger.
+- Audience profiles (`--audience vibe|engineer|professional`) change
+  presentation wording only; decisions, exit codes, and evidence references
+  stay byte-identical.
+- M5-A machine-readable remote connector contract and the M5-B local bridge
+  with a pairing lifecycle landed on main.
+- `hyodo connect` dry-run-by-default harness wiring for Claude Code hooks,
+  `pre-commit`, and GitHub Actions, with `--shadow` mode and `--status` drift
+  reporting.
 
 ## Next candidates
 
