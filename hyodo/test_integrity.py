@@ -107,8 +107,8 @@ def _call_target_name(func: ast.expr) -> str | None:
     return None
 
 
-def _has_observation(node: ast.FunctionDef) -> bool:
-    """True when *node*'s body contains an assertion-shaped statement.
+def _has_direct_observation(node: ast.FunctionDef) -> bool:
+    """True when *node*'s own body contains an assertion-shaped statement.
 
     Covers a plain `assert`, a call to anything named `assert*` (`self.assertEqual`,
     `np.testing.assert_almost_equal`), and `pytest.raises`/`pytest.warns` used as a
@@ -132,6 +132,53 @@ def _has_observation(node: ast.FunctionDef) -> bool:
                     if name in _ASSERT_LIKE_CALL_NAMES:
                         return True
     return False
+
+
+_MAX_HELPER_DEPTH = 3
+
+
+def _calls_asserting_helper(
+    node: ast.FunctionDef,
+    module_functions: dict[str, ast.FunctionDef],
+    depth: int = _MAX_HELPER_DEPTH,
+    _visited: frozenset[str] = frozenset(),
+) -> bool:
+    """True when *node* calls (transitively, up to `_MAX_HELPER_DEPTH` hops) a
+    module-level function defined in the same module whose own body observes
+    something. This is the helper-function carve-out: a test that delegates its
+    assertions to a same-module helper is not "asserts nothing" just because the
+    `assert` statement itself lives one function away."""
+    if depth <= 0:
+        return False
+    for sub in ast.walk(node):
+        if sub is node:
+            continue
+        if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
+            # Only a bare-name call can reach a module-level function; an
+            # attribute call such as ``obj.process()`` resolves through the
+            # object, so a same-named free function must not be credited.
+            name = sub.func.id
+            if name in module_functions and name not in _visited:
+                helper = module_functions[name]
+                if _has_direct_observation(helper):
+                    return True
+                if _calls_asserting_helper(helper, module_functions, depth - 1, _visited | {name}):
+                    return True
+    return False
+
+
+def _has_observation(node: ast.FunctionDef, module_functions: dict[str, ast.FunctionDef]) -> bool:
+    """True when *node* itself asserts something, or delegates to a same-module
+    helper function that does (see `_calls_asserting_helper`)."""
+    return _has_direct_observation(node) or _calls_asserting_helper(node, module_functions)
+
+
+def _module_level_functions(tree: ast.Module) -> dict[str, ast.FunctionDef]:
+    """Map name -> def for every module-level (non-nested, non-class-method)
+    function in *tree*, the universe `_calls_asserting_helper` may resolve a
+    call into. Deliberately excludes methods and nested functions: the brief's
+    "same module only" carve-out is for free functions a test calls directly."""
+    return {n.name: n for n in tree.body if isinstance(n, ast.FunctionDef)}
 
 
 def _collect_asserts(node: ast.FunctionDef) -> list[ast.Assert]:
@@ -243,12 +290,13 @@ def _scan_file(path: Path, root: Path) -> tuple[int, list[VacuousTestFinding]]:
     source_lines = source.splitlines()
     gaming_findings = scan_test_file_ast(path)
     bound_names = _import_bound_names(tree)
+    module_functions = _module_level_functions(tree)
     display_path = str(path.relative_to(root)) if _is_relative(path, root) else str(path)
 
     findings: list[VacuousTestFinding] = []
     functions = _iter_test_functions(tree)
     for node in functions:
-        if not _has_observation(node):
+        if not _has_observation(node, module_functions):
             citation = _rule_citation(gaming_findings, node)
             findings.append(
                 VacuousTestFinding(
