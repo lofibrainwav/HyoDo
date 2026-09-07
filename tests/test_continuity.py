@@ -210,6 +210,8 @@ def test_two_hosts_write_the_same_truth_store_and_continuity_reports_it(tmp_path
     receipt = json.loads(continuity_result.output)
     assert receipt["schema_version"] == CONTINUITY_SCHEMA_VERSION
     assert receipt["status"] == "READY"
+    assert receipt["integrity_status"] == "READY"
+    assert receipt["coverage_status"] == "OBSERVED"
     assert receipt["hosts"]["observed"] == 2
     assert receipt["hosts"]["expected"] == 2
     assert receipt["hosts"]["label"] == "hosts observed: 2/2 expected"
@@ -254,6 +256,7 @@ def test_continuity_reports_unobserved_and_exit_2_on_a_corrupt_ledger(tmp_path) 
     assert result.exit_code == 2
     receipt = json.loads(result.output)
     assert receipt["status"] == "UNOBSERVED"
+    assert receipt["integrity_status"] == "CORRUPT"
     assert "agent_events_corrupt" in receipt["reasons"]
     assert receipt["stores"]["agent_events"]["corrupt_lines"] == 1
 
@@ -293,11 +296,83 @@ def test_continuity_never_probes_remote_regardless_of_local_state(tmp_path) -> N
     assert paired["remote"] == {"status": "UNOBSERVED", "reason": "remote_not_probed"}
 
 
-def test_continuity_optional_stores_absent_is_not_a_failure(tmp_path) -> None:
-    """No policy.toml and no pairing.json is READY, not UNOBSERVED — both are optional."""
+def test_continuity_optional_stores_absent_does_not_corrupt_integrity(tmp_path) -> None:
+    """No policy.toml and no pairing.json is integrity READY — both are optional.
+
+    An empty workspace still has nothing observed, though: overall `status`
+    stays UNOBSERVED (see the empty-root coverage test below), which is the
+    behavior this test used to assert as READY before the false-green fix.
+    """
     receipt = measure_continuity(tmp_path)
 
-    assert receipt["status"] == "READY"
+    assert receipt["integrity_status"] == "READY"
     assert receipt["stores"]["policy"]["exists"] is False
     assert receipt["stores"]["pairing"]["exists"] is False
-    assert receipt["exit_code"] == 0
+
+
+def test_continuity_empty_root_is_unobserved_not_ready(tmp_path) -> None:
+    """An empty root (no `.hyodo` stores, 0/2 hosts) must never read as READY.
+
+    Regression for the false-green: `measure_continuity` used to only append
+    `reasons` for corrupt/invalid stores, so "nothing exists" == READY. It
+    means "nothing present is broken", not "continuity connected" — the two
+    are now split into `integrity_status` and `coverage_status`.
+    """
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["integrity_status"] == "READY"
+    assert receipt["coverage_status"] == "UNOBSERVED"
+    assert receipt["status"] == "UNOBSERVED"
+    assert receipt["exit_code"] == 2
+    assert "hosts_unobserved" in receipt["reasons"]
+    assert receipt["hosts"]["observed"] == 0
+
+    result = runner.invoke(app, ["mcp", "continuity", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 2
+    cli_receipt = json.loads(result.output)
+    assert cli_receipt["status"] == "UNOBSERVED"
+    assert cli_receipt["coverage_status"] == "UNOBSERVED"
+
+
+def test_continuity_one_caller_is_partial_coverage(tmp_path) -> None:
+    """One observed caller (of 2 expected) is PARTIAL coverage, not OBSERVED.
+
+    Overall `status` stays UNOBSERVED (fail-closed) even though the stores
+    that do exist are readable — `integrity_status` is READY, but
+    `coverage_status` PARTIAL keeps the overall receipt honest.
+    """
+    run_id = str(uuid.uuid4())
+    server = create_server(tmp_path)
+    record = asyncio.run(
+        call_hyodo_tool(server, "hyodo_event_record", {"event": _valid_event(run_id)})
+    )
+    assert json.loads(record["stdout"])["exit_code"] == 0
+
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["hosts"]["observed"] == 1
+    assert receipt["integrity_status"] == "READY"
+    assert receipt["coverage_status"] == "PARTIAL"
+    assert receipt["status"] == "UNOBSERVED"
+    assert receipt["exit_code"] == 2
+    assert "hosts_partial" in receipt["reasons"]
+
+
+def test_continuity_corrupt_store_is_corrupt_integrity_regardless_of_coverage(tmp_path) -> None:
+    """A corrupt store is `integrity_status: CORRUPT`, and overall UNOBSERVED.
+
+    Integrity failure overrides coverage: even if hosts were fully observed,
+    a corrupt store must never let `status` read READY.
+    """
+    ledger_path = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    ledger_path.parent.mkdir(parents=True)
+    ledger_path.write_text(
+        '{"schema_version": "hyodo.agent-event/v1"}\nnot json\n', encoding="utf-8"
+    )
+
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["integrity_status"] == "CORRUPT"
+    assert receipt["status"] == "UNOBSERVED"
+    assert receipt["exit_code"] == 2
+    assert "agent_events_corrupt" in receipt["reasons"]

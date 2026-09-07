@@ -170,10 +170,37 @@ the read-only receipt:
   to the connector contract above: this receipt never touches DNS, OAuth, or
   `https://mcp.hyodo.app/mcp`.
 
-Exit `0` means every present store is readable and every line-delimited
-store is uncorrupted (`READY`). Exit `2` means a store is unreadable or a
-ledger is corrupt (`UNOBSERVED`) — a present-but-corrupt
-`.hyodo/agent-events.jsonl` fails this way, never silently as zero events.
+Integrity and coverage are two different facts, reported as two separate
+fields so "nothing is broken" can never be misread as "continuity is
+connected":
+
+- **`integrity_status`** is `READY` when every *present* store parses
+  cleanly, and `CORRUPT` when any present store is unreadable or corrupt.
+  An empty workspace has nothing to be corrupt, so it is `integrity_status:
+  READY`.
+- **`coverage_status`** is `OBSERVED` when at least the expected number of
+  distinct hosts were seen in the access ledger *and* the agent-event
+  ledger and the access ledger are both present and readable; `PARTIAL`
+  when some but not all of that holds (one host observed, or one of those
+  two stores present); `UNOBSERVED` when zero hosts were observed and none
+  of the four stores exist yet.
+- **`status`** (kept for compatibility) is `READY` only when
+  `integrity_status` is `READY` **and** `coverage_status` is `OBSERVED`.
+  **READY means integrity READY and coverage OBSERVED; an empty root is
+  UNOBSERVED** — a brand-new workspace with 0/2 hosts observed and no
+  `.hyodo` stores at all used to read `status: READY` (nothing present was
+  broken), which is a false green: it reads as "continuity connected" when
+  it means "nothing present is broken". `reasons` explains which of
+  `hosts_unobserved`, `hosts_partial`, `agent_events_absent`,
+  `access_ledger_absent`, `pairing_absent`, or `policy_absent` applies, in
+  addition to the corrupt/invalid reasons above.
+
+Exit `0` means overall `status` is `READY`. Exit `2` means `UNOBSERVED`,
+whether that is because a store is corrupt (`integrity_status: CORRUPT`) or
+because coverage was never observed (`coverage_status` `PARTIAL` or
+`UNOBSERVED`) — a present-but-corrupt `.hyodo/agent-events.jsonl` fails this
+way, never silently as zero events, and neither does an empty root fail
+silently as READY.
 
 `hyodo mcp contract --json` additively folds the same receipt in as
 `"continuity": {"local": "OBSERVED"|"UNOBSERVED", "remote": "UNOBSERVED"}` —
