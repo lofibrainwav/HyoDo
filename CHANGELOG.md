@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- M5-A machine-readable remote connector contract via `hyodo mcp contract --json`, with explicit CONTRACT_ONLY/UNOBSERVED availability, OAuth discovery requirements, workspace pairing lifecycle, and local-execution boundaries (#163).
 - Graph edges and `hyodo report --format graph` (#160).
 - Anti-gaming AST visitor, not yet wired into a CLI command (#161).
 - Digest-only `tool.urls`, `gate:` evidence refs, `require_mission_prompt`,
