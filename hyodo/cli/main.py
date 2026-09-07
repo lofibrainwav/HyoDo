@@ -50,6 +50,15 @@ from hyodo import (
     SCORE_SUBSET_NAME,
     __version__,
 )
+from hyodo.audience import (
+    VALID_PROFILES,
+    AudienceProfile,
+    InvalidAudienceError,
+    resolve_audience,
+)
+from hyodo.audience import (
+    write_config as write_audience_config,
+)
 from hyodo.connect import (
     ALL_TARGETS,
     UNOBSERVED_MESSAGE,
@@ -1162,11 +1171,45 @@ def _print_general_results(results: list[GeneralGateResult], root: Path) -> None
         )
 
 
+def _audience_option() -> str | None:
+    return typer.Option(
+        None,
+        "--audience",
+        help="Presentation lens: vibe, engineer, or professional. Never changes the "
+        "decision, exit code, rule_id, or evidence -- see docs/AUDIENCE.md. "
+        "Resolution: --audience -> HYODO_AUDIENCE -> .hyodo/config.toml -> engineer.",
+    )
+
+
+def _resolve_audience_or_exit(
+    root: Path, audience_flag: str | None, command: str, json_output: bool
+) -> AudienceProfile:
+    """Resolve the audience profile, exiting 2 UNOBSERVED on an invalid explicit value."""
+    try:
+        return resolve_audience(root, flag=audience_flag, env=os.environ.get("HYODO_AUDIENCE"))
+    except InvalidAudienceError as exc:
+        reason = str(exc)
+        if json_output:
+            console.print_json(
+                json.dumps({"decision": "UNOBSERVED", "reason": reason, "exit_code": 2})
+            )
+        else:
+            console.print(f"[red]{reason}[/red] -- expected one of {', '.join(VALID_PROFILES)}.")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(2) from exc
+
+
 @contextmanager
 def _verdict_output(
-    command: str, state: dict[str, Any], quiet: bool, explain: bool, json_output: bool
+    command: str,
+    state: dict[str, Any],
+    quiet: bool,
+    explain: bool,
+    json_output: bool,
+    audience: AudienceProfile | None = None,
 ) -> Iterator[None]:
     """Stream default details; propagate the original command exit unchanged."""
+    profile = audience or AudienceProfile(profile="engineer")
     with console.capture() if quiet or json_output else nullcontext() as captured:
         try:
             yield
@@ -1180,10 +1223,18 @@ def _verdict_output(
         detail = ", ".join(state.get("failed", [])) or (
             "all executed gates passed" if exit_code == 0 else "required gates UNOBSERVED"
         )
-    verdict = render_verdict_line(
-        decision, state.get("observed", 0), state.get("expected", 0), state["unit"], detail
+    verdict_args = (
+        decision,
+        state.get("observed", 0),
+        state.get("expected", 0),
+        state["unit"],
+        detail,
     )
     if json_output:
+        # --json content stays byte-identical across profiles: the profile
+        # is surfaced only as the added "audience" key, never by reflavoring
+        # an existing field (including "verdict").
+        verdict = render_verdict_line(*verdict_args, audience="engineer")
         if command == "check":
             payload = {
                 "status": decision,
@@ -1196,11 +1247,22 @@ def _verdict_output(
             assert captured is not None
             payload = json.loads(captured.get())
         payload["verdict"] = verdict
+        payload["audience"] = profile.profile
         console.print_json(json.dumps(payload))
     else:
+        verdict = render_verdict_line(*verdict_args, audience=profile.profile)
         typer.echo(verdict)
         if explain:
-            typer.echo("Explanation: " + explain_decision(command, decision, state.get("rule_id")))
+            typer.echo(
+                "Explanation: "
+                + explain_decision(
+                    command,
+                    decision,
+                    state.get("rule_id"),
+                    audience=profile.profile,
+                    domain=profile.domain,
+                )
+            )
     raise typer.Exit(exit_code)
 
 
@@ -1225,6 +1287,7 @@ def check(
     quiet: bool = typer.Option(False, "--quiet", help="Print only the verdict line"),
     explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+    audience: str | None = _audience_option(),
 ):
     """
     Run HyoDo checkout release gates (4-Gate CI).
@@ -1240,8 +1303,9 @@ def check(
     (Python/TS/JS/Go/Rust/Shell auto-detected, up to 50 files per language).
     """
 
+    profile = _resolve_audience_or_exit(Path.cwd(), audience, "check", json_output)
     verdict_state: dict[str, Any] = {"unit": "gates"}
-    with _verdict_output("check", verdict_state, quiet, explain, json_output):
+    with _verdict_output("check", verdict_state, quiet, explain, json_output, profile):
         console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
         try:
@@ -1689,6 +1753,7 @@ def safe(
     ),
     quiet: bool = typer.Option(False, "--quiet", help="Print only the verdict line"),
     explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
+    audience: str | None = _audience_option(),
 ):
     """
     Safety early-warning scan.
@@ -1713,8 +1778,9 @@ def safe(
     Not a full SAST / secret-scan / dependency audit unless --scan is used.
     """
 
+    profile = _resolve_audience_or_exit(Path.cwd(), audience, "safe", json_output)
     verdict_state: dict[str, Any] = {"unit": "files"}
-    with _verdict_output("safe", verdict_state, quiet, explain, json_output):
+    with _verdict_output("safe", verdict_state, quiet, explain, json_output, profile):
         result = run_safety_scan(
             path=path, strict=strict, cwd=Path.cwd(), max_files=max_files, scan_tool=scan
         )
@@ -2583,6 +2649,7 @@ def event_record(
         help="Stamp policy.shadow=true on the recorded event (shadow-mode "
         "on-ramp installed by `hyodo connect --shadow`)",
     ),
+    audience: str | None = _audience_option(),
 ):
     """
     Validate and append one agent event to .hyodo/agent-events.jsonl.
@@ -2612,13 +2679,19 @@ def event_record(
         raise typer.Exit(2)
 
     root_path = Path(root).resolve()
+    profile = _resolve_audience_or_exit(root_path, audience, "event record --policy", json_output)
     file_path = Path(file) if file else None
     data, err = _load_event_payload(file_path, stdin_flag)
     if err in {"file_and_stdin", "missing_input"} or err is not None:
         if policy is not None and not json_output:
             typer.echo(
                 render_verdict_line(
-                    "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, event UNOBSERVED"
+                    "UNOBSERVED",
+                    0,
+                    0,
+                    "surfaces",
+                    "trust=UNOBSERVED, event UNOBSERVED",
+                    audience=profile.profile,
                 )
             )
         code = 2
@@ -2657,7 +2730,12 @@ def event_record(
         if policy is not None and not json_output:
             typer.echo(
                 render_verdict_line(
-                    "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, valid event UNOBSERVED"
+                    "UNOBSERVED",
+                    0,
+                    0,
+                    "surfaces",
+                    "trust=UNOBSERVED, valid event UNOBSERVED",
+                    audience=profile.profile,
                 )
             )
         # A PostToolUse hook is fire-and-forget: it can never block, so an
@@ -2684,7 +2762,12 @@ def event_record(
             if not json_output:
                 typer.echo(
                     render_verdict_line(
-                        "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, policy UNOBSERVED"
+                        "UNOBSERVED",
+                        0,
+                        0,
+                        "surfaces",
+                        "trust=UNOBSERVED, policy UNOBSERVED",
+                        audience=profile.profile,
                     )
                 )
             # Fail-closed: missing/invalid policy is unobserved, never ALLOW.
@@ -2715,6 +2798,7 @@ def event_record(
                     decision.coverage[1],
                     "surfaces",
                     state["detail"],
+                    audience=profile.profile,
                 )
             )
         normalized = apply_decision_to_event(normalized, decision)
@@ -2979,6 +3063,7 @@ def policy_check(
         help="Evaluate and print the real decision, but always exit 0 "
         "(shadow-mode on-ramp installed by `hyodo connect --shadow`)",
     ),
+    audience: str | None = _audience_option(),
 ):
     """
     Evaluate one event against a local policy.toml.
@@ -2990,11 +3075,12 @@ def policy_check(
     for that).
     """
 
+    profile = _resolve_audience_or_exit(Path(root).resolve(), audience, "policy check", json_output)
     verdict_state: dict[str, Any] = {"unit": "surfaces"}
     verdict_state.update(
         decision="UNOBSERVED", detail="trust=UNOBSERVED, required evidence UNOBSERVED"
     )
-    with _verdict_output("policy check", verdict_state, quiet, explain, json_output):
+    with _verdict_output("policy check", verdict_state, quiet, explain, json_output, profile):
         root_path = Path(root).resolve()
         file_path = Path(file) if file else None
         data, err = _load_event_payload(file_path, stdin_flag)
@@ -3399,6 +3485,29 @@ Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
   Event/policy are gates and evidence — not an agent runtime interceptor.
     """
     console.print(guide)
+
+    if not sys.stdin.isatty():
+        console.print(
+            "\n[dim]Set an audience profile (vibe / engineer / professional) "
+            "non-interactively with the --audience flag on any command, the "
+            'HYODO_AUDIENCE env var, or by adding [audience] / profile = "..." '
+            "to .hyodo/config.toml.[/dim]"
+        )
+        return
+
+    console.print(
+        "\n[bold]Who is reading these results?[/bold]\n"
+        "  1) vibe coder\n"
+        "  2) engineer\n"
+        "  3) professional (law/accounting)"
+    )
+    answer = input("> ").strip()
+    chosen = {"1": "vibe", "2": "engineer", "3": "professional"}.get(answer)
+    if chosen is None:
+        console.print("[yellow]No changes made — unrecognized answer.[/yellow]")
+        return
+    config_path = write_audience_config(Path.cwd(), chosen)
+    console.print(f"[green]Wrote {config_path} with audience profile '{chosen}'.[/green]")
 
 
 @app.command(name="trinity")
