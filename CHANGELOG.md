@@ -9,6 +9,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `hyodo score --from-check [--root R] [--json]`: derives the five
+  HyoDo Integrity Score pillar inputs from `hyodo check` / `hyodo safe` /
+  the test-integrity scan, run in-process (no subprocess), instead of
+  requiring the caller to guess five floats. `hyodo/score_derive.py` adds a
+  literal `PILLAR_RULE_TABLE` (rule_id -> pillar + weight) with full
+  per-pillar provenance and an `OBSERVED` / `PARTIAL` / `UNOBSERVED`
+  coverage state per pillar; an `UNOBSERVED` pillar reports `None` (never a
+  smuggled 0 or 100) and is excluded from the Eternity geometric-mean term
+  rather than defaulted. Explicit `--truth` etc. flags still work alongside
+  `--from-check` and override one derived pillar, recorded as
+  `override: true` in its provenance. The HyoDo Integrity Score formula
+  itself is unchanged; this only proposes its inputs, and the command still
+  prints "review signal, not automatic approval." See
+  `docs/SCORE_DERIVATION.md` for the rule table and a calibration run
+  against the HyoDo repo, an example checkout, and an empty directory.
 - `hyodo safe` (`--json` and text) now reports `scope`
   (`diff` / `status` / `file` / `directory` / `external` / `none`) and
   `coverage` (`FULL` / `PARTIAL` / `UNOBSERVED`) alongside `source`, so a
