@@ -165,8 +165,16 @@ positive control (10s timeout): if the binary does not answer with a
 version string, the scan is reported as a high-severity `gitleaks_failed`
 finding rather than being treated as clean, and the actual scan is not
 attempted. On success the reported `source` includes the detected version,
-for example `gitleaks:scan (8.30.1)`. `--scan trufflehog` and `--scan all`
-(both tools merged) behave as documented in `hyodo safe --help`.
+for example `gitleaks:scan (8.30.1)`. `--scan trufflehog` runs the same
+positive control before invoking `trufflehog git file://<path> --json`:
+HyoDo runs `trufflehog --version` first (accepting the version string on
+either stdout or stderr, since this differs across trufflehog releases). A
+binary that does not answer with a version-looking string (digits and dots)
+is reported as a high-severity `trufflehog_failed` finding and the scan is
+not attempted, mirroring the `gitleaks_failed` control above. On success the
+reported `source` includes the detected version, for example
+`trufflehog:scan (3.63.2)`. `--scan all` (both tools merged) behaves as
+documented in `hyodo safe --help`.
 
 ## Agent event ledger is opt-in evidence, not a runtime interceptor
 

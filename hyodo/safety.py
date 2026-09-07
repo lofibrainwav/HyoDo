@@ -477,6 +477,9 @@ def _run_external_scanner(
         },
         "trufflehog": {
             "binary": "trufflehog",
+            # trufflehog prints its version on stdout or stderr depending on
+            # release; the shared positive-control check below accepts either.
+            "version_args": ["--version"],
         },
     }
 
@@ -527,6 +530,14 @@ def _run_external_scanner(
             if version_result.returncode != 0 or not version_output:
                 version_error = (
                     f"{tool} did not answer 'version' (exit {version_result.returncode}, no output)"
+                )
+            elif not re.search(r"\d+\.\d+", version_output):
+                # A binary can exit 0 with *some* output (a usage banner, an
+                # "unknown flag" message) without actually reporting a version.
+                # Require something that looks like a version number (digits
+                # and dots) so that case is still caught as a failed control.
+                version_error = (
+                    f"{tool} version check produced no version-looking output: {version_output!r}"
                 )
 
         if version_error is not None:
