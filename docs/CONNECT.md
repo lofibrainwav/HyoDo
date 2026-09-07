@@ -92,6 +92,14 @@ viewer and `hyodo report --format graph` tell two agents apart within one
 run instead of collapsing them into a single row, and HyoDo never derives
 identity or authorization from it.
 
+`hyodo mcp continuity` reads that same `actor_id` to count hook-wired hosts:
+every distinct value recorded on an `actor: "agent"` event — including one
+recorded only under `--shadow` — is a distinct observed host (`source:
+"hook"`, identity `hook:<actor_id>`), even though it never appears in the
+MCP access ledger. A repository onboarded only through `hyodo connect
+claude-code` (no MCP client ever ran) can still reach `coverage_status:
+OBSERVED` once enough distinct actors have recorded events.
+
 ## Exit codes
 
 `connect` (dry run, no target, or `<target>` preview): always 0 — a preview

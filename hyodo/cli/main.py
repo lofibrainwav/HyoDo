@@ -3028,7 +3028,11 @@ def mcp_continuity(
 
     Read-only: measures the agent-event ledger, the optional policy file, the
     MCP access ledger, and the optional pairing file, plus the distinct
-    caller identities recorded in the access ledger. Remote (ChatGPT/the
+    hosts observed from two sources: MCP callers recorded in the access
+    ledger, and hook-recorded actors (``actor_id`` on agent-event ledger
+    rows, e.g. from ``hyodo connect claude-code``) — a host wired only
+    through hooks counts even though it never touches the access ledger,
+    and a shadow-mode event still counts as observed. Remote (ChatGPT/the
     hosted connector) is always reported UNOBSERVED — this command never
     probes it.
 
@@ -3052,14 +3056,25 @@ def mcp_continuity(
     console.print(f"  integrity: {receipt['integrity_status']}")
     console.print(f"  coverage:  {receipt['coverage_status']}")
     console.print(f"  {receipt['hosts']['label']}")
+    by_source = receipt["hosts"]["by_source"]
+    console.print(f"  hosts by source: mcp={by_source['mcp']} hook={by_source['hook']}")
     for store_name, store in receipt["stores"].items():
         state = "present" if store["exists"] else "absent"
         if not store["readable"]:
             state = "unreadable"
         console.print(f"  {store_name}: {state} digest={store['digest']}")
     for caller in receipt["callers"]:
-        tools = ", ".join(caller["tools"]) or "none"
-        console.print(f"  caller: {caller['identity']} calls={caller['calls']} tools=[{tools}]")
+        source = caller.get("source", "mcp")
+        if source == "hook":
+            console.print(
+                f"  caller: {caller['identity']} source=hook calls={caller['calls']} "
+                f"shadow={caller['shadow']}"
+            )
+        else:
+            tools = ", ".join(caller["tools"]) or "none"
+            console.print(
+                f"  caller: {caller['identity']} source=mcp calls={caller['calls']} tools=[{tools}]"
+            )
     console.print(
         f"  remote: {receipt['remote']['status']} ({receipt['remote']['reason']})",
         style="yellow",
