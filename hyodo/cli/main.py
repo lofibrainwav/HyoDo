@@ -2047,6 +2047,92 @@ def safe(
         raise typer.Exit(0)
 
 
+@app.command("inspect")
+def inspect_cmd(
+    path: str = typer.Argument(..., help="Directory to absorb into folder/chunks manifests"),
+    ignore: list[str] = typer.Option(  # noqa: B008 - typer repeatable-option pattern;
+        # ruff's B006/B008 heuristic fires on any `list[...]`-annotated Option default,
+        # but typer.Option's default is read once at CLI parse time, never mutated.
+        [],
+        "--ignore",
+        help=(
+            "fnmatch glob (repeatable), tested against the relative path and the "
+            "basename. Matching files are still listed with ignored: true, excluded "
+            "from chunks and from coverage's expected count. .gitignore is never read."
+        ),
+    ),
+    remote_inventory: list[str] = typer.Option(  # noqa: B008
+        [],
+        "--remote-inventory",
+        help=(
+            "Path to a hyodo.remote-inventory/v1 JSON file (repeatable) describing "
+            "items a connector (e.g. Drive MCP) declared out-of-band. Recorded as a "
+            "claim under folder-manifest 'remote'; never fetched, never chunked, "
+            "never counted in coverage. Malformed input exits 1 before any write."
+        ),
+    ),
+    report: str = typer.Option(
+        "md", "--report", help="Report format printed to stdout: md (default) or json"
+    ),
+    root: str = typer.Option(
+        ".", "--root", help="Base directory that manifest paths are reported relative to"
+    ),
+):
+    """
+    Absorb a directory into `.hyodo/folder-manifest.json` and `.hyodo/chunks-manifest.json`.
+
+    Read-only field-deployment inventory: every file is digested (or explicitly
+    listed under `unreadable`), secret-shaped files are excluded from chunking
+    and reported by digest and location only, and chunk entries never carry file
+    text. Never calls `evaluate_policy` — there is no ASK/exit-3 case here.
+
+    Exit 0: manifests written, coverage complete (every file digested or listed
+    in `unreadable`). Exit 1: `<path>` missing/not a directory, or a
+    `--remote-inventory` file is malformed (nothing is written). Exit 2: manifest
+    write failed (OSError), e.g. `.hyodo` cannot be created or is not writable.
+    """
+    from hyodo.inspect import (
+        RemoteInventoryError,
+        render_report_json,
+        render_report_md,
+        run_inspect,
+        write_manifests,
+    )
+
+    if report not in ("md", "json"):
+        console.print(f"[red]Invalid --report value: {report!r} (expected md or json)[/red]")
+        raise typer.Exit(1)
+
+    root_path = Path(root)
+
+    try:
+        result = run_inspect(
+            path, root=root_path, ignore=ignore, remote_inventory_paths=remote_inventory
+        )
+    except NotADirectoryError:
+        console.print(f"[red]Not a directory (or does not exist): {path}[/red]")
+        raise typer.Exit(1) from None
+    except RemoteInventoryError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from None
+
+    try:
+        write_manifests(result, root_path)
+    except OSError as exc:
+        console.print(f"[red]Failed to write manifests under {root_path / '.hyodo'}: {exc}[/red]")
+        raise typer.Exit(2) from None
+
+    for warning in result.warnings:
+        console.print(f"[yellow]{warning}[/yellow]")
+
+    if report == "json":
+        console.print(render_report_json(result), highlight=False, markup=False)
+    else:
+        console.print(render_report_md(result), highlight=False, markup=False)
+
+    raise typer.Exit(0)
+
+
 @mcp_app.command("contract")
 def mcp_contract(
     root: str = typer.Option(
