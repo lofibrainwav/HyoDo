@@ -90,6 +90,8 @@ to place a *ledger event*, not a *pillar card*, on a column.
 | --- | --- | --- | --- | --- |
 | `decision` | any | `DENY` | any | Goodness |
 | `decision` | any | `ASK` | any | Goodness + the column implied by `rule_id` below |
+| `decision` | any | `ALLOW` | any | Goodness (an observed pass is still evidence) |
+| `decision` | any | `UNOBSERVED` | any | Goodness, rendered as the decision's own `UNOBSERVED` tile — not the unclassified gutter |
 | `tool_call`/`tool_result` | type-check, lint tools | any | any | Truth |
 | `tool_call`/`tool_result` | test runner | any | any | Goodness |
 | `tool_call`/`tool_result` | formatter | any | any | Beauty |
