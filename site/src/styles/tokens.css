@@ -28,4 +28,13 @@
 	--color-ring-memory: #d946ef;
 	--color-ring-routines: #84cc16;
 	--color-ring-tools: #64748b;
+
+	/* Local viewer second pass: the evidence grid's SVG edge overlay.
+	   parent_event_id draws a solid elbow (slate), evidence_refs a dashed
+	   arc (blue), and a broken/off-grid ref a short stub reusing
+	   --color-deny's red. SSOT shared with hyodo/dashboard.py's
+	   EDGE_COLORS dict; tests/test_virtue_colors_ssot.py enforces this. */
+	--color-edge-parent: #64748b;
+	--color-edge-evidence: #0ea5e9;
+	--color-edge-broken: #ff5c5c;
 }

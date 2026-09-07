@@ -133,3 +133,30 @@ def test_ring_colors_match_tokens_css_ssot():
             f"hyodo.dashboard.RING_COLORS[{layer!r}] ({hex_value}) does not match "
             f"tokens.css's --color-ring-{layer} ({tokens_hex[layer]})"
         )
+
+
+# Local viewer second pass (brief finding 2): the SVG edge overlay's three
+# line-kind colours (`hyodo.dashboard.EDGE_COLORS`) are guarded the same
+# way as the ring colours above.
+EDGE_TOKEN_RE = re.compile(r"--color-edge-(?P<slug>[a-z]+):\s*(?P<hex>#[0-9a-fA-F]{6})\s*;")
+
+
+def _tokens_edge_slug_to_hex() -> dict[str, str]:
+    text = TOKENS_PATH.read_text(encoding="utf-8")
+    return {m.group("slug"): m.group("hex") for m in EDGE_TOKEN_RE.finditer(text)}
+
+
+def test_edge_colors_match_tokens_css_ssot():
+    if not TOKENS_PATH.exists():
+        pytest.skip("site/ is absent (sdist install) — nothing to compare")
+
+    from hyodo.dashboard import EDGE_COLORS
+
+    tokens_hex = _tokens_edge_slug_to_hex()
+    assert tokens_hex, "no --color-edge-* custom properties found in tokens.css"
+    for kind, hex_value in EDGE_COLORS.items():
+        assert kind in tokens_hex, f"tokens.css is missing --color-edge-{kind}"
+        assert tokens_hex[kind] == hex_value, (
+            f"hyodo.dashboard.EDGE_COLORS[{kind!r}] ({hex_value}) does not match "
+            f"tokens.css's --color-edge-{kind} ({tokens_hex[kind]})"
+        )

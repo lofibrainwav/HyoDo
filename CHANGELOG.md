@@ -16,6 +16,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (`skill_ingest:node:<label>`), and `hyodo skills propose` gains a
   `## Retrieved` section listing node-sourced rules that passed. See
   "Research node contract" in `docs/SKILLS.md`.
+- `hyodo dashboard`'s `/graph` page now renders one grid (five virtue
+  columns by actor row, oldest-to-newest within each cell, amended event
+  -> virtue mapping for test runners/file ops/network fetches/the mission
+  prompt) instead of two disconnected lists, with an SVG overlay drawing
+  `parent_event_id` and `evidence_refs` edges anchored at each tile's own
+  boundary (dangling refs as short red stubs, off-grid endpoints skipped
+  and counted separately), a 9x9 pixel-grid orb pulse replacing the flat
+  circle, tile labels showing the tool name or event kind (full text kept
+  in the tile's `title`), short lineage-id row labels, indented
+  collapsible nested rows (an `orchestrator` role requires an actual
+  spawned `agent` child lane), and a fixed open question under any virtue
+  column with zero events. See
+  `docs/superpowers/specs/2026-09-06-hyodo-core-engine-monitor-design.md`
+  and `docs/GRAPH_EXPORT.md`.
 
 ### Fixed
 

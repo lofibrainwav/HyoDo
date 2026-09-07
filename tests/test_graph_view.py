@@ -32,6 +32,8 @@ def _node(
     decision: str | None = None,
     rule_id: str | None = None,
     tool_name: str | None = None,
+    paths: list[str] | None = None,
+    output_digest: str | None = None,
     run_id: str = "run-1",
     step_index: int = 0,
     ts: str | None = None,
@@ -47,7 +49,8 @@ def _node(
         "step_index": step_index,
         "decision": decision,
         "policy": {"rule_id": rule_id, "reason": None, "evaluated_by": None},
-        "tool": {"name": tool_name, "method": None, "paths": [], "urls": []},
+        "tool": {"name": tool_name, "method": None, "paths": paths or [], "urls": []},
+        "io": {"output_digest": output_digest},
     }
 
 
@@ -85,8 +88,11 @@ def test_typecheck_and_lint_tool_calls_map_to_truth() -> None:
         assert assign_columns(_node("e1", tool_name=name)) == ["jin"]
 
 
-def test_test_runner_tool_call_maps_to_goodness() -> None:
-    assert assign_columns(_node("e1", tool_name="pytest -q")) == ["seon"]
+def test_test_runner_tool_call_maps_to_truth_not_goodness() -> None:
+    # Owner review round 2 (brief finding 3): a test run proves a claim
+    # (Truth); it is not itself the policy decision (Goodness).
+    for name in ("pytest -q", "run_tests", "jest", "vitest", "mocha"):
+        assert assign_columns(_node("e1", tool_name=name)) == ["jin"]
 
 
 def test_formatter_tool_call_maps_to_beauty() -> None:
@@ -111,9 +117,49 @@ def test_web_credential_rule_id_maps_to_goodness_and_hyo() -> None:
     assert assign_columns(node) == ["seon", "hyo"]
 
 
-def test_prompt_and_model_response_carry_no_column_and_are_not_unclassified() -> None:
-    assert assign_columns(_node("e1", kind="prompt", actor="human")) == []
+def test_mission_prompt_maps_to_hyo() -> None:
+    # Owner review round 2 (brief finding 3): the mission's own prompt is
+    # the Hyo chain's root, so it renders under Hyo rather than nowhere.
+    assert assign_columns(_node("e1", kind="prompt", actor="human")) == ["hyo"]
+
+
+def test_model_response_with_output_digest_maps_to_beauty() -> None:
+    node = _node("e1", kind="model_response", output_digest="sha256:abc")
+    assert assign_columns(node) == ["mi"]
+
+
+def test_model_response_without_output_digest_carries_no_column_and_is_not_unclassified() -> None:
     assert assign_columns(_node("e1", kind="model_response")) == []
+
+
+def test_read_file_inside_root_maps_to_hyo() -> None:
+    node = _node("e1", tool_name="read_file", paths=["hyodo/dashboard.py"])
+    assert assign_columns(node) == ["hyo"]
+
+
+def test_write_file_outside_root_maps_to_goodness_not_hyo() -> None:
+    node = _node("e1", tool_name="write_file", paths=["/etc/passwd"])
+    assert assign_columns(node) == ["seon"]
+
+
+def test_write_file_dotdot_path_maps_to_goodness_not_hyo() -> None:
+    node = _node("e1", tool_name="write_file", paths=["../outside/secret.txt"])
+    assert assign_columns(node) == ["seon"]
+
+
+def test_edit_ask_decision_maps_to_goodness_even_inside_root() -> None:
+    node = _node("e1", tool_name="edit", decision="ASK", paths=["hyodo/dashboard.py"])
+    assert assign_columns(node) == ["seon"]
+
+
+def test_edit_deny_decision_maps_to_goodness_even_inside_root() -> None:
+    node = _node("e1", tool_name="edit", decision="DENY", paths=["hyodo/dashboard.py"])
+    assert assign_columns(node) == ["seon"]
+
+
+def test_web_fetch_maps_to_goodness() -> None:
+    for name in ("web_fetch", "browser", "http_get"):
+        assert assign_columns(_node("e1", tool_name=name)) == ["seon"]
 
 
 def test_unmatched_event_lands_in_the_unclassified_gutter() -> None:
@@ -346,6 +392,28 @@ def test_human_row_role_is_always_human() -> None:
     nodes = [_node("h1", kind="prompt", actor="human", step_index=0)]
     tree = build_actor_rows(nodes, [])
     assert tree["rows"]["human"]["role"] == "human"
+
+
+def test_a_human_child_row_does_not_make_its_parent_an_orchestrator() -> None:
+    # Fix round 1 (coordinator, live-screenshot review): the mission's own
+    # `human` prompt landing as a `hyodo` row's "child" (parent_event_id
+    # points from the hyodo event to the human approval event) must not
+    # mark `hyodo` as an orchestrator -- only a spawned *agent* lane does.
+    parent_call = _node("p1", actor="hyodo", kind="decision", decision="ALLOW", step_index=0)
+    human_child = _node("h1", actor="human", kind="prompt", step_index=1)
+    nodes = [parent_call, human_child]
+    edges = [_edge("p1", "h1")]
+    tree = build_actor_rows(nodes, edges)
+    assert tree["rows"]["hyodo"]["role"] != "orchestrator"
+
+
+def test_a_hyodo_child_row_does_not_make_its_parent_an_orchestrator() -> None:
+    parent_call = _node("p1", actor="agent", tool_name="dispatch", step_index=0)
+    hyodo_child = _node("d1", actor="hyodo", kind="decision", decision="ALLOW", step_index=1)
+    nodes = [parent_call, hyodo_child]
+    edges = [_edge("p1", "d1")]
+    tree = build_actor_rows(nodes, edges)
+    assert tree["rows"]["agent:p1"]["role"] != "orchestrator"
 
 
 def test_orchestrator_role_detected_via_parent_event_id_across_actors() -> None:

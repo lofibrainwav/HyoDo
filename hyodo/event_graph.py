@@ -32,6 +32,11 @@ def _policy(event: dict[str, Any]) -> dict[str, Any]:
     return block if isinstance(block, dict) else {}
 
 
+def _io(event: dict[str, Any]) -> dict[str, Any]:
+    block = event.get("io")
+    return block if isinstance(block, dict) else {}
+
+
 def _edge_issue(
     *, event_id: str | None, field: str, ref: str | None, reason: str
 ) -> dict[str, Any]:
@@ -206,6 +211,7 @@ def build_event_graph(
         event_id = _event_id(event)
         tool = _tool(event)
         policy = _policy(event)
+        io = _io(event)
         urls = tool.get("urls")
         urls = urls if isinstance(urls, list) else []
         node = {
@@ -219,6 +225,12 @@ def build_event_graph(
             "actor_id": event.get("actor_id"),
             "step_index": event.get("step_index"),
             "decision": policy.get("decision"),
+            # Additive (local viewer second pass): the observed output
+            # digest only — never the response body — so
+            # `hyodo.graph_view.assign_columns` can tell a measured
+            # `model_response` (Beauty) from an unmeasured one (no
+            # column) without a second ledger read.
+            "io": {"output_digest": io.get("output_digest")},
             "policy": {
                 "rule_id": policy.get("rule_id"),
                 "reason": policy.get("reason"),

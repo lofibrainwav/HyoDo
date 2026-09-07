@@ -10,10 +10,12 @@ PR #179; the residual follow-ups (test-integrity helper carve-out, the
 1-E shipped in 4.14.0. Where a section below still uses future tense it
 describes the design as it was frozen before implementation; the shipped
 behaviour is documented in `docs/SKILLS.md`, `docs/INSPECT.md`,
-`docs/GRAPH_EXPORT.md` and `docs/EYE.md`. Known gaps carried forward:
-agent-to-agent nesting cannot be shown because the ledger's `actor` field
-has three values (an optional actor identifier is an owner decision), and
-`url:` skill sources are recorded but never fetched.
+`docs/GRAPH_EXPORT.md` and `docs/EYE.md`. Known gap carried forward: `url:`
+skill sources are recorded but never fetched. Agent-to-agent nesting is
+shown when the harness supplies the optional `actor_id` field (PR #182);
+absent `actor_id`, nesting still falls back to the `parent_event_id`-
+derived lineage grouping `hyodo.graph_view.build_actor_rows` already used
+before that field shipped.
 
 ## Context
 
