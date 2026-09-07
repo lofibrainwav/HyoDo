@@ -20,6 +20,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `hyodo report --format graph`'s corrupt/unreadable handling). Rollout step
   (b) of the core engine monitor design shipped server-rendered; sharing the
   design's TypeScript renderer with the public site prototype is pending.
+- `hyodo connect` (Phase 1-D): dry-run-by-default harness wiring for Claude
+  Code hooks (`.claude/settings.json`), `pre-commit`, and GitHub Actions,
+  plus `--shadow` mode (`policy check`/`event record` gain a `--shadow` flag
+  and a `--hook claude-code` payload adapter) that records the real decision
+  with `policy.shadow: true` while always exiting 0; `--status` reports
+  drift against `.hyodo/connect.json`. `cursor`/`codex` report UNOBSERVED —
+  their hook contracts are not verified against a live install.
 - M5-B local bridge: an untracked `.hyodo/pairing.json` pairing lifecycle
   (`hyodo mcp pair` / `unpair` / `revoke` / `pairing show`), a `--paired`
   option on `hyodo mcp serve` that verifies the caller's bearer token against
