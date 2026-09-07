@@ -441,3 +441,71 @@ def test_event_record_shadow_requires_policy(tmp_path: Path) -> None:
     assert result.exit_code == 2, result.output
     payload = json.loads(result.output)
     assert payload["ok"] is False
+
+
+# --------------------------------------------------------------------------
+# Judge findings: non-interactive consent, fire-and-forget hooks, unobserved steps
+# --------------------------------------------------------------------------
+
+
+def test_write_without_yes_is_refused_when_not_interactive(tmp_path: Path) -> None:
+    """Silence is not consent: a non-TTY caller must pass --yes to write."""
+    result = runner.invoke(app, ["connect", "github-actions", "--write", "--root", str(tmp_path)])
+    assert result.exit_code == 1, result.output
+    assert "confirmation_required" in result.output
+    assert not (tmp_path / ".github" / "workflows" / "hyodo.yml").exists()
+    assert not (tmp_path / ".hyodo" / "connect.json").exists()
+
+
+def test_write_without_yes_json_is_refused_with_receipt(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["connect", "github-actions", "--write", "--json", "--root", str(tmp_path)]
+    )
+    assert result.exit_code == 1, result.output
+    payload = json.loads(result.output)
+    assert payload["ok"] is False
+    assert payload["exit_code"] == 1
+    assert payload["reasons"][0].startswith("confirmation_required")
+
+
+def test_hook_event_that_fails_validation_never_blocks(tmp_path: Path) -> None:
+    """PostToolUse is fire-and-forget: an unrecordable event exits 0, not 1."""
+    (tmp_path / ".hyodo").mkdir()
+    payload = {
+        "hook_event_name": "PostToolUse",
+        "session_id": "run-1",
+        "tool_use_id": "evt-1",
+        "tool_name": "WebFetch",
+        "tool_input": {"url": "not-a-url"},
+        "cwd": str(tmp_path),
+    }
+    result = runner.invoke(
+        app,
+        ["event", "record", "--stdin", "--hook", "claude-code", "--root", str(tmp_path), "--json"],
+        input=json.dumps(payload),
+    )
+    assert result.exit_code == 0, result.output
+    receipt = json.loads(result.output)
+    assert receipt["ok"] is False
+    assert receipt["exit_code"] == 0
+    assert any("tool.urls" in reason for reason in receipt["reasons"])
+    assert not (tmp_path / ".hyodo" / "agent-events.jsonl").exists()
+
+
+def test_mapped_hook_event_tags_an_unobserved_step_index(tmp_path: Path) -> None:
+    """An unreadable ledger yields a placeholder step_index that is tagged, not silent."""
+    (tmp_path / ".hyodo").mkdir()
+    (tmp_path / ".hyodo" / "agent-events.jsonl").mkdir()  # a directory cannot be read
+    payload = {
+        "hook_event_name": "PreToolUse",
+        "session_id": "run-1",
+        "tool_use_id": "evt-1",
+        "tool_name": "Bash",
+        "tool_input": {"command": "ls"},
+        "cwd": str(tmp_path),
+    }
+    mapped, err = map_claude_code_hook_payload(payload, tmp_path)
+    assert err is None
+    assert mapped is not None
+    assert mapped.raw["step_index"] == 0
+    assert "step_index:unobserved" in mapped.raw["meta"]["tags"]

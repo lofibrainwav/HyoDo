@@ -489,8 +489,12 @@ def map_claude_code_hook_payload(
     cwd = payload.get("cwd")
     effective_root = Path(cwd) if _is_str(cwd) else default_root
     step_index = count_run_events(effective_root, session_id)
+    tags: list[str] = []
     if step_index is None:
+        # The ledger could not be observed; zero is a placeholder, and the tag
+        # keeps that fact in the record instead of handing out a free zero.
         step_index = 0
+        tags.append("step_index:unobserved")
 
     tool_name = payload.get("tool_name")
     tool_input_raw = payload.get("tool_input")
@@ -522,4 +526,6 @@ def map_claude_code_hook_payload(
         "actor": "agent",
         "tool": tool,
     }
+    if tags:
+        raw["meta"] = {"tags": tags}
     return MappedHookEvent(raw=raw, root=effective_root), None

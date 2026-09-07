@@ -2633,13 +2633,18 @@ def event_record(
                     "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, valid event UNOBSERVED"
                 )
             )
+        # A PostToolUse hook is fire-and-forget: it can never block, so an
+        # unrecordable event exits 0 there and is reported as UNOBSERVED.
+        code = 0 if hook == "claude-code" else 1
         if json_output:
-            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": 1}))
+            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": code}))
         else:
             console.print("[red]INVALID[/red] event — not recorded")
             for reason in reasons:
                 console.print(f"  - {reason}")
-        raise typer.Exit(1)
+            if hook == "claude-code":
+                console.print("HYODO UNOBSERVED: event not recorded (fire-and-forget hook)")
+        raise typer.Exit(code)
 
     if not full_body:
         normalized = strip_full_bodies(normalized)
@@ -3279,13 +3284,19 @@ def connect(
                 console.print("  ---")
         raise typer.Exit(0)
 
-    should_confirm = (
-        not yes and not json_output and sys.stdin.isatty() and plan.status == "would_write"
-    )
-    if should_confirm:
-        proceed = typer.confirm(f"Write {len(plan.files)} file(s) for {target}?")
-        if not proceed:
-            console.print("[yellow]Declined - nothing written.[/yellow]")
+    if not yes and plan.status == "would_write":
+        if sys.stdin.isatty() and not json_output:
+            proceed = typer.confirm(f"Write {len(plan.files)} file(s) for {target}?")
+            if not proceed:
+                console.print("[yellow]Declined - nothing written.[/yellow]")
+                raise typer.Exit(1)
+        else:
+            # Non-interactive callers must say --yes; silence is not consent.
+            reason = "confirmation_required: pass --yes to write without a prompt"
+            if json_output:
+                console.print_json(json.dumps({"ok": False, "reasons": [reason], "exit_code": 1}))
+            else:
+                console.print(f"[yellow]{reason} - nothing written.[/yellow]")
             raise typer.Exit(1)
 
     state = load_connect_state(root_path)
