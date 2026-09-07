@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.16.0 is the latest published release. Main is preparing the 4.17.0
+HyoDo 4.15.0 is the latest published release. Main is preparing the 4.16.0
 development cycle.
 
 Landed and released:
@@ -80,24 +80,6 @@ evidence is not converted into a pass.
   (ephemeral visual evidence with an existence and destruction pair).
 - Embeddings, model calls, and screen capture tools stay outside HyoDo: the
   package records digests, hashes, and receipts only.
-
-### 4.16.0 (released 2026-09-07)
-
-- `hyodo check` derives a real Benevolence signal from onboarding evidence
-  (`hyodo/dx_signals.py`) instead of reporting it `UNOBSERVED`; `hyodo score
-  --from-check` derives all five HyoDo Integrity Score pillar inputs
-  in-process from `check`/`safe`/test-integrity, with per-pillar
-  `OBSERVED`/`PARTIAL`/`UNOBSERVED` coverage.
-- Shadow mode's "always exits 0, nothing is blocked" guarantee now holds on
-  every early exit in `hyodo policy check --shadow` and `hyodo event record
-  --shadow`; `hyodo connect claude-code` bootstraps a starter
-  `.hyodo/policy.toml` when none exists.
-- `hyodo safe` reports `scope` and `coverage` alongside `source`; the
-  gitleaks and trufflehog scan adapters gain version positive controls
-  against silent CLI drift.
-- `hyodo mcp continuity` counts hook-recorded actors as their own hosts, so
-  a hook-only onboarding (no MCP client ever connected) can reach
-  `OBSERVED`/`READY` instead of being stuck at `hosts observed: 0/2`.
 
 ## Next candidates
 

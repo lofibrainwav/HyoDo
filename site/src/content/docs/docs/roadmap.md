@@ -30,8 +30,6 @@ page is not that viewer and does not read a real ledger. See
 
 Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo eye`) ship in HyoDo 4.15.0. They record digests, hashes, and receipts only; embeddings, model calls, and capture tools remain external.
 
-HyoDo 4.16.0 derives Benevolence and the HyoDo Integrity Score's five pillar inputs from measured `check`/`safe`/test-integrity evidence, closes shadow-mode and continuity coverage gaps, and adds scan positive controls.
-
 ## Shipped today vs. not built yet
 
 | Shipped today | Not built yet |
@@ -53,9 +51,6 @@ HyoDo 4.16.0 derives Benevolence and the HyoDo Integrity Score's five pillar inp
 | `hyodo graph export` evidence-graph bridge (4.15.0) | |
 | `hyodo eye capture`/`verify` ephemeral visual evidence (4.15.0) | |
 | `actor_id` nesting and per-actor rings in the local graph viewer (4.15.0) | |
-| `hyodo check`/`score --from-check` derived Benevolence and pillar coverage (4.16.0) | |
-| `hyodo safe` scope/coverage reporting and scan positive controls (4.16.0) | |
-| `hyodo mcp continuity` hook-recorded host coverage (4.16.0) | |
 
 A public [evidence-graph prototype](/evidence-graph/) shows the intended shape
 using demo fixture data. See [its documentation](/docs/evidence-graph/) for the
