@@ -268,6 +268,37 @@ def test_validate_tool_urls_requires_domain():
     assert "invalid_field:tool.urls" in reasons
 
 
+def test_validate_event_edge_fields_are_optional_and_round_trip():
+    ok, reasons, parent = validate_event(_valid_event(event_id="parent-1"))
+    assert ok, reasons
+    assert parent is not None
+
+    ok, reasons, child = validate_event(
+        _valid_event(parent_event_id=" parent-1 ", evidence_refs=[" parent-1 "])
+    )
+    assert ok, reasons
+    assert child is not None
+    assert child["parent_event_id"] == "parent-1"
+    assert child["evidence_refs"] == ["parent-1"]
+
+    again = json.loads(json.dumps(child, sort_keys=True))
+    ok2, reasons2, normalized_again = validate_event(again)
+    assert ok2, reasons2
+    assert normalized_again == child
+
+
+def test_validate_event_edge_fields_reject_invalid_shapes():
+    ok, reasons, normalized = validate_event(_valid_event(parent_event_id=""))
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:parent_event_id" in reasons
+
+    ok, reasons, normalized = validate_event(_valid_event(evidence_refs="not-a-list"))
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:evidence_refs" in reasons
+
+
 # --------------------------------------------------------------------------- #
 # Policy unit (T1.9-T1.13)
 # --------------------------------------------------------------------------- #
@@ -611,3 +642,50 @@ def test_event_record_json_includes_ledger_obligation_at_trust_level_2(
     assert corrupt == 0
     assert len(events) == 1
     assert events[0]["event_id"] == payload["event_id"]
+
+
+def test_event_record_rejects_broken_parent_edge_without_appending(tmp_path: Path):
+    event = _valid_event(event_id="child", parent_event_id="missing-parent")
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps(event), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        ["event", "record", "--root", str(tmp_path), "--file", str(event_path), "--json"],
+    )
+
+    assert result.exit_code == 1
+    payload = json.loads(result.output)
+    assert payload["reasons"] == [
+        "edge_validation_failed:parent_event_id:unresolved_ref:missing-parent"
+    ]
+    ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    assert not ledger.exists()
+
+
+def test_event_record_allows_resolved_parent_and_evidence_edges(tmp_path: Path):
+    parent = _valid_event(event_id="parent", step_index=0)
+    child = _valid_event(
+        event_id="child", parent_event_id="parent", evidence_refs=["parent"], step_index=1
+    )
+    parent_path = tmp_path / "parent.json"
+    child_path = tmp_path / "child.json"
+    parent_path.write_text(json.dumps(parent), encoding="utf-8")
+    child_path.write_text(json.dumps(child), encoding="utf-8")
+
+    first = runner.invoke(
+        app,
+        ["event", "record", "--root", str(tmp_path), "--file", str(parent_path), "--json"],
+    )
+    second = runner.invoke(
+        app,
+        ["event", "record", "--root", str(tmp_path), "--file", str(child_path), "--json"],
+    )
+
+    assert first.exit_code == second.exit_code == 0
+    events, corrupt = read_agent_events(tmp_path)
+    assert corrupt == 0
+    assert events is not None
+    assert [event["event_id"] for event in events] == ["parent", "child"]
+    assert events[1]["parent_event_id"] == "parent"
+    assert events[1]["evidence_refs"] == ["parent"]

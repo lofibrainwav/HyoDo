@@ -1,6 +1,6 @@
 ---
 title: Evidence Graph
-description: What the evidence-graph prototype shows, and which of its fields are real today.
+description: What the evidence-graph prototype shows, what the source graph export emits, and what remains demo-only.
 ---
 
 ## What this shows
@@ -13,7 +13,7 @@ side panel.
 
 ## 5W1H mapping
 
-| Field | Source                                       |
+| Field | Source                                        |
 | ----- | --------------------------------------------- |
 | Who   | `actor`                                       |
 | When  | `ts`, `step_index`                            |
@@ -30,16 +30,23 @@ v4.13.0. `hyodo policy check` exits `0` for `ALLOW`, `1` for `DENY`, `2` for
 it means no policy record exists for that step, not that the step was
 approved.
 
-## Proposed fields: `parent_event_id` and `evidence_refs`
+## Graph fields and release boundary
 
 The two link types the graph draws — a solid elbow for "result of" and a
-dashed curve for "decided from" — are **not** in the shipped
-`hyodo.agent-event/v1` schema. See
-[`hyodo/events.py`](https://github.com/lofibrainwav/HyoDo/blob/main/hyodo/events.py)
-for the fields that do exist today. `parent_event_id` and `evidence_refs`
-are planned in package 1-B of the
-[Phase 1 design spec](https://github.com/lofibrainwav/HyoDo/blob/main/docs/superpowers/specs/2026-09-06-hyodo-agent-os-phase1-design.md).
-Until then, both fields exist only in this prototype's fixture data.
+dashed curve for "decided from" — map to optional `hyodo.agent-event/v1`
+fields on the source development line: `parent_event_id` and `evidence_refs`.
+`tool.urls` is also preserved in graph output so web observations can name the
+observed domain/path without storing a full response body.
+
+`hyodo report --format graph` emits a deterministic local JSON artifact at
+`.hyodo/reports/hyodo-report.graph.json`. It is still evidence-only: broken
+parents, broken evidence references, unreadable ledgers, or corrupt ledger
+lines are reported as `UNOBSERVED` instead of being converted into a clean
+graph.
+
+Release boundary: the public page still uses fixed demo fixture data and does
+not read a real ledger. Installing the latest published package may lag the
+source development line until the next release is published.
 
 ## Broken links
 
@@ -52,8 +59,9 @@ part of what this prototype demonstrates, not an edge case it hides.
 
 The 14 events on the page are fixed, in-memory demo data. Nothing is
 uploaded, stored, or fetched from a network, and no real ledger is read.
-The shipped `hyodo` CLI has no graph viewer yet — this page is a prototype
-of the intended shape, not an installed feature.
+`hyodo report --format graph` can emit a local JSON graph artifact on the
+source development line. The shipped CLI still has no browser graph viewer yet
+— this page is a prototype of the intended visual shape, not a live run.
 
 ## Next
 

@@ -11,38 +11,41 @@ in the repository is the source of truth; this page summarizes it.
 
 ## Five stages
 
-| Stage | Name | What it covers | Status |
-| --- | --- | --- | --- |
-| 0 | Launch surface | The `hyodo` CLI and quality gates | Live |
-| 1 | Judgment | `ASK` decisions, trust levels, external variables, and web policy (shipped in v4.13.0); a public evidence-graph prototype (demo data only); hyodo connect (not built) | In progress |
-| 2 | Mobilization | Research nodes under policy | Planned |
-| 3 | Reconciliation | Cross-source verification | Exploration |
-| 4 | Intent | The full loop | Exploration |
+| Stage | Name | Status |
+| --- | --- | --- |
+| 0 | Launch surface | Live |
+| 1 | Judgment | In progress |
+| 2 | Mobilization | Planned |
+| 3 | Reconciliation | Exploration |
+| 4 | Intent | Exploration |
 
-Stage 1's policy layer — `ASK` decisions, trust levels, external variables,
-and web policy — shipped in v4.13.0 and requires no model. The
-[evidence graph](/evidence-graph/) is a public, browser-only prototype that
-renders fixed demo data; it is not an installed local viewer and does not
-read a real ledger — see [its documentation](/docs/evidence-graph/) for
-exactly which fields are real today. `hyodo connect` and Stage 2's
-bring-your-own-model support are not built yet.
+Stage 1 includes `ASK` decisions, trust levels, external variables, and web
+policy. That policy layer shipped in v4.13.0 and requires no model.
+
+The [evidence graph](/evidence-graph/) is a public, browser-only prototype that
+renders fixed demo data. The source development line can emit a local graph JSON
+report from the agent-event ledger, but the public page is not an installed
+browser viewer and does not read a real ledger. See
+[its documentation](/docs/evidence-graph/) for the exact boundary.
+
+`hyodo connect` and Stage 2's bring-your-own-model support are not built yet.
 
 ## Shipped today vs. not built yet
 
 | Shipped today | Not built yet |
 | --- | --- |
-| `hyodo safe` scans (strict, JSON) | `hyodo connect` |
-| `hyodo init` / `hyodo check` gates | Evidence graph as an installed local viewer |
-| FDE evidence spine, policy checks | `parent_event_id` / `evidence_refs` in the shipped ledger schema |
-| `ASK` decisions, trust levels, external variables, web policy (v4.13.0) | Research nodes under policy |
-| Schema validation, local eval runs | Bring-your-own-model support |
-| MCP stdio, Tailscale serve, doctor | Cross-source verification, full loop |
-| PyPI Trusted Publishing, SBOM, SARIF, pre-commit hooks, GH Action | Stage 4 intent loop |
+| `hyodo safe` scans | `hyodo connect` |
+| `hyodo init` and `hyodo check` gates | Installed browser graph viewer |
+| FDE evidence spine and policy checks | Research nodes under policy |
+| `ASK` decisions and trust levels | Bring-your-own-model support |
+| Schema validation and local eval runs | Full folder semantic onboarding |
+| Source-line graph JSON report export | RAG or embeddings in public HyoDo |
+| MCP stdio, Tailscale serve, doctor | Cross-source verification loop |
+| PyPI Trusted Publishing, SBOM, SARIF | Stage 4 intent loop |
 
-A public [evidence-graph prototype](/evidence-graph/) shows the intended
-shape using demo fixture data — see
-[its documentation](/docs/evidence-graph/) for which fields are live today
-and which are proposed.
+A public [evidence-graph prototype](/evidence-graph/) shows the intended shape
+using demo fixture data. See [its documentation](/docs/evidence-graph/) for the
+source-line graph export boundary and what remains demo-only.
 
 ## Proposing roadmap work
 

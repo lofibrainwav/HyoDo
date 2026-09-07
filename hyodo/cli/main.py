@@ -50,16 +50,18 @@ from hyodo import (
 )
 from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
 from hyodo.eval import EvalInputError, run_evaluation
+from hyodo.event_graph import validate_event_edges
 from hyodo.events import (
     AGENT_EVENTS_RELATIVE_PATH,
     EVENT_ID_CONFLICT,
-    EVENT_ID_DUPLICATE,
+    EVENT_ID_NEW,
     EVENT_ID_UNOBSERVED,
     append_agent_event,
     check_event_id,
     count_run_events,
     load_event_from_path,
     load_event_from_text,
+    read_agent_events,
     strip_full_bodies,
     validate_event,
 )
@@ -2085,7 +2087,7 @@ def eval_command(
 @app.command("report")
 def report_command(
     report_format: str = typer.Option(
-        "md", "--format", help="Local report format: md, html, or sarif (SARIF v2.1.0)"
+        "md", "--format", help="Local report format: md, html, sarif, or graph"
     ),
     root: str = typer.Option(".", "--root", help="Project root that owns local evidence"),
     json_output: bool = typer.Option(
@@ -2093,8 +2095,8 @@ def report_command(
     ),
 ):
     """Render a local FDE sign-off report from observed evidence only."""
-    if report_format not in {"md", "html", "sarif"}:
-        console.print("[red]--format must be md, html, or sarif[/red]")
+    if report_format not in {"md", "html", "sarif", "graph"}:
+        console.print("[red]--format must be md, html, sarif, or graph[/red]")
         raise typer.Exit(2)
     exit_code, summary = write_report(Path(root).resolve(), report_format)
     if json_output:
@@ -2289,12 +2291,49 @@ def event_record(
     # (same id, same content incl. the policy stamp) is a no-op, while reusing an id
     # with different content is refused — otherwise an agent could rewrite its history.
     id_state = check_event_id(root_path, normalized)
-    if id_state != EVENT_ID_DUPLICATE and not append_agent_event(root_path, normalized):
+    if id_state == EVENT_ID_NEW:
+        existing_events, corrupt = read_agent_events(root_path)
+        if existing_events is None:
+            id_state = EVENT_ID_UNOBSERVED
+        elif corrupt:
+            id_state = "ledger_corrupt"
+        else:
+            edge_issues = [
+                issue
+                for issue in validate_event_edges([*existing_events, normalized])
+                if issue.get("event_id") == normalized["event_id"]
+            ]
+            if edge_issues:
+                reasons = [
+                    "edge_validation_failed:"
+                    f"{issue['field']}:{issue['reason']}:{issue.get('ref') or 'none'}"
+                    for issue in edge_issues
+                ]
+                if json_output:
+                    console.print_json(
+                        json.dumps(
+                            {
+                                "ok": False,
+                                "reasons": reasons,
+                                "edge_issues": edge_issues,
+                                "exit_code": 1,
+                                "ledger": str(root_path / AGENT_EVENTS_RELATIVE_PATH),
+                                **ledger_obligation,
+                            }
+                        )
+                    )
+                else:
+                    console.print("[red]INVALID[/red] event edges — not recorded")
+                    for reason in reasons:
+                        console.print(f"  - {reason}")
+                raise typer.Exit(1)
+    if id_state == EVENT_ID_NEW and not append_agent_event(root_path, normalized):
         id_state = "append_failed"
-    if id_state in (EVENT_ID_CONFLICT, EVENT_ID_UNOBSERVED, "append_failed"):
+    if id_state in (EVENT_ID_CONFLICT, EVENT_ID_UNOBSERVED, "ledger_corrupt", "append_failed"):
         reason = {
             EVENT_ID_CONFLICT: "event_id_conflict",
             EVENT_ID_UNOBSERVED: "ledger_unobserved",
+            "ledger_corrupt": "ledger_corrupt",
         }.get(id_state, "append_failed")
         if json_output:
             console.print_json(
