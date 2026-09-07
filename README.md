@@ -60,7 +60,7 @@ gates. No detected tooling means no invented green check.
 | Field-deployment folder absorption | `hyodo inspect <path>` |
 | Evidence-graph export bridge | `hyodo graph export` |
 | Ephemeral visual evidence | `hyodo eye capture` / `verify` |
-| Reader vocabulary (same decision) | `--audience vibe` / `engineer` / `professional` |
+| Reader vocabulary | `--audience vibe` / `engineer` / `professional` |
 
 ## Honest boundaries
 
