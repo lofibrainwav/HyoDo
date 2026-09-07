@@ -35,6 +35,8 @@ def test_safe_json_emits_parseable_json(tmp_path):
 
     payload = json.loads(result.output)
     assert payload["source"].startswith("file:")
+    assert payload["scope"] == "file"
+    assert payload["coverage"] in {"FULL", "PARTIAL", "UNOBSERVED"}
     secrets = [
         f for f in payload["findings"] if f["category"] == "secret" and f["severity"] == "high"
     ]

@@ -119,6 +119,41 @@ Treat a clean `hyodo safe` run as "no obvious red flags found," not as
 hyodo safe
 ```
 
+Inside a git repository `hyodo safe` with no path scans the working diff
+only; `hyodo safe . --max-files 0` scans the tree.
+
+### Scan scope and coverage are named, not inferred
+
+Both text and `--json` output carry two fields that state exactly what was
+scanned, so a reader never has to parse the free-text `source` string to
+find out:
+
+- `scope` — which corpus was scanned:
+  - `diff` — the `git diff HEAD` corpus (the default inside a git repo with
+    pending changes)
+  - `status` — the `git status --porcelain` fallback (used when the diff is
+    empty, e.g. only untracked files)
+  - `file` — a single file was named on the command line
+  - `directory` — a directory was named on the command line
+  - `external` — an external scanner (`--scan gitleaks` / `trufflehog` /
+    `all`) ran instead of the built-in pattern scan
+  - `none` — no corpus was available at all (missing path, unreadable
+    target, or a git repo with nothing to diff or list)
+- `coverage` — how much of that scope was actually read:
+  - `FULL` — every scannable file in the corpus was read (`scanned_files ==
+    total_scannable`, both known, and greater than zero)
+  - `PARTIAL` — some but not all of the corpus was read (for example a
+    `--max-files` cap was hit, or a diff contained sections without hunks)
+  - `UNOBSERVED` — the corpus was missing, unreadable, or errored, or the
+    counts are unknown; for `external`, this also covers a scanner that
+    failed to run. Unobserved is never reported as a clean pass.
+
+The text output prints this as a line right after `source:` —
+`Scope: <scope> · Coverage: <coverage> (<scanned>/<total> files)` — and,
+when `scope` is `diff` or `status`, a follow-up hint suggesting a directory
+scan. `--quiet` suppresses both lines; `--audience` lenses never change the
+underlying `scope` or `coverage` values.
+
 ## Agent event ledger is opt-in evidence, not a runtime interceptor
 
 `hyodo event` / `hyodo policy` implement an **opt-in FDE evidence spine**:

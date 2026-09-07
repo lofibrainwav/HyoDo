@@ -1981,6 +1981,8 @@ def safe(
             )
             payload = {
                 "source": source,
+                "scope": result.get("scope", "none"),
+                "coverage": result.get("coverage", "UNOBSERVED"),
                 "risk_score": result["risk_score"],
                 "level": result["level"],
                 "action": result["action"],
@@ -1996,6 +1998,17 @@ def safe(
 
         console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
         console.print(f"source: {source}")
+        scope = result.get("scope", "none")
+        coverage = result.get("coverage", "UNOBSERVED")
+        scanned_for_line = result.get("scanned_files")
+        total_for_line = result.get("total_scannable")
+        scanned_display = scanned_for_line if isinstance(scanned_for_line, int) else "?"
+        total_display = total_for_line if isinstance(total_for_line, int) else "?"
+        console.print(
+            f"Scope: {scope} · Coverage: {coverage} ({scanned_display}/{total_display} files)"
+        )
+        if scope in ("diff", "status"):
+            console.print("Hint: pass a directory (hyodo safe . --max-files 0) to scan the tree.")
         exceptions_applied = int(result.get("exceptions_applied", 0))
         if exceptions_applied:
             console.print(
