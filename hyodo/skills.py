@@ -30,6 +30,19 @@ MANIFEST_RELATIVE_PATH = Path(".hyodo") / "skills" / "manifest.json"
 BODIES_RELATIVE_DIR = Path(".hyodo") / "skills" / "bodies"
 PROPOSED_RELATIVE_PATH = Path(".hyodo") / "skills" / "proposed.md"
 
+#: Schema for a research node's retrieval hand-off file. The node owns
+#: embeddings/vectors and never sends them; this schema carries only rule
+#: text (short, human-readable rules, each <= 512 chars), content digests,
+#: and an ordinal rank -- never a vector, never a fetched body, never a
+#: float score/probability/percentage.
+NODE_RETRIEVAL_SCHEMA = "hyodo.skill-retrieval/v1"
+
+#: Hard cap on one retrieved rule's text, matching the ruling exactly.
+NODE_RULE_TEXT_MAX_LEN = 512
+
+_HEX12_RE = re.compile(r"^[0-9a-f]{12}$")
+_PROBABILITY_SHAPED_FIELDS = ("score", "probability", "percentage")
+
 #: Fixed, deterministic pillar order used everywhere in this module's output.
 PILLARS: tuple[str, ...] = ("truth", "goodness", "beauty", "benevolence", "hyo", "eternity")
 
@@ -285,6 +298,220 @@ def build_ingest_tool(parsed: ParsedSource) -> dict[str, Any]:
     return {"name": "skills.ingest", "paths": [], "urls": [{"domain": parsed.domain}]}
 
 
+@dataclass(frozen=True)
+class RetrievedRule:
+    """One rule handed off by a research node, already validated."""
+
+    skill: str
+    source: str  # "path:<...>" or "url:<domain>"
+    rule_text: str
+    rule_digest: str
+    score_rank: int
+
+
+@dataclass(frozen=True)
+class NodeRetrieval:
+    """A fully validated ``hyodo.skill-retrieval/v1`` hand-off file."""
+
+    node: str
+    query_digest: str | None
+    retrieved: tuple[RetrievedRule, ...]
+
+
+def parse_node_retrieval_file(path: Path) -> tuple[dict[str, Any] | None, list[str]]:
+    """Read and JSON-decode *path*. Returns ``(data_or_none, reasons)``.
+
+    A read/parse failure is malformed, never a crash -- the caller exits 1
+    without writing anything.
+    """
+    try:
+        raw_text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None, ["file_unreadable"]
+    try:
+        data = json.loads(raw_text)
+    except json.JSONDecodeError:
+        return None, ["invalid_json"]
+    if not isinstance(data, dict):
+        return None, ["invalid_field:root"]
+    return data, []
+
+
+def validate_node_retrieval(data: dict[str, Any]) -> tuple[NodeRetrieval | None, list[str]]:
+    """Validate a decoded retrieval payload against ``hyodo.skill-retrieval/v1``.
+
+    Rejects, by design, anything vector- or probability-shaped: a
+    ``score``/``probability``/``percentage`` field on any retrieved item is
+    refused outright (``invalid_field:retrieved[i].score``) -- HyoDo accepts
+    only the ordinal ``score_rank``, never a float the node computed.
+    """
+    reasons: list[str] = []
+
+    if data.get("schema") != NODE_RETRIEVAL_SCHEMA:
+        reasons.append("invalid_field:schema")
+
+    node = data.get("node")
+    if not isinstance(node, str) or not node.strip():
+        reasons.append("invalid_field:node")
+        node = ""
+
+    query_digest = data.get("query_digest")
+    if query_digest is not None and (
+        not isinstance(query_digest, str) or not _HEX12_RE.match(query_digest)
+    ):
+        reasons.append("invalid_field:query_digest")
+
+    retrieved_raw = data.get("retrieved")
+    if not isinstance(retrieved_raw, list):
+        reasons.append("invalid_field:retrieved")
+        retrieved_raw = []
+
+    retrieved: list[RetrievedRule] = []
+    for index, item in enumerate(retrieved_raw):
+        if not isinstance(item, dict):
+            reasons.append(f"invalid_field:retrieved[{index}]")
+            continue
+
+        if any(field in item for field in _PROBABILITY_SHAPED_FIELDS):
+            reasons.append(f"invalid_field:retrieved[{index}].score")
+            continue
+
+        skill = item.get("skill")
+        if not isinstance(skill, str) or not skill.strip():
+            reasons.append(f"invalid_field:retrieved[{index}].skill")
+            continue
+
+        source = item.get("source")
+        if not isinstance(source, str) or not (
+            source.startswith("path:") or source.startswith("url:")
+        ):
+            reasons.append(f"invalid_field:retrieved[{index}].source")
+            continue
+
+        rule_text = item.get("rule_text")
+        if (
+            not isinstance(rule_text, str)
+            or not rule_text.strip()
+            or len(rule_text) > NODE_RULE_TEXT_MAX_LEN
+        ):
+            reasons.append(f"invalid_field:retrieved[{index}].rule_text")
+            continue
+
+        rule_digest = item.get("rule_digest")
+        if not isinstance(rule_digest, str) or not _HEX12_RE.match(rule_digest):
+            reasons.append(f"invalid_field:retrieved[{index}].rule_digest")
+            continue
+        if rule_digest != content_digest(rule_text):
+            reasons.append(f"invalid_field:retrieved[{index}].rule_digest")
+            continue
+
+        score_rank = item.get("score_rank")
+        if isinstance(score_rank, bool) or not isinstance(score_rank, int) or score_rank < 1:
+            reasons.append(f"invalid_field:retrieved[{index}].score_rank")
+            continue
+
+        retrieved.append(
+            RetrievedRule(
+                skill=skill,
+                source=source,
+                rule_text=rule_text,
+                rule_digest=rule_digest,
+                score_rank=score_rank,
+            )
+        )
+
+    if reasons:
+        return None, reasons
+
+    return NodeRetrieval(node=node, query_digest=query_digest, retrieved=tuple(retrieved)), []
+
+
+def build_node_ingest_tool(node: str) -> dict[str, Any]:
+    """Build the ``tool`` block of a node ``skills.ingest`` tool_call event.
+
+    ``paths`` carries ``node:<label>`` (never a filesystem path) so
+    ``evaluate_policy`` derives the external variable
+    ``skill_ingest:node:<label>`` -- the same gate a path/url source gets.
+    """
+    return {"name": "skills.ingest", "paths": [f"node:{node}"], "urls": []}
+
+
+def node_rules_for(retrieval: NodeRetrieval) -> list[Rule]:
+    """Compile a validated retrieval's rules into :class:`Rule` objects.
+
+    Each rule is compiled exactly as if it were a bullet of a skill named
+    ``<node>/<skill>`` (rule id ``<node>/<skill>:<slug>``), reusing the same
+    tag/keyword pillar mapping and mechanical-prefix compiler as any other
+    skill source -- node-sourced rules are not a special case downstream.
+    The rule's provenance-facing ``skill_name`` is ``node:<label>`` (the
+    node is the skill source lens/propose show), distinct from the
+    ``<node>/<skill>`` prefix folded into the rule id itself.
+    """
+    rules: list[Rule] = []
+    for item in retrieval.retrieved:
+        rule_id_prefix = f"{retrieval.node}/{item.skill}"
+        display_skill_name = f"node:{retrieval.node}"
+        base_text, tagged_pillars = strip_pillar_tag(item.rule_text)
+        pillars = tagged_pillars if tagged_pillars is not None else infer_pillars(base_text)
+        compiled = compile_rule(base_text)
+        rules.append(
+            Rule(
+                skill_name=display_skill_name,
+                text=item.rule_text,
+                base_text=base_text,
+                rule_id=rule_id_for(rule_id_prefix, base_text),
+                pillars=pillars,
+                compiled=compiled,
+                rule_text_digest=item.rule_digest,
+            )
+        )
+    return rules
+
+
+def node_manifest_entry(
+    retrieval: NodeRetrieval,
+    rules: list[Rule],
+    ingested_at: str | None,
+) -> dict[str, Any]:
+    """Build one ``skills[]`` row for a node hand-off.
+
+    ``body_stored`` is always ``false``: the ``rule_text`` lines kept in
+    ``node_rules`` are the rules themselves (each <= 512 chars), not a
+    fetched body -- this is the one place node-sourced rule text is
+    retained. ``content_digest`` is the digest of the concatenated
+    per-rule digests, in retrieval order.
+    """
+    compiled_ids = [rule.rule_id for rule in rules if rule.compiled is not None]
+    pillars: list[str] = []
+    for rule in rules:
+        if rule.compiled is None:
+            continue
+        for pillar in rule.pillars:
+            if pillar not in pillars:
+                pillars.append(pillar)
+    combined_digest = content_digest("".join(item.rule_digest for item in retrieval.retrieved))
+    return {
+        "name": retrieval.node,
+        "source": f"node:{retrieval.node}",
+        "content_digest": combined_digest,
+        "status": "ok",
+        "pillars": pillars,
+        "compiled_rule_ids": compiled_ids,
+        "ingested_at": ingested_at,
+        "body_stored": False,
+        "node_rules": [
+            {
+                "skill": item.skill,
+                "source": item.source,
+                "rule_text": item.rule_text,
+                "rule_digest": item.rule_digest,
+                "score_rank": item.score_rank,
+            }
+            for item in retrieval.retrieved
+        ],
+    }
+
+
 def manifest_entry(
     parsed: ParsedSource,
     rules: list[Rule],
@@ -465,8 +692,48 @@ def _rules_for_manifest_entry(entry: dict[str, Any], root: Path) -> list[Rule]:
     is re-parsed live so lens/propose always reflect the current file, not a
     snapshot frozen at ingest time. A ``url:`` source (never fetched in this
     package) or a source that no longer reads yields no rules.
+
+    A ``node:`` source is the one exception: there is nothing to re-read
+    (the node is not part of this package and is never re-contacted), so
+    its rules are rebuilt from the ``node_rules`` the manifest itself kept
+    at ingest time -- the rule text lines *are* the retained body.
     """
     source = entry.get("source")
+    if isinstance(source, str) and source.startswith("node:"):
+        node_label = entry.get("name")
+        node = node_label if isinstance(node_label, str) and node_label else "node"
+        node_rules_raw = entry.get("node_rules")
+        if not isinstance(node_rules_raw, list):
+            return []
+        retrieved: list[RetrievedRule] = []
+        for item in node_rules_raw:
+            if not isinstance(item, dict):
+                continue
+            skill = item.get("skill")
+            rule_text = item.get("rule_text")
+            item_source = item.get("source")
+            rule_digest = item.get("rule_digest")
+            score_rank = item.get("score_rank")
+            if (
+                not isinstance(skill, str)
+                or not isinstance(rule_text, str)
+                or not isinstance(item_source, str)
+                or not isinstance(rule_digest, str)
+                or not isinstance(score_rank, int)
+            ):
+                continue
+            retrieved.append(
+                RetrievedRule(
+                    skill=skill,
+                    source=item_source,
+                    rule_text=rule_text,
+                    rule_digest=rule_digest,
+                    score_rank=score_rank,
+                )
+            )
+        return node_rules_for(
+            NodeRetrieval(node=node, query_digest=None, retrieved=tuple(retrieved))
+        )
     if not isinstance(source, str) or not source.startswith("path:"):
         return []
     rel = source[len("path:") :]
@@ -590,7 +857,9 @@ def render_proposal(root: Path, project_name: str) -> ProposeResult:
     """Render the Markdown proposal per the propose ruling.
 
     Includes every compiled rule that currently PASSes (verbatim text, tags
-    kept), an ``## Unverified`` section of advisory rules by digest, and a
+    kept), an ``## Unverified`` section of advisory rules by digest, a
+    ``## Retrieved`` section of node-sourced rules that passed (by rule id
+    and digest, so the proposal records where each came from), and a
     ``## Provenance`` section naming source skills + digests.
     """
     manifest, status = load_manifest(root)
@@ -598,12 +867,14 @@ def render_proposal(root: Path, project_name: str) -> ProposeResult:
 
     passed_rules: list[Rule] = []
     unverified: list[Rule] = []
+    retrieved_passed: list[Rule] = []
     provenance_lines: list[str] = []
     seen_rule_ids: set[str] = set()
 
     for entry in entries if isinstance(entries, list) else []:
         if not isinstance(entry, dict):
             continue
+        is_node_entry = isinstance(entry.get("source"), str) and entry["source"].startswith("node:")
         entry_rules = _rules_for_manifest_entry(entry, root)
         for rule in entry_rules:
             if rule.rule_id in seen_rule_ids:
@@ -615,6 +886,8 @@ def render_proposal(root: Path, project_name: str) -> ProposeResult:
             rule_status = evaluate_compiled_rule(rule, root)
             if rule_status.status == "PASS":
                 passed_rules.append(rule)
+                if is_node_entry:
+                    retrieved_passed.append(rule)
         if entry_rules:
             provenance_lines.append(
                 f"- {entry.get('name')} (`{entry.get('source')}`, digest "
@@ -630,6 +903,11 @@ def render_proposal(root: Path, project_name: str) -> ProposeResult:
     lines.append("## Unverified")
     if unverified:
         for rule in unverified:
+            lines.append(f"- {rule.rule_id} (digest `{rule.rule_text_digest}`)")
+    lines.append("")
+    lines.append("## Retrieved")
+    if retrieved_passed:
+        for rule in retrieved_passed:
             lines.append(f"- {rule.rule_id} (digest `{rule.rule_text_digest}`)")
     lines.append("")
     lines.append("## Provenance")

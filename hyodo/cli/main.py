@@ -178,15 +178,20 @@ from hyodo.skills import (
 )
 from hyodo.skills import (
     build_ingest_tool,
+    build_node_ingest_tool,
     compute_lens,
     load_manifest,
     manifest_entry,
+    node_manifest_entry,
+    node_rules_for,
+    parse_node_retrieval_file,
     parse_skill_rules,
     render_proposal,
     resolve_source,
     save_manifest,
     save_proposal,
     skill_name_for,
+    validate_node_retrieval,
 )
 from hyodo.skills import (
     store_body as store_skill_body,
@@ -4207,10 +4212,158 @@ def _new_agent_event(
 _SKILLS_EXIT_CODES = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}
 
 
+def _skills_ingest_from_node(
+    *,
+    from_node: str,
+    root: str,
+    yes: bool,
+    json_output: bool,
+) -> None:
+    """``hyodo skills ingest --from-node <file>``: BYOM research-node hand-off.
+
+    The node owns embeddings/vectors and never sends them; this only accepts
+    a ``hyodo.skill-retrieval/v1`` file of rule text + digests + an ordinal
+    rank. A malformed file (bad JSON, missing/invalid field, or any
+    float score/probability/percentage field) exits 1 and writes nothing.
+    The same ``skills.ingest`` policy gate applies, keyed on
+    ``skill_ingest:node:<label>`` -- ASK unless trust level 3 or ``--yes``,
+    identical to a path/url source.
+    """
+    root_path = Path(root).resolve()
+    data, parse_reasons = parse_node_retrieval_file(Path(from_node))
+    if data is None:
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": parse_reasons, "exit_code": 1}))
+        else:
+            console.print(f"[red]malformed retrieval file: {', '.join(parse_reasons)}[/red]")
+        raise typer.Exit(1)
+
+    retrieval, reasons = validate_node_retrieval(data)
+    if retrieval is None:
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": 1}))
+        else:
+            console.print(f"[red]malformed retrieval file: {', '.join(reasons)}[/red]")
+        raise typer.Exit(1)
+
+    tool = build_node_ingest_tool(retrieval.node)
+    run_id = str(uuid.uuid4())
+    raw_event = _new_agent_event(kind="tool_call", actor="hyodo", tool=tool, run_id=run_id)
+    ok, event_reasons, normalized = validate_event(raw_event)
+    if not ok or normalized is None:  # pragma: no cover - internal construction guard
+        message = f"internal error building node ingest event: {event_reasons}"
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": event_reasons, "exit_code": 2}))
+        else:
+            console.print(f"[red]{message}[/red]")
+        raise typer.Exit(2)
+    normalized["meta"]["tags"] = ["skills-ingest", "node"]
+
+    policy_path = root_path / POLICY_RELATIVE_PATH
+    cfg, policy_err = try_load_policy(policy_path)
+    if cfg is None:
+        if policy_err == "policy_missing":
+            cfg = PolicyConfig(
+                schema=POLICY_SCHEMA_ID,
+                max_steps=None,
+                allowed_tools=None,
+                blocked_path_globs=(),
+            )
+        else:
+            message = f"policy unobserved ({policy_err}); not ALLOW"
+            if json_output:
+                console.print_json(
+                    json.dumps({"ok": False, "reasons": [policy_err], "exit_code": 2})
+                )
+            else:
+                console.print(f"[red]{message}[/red]")
+            raise typer.Exit(2)
+
+    observed = count_run_events(root_path, run_id)
+    decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
+    stamped = apply_decision_to_event(normalized, decision)
+    append_agent_event(root_path, stamped)
+
+    effective_decision = decision.decision
+    approval_event_id: str | None = None
+    if decision.decision == "ASK" and yes:
+        approval_claim = {
+            "decision": "ALLOW",
+            "rule_id": "operator_approval",
+            "reason": "operator approved via --yes",
+        }
+        approval_raw = _new_agent_event(kind="decision", actor="human", run_id=run_id, step_index=1)
+        ok2, _reasons2, approval_normalized = validate_event(approval_raw)
+        if ok2 and approval_normalized is not None:
+            approval_normalized["policy"] = unevaluated_policy(claimed=approval_claim)
+            if append_agent_event(root_path, approval_normalized):
+                approval_event_id = approval_normalized["event_id"]
+                effective_decision = "ALLOW"
+
+    manifest_data, manifest_status = load_manifest(root_path)
+    existing_skills = (
+        list(manifest_data.get("skills", []))
+        if manifest_data is not None and manifest_status == "ok"
+        else []
+    )
+
+    compiled_rule_count = 0
+    if effective_decision == "ALLOW":
+        rules = node_rules_for(retrieval)
+        compiled_rule_count = sum(1 for rule in rules if rule.compiled is not None)
+        entry = node_manifest_entry(retrieval, rules, ingested_at=stamped["event_id"])
+        existing_skills = [
+            row for row in existing_skills if row.get("source") != entry["source"]
+        ] + [entry]
+        save_manifest(root_path, existing_skills)
+
+    exit_code = _SKILLS_EXIT_CODES[decision.decision]
+    if effective_decision == "ALLOW" and decision.decision == "ASK":
+        exit_code = 0
+
+    result = {
+        "decision": decision.decision,
+        "effective_decision": effective_decision,
+        "rule_id": decision.rule_id,
+        "reason": decision.reason,
+        "trust_level": decision.trust_level,
+        "source": f"node:{retrieval.node}",
+        "readable": True,
+        "content_digest": None,
+        "compiled_rule_count": compiled_rule_count,
+        "manifest": str(root_path / SKILLS_MANIFEST_RELATIVE_PATH),
+        "event_id": stamped["event_id"],
+        "approval_event_id": approval_event_id,
+        "exit_code": exit_code,
+    }
+    if json_output:
+        console.print_json(json.dumps(result))
+    else:
+        console.print(f"[bold]{decision.decision}[/bold] node:{retrieval.node}")
+        console.print(f"  reason: {decision.reason}")
+        if effective_decision == "ALLOW" and decision.decision == "ASK":
+            console.print("  approved via --yes; manifest compiled")
+        elif effective_decision == "ALLOW":
+            console.print(f"  compiled {compiled_rule_count} mechanical rule(s)")
+        elif decision.decision == "ASK":
+            console.print("  re-run with --yes, or grant trust level 3, to compile")
+    raise typer.Exit(exit_code)
+
+
 @skills_app.command("ingest")
 def skills_ingest(
-    source: str = typer.Argument(..., help="Local path or http(s) URL to a skill Markdown file"),
+    source: str | None = typer.Argument(
+        None, help="Local path or http(s) URL to a skill Markdown file"
+    ),
     root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/skills/"),
+    from_node: str | None = typer.Option(
+        None,
+        "--from-node",
+        help=(
+            "Path to a hyodo.skill-retrieval/v1 JSON file from an external research "
+            "node (BYOM); mutually exclusive with SOURCE"
+        ),
+    ),
     store_body: bool = typer.Option(
         False,
         "--store-body",
@@ -4232,7 +4385,22 @@ def skills_ingest(
     (re-run with ``--yes`` or after granting trust level 3 to proceed).
     A ``url:`` source is never fetched in this package: only its domain is
     recorded, with ``content_digest: null`` and ``status: "unreadable"``.
+
+    ``--from-node <file>`` takes a research node's ``hyodo.skill-retrieval/v1``
+    hand-off instead of SOURCE: the node owns embeddings/vectors and never
+    sends them, HyoDo stores only rule text (<= 512 chars), digests, and an
+    ordinal rank. A malformed file exits 1 and writes nothing.
     """
+    if from_node is not None:
+        if source is not None:
+            console.print("[red]pass either SOURCE or --from-node, not both[/red]")
+            raise typer.Exit(1)
+        _skills_ingest_from_node(from_node=from_node, root=root, yes=yes, json_output=json_output)
+        return
+    if source is None:
+        console.print("[red]missing SOURCE (or pass --from-node)[/red]")
+        raise typer.Exit(1)
+
     root_path = Path(root).resolve()
     parsed = resolve_source(root_path, source)
     tool = build_ingest_tool(parsed)
