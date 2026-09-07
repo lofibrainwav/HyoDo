@@ -9,6 +9,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `hyodo mcp continuity` no longer reports `status: READY` on a workspace
+  with no `.hyodo` stores at all and 0/2 hosts observed. `measure_continuity`
+  only appended `reasons` for corrupt/invalid stores, so "nothing exists"
+  read as READY — a semantic false-green. The `hyodo.continuity/v1` receipt
+  now separates `integrity_status` (READY when every present store parses,
+  CORRUPT otherwise) from `coverage_status` (OBSERVED/PARTIAL/UNOBSERVED,
+  based on hosts observed and whether the required stores are present and
+  readable); overall `status`/exit code stay READY/0 only when both are
+  satisfied, so an empty root now correctly reports `UNOBSERVED`/exit 2.
 - `hyodo safe --scan gitleaks`: adapter used the removed `--format` flag
   (gitleaks 8.x exits 126); now `--report-format json --report-path -` plus
   a `version` positive control; regression test with a fake binary.

@@ -132,10 +132,30 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
     Reads exactly four fixed-relative-path local stores
     (``.hyodo/agent-events.jsonl``, ``.hyodo/policy.toml``,
     ``.hyodo/mcp-access.jsonl``, ``.hyodo/pairing.json``); starts no server;
-    contacts no network. ``status`` is ``READY`` when every present store is
-    readable and every line-delimited store is uncorrupted, and
-    ``UNOBSERVED`` otherwise — never a probability, and never inferred from
-    how many hosts were observed.
+    contacts no network.
+
+    Integrity and coverage are two different facts, reported separately so
+    "nothing is broken" can never be read as "something was observed":
+
+    - ``integrity_status`` is ``READY`` when every *present* store parses,
+      and ``CORRUPT`` when any present store is unreadable or corrupt.
+      A wholly empty workspace has perfect integrity — there is nothing to
+      be corrupt — so an empty root is ``integrity_status: READY``.
+    - ``coverage_status`` is ``OBSERVED`` when at least ``expected_hosts``
+      distinct callers were observed in the access ledger *and* the
+      agent-event ledger and the access ledger are both present and
+      readable; ``UNOBSERVED`` when zero hosts were observed and none of
+      the four stores exist yet; and ``PARTIAL`` for everything in between
+      (some signal, but not full coverage).
+    - ``status`` (kept for backward compatibility) is ``READY`` only when
+      ``integrity_status`` is ``READY`` *and* ``coverage_status`` is
+      ``OBSERVED``; otherwise it is ``UNOBSERVED``. An empty workspace is
+      therefore ``status: UNOBSERVED`` even though its integrity is
+      ``READY`` — "nothing is broken" is not "continuity is connected".
+
+    Exit code 0 means overall ``status`` is ``READY``; exit code 2 means it
+    is ``UNOBSERVED``, whether that is because a store is corrupt or because
+    coverage was never observed.
     """
     resolved = root.expanduser().resolve()
     reasons: list[str] = []
@@ -241,12 +261,54 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
     }
     same_ledger = agent_events_store.readable and not events_corrupt
 
-    status = "UNOBSERVED" if reasons else "READY"
+    # --- integrity: do the stores that exist parse cleanly? ---
+    integrity_status = "CORRUPT" if reasons else "READY"
+
+    # --- coverage: was continuity actually observed, or is nothing here yet? ---
+    any_store_present = (
+        agent_events_store.exists
+        or policy_store.exists
+        or access_store.exists
+        or pairing_store.exists
+    )
+    required_stores_ready = (
+        agent_events_store.exists
+        and agent_events_store.readable
+        and access_store.exists
+        and access_store.readable
+    )
+    if hosts_observed >= expected_hosts and required_stores_ready:
+        coverage_status = "OBSERVED"
+    elif hosts_observed == 0 and not any_store_present:
+        coverage_status = "UNOBSERVED"
+    else:
+        coverage_status = "PARTIAL"
+
+    if hosts_observed == 0:
+        reasons.append("hosts_unobserved")
+    elif hosts_observed < expected_hosts:
+        reasons.append("hosts_partial")
+
+    if coverage_status != "OBSERVED":
+        if not agent_events_store.exists:
+            reasons.append("agent_events_absent")
+        if not access_store.exists:
+            reasons.append("access_ledger_absent")
+        if not pairing_store.exists:
+            reasons.append("pairing_absent")
+        if not policy_store.exists:
+            reasons.append("policy_absent")
+
+    status = (
+        "READY" if integrity_status == "READY" and coverage_status == "OBSERVED" else "UNOBSERVED"
+    )
     exit_code = 0 if status == "READY" else 2
 
     return {
         "schema_version": CONTINUITY_SCHEMA_VERSION,
         "status": status,
+        "integrity_status": integrity_status,
+        "coverage_status": coverage_status,
         "reasons": reasons,
         "root": str(resolved),
         "stores": {
