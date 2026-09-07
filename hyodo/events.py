@@ -259,6 +259,25 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                     "reason": reason if isinstance(reason, str) else None,
                 }
 
+    parent_event_id_raw = raw.get("parent_event_id")
+    parent_event_id_out: str | None = None
+    if parent_event_id_raw is not None:
+        if not _is_non_empty_str(parent_event_id_raw):
+            reasons.append("invalid_field:parent_event_id")
+        else:
+            parent_event_id_out = parent_event_id_raw.strip()
+
+    evidence_refs_raw = raw.get("evidence_refs", [])
+    evidence_refs_out: list[str] = []
+    if evidence_refs_raw is None:
+        evidence_refs_raw = []
+    if not isinstance(evidence_refs_raw, list) or not all(
+        _is_non_empty_str(ref) for ref in evidence_refs_raw
+    ):
+        reasons.append("invalid_field:evidence_refs")
+    else:
+        evidence_refs_out = [ref.strip() for ref in evidence_refs_raw]
+
     meta_raw = raw.get("meta")
     meta_out: dict[str, Any] = {"model": None, "tags": []}
     if meta_raw is not None:
@@ -290,6 +309,8 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
         "kind": str(raw["kind"]).strip(),
         "step_index": int(raw["step_index"]),
         "actor": str(raw["actor"]).strip(),
+        "parent_event_id": parent_event_id_out,
+        "evidence_refs": evidence_refs_out,
         "tool": tool_out
         if tool_out is not None
         else {

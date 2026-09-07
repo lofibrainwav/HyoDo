@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 import hyodo
+from hyodo.event_graph import build_event_graph, render_event_graph_json
 from hyodo.events import read_agent_events
 from hyodo.policy import POLICY_RELATIVE_PATH, try_load_policy
 
@@ -171,6 +172,30 @@ def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, A
 
     details = {"events": len(events), "allow": allow, "deny": deny, "eval_pass_rate": eval_text}
 
+    if report_format == "graph":
+        graph = build_event_graph(
+            events,
+            corrupt=corrupt,
+            ledger_unreadable=evidence["ledger_unreadable"],
+        )
+        graph_json = render_event_graph_json(graph)
+        digest = hashlib.sha256(graph_json.encode("utf-8")).hexdigest()
+        summary = graph["summary"]
+        return (
+            graph_json,
+            digest,
+            {
+                "status": graph["status"],
+                "reason": graph["reason"],
+                "events": summary["events"],
+                "edges": summary["edges"],
+                "parent_links": summary["parent_links"],
+                "evidence_refs": summary["evidence_refs"],
+                "unresolved_refs": summary["unresolved_refs"],
+                "corrupt_event_lines": summary["corrupt_event_lines"],
+            },
+        )
+
     if report_format == "sarif":
         sarif = _render_sarif(evidence)
         digest = hashlib.sha256(sarif.encode("utf-8")).hexdigest()
@@ -222,15 +247,22 @@ def write_report(root: Path, report_format: str) -> tuple[int, dict[str, Any]]:
     """Write one local report and return the observable CLI summary."""
     try:
         content, digest, details = render_report(root, report_format)
-        relative = REPORTS_RELATIVE_DIR / f"hyodo-report.{report_format}"
+        suffix = "graph.json" if report_format == "graph" else report_format
+        relative = REPORTS_RELATIVE_DIR / f"hyodo-report.{suffix}"
         path = root / relative
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
     except OSError as exc:
         return 2, {"status": "UNOBSERVED", "reason": f"cannot write report: {exc}"}
-    return 0, {
-        "status": "READY",
+    status = str(details.pop("status", "READY"))
+    reason = details.pop("reason", None)
+    exit_code = 0 if status == "READY" else 2
+    summary = {
+        "status": status,
         "result_path": relative.as_posix(),
         "report_hash": digest,
         **details,
     }
+    if reason is not None:
+        summary["reason"] = reason
+    return exit_code, summary

@@ -18,7 +18,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 		<meta name="theme-color" content="#0b0d10" />
 		<meta
 			name="description"
-			content="A public, browser-only prototype of the HyoDo evidence graph, rendered from fixed demo data. Shows which agent-event fields are shipped today and which are proposed."
+			content="A public, browser-only prototype of the HyoDo evidence graph, rendered from fixed demo data. Shows the intended visual shape and the local graph-export boundary."
 		/>
 		<style>
 			/* Duplicated from index.astro's navbar/footer CSS on purpose — this
@@ -72,7 +72,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 		<main class="eg-wrap">
 			<h1>HyoDo Evidence Graph <span class="eg-badge">Prototype</span></h1>
 
-			<p class="eg-banner" role="note"><strong>Prototype.</strong> This is demo fixture data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below are proposed schema fields; they are not yet part of the shipped <code>hyodo.agent-event/v1</code> ledger. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
+			<p class="eg-banner" role="note"><strong>Prototype.</strong> This is demo fixture data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below mirror optional source-line graph fields, but this page still reads fixed fixture data only. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
 
 			<p class="eg-key">Rows are participants, columns are step index, cells are events. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
 
@@ -121,7 +121,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 				<p class="eg-key">The interactive grid needs JavaScript; the fixture and field meanings are documented at <a href="/docs/evidence-graph/">/docs/evidence-graph/</a>.</p>
 			</noscript>
 
-			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> (event_id, run_id, ts, kind, actor, step_index, tool, policy). <code>parent_event_id</code> and <code>evidence_refs</code> are proposed fields, shown here as fixture-only. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
+			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> (event_id, run_id, ts, kind, actor, step_index, tool, policy, optional parent_event_id/evidence_refs). This page remains fixture-only. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
 		</main>
 
 		<script>
