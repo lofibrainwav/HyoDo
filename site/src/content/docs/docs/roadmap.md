@@ -23,9 +23,9 @@ Stage 1 includes `ASK` decisions, trust levels, external variables, and web
 policy. That policy layer shipped in v4.13.0 and requires no model.
 
 The [evidence graph](/evidence-graph/) is a public, browser-only prototype that
-renders fixed demo data. The source development line can emit a local graph JSON
-report from the agent-event ledger, but the public page is not an installed
-browser viewer and does not read a real ledger. See
+renders fixed demo data. Since 4.14.0 the installed CLI renders the same graph
+from your real agent-event ledger (`hyodo dashboard`, `/graph`); the public
+page is not that viewer and does not read a real ledger. See
 [its documentation](/docs/evidence-graph/) for the exact boundary.
 
 Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo eye`) ship in HyoDo 4.15.0. They record digests, hashes, and receipts only; embeddings, model calls, and capture tools remain external.
