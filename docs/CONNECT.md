@@ -98,7 +98,11 @@ recorded only under `--shadow` — is a distinct observed host (`source:
 "hook"`, identity `hook:<actor_id>`), even though it never appears in the
 MCP access ledger. A repository onboarded only through `hyodo connect
 claude-code` (no MCP client ever ran) can still reach `coverage_status:
-OBSERVED` once enough distinct actors have recorded events.
+OBSERVED` once enough distinct actors have recorded events — and in that
+case its receipt's `reasons` array can be empty (nothing is blocking
+`READY`) while its `notes` array still lists `access_ledger_absent` and
+`hook_only_observation`, so a reader can always tell no MCP client has ever
+connected even on an otherwise-`READY` receipt.
 
 ## Exit codes
 

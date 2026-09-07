@@ -3044,6 +3044,14 @@ def mcp_continuity(
     Overall `status`/exit code stay READY/0 only when both are satisfied;
     otherwise UNOBSERVED/2 — an empty root is a false negative worth seeing,
     never a silent READY.
+
+    `reasons` drives `status`: once coverage reaches OBSERVED through
+    hook-only hosts, store-absence facts stop appearing there so a
+    hook-observed root can reach READY. Those facts are never dropped
+    though — `notes` always lists every store that is genuinely absent
+    (`access_ledger_absent`, `pairing_absent`, `policy_absent`,
+    `agent_events_absent`), plus `hook_only_observation` when every
+    observed host came from hooks and none from the MCP access ledger.
     """
     root_path = Path(root).expanduser().resolve()
     receipt = measure_continuity(root_path)
@@ -3081,6 +3089,8 @@ def mcp_continuity(
     )
     if receipt["reasons"]:
         console.print(f"[red]reasons: {', '.join(receipt['reasons'])}[/red]")
+    if receipt["notes"]:
+        console.print(f"[yellow]notes: {', '.join(receipt['notes'])}[/yellow]")
     raise typer.Exit(receipt["exit_code"])
 
 

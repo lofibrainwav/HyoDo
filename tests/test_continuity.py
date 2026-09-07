@@ -351,6 +351,24 @@ def test_continuity_empty_root_is_unobserved_not_ready(tmp_path) -> None:
     assert cli_receipt["coverage_status"] == "UNOBSERVED"
 
 
+def test_continuity_empty_root_notes_and_reasons_both_carry_the_absences(tmp_path) -> None:
+    """On an empty root, coverage never reaches OBSERVED, so every store-absence
+    fact is intentionally duplicated between `reasons` (why status is not
+    READY) and `notes` (the durable "what's absent" inventory)."""
+    receipt = measure_continuity(tmp_path)
+
+    for fact in (
+        "agent_events_absent",
+        "access_ledger_absent",
+        "pairing_absent",
+        "policy_absent",
+    ):
+        assert fact in receipt["reasons"], fact
+        assert fact in receipt["notes"], fact
+    # No hosts at all were observed, so there is nothing hook-only about it.
+    assert "hook_only_observation" not in receipt["notes"]
+
+
 def test_continuity_one_caller_is_partial_coverage(tmp_path) -> None:
     """One observed caller (of 2 expected) is PARTIAL coverage, not OBSERVED.
 
@@ -421,11 +439,30 @@ def test_continuity_counts_hook_recorded_actors_as_hosts(tmp_path) -> None:
     assert shadow_by_identity["hook:canary-p0b-20260907"] is True
     assert shadow_by_identity["hook:canary-p0c-20260907"] is False
 
+    # `reasons` is empty (a hook-only-observed root reaches READY), but the
+    # access ledger's genuine absence and the hook-only shape are never lost
+    # — they still show up in the always-present `notes` list.
+    assert receipt["reasons"] == []
+    assert "access_ledger_absent" in receipt["notes"]
+    assert "hook_only_observation" in receipt["notes"]
+    assert "policy_absent" in receipt["notes"]
+    assert "pairing_absent" in receipt["notes"]
+    assert "agent_events_absent" not in receipt["notes"]
+
     result = runner.invoke(app, ["mcp", "continuity", "--root", str(tmp_path), "--json"])
     assert result.exit_code == 0, result.output
     cli_receipt = json.loads(result.output)
     assert cli_receipt["status"] == "READY"
     assert cli_receipt["hosts"]["by_source"] == {"mcp": 0, "hook": 2}
+    assert cli_receipt["reasons"] == []
+    assert "access_ledger_absent" in cli_receipt["notes"]
+    assert "hook_only_observation" in cli_receipt["notes"]
+
+    text_result = runner.invoke(app, ["mcp", "continuity", "--root", str(tmp_path)])
+    assert text_result.exit_code == 0, text_result.output
+    assert "notes: " in text_result.output
+    assert "access_ledger_absent" in text_result.output
+    assert "hook_only_observation" in text_result.output
 
 
 def test_continuity_combines_one_hook_actor_and_one_mcp_caller(tmp_path) -> None:

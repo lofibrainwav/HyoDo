@@ -208,6 +208,20 @@ connected":
   `hosts_unobserved`, `hosts_partial`, `agent_events_absent`,
   `access_ledger_absent`, `pairing_absent`, or `policy_absent` applies, in
   addition to the corrupt/invalid reasons above.
+- **`notes`** — always present, never gated on `coverage_status`. `reasons`
+  is the `status` driver (any entry there forces `UNOBSERVED`), so once
+  coverage reaches `OBSERVED` through hook-only hosts, the store-absence
+  facts above stop appearing in `reasons` — a hook-observed root must still
+  be able to reach `READY`. Those facts are never actually lost, though:
+  `notes` carries `access_ledger_absent`, `pairing_absent`,
+  `policy_absent`, and `agent_events_absent` whenever that store is
+  genuinely absent, regardless of coverage, plus `hook_only_observation`
+  when every observed host came from hooks and none from the MCP access
+  ledger. When `coverage_status` is not `OBSERVED`, the same fact appears
+  in both `reasons` and `notes` — that duplication is intended: `reasons`
+  explains the non-`READY` verdict, `notes` is the durable "what's
+  actually absent" inventory that a reader can trust even on a `READY`
+  receipt.
 
 Exit `0` means overall `status` is `READY`. Exit `2` means `UNOBSERVED`,
 whether that is because a store is corrupt (`integrity_status: CORRUPT`) or

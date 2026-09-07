@@ -220,6 +220,22 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
     Exit code 0 means overall ``status`` is ``READY``; exit code 2 means it
     is ``UNOBSERVED``, whether that is because a store is corrupt or because
     coverage was never observed.
+
+    ``reasons`` is the ``status`` driver: any entry means ``UNOBSERVED``.
+    Once coverage reaches ``OBSERVED`` through hook-only hosts, the
+    store-absence facts (``access_ledger_absent``, ``pairing_absent``,
+    ``policy_absent``, ``agent_events_absent``) stop being appended to
+    ``reasons`` — a hook-observed root must still be able to reach
+    ``READY``. Those same facts are never dropped, though: ``notes`` is a
+    separate, always-present list that carries every store-absence fact
+    whenever that store is genuinely absent, regardless of
+    ``coverage_status``, plus ``hook_only_observation`` when every observed
+    host came from the agent-events ledger and none from the MCP access
+    ledger. When ``coverage_status`` is not ``OBSERVED``, the same absence
+    fact appears in both ``reasons`` and ``notes`` — that duplication is
+    intended: ``reasons`` explains the non-``READY`` verdict, ``notes`` is
+    the durable "what's actually absent" inventory that never disappears
+    just because coverage was satisfied without it.
     """
     resolved = root.expanduser().resolve()
     reasons: list[str] = []
@@ -372,6 +388,28 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
         if not policy_store.exists:
             reasons.append("policy_absent")
 
+    # --- notes: non-blocking facts, always present regardless of coverage ---
+    # `reasons` drives `status` (any entry means UNOBSERVED), so once
+    # coverage reaches OBSERVED through hook-only hosts the absence facts
+    # above stop being appended there — a hook-observed root must still be
+    # able to reach READY. `notes` carries the same store-absence facts
+    # unconditionally, so a reader never loses "the access ledger doesn't
+    # exist" just because coverage was satisfied without it. When coverage
+    # is not OBSERVED, the same fact appears in both `reasons` and `notes`
+    # — that duplication is intended: `reasons` explains the non-READY
+    # verdict, `notes` is the durable inventory of what's absent.
+    notes: list[str] = []
+    if not agent_events_store.exists:
+        notes.append("agent_events_absent")
+    if not access_store.exists:
+        notes.append("access_ledger_absent")
+    if not pairing_store.exists:
+        notes.append("pairing_absent")
+    if not policy_store.exists:
+        notes.append("policy_absent")
+    if hosts_observed > 0 and len(mcp_caller_list) == 0 and len(hook_caller_list) > 0:
+        notes.append("hook_only_observation")
+
     status = (
         "READY" if integrity_status == "READY" and coverage_status == "OBSERVED" else "UNOBSERVED"
     )
@@ -383,6 +421,7 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
         "integrity_status": integrity_status,
         "coverage_status": coverage_status,
         "reasons": reasons,
+        "notes": notes,
         "root": str(resolved),
         "stores": {
             "agent_events": agent_events_store.to_dict(),
