@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.15.0] - 2026-09-07
+
+Stage 2 of the HyoDo Agent OS design on the source line: skill lens, folder
+absorption, graph export bridge with actor rings and derived roles,
+ephemeral visual evidence, the optional `actor_id` field, the research-node
+hand-off, and the M5-C/M5-D onboarding and continuity receipts.
+
 ### Added
 
 - `hyodo skills ingest --from-node <file>` accepts a BYOM research node's
@@ -30,20 +37,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   column with zero events. See
   `docs/superpowers/specs/2026-09-06-hyodo-core-engine-monitor-design.md`
   and `docs/GRAPH_EXPORT.md`.
-
-### Fixed
-
-- Test integrity (1-E) no longer flags a test as `no_assertion` when it
-  delegates its assertions to a same-module helper function (checked
-  transitively up to three call hops); a helper defined in another module is
-  still unresolved and the test stays flagged. See `docs/TEST_INTEGRITY.md`.
-- `hyodo skills lens` now reports a seventh `unclassified` row/JSON key for
-  compiled rules that carry no `[pillars: ...]` tag and match no keyword, so
-  every compiled rule is visible in exactly one lens row. See
-  `docs/SKILLS.md`.
-
-### Added
-
 - Optional `actor_id` field on `hyodo.agent-event/v1` (additive; absent or
   `null` by default): an opaque label the harness chooses (session id, seat
   name, model alias) so two agents in one run keep separate rows instead of
@@ -109,6 +102,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   rings, built from the ledger and local `.hyodo/skills/manifest.json` /
   `.hyodo/connect.json` manifests only — no network. `GET
   /api/actor?key=<row key>` serves the same rings as JSON.
+
+### Fixed
+
+- Test integrity (1-E) no longer flags a test as `no_assertion` when it
+  delegates its assertions to a same-module helper function (checked
+  transitively up to three call hops); a helper defined in another module is
+  still unresolved and the test stays flagged. See `docs/TEST_INTEGRITY.md`.
+- `hyodo skills lens` now reports a seventh `unclassified` row/JSON key for
+  compiled rules that carry no `[pillars: ...]` tag and match no keyword, so
+  every compiled rule is visible in exactly one lens row. See
+  `docs/SKILLS.md`.
+
+### Evidence
+
+- Release receipt: `docs/releases/4.15.0.md` (chain boxes are checked as each
+  step is measured).
 
 ## [4.14.0] - 2026-09-07
 
