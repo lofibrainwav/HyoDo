@@ -37,7 +37,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from secrets import compare_digest, token_urlsafe
 from typing import Any
-from urllib.parse import parse_qs
+from urllib.parse import parse_qs, urlsplit
 
 import typer
 from rich.console import Console
@@ -116,6 +116,8 @@ from hyodo.gates import (
     render_gates_toml,
     run_user_gates,
 )
+from hyodo.graph_export import build_graph_export
+from hyodo.graph_view import build_actor_rings
 from hyodo.mcp_config import (
     ALL_HOSTS,
     CHATGPT_UNOBSERVED_MESSAGE,
@@ -229,6 +231,13 @@ skills_app = typer.Typer(
     help="Ingest a project's own skills as a lens over the six pillars",
     add_completion=False,
 )
+# Package 2-C: kept as its own sub-app registration block, deliberately
+# small, so a merge with any other lane's CLI edits stays trivial.
+graph_app = typer.Typer(
+    name="graph",
+    help="Evidence-graph export bridge (Package 2-C, no auto-approval)",
+    add_completion=False,
+)
 mcp_app.add_typer(rules_app, name="rules")
 mcp_app.add_typer(pairing_app, name="pairing")
 app.add_typer(event_app, name="event")
@@ -237,6 +246,7 @@ policy_app.add_typer(trust_app, name="trust")
 app.add_typer(schema_app, name="schema")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(skills_app, name="skills")
+app.add_typer(graph_app, name="graph")
 console = Console()
 
 
@@ -724,7 +734,7 @@ class DashboardState:
 # pages at "/" and "/graph" are never CORS targets (a cross-origin page can
 # only read response bodies from these JSON endpoints when the browser
 # lets it).
-_CORS_ELIGIBLE_PATHS = frozenset({"/api/evidence", "/api/status", "/api/graph"})
+_CORS_ELIGIBLE_PATHS = frozenset({"/api/evidence", "/api/status", "/api/graph", "/api/actor"})
 
 
 def make_dashboard_handler(
@@ -756,21 +766,46 @@ def make_dashboard_handler(
     class DashboardHandler(BaseHTTPRequestHandler):
         """Serve the dashboard's current loopback snapshot over HTTP."""
 
-        def _resolve(self) -> tuple[bytes, str] | None:
-            if self.path in ("/graph", "/api/graph"):
+        def _path(self) -> str:
+            """The request path without its query string (`self.path` carries both)."""
+            return urlsplit(self.path).path
+
+        def _resolve(self) -> tuple[bytes, str, int] | None:
+            path = self._path()
+            if path in ("/graph", "/api/graph"):
                 if root is None:
                     return None
                 graph = build_report_graph(root)
-                if self.path == "/graph":
-                    return render_graph_html(graph).encode("utf-8"), "text/html; charset=utf-8"
-                return render_event_graph_json(graph).encode("utf-8"), "application/json"
+                if path == "/graph":
+                    return (
+                        render_graph_html(graph, root=root).encode("utf-8"),
+                        "text/html; charset=utf-8",
+                        200,
+                    )
+                return render_event_graph_json(graph).encode("utf-8"), "application/json", 200
+            if path == "/api/actor":
+                # Package 2-C: actor rings (spec section 5), keyed the same way
+                # `build_actor_rows` keys its own `rows` dict (Ruling 3).
+                if root is None:
+                    return None
+                graph = build_report_graph(root)
+                rings = build_actor_rings(graph, root)
+                query = parse_qs(urlsplit(self.path).query)
+                key = query.get("key", [None])[0]
+                if key is None or key not in rings:
+                    return (
+                        json.dumps({"error": "unknown_actor"}).encode("utf-8"),
+                        "application/json",
+                        404,
+                    )
+                return json.dumps(rings[key]).encode("utf-8"), "application/json", 200
             page, evidence_json = state.snapshot()
-            if self.path == "/":
-                return page, "text/html; charset=utf-8"
-            if self.path == "/api/evidence":
-                return evidence_json, "application/json"
-            if self.path == "/api/status":
-                return state.status(), "application/json"
+            if path == "/":
+                return page, "text/html; charset=utf-8", 200
+            if path == "/api/evidence":
+                return evidence_json, "application/json", 200
+            if path == "/api/status":
+                return state.status(), "application/json", 200
             return None
 
         def _cors_headers(self) -> list[tuple[str, str]]:
@@ -780,15 +815,15 @@ def make_dashboard_handler(
             header was sent, and it exactly matches a configured allowed
             origin. No wildcard, no partial/prefix/suffix match.
             """
-            if self.path not in _CORS_ELIGIBLE_PATHS or not allowed_origins:
+            if self._path() not in _CORS_ELIGIBLE_PATHS or not allowed_origins:
                 return []
             origin = self.headers.get("Origin")
             if not origin or origin not in allowed_origins:
                 return []
             return [("Access-Control-Allow-Origin", origin), ("Vary", "Origin")]
 
-        def _send_headers(self, body: bytes, content_type: str) -> None:
-            self.send_response(200)
+        def _send_headers(self, body: bytes, content_type: str, status: int = 200) -> None:
+            self.send_response(status)
             self.send_header("Content-Type", content_type)
             self.send_header("Content-Length", str(len(body)))
             self.send_header("Cache-Control", "no-store")
@@ -804,8 +839,8 @@ def make_dashboard_handler(
             if resolved is None:
                 self.send_error(404, "Not found")
                 return
-            body, content_type = resolved
-            self._send_headers(body, content_type)
+            body, content_type, status = resolved
+            self._send_headers(body, content_type, status)
             self.wfile.write(body)
 
         def do_HEAD(self) -> None:
@@ -814,8 +849,8 @@ def make_dashboard_handler(
             if resolved is None:
                 self.send_error(404, "Not found")
                 return
-            body, content_type = resolved
-            self._send_headers(body, content_type)
+            body, content_type, status = resolved
+            self._send_headers(body, content_type, status)
 
         def do_POST(self) -> None:
             """Refresh local evidence only when the server-issued token matches."""
@@ -3839,6 +3874,66 @@ def _ask_audience_question(root: Path) -> str | None:
     config_path = write_audience_config(root, chosen)
     console.print(f"[green]Wrote {config_path} with audience profile '{chosen}'.[/green]")
     return chosen
+
+
+@graph_app.command("export")
+def graph_export_cmd(
+    out: str = typer.Option(
+        ".hyodo/graph.json", "--out", help="Path (relative to --root) to write the export to"
+    ),
+    yes: bool = typer.Option(False, "--yes", help="Skip the confirmation prompt"),
+    root: str = typer.Option(".", "--root", help="Project root to read the ledger from"),
+):
+    """
+    Write the `hyodo.graph-export/v1` bridge artifact (Package 2-C).
+
+    Nodes/edges mirror `hyodo report --format graph`'s own
+    `hyodo.evidence-graph/v1` shape; `backlinks` reverse-indexes every
+    non-broken `evidence_refs` entry; `clusters` groups decision events by
+    pillar. A pre-1-B ledger (no `parent_event_id`/`evidence_refs`
+    anywhere) still exports successfully, with empty `edges`/`backlinks` —
+    an honestly empty graph is not an error.
+
+    Mirrors `connect`'s consent pattern: default is an interactive
+    confirmation before writing; `--yes` skips it for non-interactive
+    callers, which must say so explicitly (silence is not consent).
+
+    Exit: 0 written, 1 confirmation declined without `--yes`, 2 the
+    ledger could not be read at all or the write itself failed.
+    """
+    root_path = Path(root).resolve()
+    graph = build_report_graph(root_path)
+    if graph.get("reason") == "ledger_unreadable":
+        console.print(
+            "[red]The agent-event ledger exists but could not be read — nothing exported.[/red]"
+        )
+        raise typer.Exit(2)
+
+    export = build_graph_export(graph)
+
+    if not yes:
+        if sys.stdin.isatty():
+            proceed = typer.confirm(f"Write graph export to {out}?")
+            if not proceed:
+                console.print("[yellow]Declined - nothing written.[/yellow]")
+                raise typer.Exit(1)
+        else:
+            console.print(
+                "[yellow]confirmation_required: pass --yes to write without a prompt - "
+                "nothing written.[/yellow]"
+            )
+            raise typer.Exit(1)
+
+    out_path = root_path / out
+    try:
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        out_path.write_text(json.dumps(export, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    except OSError as exc:
+        console.print(f"[red]Write failed: {exc}[/red]")
+        raise typer.Exit(2) from exc
+
+    console.print(f"[green]Wrote {out_path}[/green]")
+    raise typer.Exit(0)
 
 
 def _connect_host_with_confirm(root: Path, host: str) -> None:

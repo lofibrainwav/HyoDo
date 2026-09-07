@@ -105,3 +105,31 @@ def test_virtue_tokens_appear_in_fixed_column_order():
         "tokens.css virtue tokens must appear in the fixed order Truth, "
         "Goodness, Beauty, Benevolence, Hyo, Eternity"
     )
+
+
+# Package 2-C, Ruling 5: the four actor-ring layer colours
+# (`hyodo.dashboard.RING_COLORS`) are guarded the same way as the six
+# virtue colours above — `site/src/styles/tokens.css`'s `--color-ring-*`
+# custom properties are the SSOT this test parses both ends against.
+RING_TOKEN_RE = re.compile(r"--color-ring-(?P<slug>[a-z]+):\s*(?P<hex>#[0-9a-fA-F]{6})\s*;")
+
+
+def _tokens_ring_slug_to_hex() -> dict[str, str]:
+    text = TOKENS_PATH.read_text(encoding="utf-8")
+    return {m.group("slug"): m.group("hex") for m in RING_TOKEN_RE.finditer(text)}
+
+
+def test_ring_colors_match_tokens_css_ssot():
+    if not TOKENS_PATH.exists():
+        pytest.skip("site/ is absent (sdist install) — nothing to compare")
+
+    from hyodo.dashboard import RING_COLORS
+
+    tokens_hex = _tokens_ring_slug_to_hex()
+    assert tokens_hex, "no --color-ring-* custom properties found in tokens.css"
+    for layer, hex_value in RING_COLORS.items():
+        assert layer in tokens_hex, f"tokens.css is missing --color-ring-{layer}"
+        assert tokens_hex[layer] == hex_value, (
+            f"hyodo.dashboard.RING_COLORS[{layer!r}] ({hex_value}) does not match "
+            f"tokens.css's --color-ring-{layer} ({tokens_hex[layer]})"
+        )

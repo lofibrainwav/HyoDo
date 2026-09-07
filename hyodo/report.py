@@ -11,6 +11,8 @@ from typing import Any
 import hyodo
 from hyodo.event_graph import build_event_graph, render_event_graph_json
 from hyodo.events import read_agent_events
+from hyodo.graph_export import compute_backlinks
+from hyodo.graph_view import build_actor_rows
 from hyodo.policy import POLICY_RELATIVE_PATH, try_load_policy
 
 REPORTS_RELATIVE_DIR = Path(".hyodo") / "reports"
@@ -166,6 +168,14 @@ def build_report_graph(root: Path, evidence: dict[str, Any] | None = None) -> di
     ``GET /api/graph`` (`hyodo/cli/main.py`) so both read the same ledger
     with identical corrupt/unreadable and mission-policy handling — the
     viewer never computes a second, looser notion of "ready".
+
+    Package 2-C adds two additive fields on top of 1-B's shape:
+    ``backlinks`` (the reverse index of every non-broken ``evidence_refs``
+    entry, `hyodo.graph_export.compute_backlinks`) and ``rows`` (the
+    per-actor row tree with role/hyo-hierarchy annotations,
+    `hyodo.graph_view.build_actor_rows`) — the same rows the ``/graph``
+    page and the actor-rings endpoint (`GET /api/actor`) render from.
+    Neither field changes this function's ``status``/``reason`` contract.
     """
     evidence = evidence if evidence is not None else _collect_evidence(root)
     graph = build_event_graph(
@@ -182,6 +192,8 @@ def build_report_graph(root: Path, evidence: dict[str, Any] | None = None) -> di
     ):
         graph["status"] = "UNOBSERVED"
         graph["reason"] = f"mission_unobserved:{graph['summary']['intent_unobserved_runs'][0]}"
+    graph["backlinks"] = compute_backlinks(graph["edges"])
+    graph["rows"] = build_actor_rows(graph["nodes"], graph["edges"])
     return graph
 
 

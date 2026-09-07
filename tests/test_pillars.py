@@ -305,7 +305,7 @@ def test_render_v2_pillars_without_composite_score(tmp_path):
     assert "Mutating flags (--fix)" in html
     assert "Recorded measurement runs" in html
     assert "All-PASS run rate" in html
-    assert "100% (1/1)" in html
+    assert "1/1 runs all-PASS" in html
     assert "Not measured" not in html
     assert "composite score" in html  # the header still promises no composite score
     assert "inventory artifact" in html  # SBOM stays labelled as inventory only
