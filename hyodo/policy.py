@@ -29,10 +29,11 @@ except ModuleNotFoundError:  # Python 3.10
 POLICY_SCHEMA_ID = "hyodo.policy/v1"
 POLICY_RELATIVE_PATH = Path(".hyodo") / "policy.toml"
 _BUILTIN_WEB_TOOLS = frozenset({"web_fetch", "browser", "http", "fetch", "WebFetch", "WebSearch"})
-#: Tools that ingest supply-chain-shaped content (a skill's rules), judged the
-#: same conservative way a web fetch is: unconditionally an external variable,
+#: Tools that ingest supply-chain-shaped content (a skill's rules) or capture
+#: an undeclared screen boundary (``hyodo eye``), judged the same
+#: conservative way a web fetch is: unconditionally an external variable,
 #: never promotable to ALLOW at trust level 2 (see the trust gate below).
-_BUILTIN_SUPPLY_CHAIN_TOOLS = frozenset({"skills.ingest"})
+_BUILTIN_SUPPLY_CHAIN_TOOLS = frozenset({"skills.ingest", "eye.capture"})
 _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD"})
 
 
@@ -57,6 +58,19 @@ class TrustPolicy:
 
 
 @dataclass(frozen=True)
+class EphemeralPolicy:
+    """Advisory comparison threshold for ``hyodo eye verify``.
+
+    ``phash_distance_threshold`` is a Hamming distance out of 64 bits, never
+    a probability: it only annotates whether ``eye verify`` prints "same
+    screen" or "different screen" text, the same way ``ask_threshold`` only
+    annotates ``--explain`` text and never changes a policy decision.
+    """
+
+    phash_distance_threshold: int = 10  # out of 64 bits; advisory only
+
+
+@dataclass(frozen=True)
 class PolicyConfig:
     """Parsed agent policy."""
 
@@ -77,6 +91,7 @@ class PolicyConfig:
     ask_tools: tuple[str, ...] = ()
     ask_threshold: int | None = None
     trust: TrustPolicy | None = None
+    ephemeral: EphemeralPolicy | None = None
 
     @property
     def allowlist_active(self) -> bool:
@@ -218,6 +233,22 @@ def load_policy_config(path: Path) -> PolicyConfig:
             raise PolicyConfigError(f"{path}: trust.max_level must be an integer between 0 and 3")
         trust = TrustPolicy(max_level=max_level)
 
+    ephemeral_raw = raw.get("ephemeral")
+    ephemeral: EphemeralPolicy | None = None
+    if ephemeral_raw is not None:
+        if not isinstance(ephemeral_raw, dict):
+            raise PolicyConfigError(f"{path}: [ephemeral] must be a table")
+        phash_distance_threshold = ephemeral_raw.get("phash_distance_threshold", 10)
+        if (
+            not isinstance(phash_distance_threshold, int)
+            or isinstance(phash_distance_threshold, bool)
+            or not 0 <= phash_distance_threshold <= 64
+        ):
+            raise PolicyConfigError(
+                f"{path}: ephemeral.phash_distance_threshold must be an integer between 0 and 64"
+            )
+        ephemeral = EphemeralPolicy(phash_distance_threshold=phash_distance_threshold)
+
     return PolicyConfig(
         schema=schema,
         max_steps=max_steps,
@@ -229,6 +260,7 @@ def load_policy_config(path: Path) -> PolicyConfig:
         ask_tools=tuple(ask_tools_raw),
         ask_threshold=ask_threshold,
         trust=trust,
+        ephemeral=ephemeral,
     )
 
 
@@ -492,9 +524,15 @@ def evaluate_policy(
         external_variables.append(f"ask_tools:{tool_name}")
 
     if is_tool_event and tool_name in _BUILTIN_SUPPLY_CHAIN_TOOLS:
-        domain = urls[0].get("domain") if urls else None
-        source = paths[0] if paths else (domain or "unknown")
-        external_variables.append(f"skill_ingest:{source}")
+        if tool_name == "eye.capture":
+            # Exact string, no suffix: an undeclared screen capture is a
+            # boundary in itself, not something identified by a source path
+            # or domain the way a skill ingest or web fetch is.
+            external_variables.append("eye_capture")
+        else:
+            domain = urls[0].get("domain") if urls else None
+            source = paths[0] if paths else (domain or "unknown")
+            external_variables.append(f"skill_ingest:{source}")
 
     if unobserved_boundary is not None:
         return PolicyDecision(

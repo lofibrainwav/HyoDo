@@ -38,6 +38,13 @@ ACTORS = frozenset({"agent", "human", "hyodo"})
 POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK", "UNOBSERVED"})
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{12}$")
+#: 16 lowercase hex characters = 64 bits, sized for the ``dct64`` perceptual
+#: hash (Stage 2 package 2-D, ``hyodo eye``). See ``meta.ephemeral.phash``.
+_PHASH_RE = re.compile(r"^[0-9a-f]{16}$")
+#: The only ``meta.ephemeral.phash_algo`` value Stage 2 accepts. A later
+#: algorithm gets a new literal; two captures are only comparable when their
+#: ``phash_algo`` values match (see ``hyodo eye verify``).
+_PHASH_ALGO_DCT64 = "dct64"
 GATE_REF_RE = re.compile(r"^gate:[A-Za-z0-9_.\-]+@[0-9a-f]{7,64}$")
 _HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 
@@ -337,7 +344,7 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
         evidence_refs_out = [ref.strip() for ref in evidence_refs_raw]
 
     meta_raw = raw.get("meta")
-    meta_out: dict[str, Any] = {"model": None, "tags": []}
+    meta_out: dict[str, Any] = {"model": None, "tags": [], "ephemeral": None}
     if meta_raw is not None:
         if not isinstance(meta_raw, dict):
             reasons.append("invalid_field:meta")
@@ -354,6 +361,53 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                 reasons.append("invalid_field:meta.tags")
             else:
                 meta_out["tags"] = list(tags)
+
+            ephemeral_raw = meta_raw.get("ephemeral")
+            if ephemeral_raw is not None:
+                if not isinstance(ephemeral_raw, dict):
+                    reasons.append("invalid_field:meta.ephemeral")
+                else:
+                    ttl_s = ephemeral_raw.get("ttl_s")
+                    phash_algo = ephemeral_raw.get("phash_algo")
+                    phash = ephemeral_raw.get("phash")
+                    destroyed_at = ephemeral_raw.get("destroyed_at")
+                    kept = ephemeral_raw.get("kept")
+                    unsupported = ephemeral_raw.get("unsupported")
+                    ephemeral_ok = True
+                    if not isinstance(ttl_s, int) or isinstance(ttl_s, bool) or ttl_s < 0:
+                        reasons.append("invalid_field:meta.ephemeral.ttl_s")
+                        ephemeral_ok = False
+                    if phash_algo != _PHASH_ALGO_DCT64:
+                        reasons.append("invalid_field:meta.ephemeral.phash_algo")
+                        ephemeral_ok = False
+                    # phash may be null (only expected on the eye_image_unsupported
+                    # failure path, where no hash could be computed) or 16 lowercase
+                    # hex characters; anything else is a format error.
+                    if phash is not None and not (
+                        isinstance(phash, str) and _PHASH_RE.fullmatch(phash)
+                    ):
+                        reasons.append("invalid_field:meta.ephemeral.phash")
+                        ephemeral_ok = False
+                    if destroyed_at is not None and not isinstance(destroyed_at, str):
+                        reasons.append("invalid_field:meta.ephemeral.destroyed_at")
+                        ephemeral_ok = False
+                    if not isinstance(kept, bool):
+                        reasons.append("invalid_field:meta.ephemeral.kept")
+                        ephemeral_ok = False
+                    if unsupported is not None and not isinstance(unsupported, bool):
+                        reasons.append("invalid_field:meta.ephemeral.unsupported")
+                        ephemeral_ok = False
+                    if ephemeral_ok:
+                        normalized_ephemeral: dict[str, Any] = {
+                            "ttl_s": ttl_s,
+                            "phash_algo": phash_algo,
+                            "phash": phash,
+                            "destroyed_at": destroyed_at,
+                            "kept": kept,
+                        }
+                        if unsupported is not None:
+                            normalized_ephemeral["unsupported"] = unsupported
+                        meta_out["ephemeral"] = normalized_ephemeral
 
     if reasons:
         return False, reasons, None
