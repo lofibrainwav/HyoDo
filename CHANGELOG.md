@@ -9,6 +9,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `hyodo skills ingest|lens|propose` (Stage 2 package 2-A, the "skill
+  lens"): ingest a project's own Markdown skill as an external variable
+  (never silently `ALLOW`, `.hyodo/skills/manifest.json`), report live
+  per-pillar `observed/expected` coverage with rule-level provenance, and
+  propose a tailored custom skill made of the currently-passing compiled
+  rules. No model, no RAG, no fetched skill bodies by default. See
+  `docs/SKILLS.md`.
 - `hyodo mcp config <host>` (`claude-code`, `claude-desktop`, `cursor`,
   `vscode`, `codex`): prints, or with `--write` merges key-level, the MCP
   client configuration that registers HyoDo's local stdio adapter — no
