@@ -10,14 +10,26 @@ import threading
 import time
 import uuid
 from pathlib import Path
+from typing import Any
 
-import httpx
 import pytest
 import tomllib
-import uvicorn
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
-from mcp.client.streamable_http import streamablehttp_client
+
+try:  # HTTP bridge tests need extras the base test lane does not install.
+    import httpx
+    import uvicorn
+    from mcp.client.streamable_http import streamablehttp_client
+except ImportError:  # pragma: no cover - exercised only in the base lane
+    httpx = None  # type: ignore[assignment]
+    uvicorn = None  # type: ignore[assignment]
+    streamablehttp_client = None  # type: ignore[assignment]
+
+needs_http_bridge = pytest.mark.skipif(
+    httpx is None or uvicorn is None or streamablehttp_client is None,
+    reason="httpx, uvicorn, and the streamable HTTP client are required",
+)
 from typer.testing import CliRunner
 
 from hyodo.access_ledger import read_access_log
@@ -491,7 +503,7 @@ def test_mcp_loopback_auth_allows_valid_bearer_to_reach_the_mcp_endpoint():
 # ── M5-B: paired loopback bridge receipts ──────────────────────────────────
 
 
-async def _post_mcp(asgi_app, token: str | None) -> httpx.Response:
+async def _post_mcp(asgi_app, token: str | None) -> Any:
     """One raw HTTP POST against a paired app's rejection path.
 
     The pairing middleware rejects before the MCP session manager is ever
@@ -504,6 +516,7 @@ async def _post_mcp(asgi_app, token: str | None) -> httpx.Response:
         return await client.post("/mcp", headers=headers, json={})
 
 
+@needs_http_bridge
 def test_mcp_paired_bridge_authenticated_route_reaches_the_locked_workspace(tmp_path):
     """Receipt: one authenticated remote route reaches one root-locked workspace."""
     from hyodo.access_ledger import AccessEntry
@@ -536,6 +549,7 @@ def test_mcp_paired_bridge_authenticated_route_reaches_the_locked_workspace(tmp_
     assert entries[-1].caller_id == record.workspace_id
 
 
+@needs_http_bridge
 def test_mcp_paired_bridge_revoked_token_is_rejected(tmp_path):
     """Receipt: revoke takes effect immediately — same token, 401 REVOKED."""
     from hyodo.mcp_server import create_loopback_app
@@ -550,6 +564,7 @@ def test_mcp_paired_bridge_revoked_token_is_rejected(tmp_path):
     assert response.json() == {"state": "REVOKED"}
 
 
+@needs_http_bridge
 def test_mcp_paired_bridge_unpaired_workspace_is_rejected(tmp_path):
     """Receipt: no pairing file at all — 401 UNPAIRED, never PASS."""
     from hyodo.mcp_server import create_loopback_app
@@ -562,6 +577,7 @@ def test_mcp_paired_bridge_unpaired_workspace_is_rejected(tmp_path):
     assert response.json() == {"state": "UNPAIRED"}
 
 
+@needs_http_bridge
 def test_mcp_paired_bridge_corrupt_pairing_file_is_unobserved(tmp_path):
     """Receipt: a present-but-unreadable pairing file fails closed as UNOBSERVED."""
     from hyodo.mcp_server import create_loopback_app
@@ -577,6 +593,7 @@ def test_mcp_paired_bridge_corrupt_pairing_file_is_unobserved(tmp_path):
     assert response.json() == {"state": "UNOBSERVED"}
 
 
+@needs_http_bridge
 def test_mcp_paired_bridge_never_persists_the_token(tmp_path):
     """Receipt: the bearer token is never written to the pairing file or the ledger."""
     from hyodo.mcp_server import create_loopback_app
