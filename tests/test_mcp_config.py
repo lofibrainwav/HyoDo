@@ -386,3 +386,28 @@ def test_plan_host_and_write_host_agree_on_content(tmp_path: Path) -> None:
         assert planned.status == "would_write"
         written = write_host(host, tmp_path, home=tmp_path)
         assert written.content == planned.content
+
+
+def test_dry_run_preview_keeps_bracketed_path_text(tmp_path, monkeypatch):
+    """A root whose name looks like Rich markup is printed literally in the preview."""
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+
+    root = tmp_path / "[red]project"
+    root.mkdir()
+    monkeypatch.setenv("HOME", str(tmp_path))
+    result = CliRunner().invoke(app, ["mcp", "config", "claude-code", "--root", str(root)])
+    assert result.exit_code == 0, result.output
+    assert "[red]project" in result.output
+
+
+def test_global_hosts_are_labelled_in_the_preview(tmp_path, monkeypatch):
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+
+    monkeypatch.setenv("HOME", str(tmp_path))
+    result = CliRunner().invoke(app, ["mcp", "config", "codex", "--root", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "(global, not project-scoped)" in result.output

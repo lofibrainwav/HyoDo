@@ -40,6 +40,7 @@ from urllib.parse import parse_qs
 
 import typer
 from rich.console import Console
+from rich.markup import escape as rich_escape
 from rich.panel import Panel
 from rich.table import Table
 
@@ -2484,7 +2485,10 @@ def mcp_config_cmd(
     if plan.status == "up_to_date":
         console.print(f"[green]up to date[/green] {host}: {plan.message}")
     else:
-        console.print(f"[cyan]{host}[/cyan] {verb}: {plan.path}")
+        scope = " (global, not project-scoped)" if host in {"codex", "claude-desktop"} else ""
+        console.print(
+            f"[cyan]{rich_escape(str(host))}[/cyan] {verb}: {rich_escape(str(plan.path))}{scope}"
+        )
         console.print("  ---")
         for line in plan.content.splitlines():
             # markup=False: raw file content (TOML table headers like
@@ -3581,7 +3585,9 @@ def connect(
                 )
             )
         else:
-            console.print(f"[cyan]dry run[/cyan] {target}: {plan.message}")
+            console.print(
+                f"[cyan]dry run[/cyan] {rich_escape(str(target))}: {rich_escape(str(plan.message))}"
+            )
             if shadow and plan.shadow_ignored:
                 console.print("[dim]--shadow has no effect on this target (always enforced).[/dim]")
             for f in plan.files:
@@ -3589,7 +3595,7 @@ def connect(
                 console.print(f"  would {verb}: {f.path}")
                 console.print("  ---")
                 for line in f.content.splitlines():
-                    console.print(f"  {line}")
+                    console.print(f"  {line}", markup=False)
                 console.print("  ---")
         raise typer.Exit(0)
 
@@ -3766,13 +3772,14 @@ def _connect_host_with_confirm(root: Path, host: str) -> None:
     console.print(f"\n[bold]Preview for '{host}':[/bold]")
     connect_plan = plan_target("claude-code", root, shadow=False) if host == "claude-code" else None
     if connect_plan is not None:
-        console.print(f"  connect claude-code: {connect_plan.message}")
+        console.print(f"  connect claude-code: {rich_escape(str(connect_plan.message))}")
         for planned_file in connect_plan.files:
-            console.print(f"    {planned_file.path}")
+            console.print(f"    {rich_escape(str(planned_file.path))}")
     mcp_plan = plan_host(host, root)
-    console.print(f"  mcp config {host}: {mcp_plan.message}")
+    console.print(f"  mcp config {rich_escape(str(host))}: {rich_escape(str(mcp_plan.message))}")
     if mcp_plan.path is not None:
-        console.print(f"    {mcp_plan.path}")
+        scope = " (global, not project-scoped)" if host in {"codex", "claude-desktop"} else ""
+        console.print(f"    {rich_escape(str(mcp_plan.path))}{scope}")
     if not mcp_plan.verified:
         console.print(f"  [yellow]{UNVERIFIED_FORMAT_LABEL}[/yellow]")
 
