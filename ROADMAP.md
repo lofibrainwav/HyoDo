@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.13.0 is the latest published release. Main is preparing the 4.14.0
+HyoDo 4.14.0 is the latest published release. Main is preparing the 4.15.0
 development cycle.
 
 Landed and released:
@@ -52,7 +52,7 @@ evidence is not converted into a pass.
   grants and fail-closed `UNOBSERVED` handling.
 - Keep the seven version-bearing sources synchronized during release prep.
 
-### 4.14.0 development cycle
+### 4.14.0 (released 2026-09-07)
 
 - Phase 1 packages 1-B through 1-E (graph edges, digest-only URLs, mission
   detection, test integrity) landed on main.
@@ -66,6 +66,20 @@ evidence is not converted into a pass.
 - `hyodo connect` dry-run-by-default harness wiring for Claude Code hooks,
   `pre-commit`, and GitHub Actions, with `--shadow` mode and `--status` drift
   reporting.
+
+### 4.15.0 development cycle
+
+- M5-C onboarding (`hyodo mcp config <host>`, guided `hyodo start`) and M5-D
+  continuity receipt (`hyodo mcp continuity`) closed issue #163.
+- Stage 2 packages on the source line: `hyodo skills ingest|lens|propose`
+  (skill files consumed as a lens over the six pillars, ingestion gated as a
+  supply-chain external variable), `hyodo inspect` (digest-only folder and
+  chunk manifests, connector-supplied remote inventories recorded as claims),
+  `hyodo graph export` (backlinks and pillar clusters) with actor rings and
+  derived actor roles in the local viewer, and `hyodo eye capture|verify`
+  (ephemeral visual evidence with an existence and destruction pair).
+- Embeddings, model calls, and screen capture tools stay outside HyoDo: the
+  package records digests, hashes, and receipts only.
 
 ## Next candidates
 
