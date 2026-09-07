@@ -28,7 +28,7 @@ report from the agent-event ledger, but the public page is not an installed
 browser viewer and does not read a real ledger. See
 [its documentation](/docs/evidence-graph/) for the exact boundary.
 
-Stage 2's bring-your-own-model support is not built yet.
+Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo eye`) exist on the source development line and are not yet in a published release. They record digests, hashes, and receipts only; embeddings, model calls, and capture tools remain external.
 
 ## Shipped today vs. not built yet
 

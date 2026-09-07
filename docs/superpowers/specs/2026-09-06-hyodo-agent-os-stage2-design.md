@@ -2,13 +2,18 @@
 
 ## Status
 
-Draft for owner review; nothing here is implemented. Phase 1 packages
-1-A through 1-E are on main as of 4.14.0 preparation. Every
-citation below to `hyodo/policy.py`, `hyodo/events.py`, `hyodo/gates.py`,
-and `hyodo/safety.py` points at code that exists today; every citation to
-`docs/superpowers/specs/2026-09-06-hyodo-agent-os-phase1-design.md`
-points at design that is written but not yet built, and this document
-never restates that design — it links to it.
+Implemented on main as of 2026-09-07. Package 2-A `hyodo skills` landed in
+PR #176, 2-B `hyodo inspect` in PR #177, 2-C `hyodo graph export` with the
+viewer's actor rings and derived roles in PR #180, and 2-D `hyodo eye` in
+PR #179; the residual follow-ups (test-integrity helper carve-out, the
+`unclassified` lens row) landed in PR #178. Phase 1 packages 1-A through
+1-E shipped in 4.14.0. Where a section below still uses future tense it
+describes the design as it was frozen before implementation; the shipped
+behaviour is documented in `docs/SKILLS.md`, `docs/INSPECT.md`,
+`docs/GRAPH_EXPORT.md` and `docs/EYE.md`. Known gaps carried forward:
+agent-to-agent nesting cannot be shown because the ledger's `actor` field
+has three values (an optional actor identifier is an owner decision), and
+`url:` skill sources are recorded but never fetched.
 
 ## Context
 
