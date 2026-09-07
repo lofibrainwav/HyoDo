@@ -29,6 +29,10 @@ except ModuleNotFoundError:  # Python 3.10
 POLICY_SCHEMA_ID = "hyodo.policy/v1"
 POLICY_RELATIVE_PATH = Path(".hyodo") / "policy.toml"
 _BUILTIN_WEB_TOOLS = frozenset({"web_fetch", "browser", "http", "fetch", "WebFetch", "WebSearch"})
+#: Tools that ingest supply-chain-shaped content (a skill's rules), judged the
+#: same conservative way a web fetch is: unconditionally an external variable,
+#: never promotable to ALLOW at trust level 2 (see the trust gate below).
+_BUILTIN_SUPPLY_CHAIN_TOOLS = frozenset({"skills.ingest"})
 _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD"})
 
 
@@ -486,6 +490,11 @@ def evaluate_policy(
 
     if is_tool_event and _is_web_classified(tool_name, policy):
         external_variables.append(f"ask_tools:{tool_name}")
+
+    if is_tool_event and tool_name in _BUILTIN_SUPPLY_CHAIN_TOOLS:
+        domain = urls[0].get("domain") if urls else None
+        source = paths[0] if paths else (domain or "unknown")
+        external_variables.append(f"skill_ingest:{source}")
 
     if unobserved_boundary is not None:
         return PolicyDecision(

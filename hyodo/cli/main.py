@@ -26,6 +26,7 @@ import shutil
 import subprocess
 import sys
 import threading
+import uuid
 import webbrowser
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, nullcontext
@@ -85,6 +86,7 @@ from hyodo.dashboard import (
 from hyodo.eval import EvalInputError, run_evaluation
 from hyodo.event_graph import render_event_graph_json, validate_event_edges
 from hyodo.events import (
+    AGENT_EVENT_SCHEMA_VERSION,
     AGENT_EVENTS_RELATIVE_PATH,
     EVENT_ID_CONFLICT,
     EVENT_ID_NEW,
@@ -96,6 +98,7 @@ from hyodo.events import (
     load_event_from_text,
     read_agent_events,
     strip_full_bodies,
+    unevaluated_policy,
     validate_event,
 )
 from hyodo.exceptions import (
@@ -142,6 +145,9 @@ from hyodo.pillars import (
 )
 from hyodo.policy import (
     POLICY_RELATIVE_PATH,
+    POLICY_SCHEMA_ID,
+    PolicyConfig,
+    PolicyDecision,
     apply_decision_to_event,
     evaluate_policy,
     try_load_policy,
@@ -157,6 +163,24 @@ from hyodo.policy_trust import (
 from hyodo.report import build_report_graph, write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
+from hyodo.skills import (
+    MANIFEST_RELATIVE_PATH as SKILLS_MANIFEST_RELATIVE_PATH,
+)
+from hyodo.skills import (
+    build_ingest_tool,
+    compute_lens,
+    load_manifest,
+    manifest_entry,
+    parse_skill_rules,
+    render_proposal,
+    resolve_source,
+    save_manifest,
+    save_proposal,
+    skill_name_for,
+)
+from hyodo.skills import (
+    store_body as store_skill_body,
+)
 from hyodo.test_integrity import TestIntegrityReport, scan_test_integrity
 from hyodo.verdict import explain_decision, render_verdict_line
 
@@ -200,6 +224,11 @@ pairing_app = typer.Typer(
     help="Read-only pairing status for the M5-B loopback/tailscale bridge",
     add_completion=False,
 )
+skills_app = typer.Typer(
+    name="skills",
+    help="Ingest a project's own skills as a lens over the six pillars",
+    add_completion=False,
+)
 mcp_app.add_typer(rules_app, name="rules")
 mcp_app.add_typer(pairing_app, name="pairing")
 app.add_typer(event_app, name="event")
@@ -207,6 +236,7 @@ app.add_typer(policy_app, name="policy")
 policy_app.add_typer(trust_app, name="trust")
 app.add_typer(schema_app, name="schema")
 app.add_typer(mcp_app, name="mcp")
+app.add_typer(skills_app, name="skills")
 console = Console()
 
 
@@ -3944,6 +3974,286 @@ def trinity_analysis(
     console.print("  - Diff readable? Naming/structure understandable?")
     console.print("\n[bold yellow]Checklist only — no automatic approval[/bold yellow]")
     console.print("Next: hyodo check && hyodo safe, then human review.")
+
+
+def _new_agent_event(
+    *,
+    kind: str,
+    actor: str,
+    tool: dict[str, Any] | None = None,
+    run_id: str,
+    step_index: int = 0,
+) -> dict[str, Any]:
+    """Build a minimal, unvalidated ``hyodo.agent-event/v1`` shell for HyoDo-synthesized events."""
+    raw: dict[str, Any] = {
+        "schema_version": AGENT_EVENT_SCHEMA_VERSION,
+        "event_id": str(uuid.uuid4()),
+        "run_id": run_id,
+        "ts": datetime.now(timezone.utc).isoformat(),
+        "kind": kind,
+        "step_index": step_index,
+        "actor": actor,
+    }
+    if tool is not None:
+        raw["tool"] = tool
+    return raw
+
+
+_SKILLS_EXIT_CODES = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}
+
+
+@skills_app.command("ingest")
+def skills_ingest(
+    source: str = typer.Argument(..., help="Local path or http(s) URL to a skill Markdown file"),
+    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/skills/"),
+    store_body: bool = typer.Option(
+        False,
+        "--store-body",
+        help="Persist the skill body at .hyodo/skills/bodies/<digest>.md (default: not stored)",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Approve an ASK decision now; records a human_response approval event, then proceeds",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+):
+    """
+    Ingest one skill source as a lens: record it, evaluate policy, compile its
+    rules into ``.hyodo/skills/manifest.json`` on a proceeding decision.
+
+    Ingesting a skill is treated as an external variable exactly like a web
+    fetch — never silently ALLOW. Exit 0 ALLOW, 1 DENY, 2 UNOBSERVED, 3 ASK
+    (re-run with ``--yes`` or after granting trust level 3 to proceed).
+    A ``url:`` source is never fetched in this package: only its domain is
+    recorded, with ``content_digest: null`` and ``status: "unreadable"``.
+    """
+    root_path = Path(root).resolve()
+    parsed = resolve_source(root_path, source)
+    tool = build_ingest_tool(parsed)
+    run_id = str(uuid.uuid4())
+    raw_event = _new_agent_event(kind="tool_call", actor="hyodo", tool=tool, run_id=run_id)
+    ok, reasons, normalized = validate_event(raw_event)
+    if not ok or normalized is None:  # pragma: no cover - internal construction guard
+        message = f"internal error building ingest event: {reasons}"
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": 2}))
+        else:
+            console.print(f"[red]{message}[/red]")
+        raise typer.Exit(2)
+
+    policy_path = root_path / POLICY_RELATIVE_PATH
+    cfg, policy_err = try_load_policy(policy_path)
+    if cfg is None:
+        if policy_err == "policy_missing":
+            # No policy.toml: ingestion is unconditionally discretionary regardless,
+            # so fall back to the all-defaults policy rather than refusing to run.
+            cfg = PolicyConfig(
+                schema=POLICY_SCHEMA_ID,
+                max_steps=None,
+                allowed_tools=None,
+                blocked_path_globs=(),
+            )
+        else:
+            message = f"policy unobserved ({policy_err}); not ALLOW"
+            if json_output:
+                console.print_json(
+                    json.dumps({"ok": False, "reasons": [policy_err], "exit_code": 2})
+                )
+            else:
+                console.print(f"[red]{message}[/red]")
+            raise typer.Exit(2)
+
+    observed = count_run_events(root_path, run_id)
+    decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
+    stamped = apply_decision_to_event(normalized, decision)
+    append_agent_event(root_path, stamped)
+
+    effective_decision = decision.decision
+    approval_event_id: str | None = None
+    if decision.decision == "ASK" and yes:
+        approval_claim = {
+            "decision": "ALLOW",
+            "rule_id": "operator_approval",
+            "reason": "operator approved via --yes",
+        }
+        approval_raw = _new_agent_event(kind="decision", actor="human", run_id=run_id, step_index=1)
+        ok2, _reasons2, approval_normalized = validate_event(approval_raw)
+        if ok2 and approval_normalized is not None:
+            approval_normalized["policy"] = unevaluated_policy(claimed=approval_claim)
+            if append_agent_event(root_path, approval_normalized):
+                approval_event_id = approval_normalized["event_id"]
+                effective_decision = "ALLOW"
+
+    manifest_data, manifest_status = load_manifest(root_path)
+    existing_skills = (
+        list(manifest_data.get("skills", []))
+        if manifest_data is not None and manifest_status == "ok"
+        else []
+    )
+
+    compiled_rule_count = 0
+    if effective_decision == "ALLOW":
+        rules = []
+        if parsed.readable and parsed.content is not None:
+            skill_name = skill_name_for(parsed.resolved_path) if parsed.resolved_path else "skill"
+            rules = parse_skill_rules(skill_name, parsed.content)
+            compiled_rule_count = sum(1 for rule in rules if rule.compiled is not None)
+            if store_body and parsed.content_digest_value is not None:
+                store_skill_body(root_path, parsed.content_digest_value, parsed.content)
+        entry = manifest_entry(
+            parsed,
+            rules,
+            ingested_at=stamped["event_id"],
+            body_stored=bool(store_body and parsed.readable),
+        )
+        existing_skills = [
+            row for row in existing_skills if row.get("source") != entry["source"]
+        ] + [entry]
+        save_manifest(root_path, existing_skills)
+
+    exit_code = _SKILLS_EXIT_CODES[decision.decision]
+    if effective_decision == "ALLOW" and decision.decision == "ASK":
+        exit_code = 0
+
+    result = {
+        "decision": decision.decision,
+        "effective_decision": effective_decision,
+        "rule_id": decision.rule_id,
+        "reason": decision.reason,
+        "trust_level": decision.trust_level,
+        "source": parsed.manifest_source,
+        "readable": parsed.readable,
+        "content_digest": parsed.content_digest_value,
+        "compiled_rule_count": compiled_rule_count,
+        "manifest": str(root_path / SKILLS_MANIFEST_RELATIVE_PATH),
+        "event_id": stamped["event_id"],
+        "approval_event_id": approval_event_id,
+        "exit_code": exit_code,
+    }
+    if json_output:
+        console.print_json(json.dumps(result))
+    else:
+        console.print(f"[bold]{decision.decision}[/bold] {parsed.manifest_source}")
+        console.print(f"  reason: {decision.reason}")
+        if effective_decision == "ALLOW" and decision.decision == "ASK":
+            console.print("  approved via --yes; manifest compiled")
+        elif effective_decision == "ALLOW":
+            console.print(f"  compiled {compiled_rule_count} mechanical rule(s)")
+        elif decision.decision == "ASK":
+            console.print("  re-run with --yes, or grant trust level 3, to compile")
+    raise typer.Exit(exit_code)
+
+
+@skills_app.command("lens")
+def skills_lens(
+    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/skills/"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+):
+    """
+    Print per-pillar coverage/coherence from ingested skills, with provenance.
+
+    Numbers are always integer ``observed/expected`` and ``passed/observed``
+    pairs — never a percentage or a probability. A malformed manifest is
+    reported and treated as empty (exit 2); an absent manifest (nothing
+    ingested yet) reports 0/0 everywhere and exits 0.
+    """
+    root_path = Path(root).resolve()
+    result = compute_lens(root_path)
+
+    if result.manifest_status == "malformed":
+        typer.echo("manifest.json is malformed; treating as empty", err=True)
+
+    if json_output:
+        payload = {
+            "manifest_status": result.manifest_status,
+            "pillars": [
+                {
+                    "pillar": pillar.pillar,
+                    "expected": pillar.expected,
+                    "observed": pillar.observed,
+                    "passed": pillar.passed,
+                    "provenance": [
+                        {"rule_id": rid, "skill": skill, "status": status}
+                        for rid, skill, status in pillar.provenance
+                    ],
+                }
+                for pillar in result.pillars
+            ],
+            "unobserved": result.unobserved,
+        }
+        console.print_json(json.dumps(payload))
+    else:
+        for pillar in result.pillars:
+            console.print(
+                f"[bold]{pillar.pillar}[/bold]: "
+                f"{pillar.observed}/{pillar.expected} observed, "
+                f"{pillar.passed}/{pillar.observed} passed"
+            )
+            for rid, skill, status in pillar.provenance:
+                console.print(f"    [{status}] {rid} ({skill})")
+        console.print(f"unobserved: {len(result.unobserved)}")
+        for item in result.unobserved:
+            console.print(
+                f"    {item['rule_id']} ({item['skill']}) digest={item['rule_text_digest']}"
+            )
+
+    exit_code = 2 if result.manifest_status == "malformed" else 0
+    raise typer.Exit(exit_code)
+
+
+@skills_app.command("propose")
+def skills_propose(
+    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/skills/"),
+    accept: bool = typer.Option(
+        False,
+        "--accept",
+        help="Write .hyodo/skills/proposed.md and record one ledger event",
+    ),
+):
+    """
+    Print a tailored custom skill made of every currently-passing compiled
+    rule from ingested skills. Without --accept nothing is written and no
+    event is recorded; --accept writes exactly one file and records exactly
+    one ledger event. Never calls evaluate_policy — nothing external is
+    contacted at proposal time, only sources already judged at ingest time.
+    """
+    root_path = Path(root).resolve()
+    project_name = root_path.name or "project"
+    result = render_proposal(root_path, project_name)
+
+    if result.manifest_status == "malformed":
+        typer.echo("manifest.json is malformed; proposal sections are empty", err=True)
+
+    console.print(result.markdown, end="")
+
+    if accept:
+        save_proposal(root_path, result.markdown)
+        run_id = str(uuid.uuid4())
+        raw_event = _new_agent_event(
+            kind="tool_call",
+            actor="hyodo",
+            tool={
+                "name": "skills.propose",
+                "paths": [str(SKILLS_MANIFEST_RELATIVE_PATH)],
+                "urls": [],
+            },
+            run_id=run_id,
+        )
+        ok, _reasons, normalized = validate_event(raw_event)
+        if ok and normalized is not None:
+            decision = PolicyDecision(
+                decision="ALLOW",
+                rule_id=None,
+                reason="skills propose: local render, no external variable; evaluate_policy not called",
+                coverage=(0, 0),
+                external_variables=(),
+                trust_level=1,
+            )
+            stamped = apply_decision_to_event(normalized, decision)
+            append_agent_event(root_path, stamped)
+
+    raise typer.Exit(0)
 
 
 @app.callback(invoke_without_command=True)
