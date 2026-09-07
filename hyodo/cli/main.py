@@ -30,7 +30,7 @@ import uuid
 import webbrowser
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, nullcontext
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import datetime, timezone
 from enum import Enum
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -3186,6 +3186,42 @@ def _load_event_payload(
     return load_event_from_path(file)
 
 
+def _unobserved_policy_decision(
+    event: dict[str, Any],
+    policy_err: str | None,
+    *,
+    hook: str | None,
+    observed_steps: int | None,
+    root: Path | None,
+) -> PolicyDecision:
+    """Build the UNOBSERVED decision for a policy.toml that failed to load.
+
+    Fail-closed is unchanged here: the decision is always UNOBSERVED, never a
+    silent ALLOW. Under ``--hook claude-code`` with a *missing* (not invalid)
+    policy file, the event is first evaluated against the same permissive
+    all-defaults ``PolicyConfig`` that ``skills ingest`` and ``eye capture``
+    already fall back to -- so ``coverage``/``trust_level`` reflect a real
+    evaluation -- but the decision label itself is forced back to UNOBSERVED
+    with reason ``policy_missing``: an absent policy file is not the same
+    thing as an explicit permissive policy, so it must still be recorded as
+    unobserved rather than crash before anything is recorded.
+    """
+    if hook == "claude-code" and policy_err == "policy_missing":
+        default_cfg = PolicyConfig(
+            schema=POLICY_SCHEMA_ID,
+            max_steps=None,
+            allowed_tools=None,
+            blocked_path_globs=(),
+        )
+        probe = evaluate_policy(event, default_cfg, observed_steps=observed_steps, root=root)
+        return replace(probe, decision="UNOBSERVED", reason="policy_missing")
+    return PolicyDecision(
+        decision="UNOBSERVED",
+        rule_id=None,
+        reason=policy_err or "policy_unobserved",
+    )
+
+
 @event_app.command("validate")
 def event_validate(
     file: str | None = typer.Option(
@@ -3363,15 +3399,27 @@ def event_record(
             raise typer.Exit(2)
         mapped, map_err = map_claude_code_hook_payload(data, root_path)
         if mapped is None:
+            mapping_exit = 0 if shadow else 2
             if json_output:
-                console.print_json(json.dumps({"ok": False, "reasons": [map_err], "exit_code": 2}))
+                console.print_json(
+                    json.dumps(
+                        {
+                            "ok": False,
+                            "reasons": [map_err],
+                            "exit_code": mapping_exit,
+                            "shadow": shadow,
+                        }
+                    )
+                )
             else:
                 console.print(f"[red]Cannot map Claude Code hook payload: {map_err}[/red]")
+            stderr_prefix = "[SHADOW, not blocking] " if shadow else ""
             typer.echo(
-                "HYODO UNOBSERVED: malformed hook payload; treating as blocked, not allowed.",
+                f"{stderr_prefix}HYODO UNOBSERVED: malformed hook payload; treating as "
+                "blocked, not allowed.",
                 err=True,
             )
-            raise typer.Exit(2)
+            raise typer.Exit(mapping_exit)
         data = mapped.raw
         root_path = mapped.root
 
@@ -3412,54 +3460,89 @@ def event_record(
     if policy is not None:
         cfg, policy_err = try_load_policy(Path(policy))
         if cfg is None:
+            # Fail-closed: missing/invalid policy is unobserved, never ALLOW. When
+            # neither --shadow nor --hook claude-code is set, this remains the
+            # honest crash-before-recording it always was (no event to fall back
+            # to for a caller that isn't fire-and-forget and isn't asking to be
+            # non-blocking). Under --shadow or --hook claude-code, though, the
+            # event must still be recorded (fire-and-forget/shadow never blocks),
+            # so build an UNOBSERVED decision and fall through to the normal
+            # stamp-and-append path below instead of exiting here.
+            if not (shadow or hook == "claude-code"):
+                if not json_output:
+                    typer.echo(
+                        render_verdict_line(
+                            "UNOBSERVED",
+                            0,
+                            0,
+                            "surfaces",
+                            "trust=UNOBSERVED, policy UNOBSERVED",
+                            audience=profile.profile,
+                        )
+                    )
+                if json_output:
+                    console.print_json(
+                        json.dumps(
+                            {
+                                "ok": False,
+                                "reasons": [policy_err or "policy_unobserved"],
+                                "exit_code": 2,
+                            }
+                        )
+                    )
+                else:
+                    console.print(
+                        f"[red]Policy unobserved ({policy_err}).[/red] "
+                        "Not ALLOW. Fix --policy path or TOML."
+                    )
+                raise typer.Exit(2)
+            observed = count_run_events(root_path, normalized["run_id"])
+            decision = _unobserved_policy_decision(
+                normalized, policy_err, hook=hook, observed_steps=observed, root=root_path
+            )
+            stderr_prefix = "[SHADOW, not blocking] " if shadow else ""
+            typer.echo(
+                f"{stderr_prefix}Policy unobserved ({policy_err}). Not ALLOW.",
+                err=True,
+            )
             if not json_output:
                 typer.echo(
                     render_verdict_line(
                         "UNOBSERVED",
-                        0,
-                        0,
+                        decision.coverage[0],
+                        decision.coverage[1],
                         "surfaces",
-                        "trust=UNOBSERVED, policy UNOBSERVED",
+                        f"trust=UNOBSERVED, policy UNOBSERVED ({policy_err})",
                         audience=profile.profile,
                     )
                 )
-            # Fail-closed: missing/invalid policy is unobserved, never ALLOW.
-            if json_output:
-                console.print_json(
-                    json.dumps(
-                        {
-                            "ok": False,
-                            "reasons": [policy_err or "policy_unobserved"],
-                            "exit_code": 2,
-                        }
+            normalized = apply_decision_to_event(normalized, decision)
+            if shadow:
+                normalized["policy"] = {**normalized["policy"], "shadow": True}
+            decision_label = decision.decision
+            if decision.trust_level >= 2:
+                ledger_obligation = {"ledger_write_required": True, "ledger_written": False}
+        else:
+            observed = count_run_events(root_path, normalized["run_id"])
+            decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
+            if not json_output:
+                state = _policy_verdict_state(decision)
+                typer.echo(
+                    render_verdict_line(
+                        decision.decision,
+                        decision.coverage[0],
+                        decision.coverage[1],
+                        "surfaces",
+                        state["detail"],
+                        audience=profile.profile,
                     )
                 )
-            else:
-                console.print(
-                    f"[red]Policy unobserved ({policy_err}).[/red] "
-                    "Not ALLOW. Fix --policy path or TOML."
-                )
-            raise typer.Exit(2)
-        observed = count_run_events(root_path, normalized["run_id"])
-        decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
-        if not json_output:
-            state = _policy_verdict_state(decision)
-            typer.echo(
-                render_verdict_line(
-                    decision.decision,
-                    decision.coverage[0],
-                    decision.coverage[1],
-                    "surfaces",
-                    state["detail"],
-                    audience=profile.profile,
-                )
-            )
-        normalized = apply_decision_to_event(normalized, decision)
-        if shadow:
-            normalized["policy"] = {**normalized["policy"], "shadow": True}
-        decision_label = decision.decision
-        if decision.trust_level >= 2:
-            ledger_obligation = {"ledger_write_required": True, "ledger_written": False}
+            normalized = apply_decision_to_event(normalized, decision)
+            if shadow:
+                normalized["policy"] = {**normalized["policy"], "shadow": True}
+            decision_label = decision.decision
+            if decision.trust_level >= 2:
+                ledger_obligation = {"ledger_write_required": True, "ledger_written": False}
 
     # Idempotency on event_id, checked against the *final* event so a genuine replay
     # (same id, same content incl. the policy stamp) is a no-op, while reusing an id
@@ -3513,28 +3596,52 @@ def event_record(
             EVENT_ID_UNOBSERVED: "ledger_unobserved",
             "ledger_corrupt": "ledger_corrupt",
         }.get(id_state, "append_failed")
+        # A ledger write failure means there is nothing to record the shadow
+        # decision onto, but shadow's guarantee is still "never a blocking
+        # exit code" -- so it still forces exit 0 here, same as every other
+        # early-exit path, even though (unlike those) no event was appended.
+        ledger_exit = 0 if shadow else 2
+        plain_message = {
+            EVENT_ID_CONFLICT: "event_id already recorded with different content. Not recorded.",
+            EVENT_ID_UNOBSERVED: "Ledger unreadable — cannot check event_id. Not recorded.",
+        }.get(id_state, "Failed to append agent event ledger. Not recorded.")
+        # The stderr diagnostic must reach stderr regardless of --json: a
+        # caller monitoring stderr for shadow diagnostics (per docs/CONNECT.md's
+        # unconditional guarantee) must see this failure mode too, not only
+        # the "ok": false buried inside a --json blob that itself goes to
+        # stdout.
+        if shadow:
+            typer.echo(f"[SHADOW, not blocking] {plain_message}", err=True)
         if json_output:
             console.print_json(
                 json.dumps(
                     {
                         "ok": False,
                         "reasons": [reason],
-                        "exit_code": 2,
+                        "exit_code": ledger_exit,
+                        "shadow": shadow,
+                        "recorded": False,
                         "ledger": str(root_path / AGENT_EVENTS_RELATIVE_PATH),
                         **ledger_obligation,
                     }
                 )
             )
-        elif id_state == EVENT_ID_CONFLICT:
-            console.print(
-                "[red]event_id already recorded with different content.[/red] Not recorded."
-            )
-        elif id_state == EVENT_ID_UNOBSERVED:
-            console.print("[red]Ledger unreadable — cannot check event_id.[/red] Not recorded.")
         else:
-            console.print("[red]Failed to append agent event ledger.[/red]")
-            console.print("[yellow]This is not a validation pass.[/yellow]")
-        raise typer.Exit(2)
+            stderr_prefix = "[SHADOW, not blocking] " if shadow else ""
+            if id_state == EVENT_ID_CONFLICT:
+                console.print(
+                    f"{stderr_prefix}[red]event_id already recorded with different "
+                    "content.[/red] Not recorded."
+                )
+            elif id_state == EVENT_ID_UNOBSERVED:
+                console.print(
+                    f"{stderr_prefix}[red]Ledger unreadable — cannot check event_id.[/red] "
+                    "Not recorded."
+                )
+            else:
+                console.print(f"{stderr_prefix}[red]Failed to append agent event ledger.[/red]")
+                console.print("[yellow]This is not a validation pass.[/yellow]")
+        raise typer.Exit(ledger_exit)
 
     exit_code = {None: 0, "ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision_label]
     # The event is already durably appended by this point (every append-failure
@@ -3554,6 +3661,9 @@ def event_record(
                     "exit_code": final_exit_code,
                     "event_id": normalized["event_id"],
                     "decision": decision_label,
+                    "reason": normalized.get("policy", {}).get("reason")
+                    if isinstance(normalized.get("policy"), dict)
+                    else None,
                     "shadow": shadow,
                     "ledger": ledger,
                     "full_body": full_body,
@@ -3774,6 +3884,7 @@ def policy_check(
                 raise typer.Exit(2)
             mapped, map_err = map_claude_code_hook_payload(data, root_path)
             if mapped is None:
+                mapping_exit = 0 if shadow else 2
                 if json_output:
                     console.print_json(
                         json.dumps(
@@ -3781,17 +3892,20 @@ def policy_check(
                                 "decision": "UNOBSERVED",
                                 "rule_id": None,
                                 "reason": map_err,
-                                "exit_code": 2,
+                                "exit_code": mapping_exit,
+                                "shadow": shadow,
                             }
                         )
                     )
                 else:
                     console.print(f"[red]Cannot map Claude Code hook payload: {map_err}[/red]")
+                stderr_prefix = "[SHADOW, not blocking] " if shadow else ""
                 typer.echo(
-                    "HYODO UNOBSERVED: malformed hook payload; treating as blocked, not allowed.",
+                    f"{stderr_prefix}HYODO UNOBSERVED: malformed hook payload; treating as "
+                    "blocked, not allowed.",
                     err=True,
                 )
-                raise typer.Exit(2)
+                raise typer.Exit(mapping_exit)
             data = mapped.raw
             root_path = mapped.root
 
@@ -3818,55 +3932,58 @@ def policy_check(
             Path(config).resolve() if config else (root_path / POLICY_RELATIVE_PATH).resolve()
         )
         cfg, policy_err = try_load_policy(policy_path)
-        if cfg is None:
-            if json_output:
-                console.print_json(
-                    json.dumps(
-                        {
-                            "decision": "UNOBSERVED",
-                            "rule_id": None,
-                            "reason": policy_err,
-                            "exit_code": 2,
-                        }
-                    )
-                )
-            else:
-                console.print(f"[red]Policy unobserved ({policy_err}).[/red] Not ALLOW.")
-            raise typer.Exit(2)
-
         # Step budget is counted from the working-tree ledger, never from the
         # caller-supplied step_index. (Same root basis as the default policy lookup.)
         observed = count_run_events(root_path, normalized["run_id"])
-        decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
+        if cfg is None:
+            # Fail-closed: a missing/invalid policy is UNOBSERVED, never ALLOW --
+            # unchanged. It now flows through the same decision object as every
+            # other outcome (rather than a bespoke exit-2 branch) so --shadow's
+            # "never a blocking exit" guarantee applies here too, and so a
+            # missing policy under --hook claude-code is a real evaluated
+            # decision (reason policy_missing) instead of a crash.
+            decision = _unobserved_policy_decision(
+                normalized, policy_err, hook=hook, observed_steps=observed, root=root_path
+            )
+        else:
+            decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
         verdict_state.update(_policy_verdict_state(decision))
         # 0 = ALLOW, 1 = DENY, 2 = UNOBSERVED, 3 = ASK.
         exit_code = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision.decision]
+        # The diagnostic text is built once regardless of --hook: --shadow's
+        # "never blocking, but never silent either" guarantee has to hold for
+        # a plain `policy check --shadow` (no --hook at all) just as much as
+        # for the claude-code hook contract below.
+        if decision.decision == "DENY":
+            stderr_message = f"{decision.rule_id or 'rule'}: {decision.reason or ''}".strip()
+        elif decision.decision == "ASK":
+            stderr_message = (
+                f"HYODO ASK: {decision.reason or 'operator decision required'}. "
+                "Stop and ask the human before retrying this tool call."
+            )
+        elif decision.decision == "UNOBSERVED":
+            stderr_message = (
+                f"HYODO UNOBSERVED: {decision.reason or 'insufficient evidence'}. "
+                "Not a green light — stop and ask the human."
+            )
+        else:
+            stderr_message = None
         if hook == "claude-code":
             # Claude Code's PreToolUse contract has only two outcomes (proceed or
             # block); ASK and UNOBSERVED are enforced as a hard block here — this
             # is a real behavior change, called out under Open questions in the
             # spec, not silently smoothed over.
             hook_exit_code = 0 if decision.decision == "ALLOW" else 2
-            if decision.decision == "DENY":
-                stderr_message = f"{decision.rule_id or 'rule'}: {decision.reason or ''}".strip()
-            elif decision.decision == "ASK":
-                stderr_message = (
-                    f"HYODO ASK: {decision.reason or 'operator decision required'}. "
-                    "Stop and ask the human before retrying this tool call."
-                )
-            elif decision.decision == "UNOBSERVED":
-                stderr_message = (
-                    f"HYODO UNOBSERVED: {decision.reason or 'insufficient evidence'}. "
-                    "Not a green light — stop and ask the human."
-                )
-            else:
-                stderr_message = None
-            if stderr_message:
-                if shadow:
-                    stderr_message = "[SHADOW, not blocking] " + stderr_message
-                typer.echo(stderr_message, err=True)
         else:
             hook_exit_code = exit_code
+        # Under --hook claude-code the diagnostic is always relevant (it's the
+        # only signal for a hard block); without --hook it's only relevant
+        # under --shadow, where it's the only place the real decision surfaces
+        # outside the exit code.
+        if stderr_message and (hook == "claude-code" or shadow):
+            if shadow:
+                stderr_message = "[SHADOW, not blocking] " + stderr_message
+            typer.echo(stderr_message, err=True)
         final_exit_code = 0 if shadow else hook_exit_code
         if json_output:
             payload = decision.as_dict()

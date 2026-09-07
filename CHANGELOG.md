@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   prints "review signal, not automatic approval." See
   `docs/SCORE_DERIVATION.md` for the rule table and a calibration run
   against the HyoDo repo, an example checkout, and an empty directory.
+- `hyodo connect claude-code` now bootstraps a permissive starter
+  `.hyodo/policy.toml` when none exists yet (dry run prints
+  `would create: .hyodo/policy.toml`; `--write` creates it and tracks its
+  digest in `connect.json` the same way it tracks `.claude/settings.json`,
+  so `--status` reports drift on it too). An existing policy file — HyoDo's
+  own or the operator's — is never overwritten.
 - `hyodo safe` (`--json` and text) now reports `scope`
   (`diff` / `status` / `file` / `directory` / `external` / `none`) and
   `coverage` (`FULL` / `PARTIAL` / `UNOBSERVED`) alongside `source`, so a
@@ -36,6 +42,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `hyodo policy check --shadow` and `hyodo event record --shadow` no longer
+  exit 2 (a blocking exit under Claude Code's hook contract) when
+  `.hyodo/policy.toml` is missing or invalid, the hook payload cannot be
+  mapped, or the ledger append itself fails — shadow mode's documented
+  guarantee ("always exits 0, nothing is blocked") now holds on every early
+  exit, not only once a policy loads. Each of those paths now prints its
+  diagnostic prefixed `[SHADOW, not blocking]` and, where an event exists to
+  stamp, records `policy.shadow: true` / `policy.decision: "UNOBSERVED"`
+  with the reason. Separately, a missing policy file under
+  `--hook claude-code` (shadow or not) is now evaluated against the same
+  permissive all-defaults policy `skills ingest`/`eye capture` already fall
+  back to, tagged `reason: policy_missing`, and recorded — non-shadow
+  behavior for a missing policy is unchanged (still UNOBSERVED, still exit
+  2), but it is now a recorded decision instead of a crash before anything
+  is recorded. Previously, `hyodo connect claude-code --shadow --write` on a
+  repository without a policy file blocked every tool call, the opposite of
+  shadow mode's purpose.
 - `hyodo mcp continuity` no longer reports `status: READY` on a workspace
   with no `.hyodo` stores at all and 0/2 hosts observed. `measure_continuity`
   only appended `reasons` for corrupt/invalid stores, so "nothing exists"

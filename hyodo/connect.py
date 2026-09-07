@@ -35,6 +35,7 @@ from urllib.parse import urlsplit
 
 from hyodo import __version__
 from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, content_digest, count_run_events
+from hyodo.policy import POLICY_RELATIVE_PATH, POLICY_SCHEMA_ID
 
 CONNECT_SCHEMA_VERSION = "hyodo.connect/v1"
 CONNECT_RELATIVE_PATH = Path(".hyodo") / "connect.json"
@@ -223,6 +224,35 @@ def build_github_actions_workflow() -> str:
     )
 
 
+def build_starter_policy() -> str:
+    """Return a permissive starter ``.hyodo/policy.toml``.
+
+    Installed by ``hyodo connect claude-code`` only when no policy file is
+    already present -- never overwrites an existing one (see
+    :func:`plan_target`). Every restriction ships commented out: the
+    operator opts in explicitly. ``blocked_path_globs`` is the one
+    exception, uncommented, because a starter policy that lets a hook read
+    ``.env``/private keys by default undersells "quality gate" -- these are
+    the handful of paths almost nobody wants an agent touching.
+    """
+    return (
+        f'schema = "{POLICY_SCHEMA_ID}"\n'
+        "\n"
+        "# Starter policy installed by `hyodo connect claude-code`.\n"
+        "# Permissive by default: nothing else is restricted until you opt in.\n"
+        "#\n"
+        "# max_steps = 50                     # cap steps per run_id\n"
+        '# allowed_tools = ["Read", "Bash"]   # restrict tool calls (unlisted -> DENY)\n'
+        "\n"
+        "blocked_path_globs = [\n"
+        '    ".env",\n'
+        '    "*.pem",\n'
+        '    "id_rsa*",\n'
+        '    ".hyodo/**",\n'
+        "]\n"
+    )
+
+
 # --------------------------------------------------------------------------
 # Planning — one PlannedFile per file a target touches, dry-run and --write
 # share this.
@@ -282,12 +312,44 @@ def plan_target(name: str, root: Path, *, shadow: bool) -> TargetPlan:
     import json
 
     shadow_ignored = False
+    extra_files: tuple[PlannedFile, ...] = ()
     if name == "claude-code":
         path = CLAUDE_SETTINGS_RELATIVE_PATH
         existing = _read_json(root / path)
         current_text = _read_text(root / path)
         new_settings = build_claude_code_settings(existing, shadow=shadow)
         content = json.dumps(new_settings, indent=2, sort_keys=True) + "\n"
+        # A missing policy.toml is what made shadow mode (and every hook) fail
+        # closed with nothing to evaluate against -- bootstrap a permissive
+        # starter policy alongside the hooks so a fresh `connect` leaves a
+        # working policy in place, never leaving the file absent.
+        policy_text = _read_text(root / POLICY_RELATIVE_PATH)
+        if policy_text is None:
+            extra_files = (
+                PlannedFile(
+                    path=POLICY_RELATIVE_PATH,
+                    content=build_starter_policy(),
+                    existed_before=False,
+                    will_change=True,
+                ),
+            )
+        elif str(POLICY_RELATIVE_PATH) in _tracked_paths(load_connect_state(root)):
+            # HyoDo wrote this policy before (possibly since hand-edited by the
+            # operator). Keep tracking it for --status drift, but the content is
+            # always exactly what is on disk right now, so this is never a
+            # rewrite -- an operator's edits to their own starter policy are
+            # never reverted.
+            extra_files = (
+                PlannedFile(
+                    path=POLICY_RELATIVE_PATH,
+                    content=policy_text,
+                    existed_before=True,
+                    will_change=False,
+                ),
+            )
+        # else: a policy.toml already existed that HyoDo never wrote (an
+        # operator's own file) -- never overwrite it, and never start tracking
+        # it either.
     elif name == "pre-commit":
         path = PRECOMMIT_CONFIG_RELATIVE_PATH
         current_text = _read_text(root / path)
@@ -305,14 +367,17 @@ def plan_target(name: str, root: Path, *, shadow: bool) -> TargetPlan:
         existed_before=current_text is not None,
         will_change=current_text != content,
     )
-    status = "would_write" if planned.will_change else "up_to_date"
-    message = (
-        (f"{path} would be created" if not planned.existed_before else f"{path} would be updated")
-        if planned.will_change
-        else f"{path} already up to date"
-    )
+    files = (planned, *extra_files)
+    status = "would_write" if any(f.will_change for f in files) else "up_to_date"
+    messages = [
+        (f"{f.path} would be created" if not f.existed_before else f"{f.path} would be updated")
+        if f.will_change
+        else f"{f.path} already up to date"
+        for f in files
+    ]
+    message = "; ".join(messages)
     return TargetPlan(
-        name=name, status=status, message=message, files=(planned,), shadow_ignored=shadow_ignored
+        name=name, status=status, message=message, files=files, shadow_ignored=shadow_ignored
     )
 
 
