@@ -94,6 +94,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   now reports a high-severity `trufflehog_failed` finding and the scan is
   not attempted; regression tests with fake binaries.
 
+### Changed
+
+- `hyodo mcp continuity` now counts hook-recorded actors as hosts, not only
+  MCP access-ledger callers. Any `.hyodo/agent-events.jsonl` event with
+  `actor: "agent"` and a non-empty `actor_id` — the shape `hyodo connect
+  claude-code` produces — counts as its own distinct observed host
+  (`source: "hook"`, identity `hook:<actor_id>`), even though a hook-wired
+  host never touches the MCP access ledger. A shadow-stamped event
+  (`policy.shadow: true`) still counts: the host was observed even though
+  nothing was enforced. Each caller row now carries a `source: "mcp" |
+  "hook"` field, hook rows add `calls` and `shadow`
+  (`true`/`false`/`"mixed"`), and the receipt's `hosts` block adds
+  `by_source: {"mcp": N, "hook": M}`. `coverage_status` reaches `OBSERVED`
+  once the combined host count meets `expected_hosts` and the agent-events
+  store is present and readable, and either the access ledger is present
+  and readable or at least one hook host was observed — a repository
+  onboarded only through Claude Code hooks (no MCP client ever connected)
+  can now reach `OBSERVED` instead of being stuck at `hosts observed: 0/2`
+  forever. The text CLI output prints each host's source; the JSON schema
+  id (`hyodo.continuity/v1`) is unchanged. The receipt also adds an
+  always-present `notes` array, separate from `reasons`: `reasons` still
+  drives `status` (any entry forces `UNOBSERVED`) and, as before, stops
+  listing store-absence facts once coverage reaches `OBSERVED` — a
+  hook-observed root must still be able to reach `READY`. `notes` never
+  drops those facts: it lists `access_ledger_absent`, `pairing_absent`,
+  `policy_absent`, and `agent_events_absent` whenever that store is
+  genuinely absent regardless of coverage, plus `hook_only_observation`
+  when every observed host came from hooks and none from the MCP access
+  ledger. When coverage is not `OBSERVED` the same fact appears in both
+  `reasons` and `notes` — that duplication is intended (`reasons` explains
+  the non-`READY` verdict, `notes` is the durable absence inventory). Text
+  output prints a `notes:` line when non-empty. See `docs/CONNECT.md` and
+  `docs/M5_REMOTE_CONNECTOR_CONTRACT.md`.
+
 ## [4.15.0] - 2026-09-07
 
 Stage 2 of the HyoDo Agent OS design on the source line: skill lens, folder

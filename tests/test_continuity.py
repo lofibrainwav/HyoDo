@@ -25,7 +25,12 @@ from typer.testing import CliRunner
 from hyodo.access_ledger import ACCESS_LEDGER_PATH, read_access_log
 from hyodo.cli.main import app
 from hyodo.continuity import CONTINUITY_SCHEMA_VERSION, STDIO_IDENTITY, measure_continuity
-from hyodo.events import AGENT_EVENTS_RELATIVE_PATH, read_agent_events
+from hyodo.events import (
+    AGENT_EVENTS_RELATIVE_PATH,
+    append_agent_event,
+    read_agent_events,
+    validate_event,
+)
 from hyodo.mcp_server import create_loopback_app, create_server
 from hyodo.pairing import create_pairing
 
@@ -127,6 +132,18 @@ def _valid_event(run_id: str, **overrides: object) -> dict:
     }
     event.update(overrides)
     return event
+
+
+def _record_hook_event(root: Path, actor_id: str, *, shadow: bool = False) -> None:
+    """Append one normalized agent event carrying *actor_id*, as a Claude Code
+    hook's ``hyodo event record --hook claude-code`` would, optionally
+    shadow-stamped exactly as ``hyodo cli.main``'s ``--shadow`` path does."""
+    ok, reasons, normalized = validate_event(_valid_event(str(uuid.uuid4()), actor_id=actor_id))
+    assert ok, reasons
+    assert normalized is not None
+    if shadow:
+        normalized["policy"] = {**normalized["policy"], "shadow": True}
+    assert append_agent_event(root, normalized)
 
 
 def _store_files(root: Path) -> set[Path]:
@@ -334,6 +351,24 @@ def test_continuity_empty_root_is_unobserved_not_ready(tmp_path) -> None:
     assert cli_receipt["coverage_status"] == "UNOBSERVED"
 
 
+def test_continuity_empty_root_notes_and_reasons_both_carry_the_absences(tmp_path) -> None:
+    """On an empty root, coverage never reaches OBSERVED, so every store-absence
+    fact is intentionally duplicated between `reasons` (why status is not
+    READY) and `notes` (the durable "what's absent" inventory)."""
+    receipt = measure_continuity(tmp_path)
+
+    for fact in (
+        "agent_events_absent",
+        "access_ledger_absent",
+        "pairing_absent",
+        "policy_absent",
+    ):
+        assert fact in receipt["reasons"], fact
+        assert fact in receipt["notes"], fact
+    # No hosts at all were observed, so there is nothing hook-only about it.
+    assert "hook_only_observation" not in receipt["notes"]
+
+
 def test_continuity_one_caller_is_partial_coverage(tmp_path) -> None:
     """One observed caller (of 2 expected) is PARTIAL coverage, not OBSERVED.
 
@@ -376,3 +411,110 @@ def test_continuity_corrupt_store_is_corrupt_integrity_regardless_of_coverage(tm
     assert receipt["status"] == "UNOBSERVED"
     assert receipt["exit_code"] == 2
     assert "agent_events_corrupt" in receipt["reasons"]
+
+
+def test_continuity_counts_hook_recorded_actors_as_hosts(tmp_path) -> None:
+    """Two distinct hook `actor_id`s, no access ledger at all, is 2/2 OBSERVED.
+
+    This is the exact shape `hyodo connect claude-code --write --shadow`
+    plus hook-driven `hyodo event record` produces: hosts wired only
+    through Claude Code hooks never touch the MCP access ledger.
+    """
+    _record_hook_event(tmp_path, "canary-p0b-20260907", shadow=True)
+    _record_hook_event(tmp_path, "canary-p0c-20260907")
+
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["hosts"]["observed"] == 2
+    assert receipt["hosts"]["by_source"] == {"mcp": 0, "hook": 2}
+    assert receipt["coverage_status"] == "OBSERVED"
+    assert receipt["integrity_status"] == "READY"
+    assert receipt["status"] == "READY"
+    assert receipt["exit_code"] == 0
+    identities = {caller["identity"] for caller in receipt["callers"]}
+    assert identities == {"hook:canary-p0b-20260907", "hook:canary-p0c-20260907"}
+    for caller in receipt["callers"]:
+        assert caller["source"] == "hook"
+    shadow_by_identity = {caller["identity"]: caller["shadow"] for caller in receipt["callers"]}
+    assert shadow_by_identity["hook:canary-p0b-20260907"] is True
+    assert shadow_by_identity["hook:canary-p0c-20260907"] is False
+
+    # `reasons` is empty (a hook-only-observed root reaches READY), but the
+    # access ledger's genuine absence and the hook-only shape are never lost
+    # — they still show up in the always-present `notes` list.
+    assert receipt["reasons"] == []
+    assert "access_ledger_absent" in receipt["notes"]
+    assert "hook_only_observation" in receipt["notes"]
+    assert "policy_absent" in receipt["notes"]
+    assert "pairing_absent" in receipt["notes"]
+    assert "agent_events_absent" not in receipt["notes"]
+
+    result = runner.invoke(app, ["mcp", "continuity", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 0, result.output
+    cli_receipt = json.loads(result.output)
+    assert cli_receipt["status"] == "READY"
+    assert cli_receipt["hosts"]["by_source"] == {"mcp": 0, "hook": 2}
+    assert cli_receipt["reasons"] == []
+    assert "access_ledger_absent" in cli_receipt["notes"]
+    assert "hook_only_observation" in cli_receipt["notes"]
+
+    text_result = runner.invoke(app, ["mcp", "continuity", "--root", str(tmp_path)])
+    assert text_result.exit_code == 0, text_result.output
+    assert "notes: " in text_result.output
+    assert "access_ledger_absent" in text_result.output
+    assert "hook_only_observation" in text_result.output
+
+
+def test_continuity_combines_one_hook_actor_and_one_mcp_caller(tmp_path) -> None:
+    """One hook-recorded actor plus one MCP caller is 2/2, split 1/1 by source."""
+    server = create_server(tmp_path)
+    record = asyncio.run(
+        call_hyodo_tool(server, "hyodo_event_record", {"event": _valid_event(str(uuid.uuid4()))})
+    )
+    assert json.loads(record["stdout"])["exit_code"] == 0
+
+    _record_hook_event(tmp_path, "canary-p0b-20260907")
+
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["hosts"]["observed"] == 2
+    assert receipt["hosts"]["by_source"] == {"mcp": 1, "hook": 1}
+    assert receipt["coverage_status"] == "OBSERVED"
+    assert receipt["status"] == "READY"
+    assert receipt["exit_code"] == 0
+    sources = {caller["identity"]: caller["source"] for caller in receipt["callers"]}
+    assert sources == {STDIO_IDENTITY: "mcp", "hook:canary-p0b-20260907": "hook"}
+
+
+def test_continuity_hook_events_without_actor_id_contribute_no_host(tmp_path) -> None:
+    """Older ledgers with no `actor_id` on any event observe zero hook hosts."""
+    ok, reasons, normalized = validate_event(_valid_event(str(uuid.uuid4())))
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["actor_id"] is None
+    assert append_agent_event(tmp_path, normalized)
+
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["hosts"]["by_source"] == {"mcp": 0, "hook": 0}
+    assert receipt["hosts"]["observed"] == 0
+    assert receipt["coverage_status"] == "PARTIAL"
+    assert receipt["status"] == "UNOBSERVED"
+
+
+def test_continuity_corrupt_agent_events_store_yields_no_hook_hosts(tmp_path) -> None:
+    """A corrupt agent-events store still fails closed with zero hook hosts observed."""
+    ledger_path = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    ledger_path.parent.mkdir(parents=True)
+    ledger_path.write_text(
+        '{"schema_version": "hyodo.agent-event/v1"}\nnot json\n', encoding="utf-8"
+    )
+
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["integrity_status"] == "CORRUPT"
+    assert receipt["status"] == "UNOBSERVED"
+    assert receipt["exit_code"] == 2
+    assert receipt["hosts"]["by_source"] == {"mcp": 0, "hook": 0}
+    assert receipt["hosts"]["observed"] == 0
+    assert receipt["callers"] == []
