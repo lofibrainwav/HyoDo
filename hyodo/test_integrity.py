@@ -153,9 +153,12 @@ def _calls_asserting_helper(
     for sub in ast.walk(node):
         if sub is node:
             continue
-        if isinstance(sub, ast.Call):
-            name = _call_target_name(sub.func)
-            if name and name in module_functions and name not in _visited:
+        if isinstance(sub, ast.Call) and isinstance(sub.func, ast.Name):
+            # Only a bare-name call can reach a module-level function; an
+            # attribute call such as ``obj.process()`` resolves through the
+            # object, so a same-named free function must not be credited.
+            name = sub.func.id
+            if name in module_functions and name not in _visited:
                 helper = module_functions[name]
                 if _has_direct_observation(helper):
                     return True

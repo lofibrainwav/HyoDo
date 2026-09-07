@@ -78,6 +78,19 @@ def test_same_module_helper_with_assert_is_not_flagged(tmp_path: Path) -> None:
     assert not any(f.function == "test_delegates_to_helper" for f in report.findings)
 
 
+def test_attribute_call_with_colliding_name_is_still_flagged(tmp_path: Path) -> None:
+    """``w.process()`` never reaches the free ``process`` helper, so no credit."""
+    _write(
+        tmp_path,
+        "test_helper_collision.py",
+        "class Widget:\n    def process(self, value):\n        return value * 2\n\n\n"
+        "def process(value):\n    assert value > 0\n\n\n"
+        "def test_calls_method_not_helper():\n    Widget().process(5)\n",
+    )
+    report = scan_test_integrity(tmp_path)
+    assert any(f.function == "test_calls_method_not_helper" for f in report.findings)
+
+
 def test_same_module_helper_without_assert_still_flagged(tmp_path: Path) -> None:
     _write(
         tmp_path,
