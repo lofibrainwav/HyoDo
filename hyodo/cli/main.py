@@ -2831,8 +2831,16 @@ def mcp_continuity(
     MCP access ledger, and the optional pairing file, plus the distinct
     caller identities recorded in the access ledger. Remote (ChatGPT/the
     hosted connector) is always reported UNOBSERVED — this command never
-    probes it. Exit 0 means every present store is readable and
-    uncorrupted; exit 2 means a store is unreadable or a ledger is corrupt.
+    probes it.
+
+    Integrity and coverage are reported separately: ``integrity_status`` is
+    READY when every present store parses, CORRUPT otherwise. `coverage_status`
+    is OBSERVED when enough hosts were seen and the required stores are
+    present and readable, PARTIAL when some but not all of that holds, and
+    UNOBSERVED when nothing has been observed yet (an empty workspace).
+    Overall `status`/exit code stay READY/0 only when both are satisfied;
+    otherwise UNOBSERVED/2 — an empty root is a false negative worth seeing,
+    never a silent READY.
     """
     root_path = Path(root).expanduser().resolve()
     receipt = measure_continuity(root_path)
@@ -2842,6 +2850,8 @@ def mcp_continuity(
 
     color = "green" if receipt["status"] == "READY" else "red"
     console.print(f"[{color}]{receipt['status']}[/{color}] continuity: {root_path}")
+    console.print(f"  integrity: {receipt['integrity_status']}")
+    console.print(f"  coverage:  {receipt['coverage_status']}")
     console.print(f"  {receipt['hosts']['label']}")
     for store_name, store in receipt["stores"].items():
         state = "present" if store["exists"] else "absent"
