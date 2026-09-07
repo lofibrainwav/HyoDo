@@ -115,6 +115,32 @@ hidden panel a click on the row's label toggles open (Escape closes it),
 using the same fixed row key `build_actor_rows` already keys its `rows`
 dict with.
 
+## The `/graph` grid (local viewer second pass)
+
+`/graph` renders one grid — five virtue columns by actor row, per
+`docs/superpowers/specs/2026-09-06-hyodo-core-engine-monitor-design.md`
+section 2 — not two separate lists. A few rendering details worth calling
+out for anyone reading the page's markup or extending it:
+
+- **Row labels.** A row identified by the optional `actor_id` field
+  (`hyodo.graph_view.build_actor_rows`) renders exactly `agent
+  <actor_id>`. A row with no `actor_id` renders `agent ` followed by the
+  first eight characters of its earliest event's id — a short, stable
+  lineage id — rather than whichever tool that lineage happened to call
+  first.
+- **Nesting.** A child row (`parent_row`/`depth`) renders indented
+  (`depth * 18px`) under its parent, with a collapse toggle that hides
+  every descendant row.
+- **Edges.** An SVG overlay draws `parent_event_id` as a solid elbow and
+  `evidence_refs` as a dashed arc between tiles; a dangling ref or an edge
+  whose other end has no column at all (e.g. a `model_response` with no
+  observed output digest) draws as a short red stub instead. Coordinates
+  are schematic (the grid's own column/row/tile-index geometry), not a
+  measured pixel read.
+- **The orb** is a 9x9 pixel grid, not a circle: the lit square count is
+  the run's raw `observed` count (capped at 81), never a ratio or a
+  percentage.
+
 ## What this is not
 
 - Not a sync target: nothing here reads a note system back into HyoDo.

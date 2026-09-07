@@ -11,8 +11,10 @@ from html import escape
 from pathlib import Path
 from typing import Any
 
+from hyodo.audience import resolve_audience
 from hyodo.graph_view import (
     UNCLASSIFIED,
+    VIRTUE_COLUMNS,
     assign_columns,
     build_actor_rings,
     build_actor_rows,
@@ -70,11 +72,18 @@ const FIELDS = [
   ["Why", "why"],
   ["How", "how"],
 ];
-const cells = document.querySelectorAll(".cells button[data-event]");
+const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event]");
 let lastFocusedCell = null;
+function highlightEdges(eventId) {
+  document.querySelectorAll("#edge-overlay .edge").forEach((edge) => {
+    const active = eventId && (edge.dataset.source === eventId || edge.dataset.target === eventId);
+    edge.classList.toggle("edge-active", Boolean(active));
+  });
+}
 cells.forEach((button) => {
   const show = () => {
     lastFocusedCell = button;
+    highlightEdges(button.dataset.eventId || null);
     if (!panel) return;
     let data;
     try {
@@ -94,6 +103,34 @@ cells.forEach((button) => {
   };
   button.addEventListener("focus", show);
   button.addEventListener("click", show);
+});
+const rowToggles = document.querySelectorAll(".row-toggle[data-row-toggle]");
+function descendantRows(key) {
+  const allRows = Array.from(document.querySelectorAll(".grid-row[data-row-key]"));
+  const result = [];
+  const stack = [key];
+  while (stack.length) {
+    const current = stack.pop();
+    allRows.forEach((row) => {
+      if (row.dataset.parentRow === current) {
+        result.push(row);
+        stack.push(row.dataset.rowKey);
+      }
+    });
+  }
+  return result;
+}
+rowToggles.forEach((button) => {
+  button.addEventListener("click", () => {
+    const key = button.dataset.rowToggle;
+    const expanded = button.getAttribute("aria-expanded") !== "false";
+    const next = !expanded;
+    button.setAttribute("aria-expanded", String(next));
+    button.textContent = next ? "-" : "+";
+    descendantRows(key).forEach((row) => {
+      row.hidden = !next;
+    });
+  });
 });
 const ringButtons = document.querySelectorAll(".actor-label[data-actor-key]");
 let lastRingButton = null;
@@ -124,6 +161,7 @@ ringButtons.forEach((button) => {
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
   if (panel) panel.textContent = DEFAULT_DETAIL;
+  highlightEdges(null);
   const target = lastFocusedCell || cells[0];
   if (target) target.focus();
   closeRingPanels();
@@ -226,6 +264,75 @@ RING_COLORS: dict[str, str] = {
     "memory": "#d946ef",
     "routines": "#84cc16",
     "tools": "#64748b",
+}
+
+# Local viewer second pass, brief finding 2: the SVG edge overlay's three
+# line kinds. No `--color-edge-*` token existed in `site/src/styles/
+# tokens.css` before this PR added it there; `tests/test_virtue_colors_ssot.py`
+# guards this dict the same way it already guards `RING_COLORS` above.
+EDGE_COLORS: dict[str, str] = {
+    "parent": "#64748b",
+    "evidence": "#0ea5e9",
+    "broken": "#ff5c5c",
+}
+
+# Grid layout constants (brief finding 1): the SVG edge overlay
+# (`_render_edge_overlay`) and the CSS grid it sits on top of share these
+# same numbers, so a tile's schematic SVG anchor lines up with its actual
+# `.grid-cell` position. Not measured pixels (the shared TypeScript
+# renderer, spec section 8, is the pending home for that); a row-label
+# column plus five equal virtue columns, each wide enough for a handful of
+# fixed-width tiles before a cell's own horizontal scrollbar takes over.
+GRID_LABEL_WIDTH = 180
+GRID_COLUMN_WIDTH = 200
+GRID_ROW_HEIGHT = 44
+GRID_TILE_WIDTH = 76
+GRID_TILE_GAP = 6
+GRID_TILE_PAD = 8
+
+#: The orb's pixel-grid pulse (brief finding 5): a fixed 9x9 field, ported
+#: from the site hero's unlit-tile-field idea (`site/src/hero/scene.ts`) in
+#: plain CSS/SVG rather than three.js/WebGPU.
+ORB_GRID_SIZE = 9
+ORB_GRID_TOTAL = ORB_GRID_SIZE * ORB_GRID_SIZE
+
+#: Slow default pulse period, and the shortened period used when the
+#: latest event is under 60s old (brief finding 5) — both in CSS seconds.
+ORB_PULSE_PERIOD_IDLE = 4.0
+ORB_PULSE_PERIOD_RECENT = 1.4
+
+#: Brief finding 6: one fixed-wording open question per virtue column,
+#: shown only when that column has zero events (`expected == 0`).
+#: `engineer` is always present and is the fallback for a profile this
+#: table has no entry for; `vibe`/`professional` reuse the wording
+#: `hyodo.verdict`'s own profile tables already establish for the same
+#: three-profile split (`hyodo.audience.VALID_PROFILES`).
+_COLUMN_QUESTIONS: dict[str, dict[str, str]] = {
+    "jin": {
+        "engineer": "Which test run proves this change?",
+        "vibe": "What proof do we have that this actually works?",
+        "professional": "Which test evidence supports this control?",
+    },
+    "seon": {
+        "engineer": "Which policy decision governed this action?",
+        "vibe": "What kept this safe?",
+        "professional": "Which control decision authorizes this action?",
+    },
+    "mi": {
+        "engineer": "What confirms the output was reviewed for clarity?",
+        "vibe": "Did anyone actually look at the result?",
+        "professional": "What review evidence exists for this output?",
+    },
+    "in": {
+        "engineer": "What shows this serves the people using it?",
+        "vibe": "Who does this actually help?",
+        "professional": "What documented benefit exists for the end user?",
+    },
+    "hyo": {
+        "engineer": "What ties this event back to the original request?",
+        "vibe": "Does this trace back to what was actually asked?",
+        "professional": "What lineage evidence connects this to the engagement scope?",
+    },
 }
 
 #: Full pillar name (`hyodo.skills.PILLARS`) -> `_VIRTUE_ACCENT_HEX` colour
@@ -491,7 +598,27 @@ def _parse_iso_ts(value: Any) -> datetime | None:
 
 
 def _event_label(node: dict[str, Any]) -> str:
-    """Short visible label for one node's cell button; accessible name = this text."""
+    """Short visible label for one node's grid tile; accessible name = this text.
+
+    Fix round 1 (coordinator, live-screenshot review): the old `"kind:
+    name"` label (e.g. `"tool_call: pytest"`) was wider than the tile's
+    fixed CSS width and rendered as `"tool_call..."` for every tool call,
+    telling the operator nothing. The tile now shows the tool name alone
+    when present (`write_file`, `run_tests`, `web_fetch`) and the bare
+    kind otherwise (`prompt`, `decision`, `model_response`) — short enough
+    to read without truncation. The fuller `"kind: name"` pairing moves to
+    `_event_title` (the tile's `title` attribute and the 5W1H panel's
+    "What" field), so nothing is lost, only relocated off the tile face.
+    """
+    tool = node.get("tool") if isinstance(node.get("tool"), dict) else {}
+    name = tool.get("name") if isinstance(tool, dict) else None
+    if isinstance(name, str) and name:
+        return name
+    return str(node.get("kind") or "event")
+
+
+def _event_title(node: dict[str, Any]) -> str:
+    """Full `"kind: name"` text (or bare kind) — see `_event_label`."""
     tool = node.get("tool") if isinstance(node.get("tool"), dict) else {}
     name = tool.get("name") if isinstance(tool, dict) else None
     kind = str(node.get("kind") or "event")
@@ -521,7 +648,7 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
         how = f"{how} ({rule_id})"
     return {
         "who": str(node.get("actor") or "not recorded"),
-        "what": _event_label(node),
+        "what": _event_title(node),
         "when": str(node.get("ts") or "not recorded"),
         "where": where,
         "why": str(policy.get("reason"))
@@ -533,6 +660,7 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
 
 def _event_button(node: dict[str, Any]) -> str:
     label = _event_label(node)
+    title = escape(_event_title(node), quote=True)
     detail = escape(json.dumps(_event_detail_payload(node)), quote=True)
     node_id = escape(str(node.get("id") or ""))
     decision = node.get("decision")
@@ -541,7 +669,7 @@ def _event_button(node: dict[str, Any]) -> str:
     )
     return (
         f'<button type="button" class="{cell_class}" data-event-id="{node_id}" '
-        f'data-event="{detail}">{escape(label)}</button>'
+        f'data-event="{detail}" title="{title}">{escape(label)}</button>'
     )
 
 
@@ -667,60 +795,396 @@ def _render_actor_ring_panel(key: str, rings_for_row: Any) -> str:
     )
 
 
-def _render_actor_rows(
-    rows_tree: dict[str, Any],
-    node_by_id: dict[str, dict[str, Any]],
-    rings: dict[str, dict[str, Any]] | None = None,
-) -> str:
-    """Render collapsible actor rows (spec section 2) from `build_actor_rows`.
+def _display_row_label(key: str, label: str) -> str:
+    """Redisplay an `agent:<lineage>` row's label as short text (brief finding 4).
 
-    `rings` (Package 2-C) is `build_actor_rings(graph, root)`'s return
-    value, or `None` when no `root` was supplied to `render_graph_html`
-    (the graph-viewer-asset-missing-style degrade: rows render without a
-    rings affordance rather than failing). When present, the row's label
-    becomes a button that toggles that row's concentric-ring panel
-    (`_render_actor_ring_panel`); the row's `role` (coordinator ruling)
-    renders as plain text next to the label — no new colours.
+    `build_actor_rows` (`hyodo/graph_view.py`, row identity — not touched
+    by this PR) already renders an `actor_id`-identified row's label as
+    exactly `agent <actor_id>`; that case is left byte-identical here (its
+    label already equals `f"agent {key.removeprefix('agent:')}"`, so the
+    equality check below is a no-op for it). A lineage-identified row (no
+    `actor_id`) has key `agent:<lineage event id>` and label
+    `agent:<tool.name>` or bare `agent` — neither shows *which* lineage
+    the row is, so this redisplays it as `agent ` + the lineage id's first
+    eight characters instead. Every other row's label (human, hyodo)
+    passes through unchanged.
     """
-    rings = rings or {}
+    if not key.startswith("agent:"):
+        return label
+    lineage_id = key[len("agent:") :]
+    if label == f"agent {lineage_id}":
+        return label
+    return f"agent {lineage_id[:8]}"
+
+
+def _flatten_row_order(
+    rows_tree: dict[str, Any],
+) -> tuple[list[str], dict[str | None, list[str]]]:
+    """Depth-first row render order (parent immediately before its children).
+
+    Returns the flattened key list (this order *is* the grid's row index,
+    `_build_grid_cells` below) and the `{parent_key: [child_key, ...]}`
+    map the recursive row renderer also needs to know which rows nest.
+    """
     rows = rows_tree.get("rows", {})
     order = rows_tree.get("order", [])
     children: dict[str | None, list[str]] = {}
     for key in order:
-        parent = rows[key].get("parent_row")
+        parent = rows.get(key, {}).get("parent_row")
         children.setdefault(parent, []).append(key)
+    flat: list[str] = []
 
-    def _render_row(key: str) -> str:
-        """Render one row (and its nested sub-agent rows) as HTML."""
-        row = rows[key]
-        label = str(row.get("label", key))
-        role = row.get("role")
-        role_html = f' <span class="row-role">{escape(str(role))}</span>' if role else ""
-        has_rings = key in rings
-        label_html = (
-            f'<button type="button" class="actor-label" data-actor-key="{escape(key)}" '
-            f'aria-expanded="false" aria-controls="rings-{escape(key)}">{escape(label)}</button>'
-            if has_rings
-            else escape(label)
+    def _walk(key: str) -> None:
+        flat.append(key)
+        for child_key in children.get(key, []):
+            _walk(child_key)
+
+    for key in children.get(None, []):
+        _walk(key)
+    return flat, children
+
+
+def _build_grid_cells(
+    rows_tree: dict[str, Any], assignments: dict[str, list[str]]
+) -> tuple[list[str], dict[str, dict[str, list[str]]], dict[str, tuple[int, int, int]]]:
+    """Place every column-assigned node at (row index, column index, cell position).
+
+    Brief finding 1: one grid whose columns are the five virtue columns and
+    whose rows are actors, each event a tile at (its column, its row),
+    ordered left-to-right within a cell by time. A row's own `events` list
+    (`build_actor_rows`) is already earliest-first, so filtering it by
+    column membership preserves that order with no extra sort.
+
+    Returns the flattened row order (`_flatten_row_order`), `{row_key:
+    {column: [node_id, ...]}}`, and `{node_id: (row_index, col_index,
+    tile_index)}` — a node spanning more than one column (brief finding 3
+    keeps spans, e.g. a data_boundary ASK) anchors at its first match in
+    `VIRTUE_COLUMNS` fixed order; that anchor is what
+    `_render_edge_overlay` draws edges from and to.
+    """
+    flat_keys, _children = _flatten_row_order(rows_tree)
+    rows = rows_tree.get("rows", {})
+    cells: dict[str, dict[str, list[str]]] = {}
+    anchors: dict[str, tuple[int, int, int]] = {}
+    for row_index, key in enumerate(flat_keys):
+        row = rows.get(key, {})
+        row_cells: dict[str, list[str]] = {}
+        for col_index, column in enumerate(VIRTUE_COLUMNS):
+            bucket = [
+                node_id
+                for node_id in row.get("events", [])
+                if column in assignments.get(node_id, [])
+            ]
+            row_cells[column] = bucket
+            for tile_index, node_id in enumerate(bucket):
+                anchors.setdefault(node_id, (row_index, col_index, tile_index))
+        cells[key] = row_cells
+    return flat_keys, cells, anchors
+
+
+#: Fix round 1 (coordinator, live-screenshot review): a tile's rendered
+#: height, close enough to the button's actual line-box for the schematic
+#: top/bottom anchor points below — not a measured pixel read (see
+#: `_anchor_xy`'s own note).
+GRID_TILE_HEIGHT = 22
+
+#: How far before the target's x the parent-elbow's single vertical bend
+#: sits (fix round 1: "a single horizontal-then-vertical bend near the
+#: target", replacing the old midpoint bend that cut across every column
+#: between source and target).
+GRID_EDGE_BEND_INSET = 14
+
+
+def _anchor_xy(anchor: tuple[int, int, int]) -> tuple[float, float]:
+    """Schematic (not measured-pixel) centre of one tile's grid cell position."""
+    row_index, col_index, tile_index = anchor
+    x = (
+        GRID_LABEL_WIDTH
+        + col_index * GRID_COLUMN_WIDTH
+        + GRID_TILE_PAD
+        + tile_index * (GRID_TILE_WIDTH + GRID_TILE_GAP)
+        + GRID_TILE_WIDTH / 2
+    )
+    y = row_index * GRID_ROW_HEIGHT + GRID_ROW_HEIGHT / 2
+    return x, y
+
+
+def _tile_edge_point(anchor: tuple[int, int, int], side: str) -> tuple[float, float]:
+    """One tile's boundary point (fix round 1: anchor edges at a tile's
+    edge, not its centre) — `"left"`/`"right"`/`"top"`/`"bottom"`-middle.
+    """
+    x, y = _anchor_xy(anchor)
+    if side == "left":
+        return x - GRID_TILE_WIDTH / 2, y
+    if side == "right":
+        return x + GRID_TILE_WIDTH / 2, y
+    if side == "top":
+        return x, y - GRID_TILE_HEIGHT / 2
+    if side == "bottom":
+        return x, y + GRID_TILE_HEIGHT / 2
+    return x, y
+
+
+def _parent_edge_path(
+    source_anchor: tuple[int, int, int], target_anchor: tuple[int, int, int]
+) -> str:
+    """One `parent_event_id` edge's `d` attribute (fix round 1).
+
+    Same column (a lineage's own consecutive events): a single straight
+    vertical line between bottom/top-middle, in whichever direction the
+    target actually sits. Different column: right-middle/left-middle (or
+    the mirrored left/right when the target column sits to the source's
+    left), with the path's one vertical bend placed `GRID_EDGE_BEND_INSET`
+    px before the target rather than at the source/target midpoint — the
+    old midpoint bend is what drew as "a rectangle crossing cells" when
+    source and target were several columns apart.
+    """
+    _src_row, src_col, _src_tile = source_anchor
+    _tgt_row, tgt_col, _tgt_tile = target_anchor
+    if src_col == tgt_col:
+        _sx, sy_center = _anchor_xy(source_anchor)
+        _tx, ty_center = _anchor_xy(target_anchor)
+        going_down = ty_center >= sy_center
+        x1, y1 = _tile_edge_point(source_anchor, "bottom" if going_down else "top")
+        x2, y2 = _tile_edge_point(target_anchor, "top" if going_down else "bottom")
+        return f"M{x1:.1f},{y1:.1f} L{x2:.1f},{y2:.1f}"
+
+    sx_center, _sy = _anchor_xy(source_anchor)
+    tx_center, _ty = _anchor_xy(target_anchor)
+    going_right = tx_center >= sx_center
+    x1, y1 = _tile_edge_point(source_anchor, "right" if going_right else "left")
+    x2, y2 = _tile_edge_point(target_anchor, "left" if going_right else "right")
+    bend_x = x2 - GRID_EDGE_BEND_INSET if going_right else x2 + GRID_EDGE_BEND_INSET
+    # Never let the bend fall outside the [x1, x2] span (a source/target
+    # pair close enough together that the inset would overshoot).
+    bend_x = max(x1, min(bend_x, x2)) if going_right else min(x1, max(bend_x, x2))
+    return f"M{x1:.1f},{y1:.1f} L{bend_x:.1f},{y1:.1f} L{bend_x:.1f},{y2:.1f} L{x2:.1f},{y2:.1f}"
+
+
+def _evidence_edge_path(
+    source_anchor: tuple[int, int, int], target_anchor: tuple[int, int, int]
+) -> str:
+    """One `evidence_refs` edge's `d` attribute: a single shallow bezier
+    between the two tiles' top-middle points (fix round 1 keeps this arc
+    shape, only the parent elbow's geometry changed).
+    """
+    x1, y1 = _tile_edge_point(source_anchor, "top")
+    x2, y2 = _tile_edge_point(target_anchor, "top")
+    mid_x = (x1 + x2) / 2
+    mid_y = min(y1, y2) - 18
+    return f"M{x1:.1f},{y1:.1f} Q{mid_x:.1f},{mid_y:.1f} {x2:.1f},{y2:.1f}"
+
+
+def _render_edge_overlay(
+    graph: dict[str, Any], anchors: dict[str, tuple[int, int, int]], row_count: int
+) -> str:
+    """SVG overlay (brief finding 2, fix round 1): parent-chain elbows,
+    evidence-ref arcs, broken stubs, tile-edge anchoring.
+
+    `parent_event_id` edges draw as solid elbow lines, `evidence_refs`
+    edges as dashed arcs — both only between two anchored tiles, each
+    anchored at the tile's own boundary (`_tile_edge_point`), never its
+    centre, so a line never visually crosses through a tile it does not
+    touch. `graph["edges"]` only ever carries ids that already resolve to
+    a real node (`hyodo.event_graph.validate_event_edges` excludes a
+    dangling ref from it, into `graph["unresolved_refs"]` instead) — so
+    within that list, an endpoint that is not in `anchors` is a real event
+    with no virtue column (e.g. a digest-less `model_response`), not a
+    broken ref. Fix round 1: that off-grid case draws nothing (no edge,
+    no stub) and counts under `data-offgrid-edges` instead of
+    `data-broken-edges`; only a genuinely dangling ref
+    (`graph["unresolved_refs"]`) still draws a short red stub and counts
+    as broken. Every edge kind's colour reads from `EDGE_COLORS`
+    (`--color-edge-*` in `site/src/styles/tokens.css`, guarded by
+    `tests/test_virtue_colors_ssot.py` the same way `RING_COLORS` is).
+    """
+    raw_edges = graph.get("edges")
+    edges = raw_edges if isinstance(raw_edges, list) else []
+    width = GRID_LABEL_WIDTH + len(VIRTUE_COLUMNS) * GRID_COLUMN_WIDTH
+    height = max(1, row_count) * GRID_ROW_HEIGHT
+    parts: list[str] = []
+    parent_count = evidence_count = broken_count = offgrid_count = 0
+
+    def _stub(node_id: Any, dx: float, dy: float) -> None:
+        nonlocal broken_count
+        anchor = anchors.get(node_id) if isinstance(node_id, str) else None
+        if anchor is None:
+            return
+        x, y = _anchor_xy(anchor)
+        parts.append(
+            f'<line class="edge edge-broken" x1="{x - dx:.1f}" y1="{y - dy:.1f}" '
+            f'x2="{x + dx:.1f}" y2="{y + dy:.1f}" stroke="{EDGE_COLORS["broken"]}" '
+            'stroke-width="2"/>'
         )
-        header_html = f'<span class="row-header">{label_html}{role_html}</span>'
-        cells = "".join(
+        broken_count += 1
+
+    for edge in edges:
+        source, target = edge.get("source"), edge.get("target")
+        source_ok = isinstance(source, str) and source in anchors
+        target_ok = isinstance(target, str) and target in anchors
+        if edge.get("type") == "parent_event_id":
+            if source_ok and target_ok:
+                parts.append(
+                    f'<path class="edge edge-parent" data-source="{escape(str(source))}" '
+                    f'data-target="{escape(str(target))}" '
+                    f'd="{_parent_edge_path(anchors[source], anchors[target])}" fill="none" '
+                    f'stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5"/>'
+                )
+                parent_count += 1
+            else:
+                offgrid_count += 1
+        elif edge.get("type") == "evidence_ref":
+            if source_ok and target_ok:
+                parts.append(
+                    f'<path class="edge edge-evidence" data-source="{escape(str(source))}" '
+                    f'data-target="{escape(str(target))}" '
+                    f'd="{_evidence_edge_path(anchors[source], anchors[target])}" fill="none" '
+                    f'stroke="{EDGE_COLORS["evidence"]}" stroke-width="1.5" '
+                    'stroke-dasharray="4 3"/>'
+                )
+                evidence_count += 1
+            else:
+                offgrid_count += 1
+
+    for issue in graph.get("unresolved_refs") or []:
+        if isinstance(issue, dict):
+            _stub(issue.get("event_id"), 6, 6)
+
+    return (
+        f'<svg id="edge-overlay" class="edge-overlay" width="{width}" height="{height}" '
+        f'viewBox="0 0 {width} {height}" role="img" aria-hidden="true" '
+        f'data-parent-edges="{parent_count}" data-evidence-edges="{evidence_count}" '
+        f'data-broken-edges="{broken_count}" data-offgrid-edges="{offgrid_count}">'
+        + "".join(parts)
+        + "</svg>"
+    )
+
+
+def _orb_grid_html(
+    lit_count: int, color: str, pulse_period: float, decision: str, observed: int, expected: int
+) -> str:
+    """The orb's 9x9 pixel-grid pulse (brief finding 5), ported from the site
+    hero's unlit-tile-field idea (`site/src/hero/scene.ts`) in plain
+    CSS/SVG — no three.js, no external script. `lit_count` is the run's
+    raw `observed` count, capped at the grid's 81 cells: a second
+    rendering of the same number the verdict line/column badges already
+    print (never a synthesized ratio, never a percentage). The pulse
+    period is a CSS custom property so `prefers-reduced-motion` can
+    disable the animation outright in CSS alone.
+    """
+    total = ORB_GRID_TOTAL
+    lit_count = max(0, min(total, lit_count))
+    cells = "".join(
+        f'<span class="orb-cell orb-cell-lit" style="--tint:{color}"></span>'
+        if index < lit_count
+        else '<span class="orb-cell"></span>'
+        for index in range(total)
+    )
+    return (
+        f'<div class="orb-grid" role="img" data-decision="{escape(decision)}" '
+        f'data-lit-count="{lit_count}" style="--pulse-period:{pulse_period}s" '
+        f'aria-label="Core engine pulse: latest decision {escape(decision)}, '
+        f'{observed}/{expected} observed">{cells}</div>'
+    )
+
+
+def _render_column_header(
+    key: str,
+    hanja: str,
+    korean: str,
+    english: str,
+    color: str,
+    cov: dict[str, int],
+    audience: str,
+    extra_note_html: str = "",
+) -> str:
+    """One virtue column's header cell (brief finding 6 adds the empty-column question)."""
+    question_html = ""
+    if cov["expected"] == 0:
+        table = _COLUMN_QUESTIONS[key]
+        question = table.get(audience, table["engineer"])
+        question_html = f'<p class="column-question">{escape(question)}</p>'
+    return (
+        f'<div class="grid-colhead" data-column="{escape(key)}">'
+        f'<h2 id="col-{escape(key)}" style="--accent:{_VIRTUE_ACCENT_HEX[color]}">'
+        f'<span lang="ko">{escape(hanja)} {escape(korean)}</span> {escape(english)}</h2>'
+        f'<p class="coverage">{cov["observed"]}/{cov["expected"]} observed</p>'
+        f"{extra_note_html}{question_html}</div>"
+    )
+
+
+def _render_grid_row(
+    key: str,
+    rows_tree: dict[str, Any],
+    cells: dict[str, dict[str, list[str]]],
+    node_by_id: dict[str, dict[str, Any]],
+    rings: dict[str, dict[str, Any]],
+    children: dict[str | None, list[str]],
+) -> str:
+    """Render one grid row (row-header cell + five virtue-column cells).
+
+    Indented by `depth * 18px` (brief addendum item 8: nested child rows
+    render indented); a row with children gets a `row-toggle` disclosure
+    button `GRAPH_SCRIPT` wires to hide/show its descendants (collapsible,
+    same requirement). The row's own ring-panel affordance
+    (`_render_actor_ring_panel`) is unchanged from before this PR.
+    """
+    row = rows_tree.get("rows", {}).get(key, {})
+    depth = row.get("depth", 0)
+    label = _display_row_label(key, str(row.get("label", key)))
+    role = row.get("role")
+    role_html = f' <span class="row-role">{escape(str(role))}</span>' if role else ""
+    has_rings = key in rings
+    label_html = (
+        f'<button type="button" class="actor-label" data-actor-key="{escape(key)}" '
+        f'aria-expanded="false" aria-controls="rings-{escape(key)}">{escape(label)}</button>'
+        if has_rings
+        else escape(label)
+    )
+    has_children = bool(children.get(key))
+    toggle_html = (
+        f'<button type="button" class="row-toggle" data-row-toggle="{escape(key)}" '
+        'aria-expanded="true" aria-label="Collapse child rows">-</button>'
+        if has_children
+        else ""
+    )
+    rowhead = (
+        f'<div class="grid-rowhead" style="padding-left:{depth * 18}px">'
+        f'{toggle_html}<span class="row-header">{label_html}{role_html}</span></div>'
+    )
+    row_cells = cells.get(key, {})
+    cell_html = "".join(
+        f'<div class="grid-cell" data-row-key="{escape(key)}" data-column="{escape(column)}">'
+        + "".join(
             _event_button(node_by_id[node_id])
-            for node_id in row.get("events", [])
+            for node_id in row_cells.get(column, [])
             if node_id in node_by_id
         )
-        panel_html = _render_actor_ring_panel(key, rings[key]) if has_rings else ""
-        nested = "".join(_render_row(child_key) for child_key in children.get(key, []))
-        if nested:
-            return (
-                f'<details class="row" open><summary>{header_html}</summary>'
-                f'<div class="row-cells">{cells}</div>{panel_html}{nested}</details>'
-            )
-        return (
-            f'<div class="row">{header_html}<div class="row-cells">{cells}</div>{panel_html}</div>'
-        )
+        + "</div>"
+        for column in VIRTUE_COLUMNS
+    )
+    panel_html = _render_actor_ring_panel(key, rings[key]) if has_rings else ""
+    parent_row = row.get("parent_row") or ""
+    return (
+        f'<div class="grid-row" data-row-key="{escape(key)}" '
+        f'data-parent-row="{escape(str(parent_row))}" data-depth="{depth}">'
+        f"{rowhead}{cell_html}</div>{panel_html}"
+    )
 
-    return "".join(_render_row(key) for key in children.get(None, []))
+
+def _render_grid_rows(
+    rows_tree: dict[str, Any],
+    cells: dict[str, dict[str, list[str]]],
+    node_by_id: dict[str, dict[str, Any]],
+    rings: dict[str, dict[str, Any]] | None,
+    flat_keys: list[str],
+) -> str:
+    """Render every grid row in flattened (depth-first) display order."""
+    rings = rings or {}
+    _flat, children = _flatten_row_order(rows_tree)
+    return "".join(
+        _render_grid_row(key, rows_tree, cells, node_by_id, rings, children) for key in flat_keys
+    )
 
 
 def render_graph_html(
@@ -765,6 +1229,7 @@ def render_graph_html(
     orb = orb_state(graph)
     rows_tree = build_actor_rows(nodes, edges)
     rings = build_actor_rings(graph, root) if root is not None else {}
+    audience = resolve_audience(root).profile if root is not None else "engineer"
 
     notice_html = ""
     if status != "READY":
@@ -782,22 +1247,25 @@ def render_graph_html(
         else ""
     )
 
-    column_sections: list[str] = []
-    for key, hanja, korean, english, color in PILLAR_SPECS[:5]:
-        cov = coverage.get(key, {"observed": 0, "expected": 0})
-        cell_ids = [node_id for node_id, columns in assignments.items() if key in columns]
-        cells_html = "".join(_event_button(node_by_id[node_id]) for node_id in cell_ids)
-        note = mission_note if key == "hyo" else ""
-        column_sections.append(
-            f'<section class="column" aria-labelledby="col-{escape(key)}">'
-            f'<h2 id="col-{escape(key)}" style="--accent:{_VIRTUE_ACCENT_HEX[color]}">'
-            f'<span lang="ko">{escape(hanja)} {escape(korean)}</span> {escape(english)}</h2>'
-            f'<p class="coverage">{cov["observed"]}/{cov["expected"]} observed</p>'
-            f"{note}"
-            f'<div class="cells">{cells_html}</div>'
-            "</section>"
+    # Brief finding 1: one grid, columns x actor rows, each event a tile at
+    # (its column, its row) — replaces the old two-separate-lists layout
+    # (five pooled column sections plus a disconnected row listing).
+    flat_keys, grid_cells, anchors = _build_grid_cells(rows_tree, assignments)
+    column_headers = "".join(
+        _render_column_header(
+            key,
+            hanja,
+            korean,
+            english,
+            color,
+            coverage.get(key, {"observed": 0, "expected": 0}),
+            audience,
+            mission_note if key == "hyo" else "",
         )
-    columns_html = "".join(column_sections)
+        for key, hanja, korean, english, color in PILLAR_SPECS[:5]
+    )
+    grid_rows_html = _render_grid_rows(rows_tree, grid_cells, node_by_id, rings, flat_keys)
+    edge_overlay_html = _render_edge_overlay(graph, anchors, len(flat_keys))
 
     unclassified_ids = [
         node_id for node_id, columns in assignments.items() if columns == [UNCLASSIFIED]
@@ -812,16 +1280,24 @@ def render_graph_html(
             "</section>"
         )
 
-    rows_html = _render_actor_rows(rows_tree, node_by_id, rings)
+    all_ts = [_parse_iso_ts(node.get("ts")) for node in nodes]
+    known_ts = sorted(ts for ts in all_ts if ts is not None)
+    time_ruler_html = (
+        '<div class="time-ruler" aria-hidden="true">'
+        f'<span class="time-ruler-start">{escape(known_ts[0].isoformat())}</span>'
+        '<span class="time-ruler-line"></span>'
+        f'<span class="time-ruler-end">{escape(known_ts[-1].isoformat())} (oldest → newest)</span>'
+        "</div>"
+        if known_ts
+        else ""
+    )
 
     latest_ts = _parse_iso_ts(orb.get("latest_ts"))
     pulse_eligible = latest_ts is not None and (now - latest_ts).total_seconds() < 60
     orb_decision = str(orb.get("decision") or "UNOBSERVED")
     orb_cov = orb.get("coverage") or {"observed": 0, "expected": 0}
-    ratio = orb_cov["observed"] / orb_cov["expected"] if orb_cov["expected"] else 0.0
-    brightness = 0.25 + 0.75 * min(max(ratio, 0.0), 1.0)
-    orb_classes = "orb orb-" + orb_decision.lower() + (" orb-pulse" if pulse_eligible else "")
     orb_color = DECISION_COLORS.get(orb_decision, DECISION_COLORS["UNOBSERVED"])
+    pulse_period = ORB_PULSE_PERIOD_RECENT if pulse_eligible else ORB_PULSE_PERIOD_IDLE
     # The orb caption's total is the sum of the five column badges below —
     # never a new number — so the breakdown line spells out those exact
     # addends next to the total, per column, in the same fixed order.
@@ -831,11 +1307,15 @@ def render_graph_html(
         for key, _hanja, _korean, english, _color in PILLAR_SPECS[:5]
     )
     orb_html = (
-        f'<div class="{orb_classes}" role="img" '
-        f'aria-label="Core engine pulse: latest decision {escape(orb_decision)}, '
-        f'{orb_cov["observed"]}/{orb_cov["expected"]} observed" '
-        f'style="--decision-color:{orb_color}; --brightness:{brightness:.3f}"></div>'
-        f'<p class="orb-caption" title="{escape(breakdown)}">{escape(orb_decision)} · '
+        _orb_grid_html(
+            orb_cov["observed"],
+            orb_color,
+            pulse_period,
+            orb_decision,
+            orb_cov["observed"],
+            orb_cov["expected"],
+        )
+        + f'<p class="orb-caption" title="{escape(breakdown)}">{escape(orb_decision)} · '
         f"{orb_cov['observed']}/{orb_cov['expected']} observed"
         + (" · recent activity" if pulse_eligible else "")
         + "</p>"
@@ -852,25 +1332,37 @@ main {{ max-width:1180px; margin:auto; padding:28px 20px 48px }} h1 {{ margin:0;
 .unobserved-notice {{ background:#fdeaea; color:#7a1f1f; border:1px solid #f0b8b8; border-radius:10px; padding:10px 14px; font-weight:600; margin:18px 0 }}
 @media (prefers-color-scheme: dark) {{ .unobserved-notice {{ background:#3f2626; color:#f5c9c9; border-color:#7a3b3b }} }}
 .orb-wrap {{ display:flex; flex-direction:column; align-items:center; gap:6px; margin:22px 0 28px }}
-.orb {{ width:72px; height:72px; border-radius:50%; background:var(--decision-color,#6b7280); opacity:var(--brightness,0.4); box-shadow:0 0 24px var(--decision-color,#6b7280) }}
-.orb-pulse {{ animation:hyodo-orb-pulse 2.4s ease-in-out infinite }}
-@keyframes hyodo-orb-pulse {{ 0%,100% {{ transform:scale(1) }} 50% {{ transform:scale(1.14) }} }}
-@media (prefers-reduced-motion:reduce) {{ .orb-pulse {{ animation:none }} }}
+.orb-grid {{ display:grid; grid-template-columns:repeat({ORB_GRID_SIZE},1fr); gap:2px; width:96px; height:96px; animation:hyodo-orb-grid-pulse var(--pulse-period,4s) ease-in-out infinite }}
+.orb-cell {{ background:var(--line-soft); border-radius:2px }} .orb-cell-lit {{ background:var(--tint,#6b7280) }}
+@keyframes hyodo-orb-grid-pulse {{ 0%,100% {{ opacity:1 }} 50% {{ opacity:.5 }} }}
+@media (prefers-reduced-motion:reduce) {{ .orb-grid {{ animation:none }} }}
 .orb-caption {{ color:var(--muted); font-size:.9rem; margin:0 }}
 .orb-breakdown {{ color:var(--muted); font-size:.78rem; margin:.2rem 0 0; text-align:center }}
-.columns {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; margin-bottom:18px }}
-.column {{ background:var(--surface); border:1px solid var(--line); border-top:6px solid var(--accent,#888); border-radius:12px; padding:12px; min-height:120px }}
-.column h2 {{ margin:0 0 4px; font-size:.95rem }} .column h2 span {{ color:var(--accent); font-size:.85rem }}
-.coverage {{ margin:0 0 8px; color:var(--muted); font-size:.85rem }} .column-note {{ font-size:.8rem; color:var(--muted) }}
-.cells, .row-cells {{ display:flex; flex-wrap:wrap; gap:6px }}
-.gutter {{ margin-bottom:18px }} .gutter h2 {{ font-size:.95rem }}
-.rows .row {{ border-top:1px solid var(--line-soft); padding:10px 0 }} .rows details.row > summary {{ cursor:pointer; font-weight:600 }} .rows h3 {{ margin:0 0 6px; font-size:.95rem }}
-.row-header {{ display:inline-flex; align-items:baseline; gap:6px; margin:0 0 6px; font-weight:600 }}
+.grid-wrap {{ overflow-x:auto; margin-bottom:18px }}
+.grid-graph {{ display:inline-block; min-width:{GRID_LABEL_WIDTH + 5 * GRID_COLUMN_WIDTH}px; border:1px solid var(--line); border-radius:12px; background:var(--surface) }}
+.grid-headrow, .grid-row {{ display:flex }}
+.grid-corner {{ width:{GRID_LABEL_WIDTH}px; flex:0 0 auto; border-bottom:1px solid var(--line) }}
+.grid-colhead {{ width:{GRID_COLUMN_WIDTH}px; flex:0 0 auto; border-bottom:1px solid var(--line); border-left:1px solid var(--line-soft); padding:10px; border-top:6px solid var(--accent,#888) }}
+.grid-colhead h2 {{ margin:0 0 4px; font-size:.95rem }} .grid-colhead h2 span {{ color:var(--accent); font-size:.85rem }}
+.coverage {{ margin:0 0 6px; color:var(--muted); font-size:.85rem }} .column-note, .column-question {{ font-size:.78rem; color:var(--muted); margin:2px 0 0 }}
+.grid-rows {{ position:relative }}
+.grid-rowhead {{ width:{GRID_LABEL_WIDTH}px; flex:0 0 auto; min-height:{GRID_ROW_HEIGHT}px; box-sizing:border-box; border-top:1px solid var(--line-soft); padding:8px 10px; display:flex; align-items:center; gap:6px }}
+.grid-cell {{ width:{GRID_COLUMN_WIDTH}px; flex:0 0 auto; min-height:{GRID_ROW_HEIGHT}px; box-sizing:border-box; border-top:1px solid var(--line-soft); border-left:1px solid var(--line-soft); padding:6px; display:flex; flex-wrap:nowrap; align-items:center; gap:{GRID_TILE_GAP}px; overflow-x:auto }}
+.row-header {{ display:inline-flex; align-items:baseline; gap:6px; font-weight:600 }}
 .row-role {{ font-weight:400; font-size:.78rem; color:var(--muted) }}
+.row-toggle {{ border:none; background:none; color:var(--muted); cursor:pointer; padding:0 2px; font-size:.8rem }}
 .actor-label {{ font:inherit; font-weight:600 }}
+.grid-cell button {{ width:{GRID_TILE_WIDTH}px; flex:0 0 auto; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.72rem }}
 button {{ font:inherit; border:1px solid var(--line); background:var(--surface); color:var(--ink); border-radius:8px; padding:6px 9px; cursor:pointer }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:2px }}
 .cell-deny {{ border-color:{DECISION_COLORS["DENY"]} }} .cell-ask {{ border-color:{DECISION_COLORS["ASK"]} }} .cell-allow {{ border-color:{DECISION_COLORS["ALLOW"]} }} .cell-unobserved {{ border-color:{DECISION_COLORS["UNOBSERVED"]} }}
+.time-ruler {{ display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:.72rem; margin:6px 0 18px }}
+.time-ruler-line {{ flex:1; height:1px; background:var(--line) }}
+.edge-overlay {{ position:absolute; top:0; left:0; pointer-events:none }}
+.edge.edge-active {{ stroke-width:3; filter:drop-shadow(0 0 2px currentColor) }}
+.cells {{ display:flex; flex-wrap:wrap; gap:6px }}
+.gutter {{ margin-bottom:18px }} .gutter h2 {{ font-size:.95rem }}
+button[hidden], .grid-row[hidden] {{ display:none }}
 .detail {{ margin-top:20px; border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--surface); min-height:80px }} .detail p {{ margin:.25rem 0 }}
 .actor-rings[hidden] {{ display:none }}
 .actor-rings {{ display:flex; flex-wrap:wrap; gap:16px; margin:10px 0 4px; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--surface) }}
@@ -881,12 +1373,16 @@ button {{ font:inherit; border:1px solid var(--line); background:var(--surface);
 .ring-layer li {{ border-left:3px solid var(--tint,var(--ring-color)); padding:1px 0 1px 6px; margin:2px 0 }}
 .ring-layer li.ring-more {{ color:var(--muted); border-left-color:var(--line) }}
 .ring-note {{ font-size:.75rem; color:var(--muted); margin:0 0 4px }}
-@media (max-width:900px) {{ .columns {{ grid-template-columns:1fr 1fr }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
 {notice_html}
 <section class="orb-wrap">{orb_html}</section>
-<div class="columns">{columns_html}</div>
+<div class="grid-wrap">
+<div class="grid-graph">
+<div class="grid-headrow"><div class="grid-corner"></div>{column_headers}</div>
+<div class="grid-rows">{grid_rows_html}{edge_overlay_html}</div>
+</div>
+{time_ruler_html}
+</div>
 {gutter_html}
-<div class="rows">{rows_html}</div>
 <section id="event-detail" class="detail" aria-live="polite"><p>Select an event to see its 5W1H detail.</p></section>
 </main><script>{GRAPH_SCRIPT}</script></body></html>"""

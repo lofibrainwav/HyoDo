@@ -27,10 +27,11 @@ from typing import Any
 #: Hyo. Eternity is not a column — it is read off the orb (section 4).
 VIRTUE_COLUMNS: tuple[str, ...] = ("jin", "seon", "mi", "in", "hyo")
 
-#: Gutter sentinel for an event the mapping table (spec section 3) does not
-#: match at all. Distinct from the empty list `assign_columns` returns for
-#: `prompt`/`model_response`, which match the table's last row on purpose
-#: ("no column") and are not unclassified.
+#: Gutter sentinel for an event the mapping table (spec section 3, as
+#: amended by this PR's brief finding 3) does not match at all. Distinct
+#: from the empty list `assign_columns` returns for a digest-less
+#: `model_response`, which matches the table's own "no column" row on
+#: purpose and is not unclassified.
 UNCLASSIFIED = "unclassified"
 
 #: Section 3 table, row 4: "type-check, lint tools" -> Truth.
@@ -46,12 +47,23 @@ _TYPECHECK_LINT_PATTERNS: tuple[str, ...] = (
     "eslint",
     "flake8",
 )
-#: Section 3 table, row 5: "test runner" -> Goodness.
+#: Owner review round 2 (brief finding 3): a test runner is a Truth event
+#: (it proves a claim), not a Goodness one — Goodness stays reserved for
+#: the policy decision that gated it. Overrides the original spec section
+#: 3 table row, which this PR's brief supersedes.
 _TEST_RUNNER_PATTERNS: tuple[str, ...] = ("test", "pytest", "jest", "vitest", "mocha")
 #: Section 3 table, row 6: "formatter" -> Beauty.
 _FORMATTER_PATTERNS: tuple[str, ...] = ("format", "fmt", "prettier", "black", "gofmt")
 #: Section 3 table, row 7: "doc/onboarding tools" -> Benevolence.
 _DOC_PATTERNS: tuple[str, ...] = ("doc", "readme", "onboard", "changelog")
+#: Owner review round 2 (brief finding 3): a file read/write/edit is a Hyo
+#: event (it touches the project's own boundary) unless it was ASK/DENY-
+#: gated or the path itself sits outside the checkout, in which case the
+#: decision is the salient fact, not the file touch.
+_FILE_TOOL_PATTERNS: tuple[str, ...] = ("read_file", "write_file", "edit")
+#: Owner review round 2 (brief finding 3): a network fetch is a Goodness
+#: event (it is exactly the kind of action `evaluate_policy` gates).
+_WEB_TOOL_PATTERNS: tuple[str, ...] = ("web_fetch", "browser", "http")
 
 #: Section 3 table, row 8: data-boundary rule ids -> Hyo.
 _HYO_RULE_IDS = frozenset({"data_boundary", "data_boundary_undeclared"})
@@ -59,12 +71,29 @@ _HYO_RULE_IDS = frozenset({"data_boundary", "data_boundary_undeclared"})
 _WEB_CREDENTIAL_RULE_IDS = frozenset(
     {"web_credential_path_denied", "web_credential_path_unobserved"}
 )
-#: Section 3 table, last row: mission/time-axis events carry no column.
-_NO_COLUMN_KINDS = frozenset({"prompt", "model_response"})
 
 
 def _matches(name: str, patterns: tuple[str, ...]) -> bool:
     return bool(name) and any(pattern in name for pattern in patterns)
+
+
+def _is_outside_root(paths: list[Any]) -> bool:
+    """`True` when any of *paths* is plainly outside a project checkout.
+
+    A pure heuristic over the path text alone (`assign_columns` has no
+    `root` to resolve against, unlike `hyodo.policy.evaluate_policy`,
+    which does): an absolute path, a home-relative `~` path, or a `..`
+    segment anywhere in it reads as "outside" the same way
+    `hyodo.policy`'s own `path_outside_root:` variable does.
+    """
+    for path in paths:
+        if not isinstance(path, str) or not path:
+            continue
+        if path.startswith("/") or path.startswith("~"):
+            return True
+        if ".." in path.replace("\\", "/").split("/"):
+            return True
+    return False
 
 
 def assign_columns(node: dict[str, Any]) -> list[str]:
@@ -73,10 +102,12 @@ def assign_columns(node: dict[str, Any]) -> list[str]:
     `node` is one entry of `build_event_graph(...)["nodes"]`. Returns the
     virtue column keys (`VIRTUE_COLUMNS`) this event matches, in fixed
     column order, spanning every matched row rather than forcing a single
-    pick. `prompt`/`model_response` events match the table's own "no
-    column" row and return an empty list — they feed the time axis and
-    mission only, and are never counted against the unclassified gutter.
-    Any other event matching no row returns `[UNCLASSIFIED]`.
+    pick. A `prompt` event (the mission's own root) always maps to Hyo. A
+    `model_response` maps to Beauty only when it carries an observed
+    `io.output_digest`; without one it returns an empty list — it still
+    feeds the time axis, but nothing was measured to classify, so it is
+    never counted against the unclassified gutter either. Any other event
+    matching no row returns `[UNCLASSIFIED]`.
     """
     kind = node.get("kind")
     policy = node.get("policy") if isinstance(node.get("policy"), dict) else {}
@@ -100,21 +131,46 @@ def assign_columns(node: dict[str, Any]) -> list[str]:
         if _matches(name, _TYPECHECK_LINT_PATTERNS):
             _add("jin")
         if _matches(name, _TEST_RUNNER_PATTERNS):
-            _add("seon")
+            _add("jin")
         if _matches(name, _FORMATTER_PATTERNS):
             _add("mi")
         if _matches(name, _DOC_PATTERNS):
             _add("in")
+        if _matches(name, _FILE_TOOL_PATTERNS):
+            raw_paths = tool.get("paths") if isinstance(tool, dict) else None
+            paths = raw_paths if isinstance(raw_paths, list) else []
+            if node.get("decision") in ("ASK", "DENY") or _is_outside_root(paths):
+                _add("seon")
+            else:
+                _add("hyo")
+        if _matches(name, _WEB_TOOL_PATTERNS):
+            _add("seon")
     if kind == "error":
         _add("jin")
+    if kind == "prompt":
+        # Owner review round 2 (brief finding 3): the mission's own prompt
+        # is the Hyo chain's root (`hyo_chain` marks it filial by
+        # definition), so it renders in the Hyo column rather than
+        # feeding the time axis with no column at all.
+        _add("hyo")
+    if kind == "model_response":
+        raw_io = node.get("io")
+        io = raw_io if isinstance(raw_io, dict) else {}
+        if io.get("output_digest"):
+            _add("mi")
+        else:
+            # Owner review round 2 (brief finding 3): a model response with
+            # no observed output digest carries no evidence to place on a
+            # column — it still feeds the time axis, but not the gutter
+            # (nothing was measured to classify, so nothing is
+            # unclassified either).
+            return []
     if rule_id in _HYO_RULE_IDS:
         _add("hyo")
     if rule_id in _WEB_CREDENTIAL_RULE_IDS:
         _add("seon")
         _add("hyo")
 
-    if kind in _NO_COLUMN_KINDS:
-        return []
     if not matched:
         return [UNCLASSIFIED]
     # Keep the fixed column order regardless of the order rows matched in.
@@ -311,8 +367,12 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     `human > orchestrator > reviewer > worker`:
 
     - `"human"`: the row's `actor` is `"human"`.
-    - `"orchestrator"`: some *other* row's first event's `parent_event_id`
-      points at one of this row's events (this row spawned a child lane).
+    - `"orchestrator"`: some *other* `agent`-actor row's first event's
+      `parent_event_id` points at one of this row's events (this row
+      spawned a child *agent* lane). A `human` or `hyodo` row landing as
+      another row's child does not qualify — that is not spawned work,
+      it is the mission or a policy evaluation citing back (fix round 1,
+      coordinator live-screenshot review).
     - `"reviewer"`: this row has at least one event whose `evidence_refs`
       cite another actor's events (an `evidence_ref` edge whose source
       belongs to a different `actor`) *and* the row has no write-shaped
@@ -505,11 +565,18 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     orchestrator_keys: set[str] = set()
     for key in order:
         row = rows[key]
-        first_events = {
-            rows[other]["events"][0] for other in order if other != key and rows[other]["events"]
+        # Fix round 1 (coordinator, live screenshot): only an `agent` child
+        # lane makes its spawning row an orchestrator. A `human` or `hyodo`
+        # row landing as another row's child (e.g. `hyodo` citing back to
+        # the row it evaluated) is not itself "spawned work" — it stays
+        # whatever `_cites_another_actor`/write-tool-call already ruled.
+        agent_first_events = {
+            rows[other]["events"][0]
+            for other in order
+            if other != key and rows[other]["events"] and rows[other]["actor"] == "agent"
         }
         owned_events = set(row["events"])
-        if any(parent_of.get(first_event) in owned_events for first_event in first_events):
+        if any(parent_of.get(first_event) in owned_events for first_event in agent_first_events):
             orchestrator_keys.add(key)
 
     for key in order:

@@ -2,8 +2,14 @@
 
 ## Status
 
-Draft for owner review; rollout step (b) shipped server-rendered, later
-steps unimplemented. The current `hyodo dashboard` (`hyodo/dashboard.py`,
+Draft for owner review; rollout step (b) shipped server-rendered, then
+received a second pass from the owner's live review of the shipped page
+(section 3's amended mapping table, the one-grid layout in section 2, the
+SVG edge overlay, the 9x9 pixel-grid orb, and the per-column open
+questions in section 6 — all server-rendered in `hyodo/dashboard.py`, no
+shared TypeScript renderer yet). Step (c) (actor rings) is also shipped;
+section 7's audience-profile wording layer is independent future work. The
+current `hyodo dashboard` (`hyodo/dashboard.py`,
 six raw-metric cards, no composite score) and the public `/evidence-graph/`
 prototype (fixture data,
 `site/src/graph/evidence-graph.ts`) are the starting points. The local viewer
@@ -54,12 +60,24 @@ truth:
 
 ## 2. Coordinate system
 
+**Status: shipped as one grid, not two lists.** The first server-rendered
+pass (rollout step (b)) pooled each column's events into its own section
+and rendered actor rows in a separate list below — two disconnected views
+of the same events. The owner's live review of that page called this out;
+`hyodo/dashboard.py`'s `_build_grid_cells`/`_render_grid_rows` now place
+every event exactly once, at (its virtue column, its actor row), inside a
+single grid, oldest-to-newest left-to-right within each cell (the row's
+own `events` list is already time-ordered,
+`hyodo.graph_view.build_actor_rows`) — Eternity's time axis (below) is
+that same left-to-right order, not a separate structure.
+
 **Columns.** Five virtues, fixed order, fixed colours (SSOT in section 9):
 Truth, Goodness, Beauty, Benevolence, Hyo. Eternity is not a column — in
 HYOGOOK, Eternity is the geometric mean of the other five over the run, so
 it is read as the time axis (depth of the graph, oldest event at the
 mission end, latest event at the orb end), not a sixth bucket competing
-for events.
+for events. A thin time ruler renders under the grid, spanning the run's
+earliest to latest observed timestamp.
 
 **Rows.** Actors, as the public prototype already renders them, generalized
 from its four fixed row labels (`human`, `planner`, `executor`, `reviewer`,
@@ -69,13 +87,42 @@ coarse (`agent`, `human`, or `hyodo`,
 `hyodo/events.py:35 ACTORS`); `<label>` is an illustrative sub-label the
 viewer derives from `tool.name`/`policy.rule_id` context the same way the
 prototype already labels `agent:planner` versus `agent:executor` — it is
-display-only and never a new schema field.
+display-only and never a new schema field. **Status: an `actor_id`-
+identified row (PR #182) renders exactly `agent <actor_id>`; a
+lineage-identified row (no `actor_id`) renders `agent ` + the first eight
+characters of its earliest event's id instead of a tool name, so the
+operator sees a short, stable lineage id rather than whichever tool that
+lineage happened to call first.**
 
 **Sub-agent nesting.** An actor row becomes a child row, collapsible under
 its parent, when that actor's earliest event carries a `parent_event_id`
 (`hyodo/events.py:297-303`) pointing at a `tool_call` event belonging to a
 different actor. No new schema field: nesting is entirely derived from the
 edge Phase 1-B already ships. A row with no such pointer stays top-level.
+Nested rows render indented (depth x 18px) with a collapse toggle on the
+parent; collapsing hides every descendant row.
+
+**Edges.** An SVG overlay drawn on top of the grid renders every
+`parent_event_id` edge as a solid elbow line and every `evidence_refs`
+edge as a dashed arc, anchored at each tile's own boundary
+(right-middle/left-middle for a cross-column edge, bottom-middle/top-
+middle for a same-column one — fix round 1, coordinator live-screenshot
+review) rather than the tile's centre, so a line never visually crosses
+through a tile it does not touch. A cross-column parent elbow's one
+vertical bend sits near the *target*, not at the source/target midpoint —
+the earlier midpoint bend is what drew as a rectangle spanning every
+column between two distant tiles. A dangling ref
+(`hyodo.event_graph.validate_event_edges`'s own `unresolved_refs`, never
+promoted to `edges`) draws as a short red stub and counts under
+`data-broken-edges`; an edge whose other end is a real event with no
+column at all (a digest-less `model_response`) draws nothing — no edge,
+no stub — and counts under the separate `data-offgrid-edges` instead
+(fix round 1: these two "the edge doesn't fully resolve" cases are
+distinct facts and must not share one counter). Hovering or focusing a
+tile highlights its own edges and opens the same 5W1H panel section 6
+already describes. Coordinates are schematic — the grid's own
+column/row/tile-index geometry, not a measured pixel read — pending the
+shared TypeScript renderer in section 8.
 
 **Mission.** The run's lowest-`step_index` event with `kind == "prompt"`
 and `actor == "human"` (Phase 1-B's structural definition,
@@ -90,6 +137,13 @@ same six-area semantics `README.md:155-165` and `hyodo/dashboard.py:73-82`
 already document — this table only adds the event-level match keys needed
 to place a *ledger event*, not a *pillar card*, on a column.
 
+**Status: amended by the local viewer's second pass** (owner review of the
+shipped `/graph` page). The table below is the current, in-force mapping;
+`hyodo.graph_view.assign_columns` is the SSOT and `tests/test_graph_view.py`
+locks every row. Four rows differ from this spec's original draft — a test
+runner, a file read/write/edit, a network fetch, and the mission `prompt`
+itself — each called out below.
+
 | `kind` | `tool.name` pattern | `policy.decision` | `rule_id` | Column(s) |
 | --- | --- | --- | --- | --- |
 | `decision` | any | `DENY` | any | Goodness |
@@ -97,13 +151,17 @@ to place a *ledger event*, not a *pillar card*, on a column.
 | `decision` | any | `ALLOW` | any | Goodness (an observed pass is still evidence) |
 | `decision` | any | `UNOBSERVED` | any | Goodness, rendered as the decision's own `UNOBSERVED` tile — not the unclassified gutter |
 | `tool_call`/`tool_result` | type-check, lint tools | any | any | Truth |
-| `tool_call`/`tool_result` | test runner | any | any | Goodness |
+| `tool_call`/`tool_result` | test runner (`run_tests`, `pytest`, `test*`, `jest`, `vitest`, `mocha`) | any | any | **Truth** — amended: a test run proves a claim, it is not itself the policy decision that gated it |
 | `tool_call`/`tool_result` | formatter | any | any | Beauty |
 | `tool_call`/`tool_result` | doc/onboarding tools | any | any | Benevolence |
+| `tool_call`/`tool_result` | `read_file`, `write_file`, `edit` | not `ASK`/`DENY`, path inside the checkout | any | **Hyo** — new row: the file touch itself is the boundary-relevant fact |
+| `tool_call`/`tool_result` | `read_file`, `write_file`, `edit` | `ASK`/`DENY`, or the path is outside the checkout | any | **Goodness** — new row: the policy decision is the salient fact, not the file touch |
+| `tool_call`/`tool_result` | `web_fetch`, `browser`, `http` | any | any | **Goodness** — new row: exactly the kind of action `evaluate_policy` gates |
 | any | any | any | `data_boundary`, `data_boundary_undeclared` | Hyo |
 | any | any | any | `web_credential_path_denied`, `web_credential_path_unobserved` | Goodness + Hyo |
 | `error` | any | any | any | Truth |
-| `prompt`/`model_response` | n/a | n/a | n/a | no column (feeds the time axis and mission only) |
+| `prompt` (the mission) | n/a | n/a | n/a | **Hyo** — amended: the mission is the Hyo chain's own root, so it renders there rather than off-grid |
+| `model_response` | n/a | n/a | n/a | Beauty when it carries an observed `io.output_digest`; otherwise no column (feeds the time axis only, never the unclassified gutter) |
 
 An event matching more than one row renders as a bar spanning every
 matched column, not a forced single pick — a `data_boundary` `ASK`, for
@@ -131,11 +189,19 @@ computed elsewhere in the schema, never a new synthesized number:
   already defines (`site/src/styles/tokens.css`,
   `--color-tile-observed`/`--color-ask`/`--color-deny`, plus grey for
   `UNOBSERVED`).
-- **Brightness** = `observed / expected` for the whole run (the same ratio
-  the verdict line already prints, Phase 1-C).
-- **Pulse** = time since the latest event, decaying toward static as the
-  run goes idle; under `prefers-reduced-motion` the orb renders at a fixed
-  brightness with no animation, per the a11y budget in section 1.
+- **Brightness** = the run's raw `observed` count, drawn as that many lit
+  squares (capped at 81) in a fixed 9x9 grid — never a ratio and never a
+  percentage. **Status: shipped, `hyodo/dashboard.py`'s `_orb_grid_html`,
+  a plain CSS/SVG port of the site hero's unlit-tile-field idea
+  (`site/src/hero/scene.ts`, no three.js/WebGPU).** This replaced the
+  first pass's flat grey circle (owner review finding) — a single opacity
+  value read as "dimmer," not as a count, and this design's own rule is
+  that the orb prints nothing not already printed elsewhere (the verdict
+  line, a column's coverage badge); a square count keeps that rule
+  literal by construction.
+- **Pulse** = a slow, always-on CSS pulse whose period shortens when the
+  latest event is under 60 seconds old; under `prefers-reduced-motion` the
+  animation is disabled outright in CSS, per the a11y budget in section 1.
 
 The orb never prints a number that is not already printed elsewhere on the
 page (the verdict line, a column's coverage badge, or a ring). It is a
@@ -170,6 +236,14 @@ reference) it came from — nothing in the ring view is unattributed.
 Keyboard: Escape returns focus to the row grid.
 
 ## 6. Questions
+
+**Status: a narrower first slice shipped.** `hyodo/dashboard.py`'s
+`_COLUMN_QUESTIONS` shows a fixed, one-sentence question under a column
+only when that column has zero events at all (`expected == 0`), not yet
+scaled to the largest-gap rule this section originally specified; wording
+reads from the audience profile (section 7) when `root` is available,
+falling back to `engineer` wording otherwise. The larger-gap version below
+remains the target shape.
 
 Each virtue column shows at most one open question at a time: the one tied
 to that column's largest coverage gap (the biggest `expected - observed`
@@ -275,12 +349,15 @@ viewer uses, added by this PR: `--color-virtue-truth`, `-goodness`,
 from `hyodo/dashboard.py`'s existing CSS block, `hyodo/dashboard.py:293`,
 so the six-card dashboard and the graph viewer render the identical
 colour for each virtue), plus `--color-ring-skills`, `-memory`,
-`-routines`, `-tools` for the four ring layers in section 5. The decision
-colours (`--color-tile-observed`, `--color-ask`, `--color-deny`, and grey
-for `UNOBSERVED`) already exist in the same file and are reused, not
+`-routines`, `-tools` for the four ring layers in section 5, and
+`--color-edge-parent`, `-evidence`, `-broken` (added by the local viewer's
+second pass) for the edge overlay in section 2. The decision colours
+(`--color-tile-observed`, `--color-ask`, `--color-deny`, and grey for
+`UNOBSERVED`) already exist in the same file and are reused, not
 redefined. `tests/test_virtue_colors_ssot.py` parses both
 `hyodo/dashboard.py` and `tokens.css` and fails if the six virtue hex
-values ever diverge by name or by column order.
+values, the four ring colours, or the three edge colours ever diverge by
+name or by column order.
 
 ## 10. Rollout
 
