@@ -9,4 +9,23 @@
 	--color-warn: #f5b400;
 	--color-deny: #ff5c5c;
 	--color-ask: #5aa9ff;
+
+	/* Virtue columns (fixed order: Truth, Goodness, Beauty, Benevolence, Hyo,
+	   Eternity). SSOT shared with hyodo/dashboard.py PILLAR_SPECS — the hex
+	   values below are copied from that module's inline CSS block and must
+	   stay identical; tests/test_virtue_colors_ssot.py enforces this. */
+	--color-virtue-truth: #2563eb;
+	--color-virtue-goodness: #059669;
+	--color-virtue-beauty: #7c3aed;
+	--color-virtue-benevolence: #ea580c;
+	--color-virtue-hyo: #ca8a04;
+	--color-virtue-eternity: #4f46e5;
+
+	/* Agent-ring layers (core engine monitor actor rings), chosen distinct
+	   from the virtue and decision colours above: skills (teal), memory
+	   (fuchsia), routines (lime), tools (slate). */
+	--color-ring-skills: #14b8a6;
+	--color-ring-memory: #d946ef;
+	--color-ring-routines: #84cc16;
+	--color-ring-tools: #64748b;
 }
