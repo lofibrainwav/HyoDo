@@ -627,6 +627,8 @@ over mission absence. `md`/`html`/`sarif` keep their existing contracts.
 
 ## Package 1-C — `feat/verdict-line`: one calm line, `--explain`, `--quiet`, `check --json`
 
+Status: Implemented in `feat/verdict-line`; see the verification handoff.
+
 ### Data model
 
 New module `hyodo/verdict.py`:

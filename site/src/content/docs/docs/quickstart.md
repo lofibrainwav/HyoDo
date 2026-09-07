@@ -22,6 +22,8 @@ hyodo safe --strict
 
 `hyodo safe` is a fast, offline, pattern-based scanner. `--strict` makes it
 exit non-zero on a high-severity finding instead of only reporting.
+Use `--explain` for a stored explanation, `--quiet` for only the verdict,
+or `--json` for a machine-readable receipt. These flags preserve exit codes.
 
 ## 3. Absorb your existing checks
 

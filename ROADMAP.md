@@ -46,6 +46,8 @@ evidence is not converted into a pass.
 
 ### 4.13.0 development cycle
 
+- Machine-readable `hyodo check` results for CI consumers landed on main.
+
 - Policy ASK and the trust ladder are live on main, with explicit operator
   grants and fail-closed `UNOBSERVED` handling.
 - Keep the seven version-bearing sources synchronized during release prep.
@@ -55,7 +57,6 @@ evidence is not converted into a pass.
 These items require an issue, explicit scope, and acceptance tests before
 implementation:
 
-- Add machine-readable `hyodo check` results for CI consumers.
 - Improve `safe` rule precision and document known false positives.
 - Add an optional measured second-device MCP receipt without making it a
   requirement for local-client use.
