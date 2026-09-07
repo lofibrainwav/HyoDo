@@ -56,9 +56,9 @@ PILLAR_RULE_TABLE: dict[str, RuleSpec] = {
     "safe.coverage": RuleSpec("goodness", 20.0, "Fraction of scannable files safe covered"),
     # Beauty <- hyodo check's Beauty gate (ruff lint + format).
     "check.beauty_gate": RuleSpec("beauty", 100.0, "hyodo check Beauty gate (ruff) status"),
-    # Benevolence <- onboarding/DX signals hyodo check would emit. hyodo
-    # check does not currently emit README/start-hint/help-text signals, so
-    # this pillar reports UNOBSERVED until it does (see docs).
+    # Benevolence <- the developer-experience signals hyodo check emits
+    # (hyodo/dx_signals.py: readme_present, start_hint_present,
+    # help_text_present). A caller that omits them gets UNOBSERVED.
     "check.readme_present": RuleSpec("benevolence", 40.0, "README.md present at project root"),
     "check.start_hint_present": RuleSpec(
         "benevolence", 30.0, "Onboarding entry point (hyodo start) documented"
@@ -299,10 +299,9 @@ def _derive_benevolence(check: dict | None) -> PillarResult:
                 rows.append(
                     ProvenanceRow(rule_id, "check", spec.max_weight, spec.max_weight * factor)
                 )
-    # hyodo check does not currently emit readme_present / start_hint_present /
-    # help_text_present signals; callers that do not pass them get an honest
-    # UNOBSERVED Benevolence rather than an invented number. See
-    # docs/SCORE_DERIVATION.md "Known gaps".
+    # `hyodo check` supplies these three booleans via hyodo/dx_signals.py;
+    # callers that do not pass them get an honest UNOBSERVED Benevolence
+    # rather than an invented number. See docs/SCORE_DERIVATION.md.
     return _make_pillar("benevolence", rows, rule_ids)
 
 
