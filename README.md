@@ -20,7 +20,6 @@ AI coding tools can move quickly, but a normal green check does not always answe
 - Did the check actually run?
 - Did the agent touch only approved tools and paths?
 - Was missing or unreadable evidence treated as a pass?
-- Can the project keep using its existing pytest, Ruff, npm, Go, or Rust checks?
 
 HyoDo makes those boundaries explicit with local evidence, policy decisions,
 and fail-closed exit contracts.
@@ -52,7 +51,7 @@ gates. No detected tooling means no invented green check.
 | Optional MCP adapter | `hyodo mcp stdio` / `serve` |
 | MCP diagnostics and audit | `hyodo mcp doctor`, `access-log`, `rules` |
 | Onboarding, harness and host wiring | `hyodo start`, `connect`, `mcp config` |
-| Skill lens, folder absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
+| Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
 | Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
 ## Honest boundaries
