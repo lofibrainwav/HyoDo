@@ -34,12 +34,13 @@ Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo 
 
 | Shipped today | Not built yet |
 | --- | --- |
-| `hyodo safe` scans | Research nodes under policy |
-| `hyodo init` and `hyodo check` gates | Bring-your-own-model support |
+| `hyodo safe` scans | Live Drive connector (remote inventories are recorded as claims, never fetched) |
+| `hyodo init` and `hyodo check` gates | Remote MCP OAuth onboarding |
 | FDE evidence spine and policy checks | Full folder semantic onboarding |
 | `ASK` decisions and trust levels | RAG or embeddings in public HyoDo |
 | Schema validation and local eval runs | Cross-source verification loop |
 | Source-line graph JSON report export | Stage 4 intent loop |
+| Research-node hand-off (`hyodo skills ingest --from-node`) — the node itself stays external | |
 | MCP stdio, Tailscale serve, doctor | |
 | PyPI Trusted Publishing, SBOM, SARIF | |
 | `hyodo connect` (dry-run by default; `cursor`/`codex` report UNOBSERVED) | |
