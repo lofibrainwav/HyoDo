@@ -142,6 +142,7 @@ from hyodo.policy_trust import (
 from hyodo.report import build_report_graph, write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
+from hyodo.test_integrity import TestIntegrityReport, scan_test_integrity
 from hyodo.verdict import explain_decision, render_verdict_line
 
 app = typer.Typer(
@@ -479,6 +480,42 @@ def _print_gate_result(result: GateResult) -> None:
         console.print(f"  [yellow]SKIP {result.message}[/yellow]")
     else:
         console.print(f"  [yellow]UNSUPPORTED {result.message}[/yellow]")
+
+
+def _print_test_integrity_line(report: TestIntegrityReport) -> None:
+    """Report-only Phase 1-E line: never affects `check`'s default exit code.
+
+    A project with no discoverable pytest-convention tests is UNOBSERVED, not a
+    failure -- the honesty rule that "unenforced is not the same as passing"
+    cuts both ways: it is also never silently reported as a clean 0/0.
+    """
+    if report.total_tests == 0:
+        console.print("\n[dim]Test integrity: UNOBSERVED (no pytest-convention tests found)[/dim]")
+        return
+    console.print(
+        f"\nTest integrity: {report.vacuous_tests}/{report.total_tests} tests assert "
+        "nothing -- see `hyodo check --json`"
+    )
+
+
+def _test_integrity_payload(report: TestIntegrityReport) -> dict[str, Any]:
+    """Render a `TestIntegrityReport` as the `check --json` `test_integrity` object."""
+    return {
+        "scanned_files": report.scanned_files,
+        "total_files": report.total_files,
+        "total_tests": report.total_tests,
+        "vacuous_tests": report.vacuous_tests,
+        "findings": [
+            {
+                "path": f.path,
+                "line": f.line,
+                "function": f.function,
+                "category": f.category,
+                "detail": f.detail,
+            }
+            for f in report.findings
+        ],
+    }
 
 
 def _print_failure_guidance(failures: list[tuple[str, str]]) -> None:
@@ -1243,6 +1280,8 @@ def _verdict_output(
                 "failed": state.get("failed", []),
                 "exit_code": exit_code,
             }
+            if "test_integrity" in state:
+                payload["test_integrity"] = state["test_integrity"]
         else:
             assert captured is not None
             payload = json.loads(captured.get())
@@ -1288,6 +1327,11 @@ def check(
     explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
     json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
     audience: str | None = _audience_option(),
+    strict_tests: bool = typer.Option(
+        False,
+        "--strict-tests",
+        help="Fail the Truth gate when pyright passes but vacuous tests are found (Phase 1-E)",
+    ),
 ):
     """
     Run HyoDo checkout release gates (4-Gate CI).
@@ -1301,6 +1345,10 @@ def check(
 
     --general instead runs bounded language-agnostic syntax gates
     (Python/TS/JS/Go/Rust/Shell auto-detected, up to 50 files per language).
+
+    A fifth, report-only computation (test integrity: are the tests asserting
+    anything observable?) always runs alongside the HyoDo-checkout preset gates;
+    it never changes the exit code unless --strict-tests is passed.
     """
 
     profile = _resolve_audience_or_exit(Path.cwd(), audience, "check", json_output)
@@ -1452,6 +1500,34 @@ def check(
         sbom_result = run_sbom_check(root, verbose)
         _print_gate_result(sbom_result)
         results.append(sbom_result)
+
+        # Phase 1-E: report-only fifth computation. Native AST scan (no shelled-out
+        # tool, no model call) of whether the project's own tests observe anything.
+        # Additive by default -- does not join the results/executed/failed gate list,
+        # so the "N/4 gates ran" counting above is unchanged. --strict-tests amends
+        # the already-computed Truth (pyright) result in place instead of adding a
+        # fifth named gate, per the Phase 1-E spec.
+        test_integrity_report = scan_test_integrity(check_root)
+        if (
+            strict_tests
+            and pyright_result.status is GateStatus.PASS
+            and test_integrity_report.vacuous_tests > 0
+        ):
+            pyright_result = GateResult(
+                GateStatus.FAIL,
+                f"pyright: pass; test-integrity: {test_integrity_report.vacuous_tests}/"
+                f"{test_integrity_report.total_tests} tests assert nothing",
+            )
+            results[0] = pyright_result
+            # The live "[1/4] Truth" line above already said PASS; say plainly
+            # that the strict test-integrity check amended it.
+            console.print(
+                "[bold red][1/4] Truth - amended to FAIL by --strict-tests:[/bold red] "
+                f"{test_integrity_report.vacuous_tests}/{test_integrity_report.total_tests} "
+                "tests assert nothing"
+            )
+        _print_test_integrity_line(test_integrity_report)
+        verdict_state["test_integrity"] = _test_integrity_payload(test_integrity_report)
 
         executed = [r for r in results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
         failed = [r for r in results if r.status is GateStatus.FAIL]
