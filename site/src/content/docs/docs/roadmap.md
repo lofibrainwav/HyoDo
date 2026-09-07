@@ -44,6 +44,12 @@ Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo 
 | PyPI Trusted Publishing, SBOM, SARIF | |
 | `hyodo connect` (dry-run by default; `cursor`/`codex` report UNOBSERVED) | |
 | Local graph viewer (`hyodo dashboard` → `/graph`, reads the real ledger) | |
+| Audience profiles (`--audience vibe`/`engineer`/`professional`) — on the source line, published in 4.15.0 once released | |
+| `hyodo skills` lens (ingest/lens/propose, no model or embeddings) — on the source line, published in 4.15.0 once released | |
+| `hyodo inspect` field-deployment folder absorption — on the source line, published in 4.15.0 once released | |
+| `hyodo graph export` evidence-graph bridge — on the source line, published in 4.15.0 once released | |
+| `hyodo eye capture`/`verify` ephemeral visual evidence — on the source line, published in 4.15.0 once released | |
+| `actor_id` nesting and per-actor rings in the local graph viewer — on the source line, published in 4.15.0 once released | |
 
 A public [evidence-graph prototype](/evidence-graph/) shows the intended shape
 using demo fixture data. See [its documentation](/docs/evidence-graph/) for the
