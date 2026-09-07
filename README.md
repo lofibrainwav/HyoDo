@@ -52,15 +52,10 @@ gates. No detected tooling means no invented green check.
 | Local evidence panel | `hyodo dashboard --open` |
 | Optional MCP adapter | `hyodo mcp stdio` / `serve` |
 | MCP diagnostics and audit | `hyodo mcp doctor`, `access-log`, `rules` |
-| First-use onboarding | `hyodo start` |
-| Wire a coding harness to the gates | `hyodo connect` |
-| Wire an MCP host's config | `hyodo mcp config` |
-| Check host truth-store consistency | `hyodo mcp continuity` |
-| Skill lens (rules → pillars) | `hyodo skills ingest` / `lens` / `propose` |
-| Field-deployment folder absorption | `hyodo inspect <path>` |
-| Evidence-graph export bridge | `hyodo graph export` |
-| Ephemeral visual evidence | `hyodo eye capture` / `verify` |
-| Reader vocabulary | `--audience vibe` / `engineer` / `professional` |
+| Onboarding and harness wiring | `hyodo start`, `connect`, `mcp config` |
+| Skill lens and folder absorption | `hyodo skills`, `hyodo inspect` |
+| Graph bridge, ephemeral eye | `hyodo graph export`, `hyodo eye` |
+| Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
 ## Honest boundaries
 
@@ -73,17 +68,11 @@ HyoDo is deliberately narrow:
 - The public MCP server supports loopback or authenticated Tailscale binding;
   public `0.0.0.0` listeners are not supported.
 - Missing, unreadable, or unmeasured evidence is never reported as healthy.
+- Embeddings, model calls, capture tools, and remote inventories stay outside
+  the package: HyoDo keeps digests, hashes, and receipts, never the payload.
 
 That scope is intentional: the tool should be useful locally without requiring
 a hosted service, model provider, or remote control plane.
-
-## Bring your own
-
-Embeddings, model calls, screen-capture tools, and remote inventories stay
-outside this package. HyoDo records digests, hashes, and receipts for what an
-external tool reports — never a vector, never pixel bytes, never a fetched
-remote listing — so a project can plug in its own model, capture command, or
-connector without HyoDo re-implementing or trusting it silently.
 
 ## Use your existing CI
 
