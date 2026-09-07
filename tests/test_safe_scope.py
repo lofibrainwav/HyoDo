@@ -97,10 +97,13 @@ def test_external_scanner_success_scope_external_and_full(tmp_path: Path, monkey
     import hyodo.safety as safety
 
     monkeypatch.setattr(safety.shutil, "which", lambda name: f"/usr/bin/{name}")
-    with patch(
-        "hyodo.safety.subprocess.run",
-        return_value=type("R", (), {"returncode": 0, "stdout": "", "stderr": ""})(),
-    ):
+
+    def fake_run(cmd, **_kwargs):
+        # The adapter first asks `gitleaks version` (positive control), then scans.
+        stdout = "8.30.1\n" if "version" in cmd else "[]"
+        return type("R", (), {"returncode": 0, "stdout": stdout, "stderr": ""})()
+
+    with patch("hyodo.safety.subprocess.run", side_effect=fake_run):
         result = run_safety_scan(scan_tool="gitleaks", cwd=tmp_path)
 
     assert result["scope"] == "external"
