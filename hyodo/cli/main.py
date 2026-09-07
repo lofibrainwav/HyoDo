@@ -50,6 +50,19 @@ from hyodo import (
     SCORE_SUBSET_NAME,
     __version__,
 )
+from hyodo.connect import (
+    ALL_TARGETS,
+    UNOBSERVED_MESSAGE,
+    UNOBSERVED_TARGETS,
+    WRITABLE_TARGETS,
+    check_status,
+    load_connect_state,
+    map_claude_code_hook_payload,
+    plan_target,
+    save_connect_state,
+    write_target,
+)
+from hyodo.connect import detect as detect_connect_targets
 from hyodo.connector_contract import build_connector_contract
 from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
 from hyodo.eval import EvalInputError, run_evaluation
@@ -2531,6 +2544,18 @@ def event_record(
         "--json",
         help="Emit machine-readable JSON receipt",
     ),
+    hook: str | None = typer.Option(
+        None,
+        "--hook",
+        help="Adapt stdin from a harness-native hook JSON shape instead of "
+        "hyodo.agent-event/v1 (currently: claude-code)",
+    ),
+    shadow: bool = typer.Option(
+        False,
+        "--shadow",
+        help="Stamp policy.shadow=true on the recorded event (shadow-mode "
+        "on-ramp installed by `hyodo connect --shadow`)",
+    ),
 ):
     """
     Validate and append one agent event to .hyodo/agent-events.jsonl.
@@ -2541,10 +2566,24 @@ def event_record(
     With --policy: evaluate policy, stamp policy.* on the event, always try to
     append (including DENY) for audit continuity. Exit 1 on DENY or invalid
     event; exit 2 when input/policy path is unreadable or policy is unobserved;
-    exit 3 on ASK (operator decision required).
+    exit 3 on ASK (operator decision required). With ``--hook claude-code``
+    this command plays the fire-and-forget PostToolUse role: it always exits 0
+    once the event is appended (regardless of the recorded decision), and
+    non-zero only when the ledger append itself fails. ``--shadow`` requires
+    ``--policy`` (there is no decision to shadow-stamp without one) and stamps
+    ``policy.shadow: true`` instead of changing the exit code — the honest exit
+    for a fire-and-forget hook is already 0.
 
     HyoDo is a gate, not an agent runtime — callers must enforce DENY.
     """
+    if shadow and policy is None:
+        message = "--shadow requires --policy (nothing to shadow-stamp without a decision)"
+        if json_output:
+            console.print_json(json.dumps({"ok": False, "reasons": [message], "exit_code": 2}))
+        else:
+            console.print(f"[red]{message}[/red]")
+        raise typer.Exit(2)
+
     root_path = Path(root).resolve()
     file_path = Path(file) if file else None
     data, err = _load_event_payload(file_path, stdin_flag)
@@ -2564,6 +2603,28 @@ def event_record(
             console.print("[yellow]This is not a validation pass.[/yellow]")
         raise typer.Exit(code)
 
+    if hook is not None:
+        if hook != "claude-code":
+            message = f"unsupported --hook value: {hook}"
+            if json_output:
+                console.print_json(json.dumps({"ok": False, "reasons": [message], "exit_code": 2}))
+            else:
+                console.print(f"[red]{message}[/red]")
+            raise typer.Exit(2)
+        mapped, map_err = map_claude_code_hook_payload(data, root_path)
+        if mapped is None:
+            if json_output:
+                console.print_json(json.dumps({"ok": False, "reasons": [map_err], "exit_code": 2}))
+            else:
+                console.print(f"[red]Cannot map Claude Code hook payload: {map_err}[/red]")
+            typer.echo(
+                "HYODO UNOBSERVED: malformed hook payload; treating as blocked, not allowed.",
+                err=True,
+            )
+            raise typer.Exit(2)
+        data = mapped.raw
+        root_path = mapped.root
+
     ok, reasons, normalized = validate_event(data)
     if not ok or normalized is None:
         if policy is not None and not json_output:
@@ -2572,13 +2633,18 @@ def event_record(
                     "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, valid event UNOBSERVED"
                 )
             )
+        # A PostToolUse hook is fire-and-forget: it can never block, so an
+        # unrecordable event exits 0 there and is reported as UNOBSERVED.
+        code = 0 if hook == "claude-code" else 1
         if json_output:
-            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": 1}))
+            console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": code}))
         else:
             console.print("[red]INVALID[/red] event — not recorded")
             for reason in reasons:
                 console.print(f"  - {reason}")
-        raise typer.Exit(1)
+            if hook == "claude-code":
+                console.print("HYODO UNOBSERVED: event not recorded (fire-and-forget hook)")
+        raise typer.Exit(code)
 
     if not full_body:
         normalized = strip_full_bodies(normalized)
@@ -2625,6 +2691,8 @@ def event_record(
                 )
             )
         normalized = apply_decision_to_event(normalized, decision)
+        if shadow:
+            normalized["policy"] = {**normalized["policy"], "shadow": True}
         decision_label = decision.decision
         if decision.trust_level >= 2:
             ledger_obligation = {"ledger_write_required": True, "ledger_written": False}
@@ -2705,6 +2773,12 @@ def event_record(
         raise typer.Exit(2)
 
     exit_code = {None: 0, "ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision_label]
+    # The event is already durably appended by this point (every append-failure
+    # path above returned earlier). Under --hook claude-code this call plays
+    # PostToolUse, which cannot block — fire-and-forget always exits 0 once the
+    # ledger write itself succeeded. --shadow carries the same "recorded, not
+    # enforced" honesty rule regardless of --hook.
+    final_exit_code = 0 if (hook == "claude-code" or shadow) else exit_code
     ledger = str(root_path / AGENT_EVENTS_RELATIVE_PATH)
     if ledger_obligation:
         ledger_obligation["ledger_written"] = True
@@ -2712,10 +2786,11 @@ def event_record(
         console.print_json(
             json.dumps(
                 {
-                    "ok": exit_code == 0,
-                    "exit_code": exit_code,
+                    "ok": final_exit_code == 0,
+                    "exit_code": final_exit_code,
                     "event_id": normalized["event_id"],
                     "decision": decision_label,
+                    "shadow": shadow,
                     "ledger": ledger,
                     "full_body": full_body,
                     **ledger_obligation,
@@ -2728,12 +2803,14 @@ def event_record(
         if decision_label is not None:
             color = {"ALLOW": "green", "DENY": "red"}.get(decision_label, "yellow")
             console.print(f"policy: [{color}]{decision_label}[/{color}]")
-            if decision_label == "DENY":
+            if shadow:
+                console.print("[dim]shadow: true (recorded, not enforced)[/dim]")
+            if decision_label == "DENY" and not (hook == "claude-code" or shadow):
                 console.print(
                     "[yellow]DENY is recorded for audit; the caller must stop "
                     "the agent. HyoDo is not a runtime interceptor.[/yellow]"
                 )
-    raise typer.Exit(exit_code)
+    raise typer.Exit(final_exit_code)
 
 
 @trust_app.command("grant")
@@ -2863,13 +2940,27 @@ def policy_check(
     ),
     quiet: bool = typer.Option(False, "--quiet", help="Print only the verdict line"),
     explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
+    hook: str | None = typer.Option(
+        None,
+        "--hook",
+        help="Adapt stdin from a harness-native hook JSON shape instead of "
+        "hyodo.agent-event/v1 (currently: claude-code)",
+    ),
+    shadow: bool = typer.Option(
+        False,
+        "--shadow",
+        help="Evaluate and print the real decision, but always exit 0 "
+        "(shadow-mode on-ramp installed by `hyodo connect --shadow`)",
+    ),
 ):
     """
     Evaluate one event against a local policy.toml.
 
     Exit: 0 ALLOW · 1 DENY · 2 unobserved (missing/invalid policy or event) ·
-    3 ASK (operator decision required).
-    Does not write the ledger (use ``hyodo event record --policy`` for that).
+    3 ASK (operator decision required). ``--shadow`` forces exit 0 regardless
+    of the decision (the decision itself is still printed/returned, never
+    hidden). Does not write the ledger (use ``hyodo event record --policy``
+    for that).
     """
 
     verdict_state: dict[str, Any] = {"unit": "surfaces"}
@@ -2896,6 +2987,47 @@ def policy_check(
                 console.print(f"[red]Cannot load event: {err}[/red]")
                 console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2)
+
+        if hook is not None:
+            if hook != "claude-code":
+                message = f"unsupported --hook value: {hook}"
+                if json_output:
+                    console.print_json(
+                        json.dumps(
+                            {
+                                "decision": "UNOBSERVED",
+                                "rule_id": None,
+                                "reason": message,
+                                "exit_code": 2,
+                            }
+                        )
+                    )
+                else:
+                    console.print(f"[red]{message}[/red]")
+                typer.echo(f"HYODO UNOBSERVED: {message}.", err=True)
+                raise typer.Exit(2)
+            mapped, map_err = map_claude_code_hook_payload(data, root_path)
+            if mapped is None:
+                if json_output:
+                    console.print_json(
+                        json.dumps(
+                            {
+                                "decision": "UNOBSERVED",
+                                "rule_id": None,
+                                "reason": map_err,
+                                "exit_code": 2,
+                            }
+                        )
+                    )
+                else:
+                    console.print(f"[red]Cannot map Claude Code hook payload: {map_err}[/red]")
+                typer.echo(
+                    "HYODO UNOBSERVED: malformed hook payload; treating as blocked, not allowed.",
+                    err=True,
+                )
+                raise typer.Exit(2)
+            data = mapped.raw
+            root_path = mapped.root
 
         ok, reasons, normalized = validate_event(data)
         if not ok or normalized is None:
@@ -2943,9 +3075,37 @@ def policy_check(
         verdict_state.update(_policy_verdict_state(decision))
         # 0 = ALLOW, 1 = DENY, 2 = UNOBSERVED, 3 = ASK.
         exit_code = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision.decision]
+        if hook == "claude-code":
+            # Claude Code's PreToolUse contract has only two outcomes (proceed or
+            # block); ASK and UNOBSERVED are enforced as a hard block here — this
+            # is a real behavior change, called out under Open questions in the
+            # spec, not silently smoothed over.
+            hook_exit_code = 0 if decision.decision == "ALLOW" else 2
+            if decision.decision == "DENY":
+                stderr_message = f"{decision.rule_id or 'rule'}: {decision.reason or ''}".strip()
+            elif decision.decision == "ASK":
+                stderr_message = (
+                    f"HYODO ASK: {decision.reason or 'operator decision required'}. "
+                    "Stop and ask the human before retrying this tool call."
+                )
+            elif decision.decision == "UNOBSERVED":
+                stderr_message = (
+                    f"HYODO UNOBSERVED: {decision.reason or 'insufficient evidence'}. "
+                    "Not a green light — stop and ask the human."
+                )
+            else:
+                stderr_message = None
+            if stderr_message:
+                if shadow:
+                    stderr_message = "[SHADOW, not blocking] " + stderr_message
+                typer.echo(stderr_message, err=True)
+        else:
+            hook_exit_code = exit_code
+        final_exit_code = 0 if shadow else hook_exit_code
         if json_output:
             payload = decision.as_dict()
-            payload["exit_code"] = exit_code
+            payload["exit_code"] = final_exit_code
+            payload["shadow"] = shadow
             if decision.trust_level >= 2:
                 payload["ledger_write_required"] = True
                 payload["ledger_written"] = False
@@ -2957,12 +3117,228 @@ def policy_check(
                 console.print(f"rule_id: {decision.rule_id}")
             if decision.reason:
                 console.print(f"reason: {decision.reason}")
+            if shadow:
+                console.print("[dim]shadow: true (recorded, not enforced)[/dim]")
             if decision.trust_level >= 2:
                 console.print(
                     "[yellow]trust level 2+ requires the decision to be recorded — "
                     "use `hyodo event record --policy`[/yellow]"
                 )
-        raise typer.Exit(exit_code)
+        raise typer.Exit(final_exit_code)
+
+
+@app.command()
+def connect(
+    target: str | None = typer.Argument(
+        None,
+        help="Harness to wire: claude-code, pre-commit, github-actions "
+        "(cursor, codex report UNOBSERVED — no verified hook contract)",
+    ),
+    write: bool = typer.Option(
+        False, "--write", help="Perform the writes (default: dry run, writes nothing)"
+    ),
+    yes: bool = typer.Option(False, "--yes", help="Skip the per-target confirmation prompt"),
+    shadow: bool = typer.Option(
+        False,
+        "--shadow",
+        help="Install the Claude Code hook in shadow mode: evaluates and records "
+        "policy.shadow=true but always exits 0 (nothing is blocked)",
+    ),
+    status: bool = typer.Option(
+        False, "--status", help="Report drift between what was written and what is on disk"
+    ),
+    root: str = typer.Option(".", "--root", help="Project root to detect/write into"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+):
+    """
+    Wire a coding harness to HyoDo's gates (Claude Code hooks, pre-commit,
+    GitHub Actions) instead of re-implementing one.
+
+    With no target: detect harnesses present in this checkout, write nothing.
+    Default is dry run — prints the exact files a target would create or
+    modify. ``--write`` performs the writes; a file `connect` did not create
+    itself gets a ``.bak`` alongside it on its first write. Running
+    ``--write`` twice with no other change makes no further edits.
+
+    Exit: dry run always 0. ``--write``: 0 on success (including "already up
+    to date"), 1 if a confirmation was declined without ``--yes``, 2 on an
+    unknown/unsupported target or a write error. ``--status``: 0 in sync, 2
+    when a written file has drifted from its recorded digest (UNOBSERVED).
+    """
+    root_path = Path(root).resolve()
+
+    if status:
+        reports = check_status(root_path)
+        drifted = [r for r in reports if r.status != "ok"]
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {
+                        "targets": [
+                            {
+                                "target": r.target,
+                                "path": r.path,
+                                "status": r.status,
+                                "reason": r.reason,
+                            }
+                            for r in reports
+                        ],
+                        "drift": bool(drifted),
+                        "exit_code": 2 if drifted else 0,
+                    }
+                )
+            )
+        else:
+            if not reports:
+                console.print(
+                    "[yellow]No targets connected yet (.hyodo/connect.json not found).[/yellow]"
+                )
+            for r in reports:
+                color = "green" if r.status == "ok" else "red"
+                detail = f" ({r.reason})" if r.reason else ""
+                console.print(f"[{color}]{r.status}[/{color}] {r.target}: {r.path}{detail}")
+        raise typer.Exit(2 if drifted else 0)
+
+    if target is None:
+        detected = detect_connect_targets(root_path)
+        if json_output:
+            payload: dict[str, Any] = {name: detected[name] for name in WRITABLE_TARGETS}
+            payload.update(dict.fromkeys(UNOBSERVED_TARGETS, False))
+            console.print_json(
+                json.dumps({"detected": payload, "unobserved": list(UNOBSERVED_TARGETS)})
+            )
+        else:
+            table = Table(title="hyodo connect - detected harnesses", show_header=True)
+            table.add_column("Harness", style="cyan")
+            table.add_column("Status")
+            for name in WRITABLE_TARGETS:
+                label = "[green]detected[/green]" if detected[name] else "[dim]not detected[/dim]"
+                table.add_row(name, label)
+            for name in UNOBSERVED_TARGETS:
+                table.add_row(name, "[yellow]UNOBSERVED[/yellow] (hook contract not verified)")
+            console.print(table)
+            console.print(
+                "\nRun `hyodo connect <harness>` to preview what would be written "
+                "(add --write to act)."
+            )
+        raise typer.Exit(0)
+
+    if target in UNOBSERVED_TARGETS:
+        message = f"{target}: {UNOBSERVED_MESSAGE}"
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {"target": target, "status": "unobserved", "message": message, "exit_code": 2}
+                )
+            )
+        else:
+            console.print(f"[yellow]UNOBSERVED[/yellow] {message}")
+        raise typer.Exit(2)
+
+    if target not in WRITABLE_TARGETS:
+        message = f"unknown target: {target}. Known targets: {', '.join(ALL_TARGETS)}"
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {"target": target, "status": "unknown", "message": message, "exit_code": 2}
+                )
+            )
+        else:
+            console.print(f"[red]{message}[/red]")
+        raise typer.Exit(2)
+
+    plan = plan_target(target, root_path, shadow=shadow)
+
+    if not write:
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {
+                        "target": target,
+                        "status": plan.status,
+                        "write": False,
+                        "shadow": shadow and not plan.shadow_ignored,
+                        "files": [
+                            {
+                                "path": str(f.path),
+                                "existed_before": f.existed_before,
+                                "will_change": f.will_change,
+                                "content": f.content,
+                            }
+                            for f in plan.files
+                        ],
+                        "exit_code": 0,
+                    }
+                )
+            )
+        else:
+            console.print(f"[cyan]dry run[/cyan] {target}: {plan.message}")
+            if shadow and plan.shadow_ignored:
+                console.print("[dim]--shadow has no effect on this target (always enforced).[/dim]")
+            for f in plan.files:
+                verb = "create" if not f.existed_before else "update"
+                console.print(f"  would {verb}: {f.path}")
+                console.print("  ---")
+                for line in f.content.splitlines():
+                    console.print(f"  {line}")
+                console.print("  ---")
+        raise typer.Exit(0)
+
+    if not yes and plan.status == "would_write":
+        if sys.stdin.isatty() and not json_output:
+            proceed = typer.confirm(f"Write {len(plan.files)} file(s) for {target}?")
+            if not proceed:
+                console.print("[yellow]Declined - nothing written.[/yellow]")
+                raise typer.Exit(1)
+        else:
+            # Non-interactive callers must say --yes; silence is not consent.
+            reason = "confirmation_required: pass --yes to write without a prompt"
+            if json_output:
+                console.print_json(json.dumps({"ok": False, "reasons": [reason], "exit_code": 1}))
+            else:
+                console.print(f"[yellow]{reason} - nothing written.[/yellow]")
+            raise typer.Exit(1)
+
+    state = load_connect_state(root_path)
+    try:
+        plan = write_target(target, root_path, shadow=shadow, state=state)
+        save_connect_state(root_path, state)
+    except OSError as exc:
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {"target": target, "status": "error", "message": str(exc), "exit_code": 2}
+                )
+            )
+        else:
+            console.print(f"[red]Write failed: {exc}[/red]")
+        raise typer.Exit(2) from exc
+
+    if json_output:
+        console.print_json(
+            json.dumps(
+                {
+                    "target": target,
+                    "status": plan.status,
+                    "write": True,
+                    "shadow": shadow and not plan.shadow_ignored,
+                    "files": [
+                        {
+                            "path": str(f.path),
+                            "existed_before": f.existed_before,
+                            "will_change": f.will_change,
+                        }
+                        for f in plan.files
+                    ],
+                    "exit_code": 0,
+                }
+            )
+        )
+    else:
+        console.print(f"[green]{plan.status}[/green] {target}: {plan.message}")
+        if shadow and plan.shadow_ignored:
+            console.print("[dim]--shadow has no effect on this target (always enforced).[/dim]")
+    raise typer.Exit(0)
 
 
 @app.command()

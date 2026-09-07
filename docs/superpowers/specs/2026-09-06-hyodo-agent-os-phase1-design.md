@@ -715,6 +715,12 @@ Unchanged from 1-A/existing contracts — `render_verdict_line` and
 
 ## Package 1-D — `feat/connect`: one click to wire a harness, and a real pre-action gate
 
+Status: Implemented in `feat/connect`, scoped down by an implementer ruling: the
+CLI takes a positional `<target>` (`claude-code`, `pre-commit`, `github-actions`)
+rather than `--only`, the Claude Code hooks target writes project-scoped
+`.claude/settings.json` (no `--global`/`~/.claude/settings.json` in this PR), and
+`cursor`/`codex` are UNOBSERVED-only targets. See `docs/CONNECT.md`.
+
 ### Data model
 
 No new ledger/policy schema. New module `hyodo/connect.py` mirrors the
