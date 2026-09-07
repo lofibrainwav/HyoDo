@@ -74,6 +74,7 @@ from hyodo.connect import (
 )
 from hyodo.connect import detect as detect_connect_targets
 from hyodo.connector_contract import build_connector_contract
+from hyodo.continuity import measure_continuity
 from hyodo.dashboard import (
     GRAPH_SCRIPT_SHA256,
     PILLAR_SPECS,
@@ -1993,6 +1994,14 @@ def mcp_contract(
     """Show the M5 remote-connector contract without claiming it is live."""
     root_path = Path(root).expanduser().resolve()
     contract = build_connector_contract(root_path)
+    # Additive only (M5-D): the same continuity receipt `hyodo mcp continuity`
+    # measures, folded to the two facts this contract already distinguishes —
+    # the local truth store and the still-unprobed remote connector.
+    continuity_receipt = measure_continuity(root_path)
+    contract["continuity"] = {
+        "local": "OBSERVED" if continuity_receipt["status"] == "READY" else "UNOBSERVED",
+        "remote": continuity_receipt["remote"]["status"],
+    }
     if json_output:
         console.print_json(json.dumps(contract))
         return
@@ -2624,6 +2633,48 @@ def mcp_access_log(
         console.print(table)
 
     raise typer.Exit(0)
+
+
+@mcp_app.command("continuity")
+def mcp_continuity(
+    root: str = typer.Option(
+        ".", "--root", help="Workspace root to measure the M5-D continuity receipt for"
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit the machine-readable receipt"),
+) -> None:
+    """Show whether this workspace's local truth stores are one consistent store.
+
+    Read-only: measures the agent-event ledger, the optional policy file, the
+    MCP access ledger, and the optional pairing file, plus the distinct
+    caller identities recorded in the access ledger. Remote (ChatGPT/the
+    hosted connector) is always reported UNOBSERVED — this command never
+    probes it. Exit 0 means every present store is readable and
+    uncorrupted; exit 2 means a store is unreadable or a ledger is corrupt.
+    """
+    root_path = Path(root).expanduser().resolve()
+    receipt = measure_continuity(root_path)
+    if json_output:
+        console.print_json(json.dumps(receipt))
+        raise typer.Exit(receipt["exit_code"])
+
+    color = "green" if receipt["status"] == "READY" else "red"
+    console.print(f"[{color}]{receipt['status']}[/{color}] continuity: {root_path}")
+    console.print(f"  {receipt['hosts']['label']}")
+    for store_name, store in receipt["stores"].items():
+        state = "present" if store["exists"] else "absent"
+        if not store["readable"]:
+            state = "unreadable"
+        console.print(f"  {store_name}: {state} digest={store['digest']}")
+    for caller in receipt["callers"]:
+        tools = ", ".join(caller["tools"]) or "none"
+        console.print(f"  caller: {caller['identity']} calls={caller['calls']} tools=[{tools}]")
+    console.print(
+        f"  remote: {receipt['remote']['status']} ({receipt['remote']['reason']})",
+        style="yellow",
+    )
+    if receipt["reasons"]:
+        console.print(f"[red]reasons: {', '.join(receipt['reasons'])}[/red]")
+    raise typer.Exit(receipt["exit_code"])
 
 
 @schema_app.command("check")

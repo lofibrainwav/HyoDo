@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   question (at most three choices, one preview, one yes/no confirm), then a
   first prompt to try. Non-interactive runs print the same four steps as
   text and ask/write nothing.
+- `hyodo mcp continuity` (M5-D, `hyodo.continuity/v1`): a read-only receipt
+  proving that a second MCP host (the paired loopback bridge) shares one
+  local truth store with the stdio adapter — no second ledger, remote
+  (ChatGPT) honestly `UNOBSERVED`. `hyodo mcp contract --json` additively
+  folds the same receipt in as `"continuity"`.
 
 ## [4.14.0] - 2026-09-07
 

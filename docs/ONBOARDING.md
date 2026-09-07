@@ -92,6 +92,14 @@ Exit codes: print-only is always 0 unless the host is unknown or `chatgpt`
 (2, `UNOBSERVED`). `--write`: 0 on success (including "already up to
 date"), 2 on an unknown/unobserved host or a write error.
 
+## Connecting a second host
+
+Once one host is connected, connect a second one the same way (`hyodo mcp
+config <host>` or a paired bridge via `hyodo mcp pair`) and run
+`hyodo mcp continuity --root <workspace>` to see both hosts sharing the same
+local evidence — no second truth store, ChatGPT/remote honestly `UNOBSERVED`.
+See `docs/M5_REMOTE_CONNECTOR_CONTRACT.md`'s M5-D section.
+
 ## Advanced paths (unchanged, still available)
 
 - `hyodo connect` — Claude Code hooks, pre-commit, GitHub Actions, shadow

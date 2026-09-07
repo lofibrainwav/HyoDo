@@ -127,6 +127,58 @@ evidence remains the default.
 
 M5-C local onboarding shipped; remote availability still UNOBSERVED.
 
+## M5-D — cross-model continuity
+
+Issue #163's M5-D acceptance line: after one host runs `get_local_context`,
+`hyodo_check`/`hyodo_safe`, and records an evidence event, "a second
+supported AI host can connect to the same project evidence without creating
+another truth store."
+
+Honesty first: ChatGPT cannot be driven from this repository, and the remote
+connector above stays contract-only. M5-D does not claim a live ChatGPT ↔
+Claude handshake. What it proves locally is **host-independence**: two
+distinct MCP clients — the stdio adapter and the paired loopback HTTP bridge,
+each with its own caller identity — read and write the *same* workspace
+truth (`.hyodo/agent-events.jsonl`, `.hyodo/policy.toml`,
+`.hyodo/mcp-access.jsonl`) and observe identical results, with no second
+store appearing anywhere under the workspace root.
+
+`hyodo mcp continuity --root <workspace> --json` (`hyodo.continuity/v1`) is
+the read-only receipt:
+
+- **Truth store inventory.** The agent-event ledger and the MCP access
+  ledger (required paths, may not exist yet) plus the policy file and the
+  pairing file (both optional — absence is not a failure), each with a
+  `sha256:` digest so two reads of the same workspace can be compared
+  byte-for-byte.
+- **Caller identities.** Grouped from `.hyodo/mcp-access.jsonl`'s
+  `caller_id` field. The stdio transport never sets one (`create_server`'s
+  default, `run_stdio` never passes one), so every stdio session groups
+  under the literal label `stdio (no pairing)`. A paired HTTP bridge caller
+  always carries its pairing's `workspace_id` (`_create_http_app` passes it
+  as `caller_id` when `paired=True`), grouped as `paired:<workspace_id>`.
+  These are the only two shapes the access ledger can hold today. Each
+  identity's receipt row lists the distinct tool names it called.
+- **Cross-caller continuity.** Whether `hyodo_event_record` calls from
+  different callers land in the one agent-event ledger — a per-caller call
+  count next to the ledger's single digest, so "two callers, one file" is
+  checkable rather than asserted.
+- **`hosts observed: N/2 expected`.** Never a probability. `2` is the
+  ceiling this slice measures — one stdio caller and one paired caller — not
+  a claim about how many hosts a future deployment might pair.
+- **`remote: UNOBSERVED` (`remote_not_probed`), always.** Identical semantics
+  to the connector contract above: this receipt never touches DNS, OAuth, or
+  `https://mcp.hyodo.app/mcp`.
+
+Exit `0` means every present store is readable and every line-delimited
+store is uncorrupted (`READY`). Exit `2` means a store is unreadable or a
+ledger is corrupt (`UNOBSERVED`) — a present-but-corrupt
+`.hyodo/agent-events.jsonl` fails this way, never silently as zero events.
+
+`hyodo mcp contract --json` additively folds the same receipt in as
+`"continuity": {"local": "OBSERVED"|"UNOBSERVED", "remote": "UNOBSERVED"}` —
+no existing contract key changes shape.
+
 ## Current capabilities
 
 The contract advertises only the tools already served by the local adapter:
