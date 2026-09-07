@@ -50,6 +50,7 @@ from hyodo import (
     SCORE_SUBSET_NAME,
     __version__,
 )
+from hyodo.connector_contract import build_connector_contract
 from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
 from hyodo.eval import EvalInputError, run_evaluation
 from hyodo.event_graph import validate_event_edges
@@ -1768,6 +1769,26 @@ def safe(
         if strict and high_only:
             raise typer.Exit(1)
         raise typer.Exit(0)
+
+
+@mcp_app.command("contract")
+def mcp_contract(
+    json_output: bool = typer.Option(
+        False, "--json", help="Print the machine-readable M5 connector contract"
+    ),
+):
+    """Show the M5 remote-connector contract without claiming it is live."""
+    contract = build_connector_contract()
+    if json_output:
+        console.print_json(json.dumps(contract))
+        return
+
+    console.print(Panel.fit("HyoDo M5 Connector Contract", style="bold cyan"))
+    console.print(f"  status:       {contract['status']}")
+    console.print(f"  availability: {contract['availability']}")
+    console.print(f"  url:          {contract['connector']['url']}")
+    console.print(f"  auth:         {contract['connector']['auth']}")
+    console.print("[yellow]Contract only: the remote connector is not claimed live yet.[/yellow]")
 
 
 @mcp_app.command("stdio")
