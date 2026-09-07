@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.14.0 is the latest published release. Main is preparing the 4.15.0
+HyoDo 4.15.0 is the latest published release. Main is preparing the 4.16.0
 development cycle.
 
 Landed and released:
@@ -67,7 +67,7 @@ evidence is not converted into a pass.
   `pre-commit`, and GitHub Actions, with `--shadow` mode and `--status` drift
   reporting.
 
-### 4.15.0 development cycle
+### 4.15.0 (released 2026-09-07)
 
 - M5-C onboarding (`hyodo mcp config <host>`, guided `hyodo start`) and M5-D
   continuity receipt (`hyodo mcp continuity`) closed issue #163.
