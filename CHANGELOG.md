@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   ever reach the ledger. `eye.capture` is an unconditional external
   variable (softened to `ALLOW` only at trust level 3), and `eye verify`
   reports a raw Hamming distance, never a percentage. See `docs/EYE.md`.
+- `hyodo inspect <path>` (Stage 2 package 2-B, field-deployment absorption):
+  digest every file under a directory into `.hyodo/folder-manifest.json`
+  (`hyodo.folder-manifest/v1`) and chunk it into
+  `.hyodo/chunks-manifest.json` (`hyodo.chunks-manifest/v1`, byte ranges and
+  digests only, never chunk text), with an honest `observed/expected`
+  coverage count, secret-shaped files excluded from chunking and reported by
+  digest and location only, `--ignore` globs, and an optional
+  `--remote-inventory` claim recorded (never fetched) from a connector like
+  a Drive MCP listing. Local, read-only, never calls `evaluate_policy`, no
+  network, no new dependency. See `docs/INSPECT.md`.
 - `hyodo skills ingest|lens|propose` (Stage 2 package 2-A, the "skill
   lens"): ingest a project's own Markdown skill as an external variable
   (never silently `ALLOW`, `.hyodo/skills/manifest.json`), report live
