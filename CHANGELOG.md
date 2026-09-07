@@ -14,6 +14,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Local evidence-graph viewer: `hyodo dashboard` now serves `GET /graph`
+  (server-rendered five-column virtue layout plus the core-engine-pulse orb)
+  and `GET /api/graph` (live `hyodo.evidence-graph/v1` JSON, mirroring
+  `hyodo report --format graph`'s corrupt/unreadable handling). Rollout step
+  (b) of the core engine monitor design shipped server-rendered; sharing the
+  design's TypeScript renderer with the public site prototype is pending.
 - M5-B local bridge: an untracked `.hyodo/pairing.json` pairing lifecycle
   (`hyodo mcp pair` / `unpair` / `revoke` / `pairing show`), a `--paired`
   option on `hyodo mcp serve` that verifies the caller's bearer token against

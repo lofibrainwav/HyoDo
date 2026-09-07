@@ -159,6 +159,32 @@ def _render_sarif(evidence: dict[str, Any]) -> str:
     return json.dumps(log, indent=2) + "\n"
 
 
+def build_report_graph(root: Path, evidence: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Build the live `hyodo.evidence-graph/v1` dict for *root*.
+
+    Shared by ``hyodo report --format graph`` and the local graph viewer's
+    ``GET /api/graph`` (`hyodo/cli/main.py`) so both read the same ledger
+    with identical corrupt/unreadable and mission-policy handling — the
+    viewer never computes a second, looser notion of "ready".
+    """
+    evidence = evidence if evidence is not None else _collect_evidence(root)
+    graph = build_event_graph(
+        evidence["events"],
+        corrupt=evidence["corrupt"],
+        ledger_unreadable=evidence["ledger_unreadable"],
+    )
+    policy = evidence["policy"]
+    if (
+        policy is not None
+        and policy.require_mission_prompt
+        and graph["summary"]["intent_unobserved_runs"]
+        and graph["status"] == "READY"
+    ):
+        graph["status"] = "UNOBSERVED"
+        graph["reason"] = f"mission_unobserved:{graph['summary']['intent_unobserved_runs'][0]}"
+    return graph
+
+
 def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, Any]]:
     """Render deterministic local Markdown, HTML, or SARIF and return its SHA-256 hash."""
     evidence = _collect_evidence(root)
@@ -174,20 +200,7 @@ def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, A
     details = {"events": len(events), "allow": allow, "deny": deny, "eval_pass_rate": eval_text}
 
     if report_format == "graph":
-        graph = build_event_graph(
-            events,
-            corrupt=corrupt,
-            ledger_unreadable=evidence["ledger_unreadable"],
-        )
-        policy = evidence["policy"]
-        if (
-            policy is not None
-            and policy.require_mission_prompt
-            and graph["summary"]["intent_unobserved_runs"]
-            and graph["status"] == "READY"
-        ):
-            graph["status"] = "UNOBSERVED"
-            graph["reason"] = f"mission_unobserved:{graph['summary']['intent_unobserved_runs'][0]}"
+        graph = build_report_graph(root, evidence)
         graph_json = render_event_graph_json(graph)
         digest = hashlib.sha256(graph_json.encode("utf-8")).hexdigest()
         summary = graph["summary"]
