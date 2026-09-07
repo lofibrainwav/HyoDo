@@ -725,6 +725,30 @@ def _risk_level_action(score: int) -> tuple[str, str]:
     return "low", "Low early-warning risk — final approval remains human"
 
 
+#: Valid values for the ``scope`` payload field — named at the point where the
+#: corpus is chosen, never inferred later from the free-text ``source`` string.
+SCAN_SCOPES = frozenset({"diff", "status", "file", "directory", "external", "none"})
+
+
+def _classify_coverage(
+    scanned_files: int | None, total_scannable: int | None, *, errored: bool
+) -> str:
+    """Return ``FULL`` / ``PARTIAL`` / ``UNOBSERVED`` for a non-external scope.
+
+    ``errored`` covers a missing, unreadable, or otherwise failed corpus.
+    ``FULL`` requires both counts known, equal, and greater than zero — an
+    empty corpus (0/0) is not proof of complete coverage, it is nothing
+    observed at all.
+    """
+    if errored or scanned_files is None or total_scannable is None:
+        return "UNOBSERVED"
+    if total_scannable > 0 and scanned_files == total_scannable:
+        return "FULL"
+    if scanned_files < total_scannable:
+        return "PARTIAL"
+    return "UNOBSERVED"
+
+
 def _result_payload(
     source: str,
     findings: list[Finding],
@@ -732,17 +756,32 @@ def _result_payload(
     exceptions_applied: int = 0,
     scanned_files: int | None = None,
     total_scannable: int | None = None,
+    *,
+    scope: str,
 ) -> dict:
     """Assemble the scan result dict from findings — single source of truth.
 
     Counts describe observed files versus the selected corpus, including skipped
     binaries and unreadable files in the total. External scanners and unavailable
     corpora leave coverage unknown because no file inventory is reported.
+
+    ``scope`` names which corpus this scan looked at (see ``SCAN_SCOPES``); the
+    caller sets it explicitly at the point the corpus was chosen, so readers
+    never have to infer it from parsing ``source``. ``coverage`` is derived
+    from ``scope`` plus the observed/total counts (or, for ``external``,
+    from whether the scanner ran).
     """
     score = risk_score(findings)
     level, action = _risk_level_action(score)
+    errored = source.startswith(("error:", "missing:"))
+    if scope == "external":
+        coverage = "UNOBSERVED" if source.startswith("error:") else "FULL"
+    else:
+        coverage = _classify_coverage(scanned_files, total_scannable, errored=errored)
     return {
         "source": source,
+        "scope": scope,
+        "coverage": coverage,
         "findings": findings,
         "rows": summarize_checks(findings, strict=strict),
         "risk_score": score,
@@ -788,12 +827,15 @@ def _run_merged_external_scan(root: Path, path: str | None, strict: bool) -> dic
             sources.append(tool_source)
     if not sources:
         return _result_payload(
-            "error:external scanners unavailable (" + "; ".join(errors) + ")", merged, strict
+            "error:external scanners unavailable (" + "; ".join(errors) + ")",
+            merged,
+            strict,
+            scope="external",
         )
     label = "+".join(sources) + f" ({len(merged)} findings)"
     if errors:
         label += " [partial: " + "; ".join(errors) + "]"
-    return _result_payload(label, merged, strict)
+    return _result_payload(label, merged, strict, scope="external")
 
 
 def run_safety_scan(
@@ -817,27 +859,34 @@ def run_safety_scan(
         return _run_merged_external_scan(root, path, strict)
     if scan_tool:
         ext_findings, ext_source = _run_external_scanner(scan_tool, root, path)
-        return _result_payload(ext_source, ext_findings, strict)
+        return _result_payload(ext_source, ext_findings, strict, scope="external")
 
     try:
         exceptions = load_scan_exceptions(root)
     except ScanExceptionsConfigError as exc:
-        return _result_payload(f"error:scan-exceptions:{exc}", [], strict)
+        return _result_payload(f"error:scan-exceptions:{exc}", [], strict, scope="none")
 
     exceptions_applied = 0
     scanned_files: int | None = None
     total_scannable: int | None = None
+    scope: str
 
     if path:
         target = Path(path)
         if not target.is_absolute():
             target = (root / target).resolve()
         if target.is_file():
+            scope = "file"
             scanned_files, total_scannable = 0, 1
             try:
                 if target.suffix.lower() in _BINARY_SUFFIXES or _looks_binary(target):
                     return _result_payload(
-                        f"file:{target}", [], strict, scanned_files=0, total_scannable=1
+                        f"file:{target}",
+                        [],
+                        strict,
+                        scanned_files=0,
+                        total_scannable=1,
+                        scope="file",
                     )
                 text = _read_text_file(target)
             except OSError:
@@ -851,6 +900,7 @@ def run_safety_scan(
                 findings.append(assess_rollback_signal(text, path=str(target)))
                 source = f"file:{target}"
         elif target.is_dir():
+            scope = "directory"
             (
                 findings,
                 _corpus,
@@ -860,6 +910,7 @@ def run_safety_scan(
                 total_scannable,
             ) = _scan_directory(target, root, exceptions, max_files=max_files)
         else:
+            scope = "none"
             findings = []
             source = f"missing:{target}"
     else:
@@ -867,6 +918,12 @@ def run_safety_scan(
         corpus, source = collect_scan_corpus(path=None, cwd=root, coverage=coverage)
         scanned_files = coverage.get("scanned")
         total_scannable = coverage.get("total")
+        if source.startswith("git diff"):
+            scope = "diff"
+        elif source.startswith("git status"):
+            scope = "status"
+        else:
+            scope = "none"
         findings = scan_text(corpus)
         findings.append(assess_rollback_signal(corpus))
 
@@ -877,4 +934,5 @@ def run_safety_scan(
         exceptions_applied,
         scanned_files=scanned_files,
         total_scannable=total_scannable,
+        scope=scope,
     )

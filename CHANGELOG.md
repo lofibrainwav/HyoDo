@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `hyodo safe` (`--json` and text) now reports `scope`
+  (`diff` / `status` / `file` / `directory` / `external` / `none`) and
+  `coverage` (`FULL` / `PARTIAL` / `UNOBSERVED`) alongside `source`, so a
+  reader no longer has to infer what was scanned from a free-text string.
+  Text mode prints `Scope: <scope> · Coverage: <coverage>
+  (<scanned>/<total> files)` after the `source:` line, plus a hint to pass
+  a directory when the scope is `diff` or `status`; both are suppressed in
+  `--quiet` and absent from `--json`'s hint (the fields themselves remain
+  in `--json`). See `docs/SECURITY_SURFACE.md`.
+
 ### Fixed
 
 - `hyodo mcp continuity` no longer reports `status: READY` on a workspace

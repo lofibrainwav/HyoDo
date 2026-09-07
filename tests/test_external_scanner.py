@@ -221,7 +221,7 @@ def test_run_merged_external_scan_directly_total_failure(monkeypatch, tmp_path):
 
 def test_result_payload_shape():
     findings = [Finding(category="external_scan", severity="high", label="x", detail="d")]
-    payload = _result_payload("gitleaks:scan", findings, strict=False)
+    payload = _result_payload("gitleaks:scan", findings, strict=False, scope="external")
     assert payload["risk_score"] == 40
     assert payload["level"] == "high"
     assert payload["findings"] == findings
