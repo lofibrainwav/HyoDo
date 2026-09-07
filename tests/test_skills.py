@@ -502,6 +502,34 @@ def test_cli_lens_excludes_advisory_rule_from_score_and_lists_unobserved(tmp_pat
     assert not any(rid.endswith("be-kind-to-reviewers") for rid in all_rule_ids)
 
 
+def test_cli_lens_untagged_keyword_less_rule_is_unclassified(tmp_path):
+    skill_dir = tmp_path / "skills" / "demo"
+    skill_dir.mkdir(parents=True)
+    # "require file:" is a mechanical prefix (so this compiles, unlike a plain
+    # advisory sentence), but "config.toml" hits none of the pillar keywords
+    # and the rule carries no `[pillars: ...]` tag.
+    (skill_dir / "SKILL.md").write_text(
+        "## Rules\n\n- require file: config.toml\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "config.toml").write_text("", encoding="utf-8")
+    _git_init(tmp_path)
+    runner.invoke(
+        app,
+        ["skills", "ingest", "skills/demo/SKILL.md", "--root", str(tmp_path), "--yes"],
+    )
+    result = runner.invoke(app, ["skills", "lens", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+
+    unclassified_ids = {p["rule_id"] for p in payload["unclassified"]["provenance"]}
+    assert any(rid.endswith("require-file-config-toml") for rid in unclassified_ids)
+    assert payload["unclassified"]["expected"] == 1
+
+    pillar_ids = {p["rule_id"] for pillar in payload["pillars"] for p in pillar["provenance"]}
+    assert not any(rid.endswith("require-file-config-toml") for rid in pillar_ids)
+
+
 def test_cli_lens_malformed_manifest_exit_2(tmp_path):
     manifest_dir = tmp_path / ".hyodo" / "skills"
     manifest_dir.mkdir(parents=True)
