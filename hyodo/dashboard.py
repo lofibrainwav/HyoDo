@@ -647,7 +647,7 @@ def _render_actor_ring_panel(key: str, rings_for_row: Any) -> str:
             items_html += f'<li class="ring-more">{overflow} more</li>'
         status = ring.get("status") if isinstance(ring, dict) else "unobserved"
         note_html = (
-            '<p class="ring-note">Not available until skill lenses ship.</p>'
+            '<p class="ring-note">No skill manifest in this project (run hyodo skills ingest).</p>'
             if layer == "skills" and status == "unobserved"
             else ""
         )
@@ -872,6 +872,7 @@ button {{ font:inherit; border:1px solid var(--line); background:var(--surface);
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:2px }}
 .cell-deny {{ border-color:{DECISION_COLORS["DENY"]} }} .cell-ask {{ border-color:{DECISION_COLORS["ASK"]} }} .cell-allow {{ border-color:{DECISION_COLORS["ALLOW"]} }} .cell-unobserved {{ border-color:{DECISION_COLORS["UNOBSERVED"]} }}
 .detail {{ margin-top:20px; border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--surface); min-height:80px }} .detail p {{ margin:.25rem 0 }}
+.actor-rings[hidden] {{ display:none }}
 .actor-rings {{ display:flex; flex-wrap:wrap; gap:16px; margin:10px 0 4px; padding:12px; border:1px solid var(--line); border-radius:12px; background:var(--surface) }}
 .rings-visual {{ flex:0 0 auto }}
 .rings-detail {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; flex:1 1 260px }}
