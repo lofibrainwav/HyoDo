@@ -28,6 +28,7 @@ language-agnostic.
 | [EYE.md](./EYE.md) | `hyodo eye capture` / `verify` — ephemeral visual evidence, no pixels stored |
 | [AUDIENCE.md](./AUDIENCE.md) | `--audience` profiles (vibe / engineer / professional) — wording only, same decision |
 | [TEST_INTEGRITY.md](./TEST_INTEGRITY.md) | `hyodo check --strict-tests` — AST-based test-integrity scan |
+| [SCORE_DERIVATION.md](./SCORE_DERIVATION.md) | `hyodo score --from-check` — pillar derivation rule table and coverage semantics |
 | [HYODO_MCP_CONNECTOR_DESIGN.md](./HYODO_MCP_CONNECTOR_DESIGN.md) | MCP connector design, plus M1 local stdio (remote not shipped) |
 | [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Implementer queue after 4.4.0 |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |

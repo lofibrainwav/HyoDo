@@ -173,6 +173,12 @@ from hyodo.policy_trust import (
 from hyodo.report import build_report_graph, write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
+from hyodo.score_derive import (
+    DerivedPillars,
+    apply_override,
+    derive_pillars,
+    geometric_mean_observed,
+)
 from hyodo.skills import (
     MANIFEST_RELATIVE_PATH as SKILLS_MANIFEST_RELATIVE_PATH,
 )
@@ -1785,6 +1791,71 @@ def _resolve_score_pillars(
     return effective_benevolence, truth, goodness, effective_hyo, beauty, partial_filled
 
 
+def _collect_check_observation(root: Path) -> dict[str, Any]:
+    """Run the Truth/Beauty check gates in-process and shape a `check` dict.
+
+    Only the gates score_derive.py's rule table consumes are run here
+    (pyright for Truth, ruff for Beauty) -- pytest and the SBOM gate are
+    skipped since no pillar rule reads them. Onboarding/DX signals
+    (readme_present etc.) are not emitted yet -- see docs/SCORE_DERIVATION.md
+    "Known gaps" -- so Benevolence stays UNOBSERVED until they are.
+    """
+    pyright_result = run_pyright_check(root)
+    ruff_result = run_ruff_check(root)
+    return {
+        "truth_gate": pyright_result.status.value
+        if pyright_result.status in {GateStatus.PASS, GateStatus.FAIL}
+        else None,
+        "beauty_gate": ruff_result.status.value
+        if ruff_result.status in {GateStatus.PASS, GateStatus.FAIL}
+        else None,
+    }
+
+
+def _collect_safe_observation(root: Path) -> dict[str, Any]:
+    """Run `hyodo safe` in-process and shape a `safe` dict for score_derive."""
+    result = run_safety_scan(path=str(root), cwd=root, max_files=0)
+    findings = result["findings"]
+    return {
+        "high": sum(1 for f in findings if f.severity == "high"),
+        "medium": sum(1 for f in findings if f.severity == "medium"),
+        "scanned_files": result.get("scanned_files"),
+        "total_scannable": result.get("total_scannable"),
+    }
+
+
+def _collect_test_integrity_observation(root: Path) -> dict[str, Any]:
+    """Run the test-integrity scan in-process and shape a dict for score_derive."""
+    report = scan_test_integrity(root)
+    return {"total_tests": report.total_tests, "vacuous_tests": report.vacuous_tests}
+
+
+def _print_derived_pillars(derived: DerivedPillars) -> None:
+    table = Table(title="Derived pillar inputs (hyodo score --from-check)", show_header=True)
+    table.add_column("Pillar", style="cyan")
+    table.add_column("Value", justify="right")
+    table.add_column("Coverage", justify="center")
+    table.add_column("Top provenance")
+    for name, result in derived.by_name().items():
+        value_display = "UNOBSERVED" if result.value is None else f"{result.value:.1f}"
+        coverage_color = {"OBSERVED": "green", "PARTIAL": "yellow", "UNOBSERVED": "red"}[
+            result.coverage
+        ]
+        top_rows = result.top_provenance(3)
+        provenance_display = (
+            "; ".join(f"{row.rule_id} ({row.contribution:.1f})" for row in top_rows)
+            if top_rows
+            else "-"
+        )
+        table.add_row(
+            name.capitalize() + (" [override]" if result.override else ""),
+            value_display,
+            f"[{coverage_color}]{result.coverage}[/{coverage_color}]",
+            provenance_display,
+        )
+    console.print(table)
+
+
 @app.command()
 def score(
     benevolence: float | None = typer.Option(
@@ -1804,6 +1875,17 @@ def score(
     eternity: float | None = typer.Option(
         None, "--eternity", "-e", help="[Legacy] maps to hyo (0-1)"
     ),
+    from_check: bool = typer.Option(
+        False,
+        "--from-check",
+        help="Derive pillar inputs from hyodo check/safe/test-integrity instead of flags",
+    ),
+    root_opt: str | None = typer.Option(
+        None, "--root", help="Project root for --from-check (default: current directory)"
+    ),
+    json_output: bool = typer.Option(
+        False, "--json", help="Emit machine-readable JSON (--from-check only)"
+    ),
     partial: bool = typer.Option(
         False, "--partial", help="Allow missing pillars (defaults to 0.5, WEAK signal)"
     ),
@@ -1822,8 +1904,125 @@ def score(
     primary and legacy flags for the same pillar cannot be combined.
     Review emphasis labels are philosophical only — not F-score weights.
     Output is a review signal only — not automatic approval.
+
+    --from-check derives the five pillar inputs from `hyodo check` /
+    `hyodo safe` / the test-integrity scan instead of requiring flags; any
+    of --benevolence/--truth/--goodness/--hyo/--beauty passed alongside it
+    overrides that one derived pillar (recorded as an override in the
+    provenance, not silently blended in). See docs/SCORE_DERIVATION.md.
     """
     from hyodo import calculate_hygook_v5_score
+
+    if from_check:
+        root = Path(root_opt).resolve() if root_opt else Path.cwd().resolve()
+        if not root.is_dir():
+            console.print(f"[red]--root path not found or not a directory: {root}[/red]")
+            raise typer.Exit(2)
+
+        check_obs = _collect_check_observation(root)
+        safe_obs = _collect_safe_observation(root)
+        test_integrity_obs = _collect_test_integrity_observation(root)
+        derived = derive_pillars(
+            root, check=check_obs, safe=safe_obs, test_integrity=test_integrity_obs
+        )
+
+        overrides = {
+            "benevolence": benevolence,
+            "truth": truth,
+            "goodness": goodness,
+            "hyo": hyo if hyo is not None else eternity,
+            "beauty": beauty,
+        }
+        for label, override_value in overrides.items():
+            if override_value is None:
+                continue
+            if not math.isfinite(override_value) or not 0.0 <= override_value <= 1.0:
+                console.print(
+                    f"[red]--{label} must be a finite number between 0.0 and 1.0, "
+                    f"got {override_value}.[/red]"
+                )
+                raise typer.Exit(2)
+            by_name = derived.by_name()
+            by_name[label] = apply_override(by_name[label], override_value)
+            derived = DerivedPillars(**by_name)
+
+        by_name = derived.by_name()
+        observed_pairs: list[tuple[str, float]] = [
+            (name, unit_value)
+            for name, result in by_name.items()
+            if (unit_value := result.unit_value()) is not None
+        ]
+        unobserved = [name for name, result in by_name.items() if result.value is None]
+
+        if not json_output:
+            console.print(
+                f"[dim]Model: {SCORE_MODEL_NAME} · Subset: {SCORE_SUBSET_NAME} · "
+                f"Formula lineage: {SCORE_FORMULA_LINEAGE} · derived from: {root}[/dim]"
+            )
+            _print_derived_pillars(derived)
+
+        if len(observed_pairs) == 5:
+            values = dict(observed_pairs)
+            f_score, s_eternity = calculate_hygook_v5_score(
+                values["benevolence"],
+                values["truth"],
+                values["goodness"],
+                values["hyo"],
+                values["beauty"],
+            )
+            score_value = ((f_score - 6) / (60 - 6)) * 100
+            eternity_coverage = "OBSERVED"
+        else:
+            f_score = None
+            score_value = None
+            s_eternity = (
+                geometric_mean_observed([v * 100 for _, v in observed_pairs])
+                if observed_pairs
+                else None
+            )
+            eternity_coverage = "PARTIAL" if observed_pairs else "UNOBSERVED"
+
+        if json_output:
+            payload = {
+                "root": str(root),
+                "derivation": derived.as_dict(),
+                "eternity": s_eternity,
+                "eternity_coverage": eternity_coverage,
+                "f_score": f_score,
+                "score": score_value,
+                "unobserved_pillars": unobserved,
+                "note": "Review signal only — not automatic approval.",
+            }
+            console.print_json(json.dumps(payload))
+            raise typer.Exit(0)
+
+        if unobserved:
+            console.print(
+                f"\n[yellow]Eternity/F: PARTIAL — pillar(s) UNOBSERVED and excluded "
+                f"from the geometric mean: {', '.join(unobserved)}.[/yellow]"
+            )
+            if s_eternity is not None:
+                console.print(f"[dim]Eternity (S), observed pillars only: {s_eternity:.4f}[/dim]")
+            console.print(
+                "[yellow]TOTAL score requires all five pillars; pass the missing pillar(s) "
+                "explicitly (e.g. --benevolence 0.8) to complete it.[/yellow]"
+            )
+        else:
+            assert f_score is not None
+            assert score_value is not None
+            console.print(f"\nEternity (S): {s_eternity:.4f} · F Score: {f_score:.2f}")
+            console.print(f"[bold]TOTAL: {score_value:.1f}%[/bold]")
+            if score_value >= 90:
+                console.print("[bold green]REVIEW_SIGNAL_STRONG (90+)[/bold green]")
+            elif score_value >= 70:
+                console.print("[bold yellow]REVIEW_SIGNAL_CAUTION (70-89)[/bold yellow]")
+            else:
+                console.print("[bold red]REVIEW_SIGNAL_BLOCK (<70)[/bold red]")
+            console.print(
+                "[dim]Review signal only — not automatic approval. "
+                "Human approval still required.[/dim]"
+            )
+        raise typer.Exit(0)
 
     (
         effective_benevolence,
