@@ -48,6 +48,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `hyodo safe --scan gitleaks`: adapter used the removed `--format` flag
   (gitleaks 8.x exits 126); now `--report-format json --report-path -` plus
   a `version` positive control; regression test with a fake binary.
+- `hyodo safe --scan trufflehog`: added the same positive control as
+  gitleaks (`trufflehog --version`, accepting either stdout or stderr,
+  requiring a version-looking string). A trufflehog binary that starts and
+  exits with no output was previously only caught by the generic
+  no-output-plus-nonzero-exit rule; a CLI-drifted binary that still exits 0
+  with unrelated output would have been silently reported as clean. Failure
+  now reports a high-severity `trufflehog_failed` finding and the scan is
+  not attempted; regression tests with fake binaries.
 
 ## [4.15.0] - 2026-09-07
 
