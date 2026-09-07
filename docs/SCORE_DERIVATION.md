@@ -112,8 +112,8 @@ docstring.
 
 ## Calibration
 
-Ran `hyodo score --from-check --json` (commit `<pending — see repo HEAD on
-the commit that introduces this table>`) against three targets, now that
+Ran `hyodo score --from-check --json` (commit
+`c9b1624b93ab49622d05b8865726bf3c0e2eec83`) against three targets, now that
 `hyodo check` emits the three Benevolence DX signals:
 
 | Target | Benevolence | Truth | Goodness | Hyo | Beauty | Eternity | F | TOTAL |
