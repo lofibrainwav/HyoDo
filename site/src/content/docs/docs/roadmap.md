@@ -34,16 +34,23 @@ Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo 
 
 | Shipped today | Not built yet |
 | --- | --- |
-| `hyodo safe` scans | Research nodes under policy |
-| `hyodo init` and `hyodo check` gates | Bring-your-own-model support |
+| `hyodo safe` scans | Live Drive connector (remote inventories are recorded as claims, never fetched) |
+| `hyodo init` and `hyodo check` gates | Remote MCP OAuth onboarding |
 | FDE evidence spine and policy checks | Full folder semantic onboarding |
 | `ASK` decisions and trust levels | RAG or embeddings in public HyoDo |
 | Schema validation and local eval runs | Cross-source verification loop |
 | Source-line graph JSON report export | Stage 4 intent loop |
+| Research-node hand-off (`hyodo skills ingest --from-node`) — the node itself stays external | |
 | MCP stdio, Tailscale serve, doctor | |
 | PyPI Trusted Publishing, SBOM, SARIF | |
 | `hyodo connect` (dry-run by default; `cursor`/`codex` report UNOBSERVED) | |
 | Local graph viewer (`hyodo dashboard` → `/graph`, reads the real ledger) | |
+| Audience profiles (`--audience vibe`/`engineer`/`professional`) — on the source line, published in 4.15.0 once released | |
+| `hyodo skills` lens (ingest/lens/propose, no model or embeddings) — on the source line, published in 4.15.0 once released | |
+| `hyodo inspect` field-deployment folder absorption — on the source line, published in 4.15.0 once released | |
+| `hyodo graph export` evidence-graph bridge — on the source line, published in 4.15.0 once released | |
+| `hyodo eye capture`/`verify` ephemeral visual evidence — on the source line, published in 4.15.0 once released | |
+| `actor_id` nesting and per-actor rings in the local graph viewer — on the source line, published in 4.15.0 once released | |
 
 A public [evidence-graph prototype](/evidence-graph/) shows the intended shape
 using demo fixture data. See [its documentation](/docs/evidence-graph/) for the

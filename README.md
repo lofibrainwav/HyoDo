@@ -5,7 +5,6 @@
 HyoDo is a model-agnostic Python CLI that helps teams prove which checks ran,
 record agent actions, enforce local tool and path policy, and reuse existing
 tests and linters without turning missing evidence into a green result.
-
 Review signals never grant automatic approval. Unobserved is never green.
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
@@ -21,7 +20,6 @@ AI coding tools can move quickly, but a normal green check does not always answe
 - Did the check actually run?
 - Did the agent touch only approved tools and paths?
 - Was missing or unreadable evidence treated as a pass?
-- Can the project keep using its existing pytest, Ruff, npm, Go, or Rust checks?
 
 HyoDo makes those boundaries explicit with local evidence, policy decisions,
 and fail-closed exit contracts.
@@ -52,6 +50,9 @@ gates. No detected tooling means no invented green check.
 | Local evidence panel | `hyodo dashboard --open` |
 | Optional MCP adapter | `hyodo mcp stdio` / `serve` |
 | MCP diagnostics and audit | `hyodo mcp doctor`, `access-log`, `rules` |
+| Onboarding, harness and host wiring | `hyodo start`, `connect`, `mcp config` |
+| Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
+| Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
 ## Honest boundaries
 
@@ -64,9 +65,8 @@ HyoDo is deliberately narrow:
 - The public MCP server supports loopback or authenticated Tailscale binding;
   public `0.0.0.0` listeners are not supported.
 - Missing, unreadable, or unmeasured evidence is never reported as healthy.
-
-That scope is intentional: the tool should be useful locally without requiring
-a hosted service, model provider, or remote control plane.
+- Embeddings, model calls, capture tools, and remote inventories stay outside
+  the package: HyoDo keeps digests, hashes, and receipts, never the payload.
 
 ## Use your existing CI
 

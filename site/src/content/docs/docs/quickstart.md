@@ -91,6 +91,21 @@ reports `UNOBSERVED` honestly instead of guessing at a config format.
 Exit `2` means "not measured," not "measured and fine." A gate that never ran
 does not get to look like a gate that passed.
 
+## Next steps
+
+Once the basics are running, these commands cover harness wiring and the
+Stage 2 field-deployment tools:
+
+- [Connect](/docs/connect/) — wire Claude Code hooks, pre-commit, or GitHub
+  Actions to the gates above.
+- [Skills](/docs/skills/) — ingest a project's own skill files as a lens
+  over the six pillars.
+- [Inspect](/docs/inspect/) — absorb a directory into a digest inventory.
+- [Graph Export](/docs/graph-export/) — export the evidence graph's
+  structure for an external note system.
+- [Eye](/docs/eye/) — prove what was on screen without storing a picture
+  of it.
+
 ## Next
 
 - [Why HyoDo](/docs/why-hyodo/)
