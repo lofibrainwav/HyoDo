@@ -34,8 +34,9 @@ PROPOSED_RELATIVE_PATH = Path(".hyodo") / "skills" / "proposed.md"
 PILLARS: tuple[str, ...] = ("truth", "goodness", "beauty", "benevolence", "hyo", "eternity")
 
 #: Keyword table used only when a rule carries no ``[pillars: ...]`` tag.
-#: A rule may match more than one pillar; matching is case-insensitive substring
-#: search against the rule text with the tag stripped.
+#: A rule may match more than one pillar. A keyword matches only at the start of
+#: a word (so ``test`` covers ``tests`` and ``testing`` but ``ui`` never matches
+#: the letters inside ``require``), case-insensitively, with the tag stripped.
 _PILLAR_KEYWORDS: dict[str, tuple[str, ...]] = {
     "truth": ("test", "verify", "assert", "coverage"),
     "goodness": ("secret", "security", "safe", "credential", "injection"),
@@ -43,6 +44,12 @@ _PILLAR_KEYWORDS: dict[str, tuple[str, ...]] = {
     "benevolence": ("onboarding", "developer experience", "dx", "setup"),
     "hyo": ("convention", "context", "project rule", "style guide"),
     "eternity": ("dependency", "maintenance", "deprecat", "upgrade", "lockfile"),
+}
+
+#: Word-start anchored forms of :data:`_PILLAR_KEYWORDS`, built once.
+_PILLAR_KEYWORD_PATTERNS: dict[str, tuple[re.Pattern[str], ...]] = {
+    pillar: tuple(re.compile(r"\b" + re.escape(keyword)) for keyword in keywords)
+    for pillar, keywords in _PILLAR_KEYWORDS.items()
 }
 
 _TAG_RE = re.compile(r"\[pillars:\s*([^\]]*)\]\s*$", re.IGNORECASE)
@@ -126,8 +133,8 @@ def infer_pillars(base_text: str) -> tuple[str, ...]:
     lowered = base_text.lower()
     matched = []
     for pillar in PILLARS:
-        keywords = _PILLAR_KEYWORDS[pillar]
-        if any(keyword in lowered for keyword in keywords):
+        patterns = _PILLAR_KEYWORD_PATTERNS[pillar]
+        if any(pattern.search(lowered) for pattern in patterns):
             matched.append(pillar)
     return tuple(matched)
 

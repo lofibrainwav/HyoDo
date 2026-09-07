@@ -156,6 +156,13 @@ def test_keyword_mapping_hits_expected_pillar(text, expected_pillar):
     assert expected_pillar in infer_pillars(text)
 
 
+def test_keyword_mapping_matches_word_starts_only():
+    """``ui`` must not match the letters inside ``require``; ``tests`` still hits ``test``."""
+    assert infer_pillars("require pattern: def main\\(") == ()
+    assert infer_pillars("require file: docs/README.md") == ("beauty",)
+    assert infer_pillars("all tests must pass") == ("truth",)
+
+
 def test_keyword_mapping_no_match_is_empty_tuple():
     assert infer_pillars("Do a thing with no keyword overlap at all.") == ()
 
