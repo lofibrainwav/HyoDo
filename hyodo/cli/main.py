@@ -3214,7 +3214,7 @@ def _unobserved_policy_decision(
             blocked_path_globs=(),
         )
         probe = evaluate_policy(event, default_cfg, observed_steps=observed_steps, root=root)
-        return replace(probe, decision="UNOBSERVED", rule_id=probe.rule_id, reason="policy_missing")
+        return replace(probe, decision="UNOBSERVED", reason="policy_missing")
     return PolicyDecision(
         decision="UNOBSERVED",
         rule_id=None,
@@ -3601,6 +3601,17 @@ def event_record(
         # exit code" -- so it still forces exit 0 here, same as every other
         # early-exit path, even though (unlike those) no event was appended.
         ledger_exit = 0 if shadow else 2
+        plain_message = {
+            EVENT_ID_CONFLICT: "event_id already recorded with different content. Not recorded.",
+            EVENT_ID_UNOBSERVED: "Ledger unreadable — cannot check event_id. Not recorded.",
+        }.get(id_state, "Failed to append agent event ledger. Not recorded.")
+        # The stderr diagnostic must reach stderr regardless of --json: a
+        # caller monitoring stderr for shadow diagnostics (per docs/CONNECT.md's
+        # unconditional guarantee) must see this failure mode too, not only
+        # the "ok": false buried inside a --json blob that itself goes to
+        # stdout.
+        if shadow:
+            typer.echo(f"[SHADOW, not blocking] {plain_message}", err=True)
         if json_output:
             console.print_json(
                 json.dumps(
@@ -3609,6 +3620,7 @@ def event_record(
                         "reasons": [reason],
                         "exit_code": ledger_exit,
                         "shadow": shadow,
+                        "recorded": False,
                         "ledger": str(root_path / AGENT_EVENTS_RELATIVE_PATH),
                         **ledger_obligation,
                     }
@@ -3938,32 +3950,40 @@ def policy_check(
         verdict_state.update(_policy_verdict_state(decision))
         # 0 = ALLOW, 1 = DENY, 2 = UNOBSERVED, 3 = ASK.
         exit_code = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision.decision]
+        # The diagnostic text is built once regardless of --hook: --shadow's
+        # "never blocking, but never silent either" guarantee has to hold for
+        # a plain `policy check --shadow` (no --hook at all) just as much as
+        # for the claude-code hook contract below.
+        if decision.decision == "DENY":
+            stderr_message = f"{decision.rule_id or 'rule'}: {decision.reason or ''}".strip()
+        elif decision.decision == "ASK":
+            stderr_message = (
+                f"HYODO ASK: {decision.reason or 'operator decision required'}. "
+                "Stop and ask the human before retrying this tool call."
+            )
+        elif decision.decision == "UNOBSERVED":
+            stderr_message = (
+                f"HYODO UNOBSERVED: {decision.reason or 'insufficient evidence'}. "
+                "Not a green light — stop and ask the human."
+            )
+        else:
+            stderr_message = None
         if hook == "claude-code":
             # Claude Code's PreToolUse contract has only two outcomes (proceed or
             # block); ASK and UNOBSERVED are enforced as a hard block here — this
             # is a real behavior change, called out under Open questions in the
             # spec, not silently smoothed over.
             hook_exit_code = 0 if decision.decision == "ALLOW" else 2
-            if decision.decision == "DENY":
-                stderr_message = f"{decision.rule_id or 'rule'}: {decision.reason or ''}".strip()
-            elif decision.decision == "ASK":
-                stderr_message = (
-                    f"HYODO ASK: {decision.reason or 'operator decision required'}. "
-                    "Stop and ask the human before retrying this tool call."
-                )
-            elif decision.decision == "UNOBSERVED":
-                stderr_message = (
-                    f"HYODO UNOBSERVED: {decision.reason or 'insufficient evidence'}. "
-                    "Not a green light — stop and ask the human."
-                )
-            else:
-                stderr_message = None
-            if stderr_message:
-                if shadow:
-                    stderr_message = "[SHADOW, not blocking] " + stderr_message
-                typer.echo(stderr_message, err=True)
         else:
             hook_exit_code = exit_code
+        # Under --hook claude-code the diagnostic is always relevant (it's the
+        # only signal for a hard block); without --hook it's only relevant
+        # under --shadow, where it's the only place the real decision surfaces
+        # outside the exit code.
+        if stderr_message and (hook == "claude-code" or shadow):
+            if shadow:
+                stderr_message = "[SHADOW, not blocking] " + stderr_message
+            typer.echo(stderr_message, err=True)
         final_exit_code = 0 if shadow else hook_exit_code
         if json_output:
             payload = decision.as_dict()

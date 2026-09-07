@@ -665,6 +665,42 @@ def test_event_record_shadow_malformed_payload_exits_zero(tmp_path: Path) -> Non
     assert "[SHADOW, not blocking]" in result.stderr
 
 
+def test_event_record_shadow_ledger_append_failure_exits_zero(tmp_path: Path) -> None:
+    """A ledger the process cannot read/write must not turn --shadow blocking.
+
+    Forcing this: put a *directory* where the ledger file belongs, so
+    ``check_event_id`` hits an ``OSError`` reading it and reports
+    ``ledger_unobserved`` before any append is attempted -- the ledger
+    write failure path Required Change #1 explicitly names.
+    """
+    policy_path = _write_deny_policy(tmp_path)
+    ledger_path = tmp_path / ".hyodo" / "agent-events.jsonl"
+    ledger_path.mkdir(parents=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--stdin",
+            "--hook",
+            "claude-code",
+            "--policy",
+            str(policy_path),
+            "--shadow",
+            "--json",
+        ],
+        input=_hook_payload("PostToolUse", "evt-shadow-ledger", "run-shadow-ledger", tmp_path),
+    )
+    assert result.exit_code == 0, result.output
+    assert "[SHADOW, not blocking]" in result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["ok"] is False
+    assert payload["exit_code"] == 0
+    assert payload["shadow"] is True
+    assert payload["recorded"] is False
+
+
 # --------------------------------------------------------------------------
 # Judge findings: non-interactive consent, fire-and-forget hooks, unobserved steps
 # --------------------------------------------------------------------------
