@@ -177,3 +177,63 @@ def test_cli_from_check_override_marks_provenance(tmp_path: Path) -> None:
 def test_cli_from_check_rejects_invalid_root() -> None:
     result = runner.invoke(app, ["score", "--from-check", "--root", "/no/such/path"])
     assert result.exit_code == 2
+
+
+def test_cli_from_check_json_observes_benevolence_via_dx_signals(tmp_path: Path) -> None:
+    """A repo with a README start-hint + entry point yields OBSERVED Benevolence.
+
+    Exercises the `hyodo check` -> `_collect_check_observation` ->
+    `collect_dx_signals` wiring end to end: readme_present,
+    start_hint_present and help_text_present should all fire with
+    provenance, and the pillar should be OBSERVED with a full TOTAL score
+    once every pillar is supplied.
+    """
+    _init_git_repo(tmp_path)
+    (tmp_path / "sample.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text(
+        "# Sample project\n\nThis README exists to document the sample project "
+        "for the purposes of this test, and it is long enough to pass the "
+        "non-empty README size threshold used by dx_signals.\n\n"
+        "## Quick start\n\n```bash\nhyodo start\n```\n\n"
+        "Run `sample --help` for usage.\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[project]\nname = "sample"\n\n[project.scripts]\nsample = "sample.cli:app"\n',
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "add", "-A"], cwd=tmp_path, check=True)
+    subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=tmp_path, check=True)
+
+    result = runner.invoke(
+        app,
+        [
+            "score",
+            "--from-check",
+            "--root",
+            str(tmp_path),
+            "--truth",
+            "0.9",
+            "--goodness",
+            "0.9",
+            "--hyo",
+            "0.9",
+            "--beauty",
+            "0.9",
+            "--json",
+        ],
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    benevolence = payload["derivation"]["benevolence"]
+    assert benevolence["coverage"] == "OBSERVED"
+    assert benevolence["value"] == 100.0
+    provenance_rule_ids = {row["rule_id"] for row in benevolence["provenance"]}
+    assert provenance_rule_ids == {
+        "check.readme_present",
+        "check.start_hint_present",
+        "check.help_text_present",
+    }
+    assert payload["unobserved_pillars"] == []
+    assert isinstance(payload["score"], float)
