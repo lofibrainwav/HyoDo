@@ -501,11 +501,21 @@ class PillarLens:
     provenance: list[tuple[str, str, str]]  # (rule_id, skill, status)
 
 
+#: Pillar key for a compiled rule that carries no ``[pillars: ...]`` tag and
+#: matches no entry in :data:`_PILLAR_KEYWORDS` — `infer_pillars` returns an
+#: empty tuple for it, so it would otherwise never appear in any lens row.
+UNCLASSIFIED_PILLAR = "unclassified"
+
+
 @dataclass(frozen=True)
 class LensResult:
     """Full result of ``hyodo skills lens``."""
 
     pillars: list[PillarLens]
+    #: Same shape as one entry of `pillars`, for compiled rules with no pillar
+    #: (see :data:`UNCLASSIFIED_PILLAR`) — kept separate so every compiled rule
+    #: is visible in exactly one row: one of the six pillars, or this one.
+    unclassified: PillarLens
     unobserved: list[dict[str, Any]]  # {"rule_id", "skill", "rule_text_digest"}
     manifest_status: str  # "ok" | "missing" | "malformed"
 
@@ -516,6 +526,7 @@ def compute_lens(root: Path) -> LensResult:
     entries = manifest.get("skills", []) if manifest else []
 
     by_pillar: dict[str, list[RuleStatus]] = {pillar: [] for pillar in PILLARS}
+    unclassified_statuses: list[RuleStatus] = []
     unobserved: list[dict[str, Any]] = []
     seen_rule_ids: set[str] = set()
 
@@ -536,28 +547,35 @@ def compute_lens(root: Path) -> LensResult:
                 )
                 continue
             rule_status = evaluate_compiled_rule(rule, root)
-            for pillar in rule.pillars:
-                by_pillar[pillar].append(rule_status)
+            if rule.pillars:
+                for pillar in rule.pillars:
+                    by_pillar[pillar].append(rule_status)
+            else:
+                unclassified_statuses.append(rule_status)
 
-    pillars: list[PillarLens] = []
-    for pillar in PILLARS:
-        statuses = by_pillar[pillar]
+    def _lens_row(pillar_name: str, statuses: list[RuleStatus]) -> PillarLens:
         expected = len(statuses)
         observed_statuses = [s for s in statuses if s.status != "UNOBSERVED"]
         observed = len(observed_statuses)
         passed = sum(1 for s in observed_statuses if s.status == "PASS")
         provenance = [(s.rule.rule_id, s.rule.skill_name, s.status) for s in statuses]
-        pillars.append(
-            PillarLens(
-                pillar=pillar,
-                expected=expected,
-                observed=observed,
-                passed=passed,
-                provenance=provenance,
-            )
+        return PillarLens(
+            pillar=pillar_name,
+            expected=expected,
+            observed=observed,
+            passed=passed,
+            provenance=provenance,
         )
 
-    return LensResult(pillars=pillars, unobserved=unobserved, manifest_status=status)
+    pillars = [_lens_row(pillar, by_pillar[pillar]) for pillar in PILLARS]
+    unclassified = _lens_row(UNCLASSIFIED_PILLAR, unclassified_statuses)
+
+    return LensResult(
+        pillars=pillars,
+        unclassified=unclassified,
+        unobserved=unobserved,
+        manifest_status=status,
+    )
 
 
 @dataclass(frozen=True)

@@ -107,6 +107,13 @@ from hyodo.exceptions import (
     is_general_path_excluded,
     load_scan_exceptions,
 )
+from hyodo.eye import (
+    DEFAULT_TTL_S,
+    CaptureResult,
+)
+from hyodo.eye import (
+    capture as run_eye_capture,
+)
 from hyodo.gates import (
     GATES_CONFIG_RELATIVE_PATH,
     SCHEMA_ID,
@@ -139,6 +146,7 @@ from hyodo.pairing import (
     pairing_state,
     revoke_pairing,
 )
+from hyodo.phash import phash_distance
 from hyodo.pillars import (
     append_history_receipt,
     collect_hyo_evidence,
@@ -238,6 +246,11 @@ graph_app = typer.Typer(
     help="Evidence-graph export bridge (Package 2-C, no auto-approval)",
     add_completion=False,
 )
+eye_app = typer.Typer(
+    name="eye",
+    help="Ephemeral visual evidence: capture, hash, show, destroy -- never store pixels",
+    add_completion=False,
+)
 mcp_app.add_typer(rules_app, name="rules")
 mcp_app.add_typer(pairing_app, name="pairing")
 app.add_typer(event_app, name="event")
@@ -247,6 +260,7 @@ app.add_typer(schema_app, name="schema")
 app.add_typer(mcp_app, name="mcp")
 app.add_typer(skills_app, name="skills")
 app.add_typer(graph_app, name="graph")
+app.add_typer(eye_app, name="eye")
 console = Console()
 
 
@@ -2045,6 +2059,92 @@ def safe(
         if strict and high_only:
             raise typer.Exit(1)
         raise typer.Exit(0)
+
+
+@app.command("inspect")
+def inspect_cmd(
+    path: str = typer.Argument(..., help="Directory to absorb into folder/chunks manifests"),
+    ignore: list[str] = typer.Option(  # noqa: B008 - typer repeatable-option pattern;
+        # ruff's B006/B008 heuristic fires on any `list[...]`-annotated Option default,
+        # but typer.Option's default is read once at CLI parse time, never mutated.
+        [],
+        "--ignore",
+        help=(
+            "fnmatch glob (repeatable), tested against the relative path and the "
+            "basename. Matching files are still listed with ignored: true, excluded "
+            "from chunks and from coverage's expected count. .gitignore is never read."
+        ),
+    ),
+    remote_inventory: list[str] = typer.Option(  # noqa: B008
+        [],
+        "--remote-inventory",
+        help=(
+            "Path to a hyodo.remote-inventory/v1 JSON file (repeatable) describing "
+            "items a connector (e.g. Drive MCP) declared out-of-band. Recorded as a "
+            "claim under folder-manifest 'remote'; never fetched, never chunked, "
+            "never counted in coverage. Malformed input exits 1 before any write."
+        ),
+    ),
+    report: str = typer.Option(
+        "md", "--report", help="Report format printed to stdout: md (default) or json"
+    ),
+    root: str = typer.Option(
+        ".", "--root", help="Base directory that manifest paths are reported relative to"
+    ),
+):
+    """
+    Absorb a directory into `.hyodo/folder-manifest.json` and `.hyodo/chunks-manifest.json`.
+
+    Read-only field-deployment inventory: every file is digested (or explicitly
+    listed under `unreadable`), secret-shaped files are excluded from chunking
+    and reported by digest and location only, and chunk entries never carry file
+    text. Never calls `evaluate_policy` — there is no ASK/exit-3 case here.
+
+    Exit 0: manifests written, coverage complete (every file digested or listed
+    in `unreadable`). Exit 1: `<path>` missing/not a directory, or a
+    `--remote-inventory` file is malformed (nothing is written). Exit 2: manifest
+    write failed (OSError), e.g. `.hyodo` cannot be created or is not writable.
+    """
+    from hyodo.inspect import (
+        RemoteInventoryError,
+        render_report_json,
+        render_report_md,
+        run_inspect,
+        write_manifests,
+    )
+
+    if report not in ("md", "json"):
+        console.print(f"[red]Invalid --report value: {report!r} (expected md or json)[/red]")
+        raise typer.Exit(1)
+
+    root_path = Path(root)
+
+    try:
+        result = run_inspect(
+            path, root=root_path, ignore=ignore, remote_inventory_paths=remote_inventory
+        )
+    except NotADirectoryError:
+        console.print(f"[red]Not a directory (or does not exist): {path}[/red]")
+        raise typer.Exit(1) from None
+    except RemoteInventoryError as exc:
+        console.print(f"[red]{exc}[/red]")
+        raise typer.Exit(1) from None
+
+    try:
+        write_manifests(result, root_path)
+    except OSError as exc:
+        console.print(f"[red]Failed to write manifests under {root_path / '.hyodo'}: {exc}[/red]")
+        raise typer.Exit(2) from None
+
+    for warning in result.warnings:
+        console.print(f"[yellow]{warning}[/yellow]")
+
+    if report == "json":
+        console.print(render_report_json(result), highlight=False, markup=False)
+    else:
+        console.print(render_report_md(result), highlight=False, markup=False)
+
+    raise typer.Exit(0)
 
 
 @mcp_app.command("contract")
@@ -4275,11 +4375,21 @@ def skills_lens(
                 }
                 for pillar in result.pillars
             ],
+            "unclassified": {
+                "pillar": result.unclassified.pillar,
+                "expected": result.unclassified.expected,
+                "observed": result.unclassified.observed,
+                "passed": result.unclassified.passed,
+                "provenance": [
+                    {"rule_id": rid, "skill": skill, "status": status}
+                    for rid, skill, status in result.unclassified.provenance
+                ],
+            },
             "unobserved": result.unobserved,
         }
         console.print_json(json.dumps(payload))
     else:
-        for pillar in result.pillars:
+        for pillar in [*result.pillars, result.unclassified]:
             console.print(
                 f"[bold]{pillar.pillar}[/bold]: "
                 f"{pillar.observed}/{pillar.expected} observed, "
@@ -4348,6 +4458,185 @@ def skills_propose(
             stamped = apply_decision_to_event(normalized, decision)
             append_agent_event(root_path, stamped)
 
+    raise typer.Exit(0)
+
+
+_EYE_EXIT_CODES = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}
+
+
+def _load_eye_policy(root_path: Path) -> PolicyConfig:
+    """Load ``.hyodo/policy.toml``, falling back to all-defaults when absent.
+
+    ``eye.capture`` is unconditionally discretionary regardless of policy
+    presence (like ``skills.ingest``), so a missing policy file must not
+    refuse the command outright -- only an unreadable/invalid one does.
+    """
+    policy_path = root_path / POLICY_RELATIVE_PATH
+    cfg, policy_err = try_load_policy(policy_path)
+    if cfg is not None:
+        return cfg
+    if policy_err == "policy_missing":
+        return PolicyConfig(
+            schema=POLICY_SCHEMA_ID,
+            max_steps=None,
+            allowed_tools=None,
+            blocked_path_globs=(),
+        )
+    raise typer.Exit(2)
+
+
+def _print_eye_result(result: CaptureResult, source: str, *, json_output: bool) -> None:
+    payload = result.as_dict()
+    if json_output:
+        console.print_json(json.dumps(payload))
+        return
+    console.print(f"[bold]{result.decision}[/bold] {source}")
+    if result.reason:
+        console.print(f"  reason: {result.reason}")
+    if result.rule_id:
+        console.print(f"  rule_id: {result.rule_id}")
+    if result.digest is not None:
+        console.print(f"  digest: {result.digest}")
+    if result.phash is not None:
+        console.print(f"  phash: {result.phash}")
+    console.print(f"  destroyed_at: {result.destroyed_at}  kept: {result.kept}")
+    if result.decision == "ASK":
+        console.print("  re-run with --yes, or grant trust level 3, to capture")
+    if result.ledger_write_required:
+        console.print("  ledger_write_required: true")
+
+
+@eye_app.command("capture")
+def eye_capture(
+    ttl: int = typer.Option(DEFAULT_TTL_S, "--ttl", help="Seconds before the capture is deleted"),
+    keep: bool = typer.Option(
+        False, "--keep", help="Retain the file instead of deleting it (requires trust level >= 2)"
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Approve an ASK decision now; records a human decision event, then proceeds",
+    ),
+    open_after: bool = typer.Option(
+        False, "--open", help="Best-effort open the capture with the OS viewer before destroying it"
+    ),
+    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+):
+    """
+    Capture one screen via a BYOM tool (``.hyodo/config.toml``'s ``[eye]
+    command`` or ``HYODO_EYE_COMMAND``), record its digest and perceptual
+    hash, show it with a countdown, then delete it and record proof of
+    destruction. No pixels ever reach the ledger.
+
+    Exit 0 ALLOW, 1 DENY, 2 UNOBSERVED (no tool configured, capture failed,
+    unsupported image format, or destruction could not be proven), 3 ASK.
+    """
+    root_path = Path(root).resolve()
+    policy = _load_eye_policy(root_path)
+    result = run_eye_capture(
+        root_path, policy, ttl_s=ttl, keep=keep, yes=yes, open_after=open_after
+    )
+    _print_eye_result(result, "eye.capture", json_output=json_output)
+    raise typer.Exit(result.exit_code)
+
+
+@eye_app.command("verify")
+def eye_verify(
+    against: str = typer.Option(..., "--against", help="event_id of a prior eye-capture event"),
+    phash_threshold: int | None = typer.Option(
+        None,
+        "--phash-threshold",
+        help="Hamming distance (0-64) at/below which two captures are 'the same screen'",
+    ),
+    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+):
+    """
+    Re-capture now (through the same policy gate) and report the Hamming
+    distance between the fresh perceptual hash and the referenced event's
+    stored hash: "same screen" or "different screen", plus the raw
+    distance out of 64 -- never a percentage or a probability. The
+    re-capture is itself ephemeral: it is deleted and both its events are
+    recorded, exactly like ``eye capture``.
+    """
+    root_path = Path(root).resolve()
+    events, _corrupt = read_agent_events(root_path)
+    target: dict[str, Any] | None = None
+    if events is not None:
+        for event in events:
+            if isinstance(event, dict) and event.get("event_id") == against:
+                target = event
+                break
+
+    if target is None:
+        payload = {
+            "decision": "UNOBSERVED",
+            "reason": f"event {against!r} not found",
+            "exit_code": 1,
+        }
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]event {against!r} not found[/red]")
+        raise typer.Exit(1)
+
+    target_ephemeral = (
+        target.get("meta", {}).get("ephemeral") if isinstance(target.get("meta"), dict) else None
+    )
+    target_phash = target_ephemeral.get("phash") if isinstance(target_ephemeral, dict) else None
+    target_algo = target_ephemeral.get("phash_algo") if isinstance(target_ephemeral, dict) else None
+
+    if target_phash is None:
+        payload = {
+            "decision": "UNOBSERVED",
+            "reason": f"event {against!r} has no meta.ephemeral.phash to compare against",
+            "exit_code": 1,
+        }
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]event {against!r} has no phash to compare against[/red]")
+        raise typer.Exit(1)
+
+    if target_algo != "dct64":
+        payload = {"decision": "UNOBSERVED", "reason": "phash_algo_mismatch", "exit_code": 1}
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print("phash_algo_mismatch")
+        raise typer.Exit(1)
+
+    policy = _load_eye_policy(root_path)
+    result = run_eye_capture(root_path, policy, ttl_s=DEFAULT_TTL_S)
+
+    if result.decision != "ALLOW" or result.phash is None:
+        _print_eye_result(result, f"eye.verify --against {against}", json_output=json_output)
+        raise typer.Exit(result.exit_code)
+
+    threshold = phash_threshold
+    if threshold is None:
+        threshold = (
+            policy.ephemeral.phash_distance_threshold if policy.ephemeral is not None else 10
+        )
+    distance = phash_distance(target_phash, result.phash)
+    same = distance <= threshold
+    verdict = "same screen" if same else "different screen"
+
+    payload = {
+        **result.as_dict(),
+        "against_event_id": against,
+        "against_phash": target_phash,
+        "distance": distance,
+        "threshold": threshold,
+        "verdict": verdict,
+    }
+    if json_output:
+        console.print_json(json.dumps(payload))
+    else:
+        console.print(f"{verdict} (distance {distance} of 64)")
+        console.print(f"  new capture digest: {result.digest}")
+        console.print(f"  new capture event: {result.capture_event_id}")
     raise typer.Exit(0)
 
 

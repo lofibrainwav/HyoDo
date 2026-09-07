@@ -7,8 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Test integrity (1-E) no longer flags a test as `no_assertion` when it
+  delegates its assertions to a same-module helper function (checked
+  transitively up to three call hops); a helper defined in another module is
+  still unresolved and the test stays flagged. See `docs/TEST_INTEGRITY.md`.
+- `hyodo skills lens` now reports a seventh `unclassified` row/JSON key for
+  compiled rules that carry no `[pillars: ...]` tag and match no keyword, so
+  every compiled rule is visible in exactly one lens row. See
+  `docs/SKILLS.md`.
+
 ### Added
 
+- `hyodo eye capture|verify` (Stage 2 package 2-D, "ephemeral visual
+  evidence"): capture one screen through a BYOM tool
+  (`.hyodo/config.toml`'s `[eye] command`), record an exact digest and a
+  pure-stdlib 64-bit perceptual hash, show it with a countdown, delete it,
+  and record proof of destruction as a second ledger event -- no pixels
+  ever reach the ledger. `eye.capture` is an unconditional external
+  variable (softened to `ALLOW` only at trust level 3), and `eye verify`
+  reports a raw Hamming distance, never a percentage. See `docs/EYE.md`.
+- `hyodo inspect <path>` (Stage 2 package 2-B, field-deployment absorption):
+  digest every file under a directory into `.hyodo/folder-manifest.json`
+  (`hyodo.folder-manifest/v1`) and chunk it into
+  `.hyodo/chunks-manifest.json` (`hyodo.chunks-manifest/v1`, byte ranges and
+  digests only, never chunk text), with an honest `observed/expected`
+  coverage count, secret-shaped files excluded from chunking and reported by
+  digest and location only, `--ignore` globs, and an optional
+  `--remote-inventory` claim recorded (never fetched) from a connector like
+  a Drive MCP listing. Local, read-only, never calls `evaluate_policy`, no
+  network, no new dependency. See `docs/INSPECT.md`.
 - `hyodo skills ingest|lens|propose` (Stage 2 package 2-A, the "skill
   lens"): ingest a project's own Markdown skill as an external variable
   (never silently `ALLOW`, `.hyodo/skills/manifest.json`), report live

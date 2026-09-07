@@ -9,7 +9,10 @@ prototype (fixture data,
 `site/src/graph/evidence-graph.ts`) are the starting points. The local viewer
 this design describes depends on Phase 1-B's `hyodo report --format graph`
 output, `.hyodo/reports/hyodo-report.graph.json`
-(`hyodo.evidence-graph/v1`, shipped on main).
+(`hyodo.evidence-graph/v1`, shipped on main). The `parent_event_id` and
+`evidence_refs` fields this design's row-nesting and Hyo-column sections
+reference are not a future addition to plan around — they have shipped in
+the `hyodo.agent-event/v1` ledger since 4.14.0.
 
 ## 1. Context and honesty rules
 

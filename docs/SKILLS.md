@@ -48,9 +48,12 @@ Without a tag, HyoDo maps the rule text by keyword:
 | Hyo | convention, context, project rule, style guide |
 | Eternity | dependency, maintenance, deprecat, upgrade, lockfile |
 
-A rule may hit several pillars. A rule that hits none still compiles (or
-is listed `UNOBSERVED`) — it simply contributes to no pillar's coverage
-row.
+A rule may hit several pillars. A rule that hits none — no tag, no keyword
+match — still compiles (or is listed `UNOBSERVED`); it appears in the lens's
+seventh row, `unclassified` (same `expected`/`observed`/`passed`/`provenance`
+shape as a pillar row, and the `"unclassified"` key in `skills lens --json`),
+so every compiled rule stays visible somewhere instead of silently
+disappearing from the six-pillar count.
 
 ## The four mechanical prefixes
 
