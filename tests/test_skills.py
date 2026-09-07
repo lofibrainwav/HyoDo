@@ -13,7 +13,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import app
-from hyodo.events import read_agent_events
+from hyodo.events import content_digest, read_agent_events
 from hyodo.policy import (
     _BUILTIN_SUPPLY_CHAIN_TOOLS,
     PolicyConfig,
@@ -605,3 +605,210 @@ def test_render_proposal_only_includes_passed_rules(tmp_path):
     result = render_proposal(tmp_path, "demo-repo")
     assert "require file: README.md" in result.markdown
     assert "require file: MISSING.md" not in result.markdown
+
+
+# --- Research node hand-off (`skills ingest --from-node`) ------------------
+
+
+def _node_rule(skill, source, rule_text, score_rank):
+    return {
+        "skill": skill,
+        "source": source,
+        "rule_text": rule_text,
+        "rule_digest": content_digest(rule_text),
+        "score_rank": score_rank,
+    }
+
+
+def _write_node_file(path, *, node="kingdom-skill-index", query_digest=None, rules=None):
+    if rules is None:
+        rules = [
+            _node_rule("hygiene", "path:README.md", "require file: README.md", 1),
+            _node_rule("hygiene", "path:README.md", "forbid pattern: TODO", 2),
+            _node_rule("hygiene", "path:README.md", "Be kind to reviewers.", 3),
+        ]
+    payload = {
+        "schema": "hyodo.skill-retrieval/v1",
+        "node": node,
+        "query_digest": query_digest,
+        "retrieved": rules,
+    }
+    path.write_text(json.dumps(payload), encoding="utf-8")
+    return payload
+
+
+def _write_node_repo(tmp_path):
+    (tmp_path / "README.md").write_text("# demo\n", encoding="utf-8")
+    _git_init(tmp_path)
+
+
+def test_cli_ingest_from_node_valid_file_writes_manifest_and_ledger_event(tmp_path):
+    _write_node_repo(tmp_path)
+    node_file = tmp_path / "retrieval.json"
+    _write_node_file(node_file)
+
+    result = runner.invoke(
+        app,
+        [
+            "skills",
+            "ingest",
+            "--from-node",
+            str(node_file),
+            "--root",
+            str(tmp_path),
+            "--yes",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "ASK"
+    assert payload["effective_decision"] == "ALLOW"
+    assert payload["source"] == "node:kingdom-skill-index"
+
+    manifest_path = tmp_path / ".hyodo" / "skills" / "manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    entry = manifest["skills"][0]
+    assert entry["source"] == "node:kingdom-skill-index"
+    assert entry["body_stored"] is False
+    assert len(entry["node_rules"]) == 3
+    assert entry["content_digest"]
+
+    events, _corrupt = read_agent_events(tmp_path)
+    ingest_events = [e for e in events if e.get("tool", {}).get("name") == "skills.ingest"]
+    assert ingest_events
+    last = ingest_events[-1]
+    assert last["meta"]["tags"] == ["skills-ingest", "node"]
+    ext_vars = last["policy"]["external_variables"]
+    assert any(v == "skill_ingest:node:kingdom-skill-index" for v in ext_vars)
+
+
+def test_cli_ingest_from_node_default_ask_without_yes(tmp_path):
+    _write_node_repo(tmp_path)
+    node_file = tmp_path / "retrieval.json"
+    _write_node_file(node_file)
+
+    result = runner.invoke(
+        app,
+        ["skills", "ingest", "--from-node", str(node_file), "--root", str(tmp_path), "--json"],
+    )
+    assert result.exit_code == 3
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "ASK"
+    manifest_path = tmp_path / ".hyodo" / "skills" / "manifest.json"
+    assert not manifest_path.exists()
+
+
+def test_cli_ingest_from_node_malformed_json_exits_1_writes_nothing(tmp_path):
+    _write_node_repo(tmp_path)
+    node_file = tmp_path / "retrieval.json"
+    node_file.write_text("{not json", encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "skills",
+            "ingest",
+            "--from-node",
+            str(node_file),
+            "--root",
+            str(tmp_path),
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 1
+    manifest_path = tmp_path / ".hyodo" / "skills" / "manifest.json"
+    assert not manifest_path.exists()
+
+
+def test_cli_ingest_from_node_float_score_field_rejected(tmp_path):
+    _write_node_repo(tmp_path)
+    node_file = tmp_path / "retrieval.json"
+    rule = _node_rule("hygiene", "path:README.md", "require file: README.md", 1)
+    rule["score"] = 0.87
+    _write_node_file(node_file, rules=[rule])
+
+    result = runner.invoke(
+        app,
+        [
+            "skills",
+            "ingest",
+            "--from-node",
+            str(node_file),
+            "--root",
+            str(tmp_path),
+            "--yes",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert any(r == "invalid_field:retrieved[0].score" for r in payload["reasons"])
+    manifest_path = tmp_path / ".hyodo" / "skills" / "manifest.json"
+    assert not manifest_path.exists()
+
+
+def test_cli_ingest_from_node_rule_text_over_512_rejected(tmp_path):
+    _write_node_repo(tmp_path)
+    node_file = tmp_path / "retrieval.json"
+    long_text = "require file: " + ("a" * 512)
+    rule = _node_rule("hygiene", "path:README.md", long_text, 1)
+    _write_node_file(node_file, rules=[rule])
+
+    result = runner.invoke(
+        app,
+        [
+            "skills",
+            "ingest",
+            "--from-node",
+            str(node_file),
+            "--root",
+            str(tmp_path),
+            "--yes",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 1
+    payload = json.loads(result.stdout)
+    assert any(r == "invalid_field:retrieved[0].rule_text" for r in payload["reasons"])
+    manifest_path = tmp_path / ".hyodo" / "skills" / "manifest.json"
+    assert not manifest_path.exists()
+
+
+def test_cli_lens_shows_node_provenance(tmp_path):
+    _write_node_repo(tmp_path)
+    node_file = tmp_path / "retrieval.json"
+    _write_node_file(node_file)
+    runner.invoke(
+        app,
+        ["skills", "ingest", "--from-node", str(node_file), "--root", str(tmp_path), "--yes"],
+    )
+
+    result = runner.invoke(app, ["skills", "lens", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 0
+    payload = json.loads(result.stdout)
+    all_provenance = [
+        row
+        for pillar in [*payload["pillars"], payload["unclassified"]]
+        for row in pillar["provenance"]
+    ]
+    assert any(row["skill"] == "node:kingdom-skill-index" for row in all_provenance)
+    assert any(row["rule_id"].startswith("kingdom-skill-index/hygiene:") for row in all_provenance)
+
+
+def test_cli_propose_has_retrieved_section_for_passed_node_rules(tmp_path):
+    _write_node_repo(tmp_path)
+    node_file = tmp_path / "retrieval.json"
+    _write_node_file(node_file)
+    runner.invoke(
+        app,
+        ["skills", "ingest", "--from-node", str(node_file), "--root", str(tmp_path), "--yes"],
+    )
+
+    result = runner.invoke(app, ["skills", "propose", "--root", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "## Retrieved" in result.stdout
+    assert "kingdom-skill-index/hygiene:require-file-readme-md" in result.stdout
+    # The advisory (uncompiled) node rule must not appear as a passed/Retrieved rule.
+    retrieved_section = result.stdout.split("## Retrieved", 1)[1].split("## Provenance", 1)[0]
+    assert "Be kind to reviewers" not in retrieved_section

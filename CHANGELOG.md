@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `hyodo skills ingest --from-node <file>` accepts a BYOM research node's
+  `hyodo.skill-retrieval/v1` hand-off (rule text + digests + an ordinal
+  rank; never a vector, never a float score), gated by the same
+  `skills.ingest` policy as a path/url source
+  (`skill_ingest:node:<label>`), and `hyodo skills propose` gains a
+  `## Retrieved` section listing node-sourced rules that passed. See
+  "Research node contract" in `docs/SKILLS.md`.
+
 ### Fixed
 
 - Test integrity (1-E) no longer flags a test as `no_assertion` when it

@@ -86,6 +86,7 @@ domain); only trust level 3 (full delegation) does. See
 | Command | ALLOW | DENY | UNOBSERVED | ASK |
 | --- | --- | --- | --- | --- |
 | `skills ingest` | 0 | 1 | 2 | 3 |
+| `skills ingest --from-node` | 0 | 1 (also: malformed file) | 2 | 3 |
 | `skills lens` | 0 (report only) | n/a | 2 (manifest malformed) | n/a |
 | `skills propose` | 0 | n/a | n/a | n/a |
 
@@ -99,6 +100,77 @@ yet) as an honest `0/0` everywhere, not an error; only a malformed
 sources already judged at ingest time — so a malformed manifest there is
 still exit 0, with empty `## Rules`/`## Unverified`/`## Provenance`
 sections.
+
+## Research node contract
+
+`hyodo skills ingest --from-node <file>` accepts a hand-off from an external
+research node instead of a path/URL: a bring-your-own-model (BYOM) service
+that owns embeddings/vectors and runs retrieval against a project's skill
+corpus, entirely outside this package. The node is never part of the public
+`hyodo` package, is never fetched or invoked by HyoDo, and never sends a
+vector: it writes one JSON file, and HyoDo treats that file as a claim, gates
+it, and keeps a receipt.
+
+**Schema `hyodo.skill-retrieval/v1`**:
+
+```json
+{
+  "schema": "hyodo.skill-retrieval/v1",
+  "node": "kingdom-skill-index",
+  "query_digest": "a1b2c3d4e5f6",
+  "retrieved": [
+    {
+      "skill": "hygiene",
+      "source": "path:README.md",
+      "rule_text": "require file: README.md",
+      "rule_digest": "3f9a1c2b4d5e",
+      "score_rank": 1
+    }
+  ]
+}
+```
+
+- `node` — a label identifying the research node (any non-empty string).
+- `query_digest` — 12-hex or `null`; never the query text itself.
+- `retrieved[].source` — `path:<...>` or `url:<domain>`, naming where the
+  node found the rule, not a location HyoDo re-fetches.
+- `retrieved[].rule_text` — one rule line, **<= 512 characters**, exactly
+  like a skill file bullet.
+- `retrieved[].rule_digest` — the 12-hex `content_digest` of `rule_text`;
+  HyoDo recomputes it and rejects a mismatch.
+- `retrieved[].score_rank` — an **ordinal** (integer >= 1) only. Any
+  `score`, `probability`, or `percentage` field present anywhere on a
+  retrieved item is rejected outright with
+  `invalid_field:retrieved[i].score` — HyoDo refuses probability-shaped
+  inputs from a node exactly as it refuses them everywhere else.
+
+A malformed file (bad JSON, a missing/invalid field, a `rule_text` over 512
+characters, or a probability-shaped field) exits 1 and writes nothing to the
+manifest.
+
+**Policy gate**: identical to a path/url source. `skill_ingest:node:<label>`
+is added to `external_variables` unconditionally; ASK unless trust level 3
+or `--yes`. The ledger event records `meta.tags = ["skills-ingest", "node"]`
+so a node hand-off is distinguishable from a path/url ingest in the ledger.
+
+**What HyoDo stores**: each retrieved `rule_text` line is compiled exactly
+as if it were a bullet of a skill named `<node>/<skill>` (rule id
+`<node>/<skill>:<slug>`) and kept, verbatim, in the manifest's `node_rules`
+list — this is the one place node-sourced rule text is retained, because
+the rule text *is* the rule, not a fetched body: `body_stored` is always
+`false` for a node entry. The manifest's `content_digest` for the entry is
+the digest of the concatenated per-rule digests, in retrieval order.
+`lens` and `propose` treat these rules like any other: mechanical prefixes
+execute, advisory rules are `UNOBSERVED`, and provenance rows show
+`node:<label>` as the skill source. `propose` also gains a `## Retrieved`
+section listing every node-sourced rule that currently passes, by rule id
+and digest.
+
+**What HyoDo never does**: it never contacts the node, never receives or
+stores a vector/embedding, and never re-reads the node's corpus — the
+`node:<label>` source cannot be re-fetched, unlike a `path:` source, so
+`lens`/`propose` rebuild each rule live from the manifest's own
+`node_rules`, not from re-reading anything external.
 
 ## What is never stored or fetched
 
@@ -116,3 +188,6 @@ sections.
 - An unreadable source (missing file, or any `url:` source) is always
   recorded in the manifest — with `content_digest: null` and
   `status: "unreadable"` — never silently dropped.
+- A research node (`--from-node`) never receives a fetch or a callback from
+  HyoDo, and never sends a vector/embedding — only rule text, digests, and
+  an ordinal rank. See "Research node contract" above.
