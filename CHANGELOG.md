@@ -9,6 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `hyodo eye capture|verify` (Stage 2 package 2-D, "ephemeral visual
+  evidence"): capture one screen through a BYOM tool
+  (`.hyodo/config.toml`'s `[eye] command`), record an exact digest and a
+  pure-stdlib 64-bit perceptual hash, show it with a countdown, delete it,
+  and record proof of destruction as a second ledger event -- no pixels
+  ever reach the ledger. `eye.capture` is an unconditional external
+  variable (softened to `ALLOW` only at trust level 3), and `eye verify`
+  reports a raw Hamming distance, never a percentage. See `docs/EYE.md`.
 - `hyodo skills ingest|lens|propose` (Stage 2 package 2-A, the "skill
   lens"): ingest a project's own Markdown skill as an external variable
   (never silently `ALLOW`, `.hyodo/skills/manifest.json`), report live
