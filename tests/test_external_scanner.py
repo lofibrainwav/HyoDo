@@ -24,13 +24,14 @@ from hyodo.safety import (
 def _fake_run(stdout: str = "", returncode: int = 0, version_stdout: str = "9.9.9"):
     """Build a stand-in for subprocess.run's CompletedProcess return value.
 
-    gitleaks now gets a `version` positive-control call before the actual scan
-    call; this fake answers that call separately (defaulting to a successful
-    version reply) so existing scan-focused fixtures do not need to know about it.
+    Both gitleaks (`version`) and trufflehog (`--version`) now get a positive-
+    control call before the actual scan call; this fake answers that call
+    separately (defaulting to a successful version reply) so existing
+    scan-focused fixtures do not need to know about it.
     """
 
     def _runner(cmd, *_args, **_kwargs):
-        if isinstance(cmd, (list, tuple)) and "version" in cmd:
+        if isinstance(cmd, (list, tuple)) and any("version" in str(part) for part in cmd):
             return SimpleNamespace(stdout=version_stdout, stderr="", returncode=0)
         return SimpleNamespace(stdout=stdout, stderr="", returncode=returncode)
 
@@ -93,7 +94,7 @@ def test_trufflehog_ndjson_verified_high_unverified_medium(monkeypatch, tmp_path
 
     findings, source = _run_external_scanner("trufflehog", tmp_path)
 
-    assert source == "trufflehog:scan"
+    assert source == "trufflehog:scan (9.9.9)"
     assert len(findings) == 2
     verified, unverified = findings
     assert verified.severity == "high"
