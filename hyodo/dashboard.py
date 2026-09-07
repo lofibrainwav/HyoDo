@@ -61,6 +61,22 @@ POLL_SCRIPT_SHA256 = base64.b64encode(hashlib.sha256(POLL_SCRIPT.encode("utf-8")
 # clears the panel and returns focus to whichever cell last had it (or the
 # first cell in the grid, if none has been focused yet), so the keyboard
 # path never strands focus after the panel is dismissed.
+#
+# Fix round 2 (coordinator, live-screenshot review): `layoutEdges()` is
+# also responsible for the edge overlay's actual geometry.
+# `hyodo/dashboard.py`'s `_render_edge_overlay` renders each edge as a
+# `<path data-source data-target data-kind="parent|evidence|broken"
+# d="">` with an empty `d` — only the browser, after real layout (which
+# depends on tile text length, wrapped actor labels, and other things the
+# server cannot predict), knows where a tile's edges actually are.
+# `layoutEdges()` measures every tile with `getBoundingClientRect()`
+# relative to the `.grid-rows` container and fills `d` in: cross-column
+# anchors at source right-middle/target left-middle (mirrored when the
+# target sits to the left) with one bend at the midpoint x; same-column
+# anchors at bottom-middle/top-middle; an evidence edge draws the same
+# anchor pair as one quadratic curve; a broken edge draws a fixed 24px
+# stub from its one anchor. It reruns on load, on resize, and after a row
+# collapse toggle (row visibility changes what is measurable).
 GRAPH_SCRIPT = """\
 const panel = document.getElementById("event-detail");
 const DEFAULT_DETAIL = "Select an event to see its 5W1H detail.";
@@ -78,6 +94,68 @@ function highlightEdges(eventId) {
   document.querySelectorAll("#edge-overlay .edge").forEach((edge) => {
     const active = eventId && (edge.dataset.source === eventId || edge.dataset.target === eventId);
     edge.classList.toggle("edge-active", Boolean(active));
+  });
+}
+function layoutEdges() {
+  const svg = document.getElementById("edge-overlay");
+  const container = document.querySelector(".grid-rows");
+  if (!svg || !container) return;
+  const containerRect = container.getBoundingClientRect();
+  const tiles = new Map();
+  container.querySelectorAll("button[data-event-id]").forEach((el) => {
+    if (el.offsetParent === null) return;
+    const r = el.getBoundingClientRect();
+    tiles.set(el.dataset.eventId, {
+      left: r.left - containerRect.left,
+      right: r.right - containerRect.left,
+      top: r.top - containerRect.top,
+      bottom: r.bottom - containerRect.top,
+      midX: (r.left + r.right) / 2 - containerRect.left,
+      midY: (r.top + r.bottom) / 2 - containerRect.top,
+    });
+  });
+  svg.querySelectorAll("path[data-source]").forEach((path) => {
+    const kind = path.dataset.kind;
+    const source = tiles.get(path.dataset.source);
+    if (!source) {
+      path.setAttribute("d", "");
+      return;
+    }
+    if (kind === "broken") {
+      const x1 = source.midX;
+      const y1 = source.midY;
+      path.setAttribute("d", "M" + x1 + "," + y1 + " L" + (x1 + 24) + "," + y1);
+      return;
+    }
+    const target = tiles.get(path.dataset.target);
+    if (!target) {
+      path.setAttribute("d", "");
+      return;
+    }
+    let x1, y1, x2, y2;
+    if (Math.abs(source.midX - target.midX) < 1) {
+      const goingDown = target.midY >= source.midY;
+      x1 = source.midX;
+      y1 = goingDown ? source.bottom : source.top;
+      x2 = target.midX;
+      y2 = goingDown ? target.top : target.bottom;
+    } else {
+      const goingRight = target.midX >= source.midX;
+      x1 = goingRight ? source.right : source.left;
+      y1 = source.midY;
+      x2 = goingRight ? target.left : target.right;
+      y2 = target.midY;
+    }
+    const midX = (x1 + x2) / 2;
+    if (kind === "evidence") {
+      const midY = (y1 + y2) / 2 - 18;
+      path.setAttribute("d", "M" + x1 + "," + y1 + " Q" + midX + "," + midY + " " + x2 + "," + y2);
+    } else {
+      path.setAttribute(
+        "d",
+        "M" + x1 + "," + y1 + " L" + midX + "," + y1 + " L" + midX + "," + y2 + " L" + x2 + "," + y2
+      );
+    }
   });
 }
 cells.forEach((button) => {
@@ -130,6 +208,7 @@ rowToggles.forEach((button) => {
     descendantRows(key).forEach((row) => {
       row.hidden = !next;
     });
+    layoutEdges();
   });
 });
 const ringButtons = document.querySelectorAll(".actor-label[data-actor-key]");
@@ -166,7 +245,10 @@ document.addEventListener("keydown", (event) => {
   if (target) target.focus();
   closeRingPanels();
   if (lastRingButton) lastRingButton.focus();
-});"""
+});
+layoutEdges();
+window.addEventListener("load", layoutEdges);
+window.addEventListener("resize", layoutEdges);"""
 
 GRAPH_SCRIPT_SHA256 = base64.b64encode(
     hashlib.sha256(GRAPH_SCRIPT.encode("utf-8")).digest()
@@ -859,8 +941,10 @@ def _build_grid_cells(
     {column: [node_id, ...]}}`, and `{node_id: (row_index, col_index,
     tile_index)}` — a node spanning more than one column (brief finding 3
     keeps spans, e.g. a data_boundary ASK) anchors at its first match in
-    `VIRTUE_COLUMNS` fixed order; that anchor is what
-    `_render_edge_overlay` draws edges from and to.
+    `VIRTUE_COLUMNS` fixed order. Fix round 2: `_render_edge_overlay` only
+    uses this dict's *keys* now (on-grid vs off-grid membership) — the
+    row/column/tile-index values themselves stopped feeding edge geometry
+    once that moved client-side (`GRAPH_SCRIPT`'s `layoutEdges()`).
     """
     flat_keys, _children = _flatten_row_order(rows_tree)
     rows = rows_tree.get("rows", {})
@@ -882,153 +966,53 @@ def _build_grid_cells(
     return flat_keys, cells, anchors
 
 
-#: Fix round 1 (coordinator, live-screenshot review): a tile's rendered
-#: height, close enough to the button's actual line-box for the schematic
-#: top/bottom anchor points below — not a measured pixel read (see
-#: `_anchor_xy`'s own note).
-GRID_TILE_HEIGHT = 22
+def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) -> str:
+    """SVG overlay skeleton (brief finding 2; fix round 2, coordinator
+    live-screenshot review): the server only classifies and counts edges;
+    real tile-to-tile geometry is measured client-side.
 
-#: How far before the target's x the parent-elbow's single vertical bend
-#: sits (fix round 1: "a single horizontal-then-vertical bend near the
-#: target", replacing the old midpoint bend that cut across every column
-#: between source and target).
-GRID_EDGE_BEND_INSET = 14
+    Round 1 computed schematic server-side pixel coordinates from a fixed
+    `GRID_ROW_HEIGHT` — that drifted the moment a real row's rendered
+    height differed from the assumed constant (e.g. a two-line actor
+    label made that row taller), so an evidence arc from one row could
+    land near an unrelated row two lines away. There is no server-side
+    fix for "the server does not know the real layout" other than not
+    computing geometry server-side at all: this renders one `<path
+    data-source data-target data-kind="parent|evidence" d="">` per
+    on-grid edge, and `GRAPH_SCRIPT`'s `layoutEdges()` fills in `d` from
+    `getBoundingClientRect()` after the browser has actually laid the
+    page out (on load, on resize, and after a row-collapse toggle).
 
-
-def _anchor_xy(anchor: tuple[int, int, int]) -> tuple[float, float]:
-    """Schematic (not measured-pixel) centre of one tile's grid cell position."""
-    row_index, col_index, tile_index = anchor
-    x = (
-        GRID_LABEL_WIDTH
-        + col_index * GRID_COLUMN_WIDTH
-        + GRID_TILE_PAD
-        + tile_index * (GRID_TILE_WIDTH + GRID_TILE_GAP)
-        + GRID_TILE_WIDTH / 2
-    )
-    y = row_index * GRID_ROW_HEIGHT + GRID_ROW_HEIGHT / 2
-    return x, y
-
-
-def _tile_edge_point(anchor: tuple[int, int, int], side: str) -> tuple[float, float]:
-    """One tile's boundary point (fix round 1: anchor edges at a tile's
-    edge, not its centre) — `"left"`/`"right"`/`"top"`/`"bottom"`-middle.
-    """
-    x, y = _anchor_xy(anchor)
-    if side == "left":
-        return x - GRID_TILE_WIDTH / 2, y
-    if side == "right":
-        return x + GRID_TILE_WIDTH / 2, y
-    if side == "top":
-        return x, y - GRID_TILE_HEIGHT / 2
-    if side == "bottom":
-        return x, y + GRID_TILE_HEIGHT / 2
-    return x, y
-
-
-def _parent_edge_path(
-    source_anchor: tuple[int, int, int], target_anchor: tuple[int, int, int]
-) -> str:
-    """One `parent_event_id` edge's `d` attribute (fix round 1).
-
-    Same column (a lineage's own consecutive events): a single straight
-    vertical line between bottom/top-middle, in whichever direction the
-    target actually sits. Different column: right-middle/left-middle (or
-    the mirrored left/right when the target column sits to the source's
-    left), with the path's one vertical bend placed `GRID_EDGE_BEND_INSET`
-    px before the target rather than at the source/target midpoint — the
-    old midpoint bend is what drew as "a rectangle crossing cells" when
-    source and target were several columns apart.
-    """
-    _src_row, src_col, _src_tile = source_anchor
-    _tgt_row, tgt_col, _tgt_tile = target_anchor
-    if src_col == tgt_col:
-        _sx, sy_center = _anchor_xy(source_anchor)
-        _tx, ty_center = _anchor_xy(target_anchor)
-        going_down = ty_center >= sy_center
-        x1, y1 = _tile_edge_point(source_anchor, "bottom" if going_down else "top")
-        x2, y2 = _tile_edge_point(target_anchor, "top" if going_down else "bottom")
-        return f"M{x1:.1f},{y1:.1f} L{x2:.1f},{y2:.1f}"
-
-    sx_center, _sy = _anchor_xy(source_anchor)
-    tx_center, _ty = _anchor_xy(target_anchor)
-    going_right = tx_center >= sx_center
-    x1, y1 = _tile_edge_point(source_anchor, "right" if going_right else "left")
-    x2, y2 = _tile_edge_point(target_anchor, "left" if going_right else "right")
-    bend_x = x2 - GRID_EDGE_BEND_INSET if going_right else x2 + GRID_EDGE_BEND_INSET
-    # Never let the bend fall outside the [x1, x2] span (a source/target
-    # pair close enough together that the inset would overshoot).
-    bend_x = max(x1, min(bend_x, x2)) if going_right else min(x1, max(bend_x, x2))
-    return f"M{x1:.1f},{y1:.1f} L{bend_x:.1f},{y1:.1f} L{bend_x:.1f},{y2:.1f} L{x2:.1f},{y2:.1f}"
-
-
-def _evidence_edge_path(
-    source_anchor: tuple[int, int, int], target_anchor: tuple[int, int, int]
-) -> str:
-    """One `evidence_refs` edge's `d` attribute: a single shallow bezier
-    between the two tiles' top-middle points (fix round 1 keeps this arc
-    shape, only the parent elbow's geometry changed).
-    """
-    x1, y1 = _tile_edge_point(source_anchor, "top")
-    x2, y2 = _tile_edge_point(target_anchor, "top")
-    mid_x = (x1 + x2) / 2
-    mid_y = min(y1, y2) - 18
-    return f"M{x1:.1f},{y1:.1f} Q{mid_x:.1f},{mid_y:.1f} {x2:.1f},{y2:.1f}"
-
-
-def _render_edge_overlay(
-    graph: dict[str, Any], anchors: dict[str, tuple[int, int, int]], row_count: int
-) -> str:
-    """SVG overlay (brief finding 2, fix round 1): parent-chain elbows,
-    evidence-ref arcs, broken stubs, tile-edge anchoring.
-
-    `parent_event_id` edges draw as solid elbow lines, `evidence_refs`
-    edges as dashed arcs — both only between two anchored tiles, each
-    anchored at the tile's own boundary (`_tile_edge_point`), never its
-    centre, so a line never visually crosses through a tile it does not
-    touch. `graph["edges"]` only ever carries ids that already resolve to
-    a real node (`hyodo.event_graph.validate_event_edges` excludes a
-    dangling ref from it, into `graph["unresolved_refs"]` instead) — so
-    within that list, an endpoint that is not in `anchors` is a real event
-    with no virtue column (e.g. a digest-less `model_response`), not a
-    broken ref. Fix round 1: that off-grid case draws nothing (no edge,
-    no stub) and counts under `data-offgrid-edges` instead of
-    `data-broken-edges`; only a genuinely dangling ref
-    (`graph["unresolved_refs"]`) still draws a short red stub and counts
-    as broken. Every edge kind's colour reads from `EDGE_COLORS`
-    (`--color-edge-*` in `site/src/styles/tokens.css`, guarded by
+    `graph["edges"]` only ever carries ids that already resolve to a real
+    node (`hyodo.event_graph.validate_event_edges` excludes a dangling
+    ref from it, into `graph["unresolved_refs"]` instead) — so within
+    that list, an endpoint not in `anchored_ids` is a real event with no
+    virtue column (e.g. a digest-less `model_response`), not a broken
+    ref: that case renders nothing at all (no edge, no stub) and counts
+    under `data-offgrid-edges`. A genuinely dangling ref
+    (`graph["unresolved_refs"]`) renders `<path data-source
+    data-kind="broken" d="">` (no `data-target` — there is nothing to
+    target) and counts under `data-broken-edges`; `layoutEdges()` draws
+    its short stub from the one anchor it has. Every edge kind's colour
+    reads from `EDGE_COLORS` (`--color-edge-*` in
+    `site/src/styles/tokens.css`, guarded by
     `tests/test_virtue_colors_ssot.py` the same way `RING_COLORS` is).
     """
     raw_edges = graph.get("edges")
     edges = raw_edges if isinstance(raw_edges, list) else []
-    width = GRID_LABEL_WIDTH + len(VIRTUE_COLUMNS) * GRID_COLUMN_WIDTH
-    height = max(1, row_count) * GRID_ROW_HEIGHT
     parts: list[str] = []
     parent_count = evidence_count = broken_count = offgrid_count = 0
 
-    def _stub(node_id: Any, dx: float, dy: float) -> None:
-        nonlocal broken_count
-        anchor = anchors.get(node_id) if isinstance(node_id, str) else None
-        if anchor is None:
-            return
-        x, y = _anchor_xy(anchor)
-        parts.append(
-            f'<line class="edge edge-broken" x1="{x - dx:.1f}" y1="{y - dy:.1f}" '
-            f'x2="{x + dx:.1f}" y2="{y + dy:.1f}" stroke="{EDGE_COLORS["broken"]}" '
-            'stroke-width="2"/>'
-        )
-        broken_count += 1
-
     for edge in edges:
         source, target = edge.get("source"), edge.get("target")
-        source_ok = isinstance(source, str) and source in anchors
-        target_ok = isinstance(target, str) and target in anchors
+        source_ok = isinstance(source, str) and source in anchored_ids
+        target_ok = isinstance(target, str) and target in anchored_ids
         if edge.get("type") == "parent_event_id":
             if source_ok and target_ok:
                 parts.append(
                     f'<path class="edge edge-parent" data-source="{escape(str(source))}" '
-                    f'data-target="{escape(str(target))}" '
-                    f'd="{_parent_edge_path(anchors[source], anchors[target])}" fill="none" '
-                    f'stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5"/>'
+                    f'data-target="{escape(str(target))}" data-kind="parent" d="" '
+                    f'fill="none" stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5"/>'
                 )
                 parent_count += 1
             else:
@@ -1037,9 +1021,8 @@ def _render_edge_overlay(
             if source_ok and target_ok:
                 parts.append(
                     f'<path class="edge edge-evidence" data-source="{escape(str(source))}" '
-                    f'data-target="{escape(str(target))}" '
-                    f'd="{_evidence_edge_path(anchors[source], anchors[target])}" fill="none" '
-                    f'stroke="{EDGE_COLORS["evidence"]}" stroke-width="1.5" '
+                    f'data-target="{escape(str(target))}" data-kind="evidence" d="" '
+                    f'fill="none" stroke="{EDGE_COLORS["evidence"]}" stroke-width="1.5" '
                     'stroke-dasharray="4 3"/>'
                 )
                 evidence_count += 1
@@ -1047,12 +1030,17 @@ def _render_edge_overlay(
                 offgrid_count += 1
 
     for issue in graph.get("unresolved_refs") or []:
-        if isinstance(issue, dict):
-            _stub(issue.get("event_id"), 6, 6)
+        event_id = issue.get("event_id") if isinstance(issue, dict) else None
+        if isinstance(event_id, str) and event_id in anchored_ids:
+            parts.append(
+                f'<path class="edge edge-broken" data-source="{escape(event_id)}" '
+                f'data-kind="broken" d="" fill="none" stroke="{EDGE_COLORS["broken"]}" '
+                'stroke-width="2"/>'
+            )
+            broken_count += 1
 
     return (
-        f'<svg id="edge-overlay" class="edge-overlay" width="{width}" height="{height}" '
-        f'viewBox="0 0 {width} {height}" role="img" aria-hidden="true" '
+        '<svg id="edge-overlay" class="edge-overlay" role="img" aria-hidden="true" '
         f'data-parent-edges="{parent_count}" data-evidence-edges="{evidence_count}" '
         f'data-broken-edges="{broken_count}" data-offgrid-edges="{offgrid_count}">'
         + "".join(parts)
@@ -1265,7 +1253,7 @@ def render_graph_html(
         for key, hanja, korean, english, color in PILLAR_SPECS[:5]
     )
     grid_rows_html = _render_grid_rows(rows_tree, grid_cells, node_by_id, rings, flat_keys)
-    edge_overlay_html = _render_edge_overlay(graph, anchors, len(flat_keys))
+    edge_overlay_html = _render_edge_overlay(graph, anchors)
 
     unclassified_ids = [
         node_id for node_id, columns in assignments.items() if columns == [UNCLASSIFIED]
@@ -1358,7 +1346,7 @@ button {{ font:inherit; border:1px solid var(--line); background:var(--surface);
 .cell-deny {{ border-color:{DECISION_COLORS["DENY"]} }} .cell-ask {{ border-color:{DECISION_COLORS["ASK"]} }} .cell-allow {{ border-color:{DECISION_COLORS["ALLOW"]} }} .cell-unobserved {{ border-color:{DECISION_COLORS["UNOBSERVED"]} }}
 .time-ruler {{ display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:.72rem; margin:6px 0 18px }}
 .time-ruler-line {{ flex:1; height:1px; background:var(--line) }}
-.edge-overlay {{ position:absolute; top:0; left:0; pointer-events:none }}
+.edge-overlay {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible }}
 .edge.edge-active {{ stroke-width:3; filter:drop-shadow(0 0 2px currentColor) }}
 .cells {{ display:flex; flex-wrap:wrap; gap:6px }}
 .gutter {{ margin-bottom:18px }} .gutter h2 {{ font-size:.95rem }}

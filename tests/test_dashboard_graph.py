@@ -589,9 +589,15 @@ def test_tile_label_is_tool_name_or_kind_and_title_carries_the_full_pairing(
     assert ">prompt<" in html  # the mission tile shows the bare kind, no tool name
 
 
-def test_edge_coordinates_stay_within_grid_bounds_and_skip_offgrid_tiles(
+def test_edge_paths_render_empty_d_with_source_target_kind_and_skip_offgrid_tiles(
     tmp_path: Path,
 ) -> None:
+    # Fix round 2 (coordinator, live-screenshot review): the server no
+    # longer computes edge geometry at all (round 1's schematic
+    # server-side pixel math drifted once real, variable-height rows
+    # differed from the assumed fixed row height). It only classifies and
+    # counts edges, emitting an empty `d` for `GRAPH_SCRIPT`'s
+    # `layoutEdges()` to fill in client-side from real measured layout.
     _write_ledger(
         tmp_path,
         [
@@ -619,7 +625,7 @@ def test_edge_coordinates_stay_within_grid_bounds_and_skip_offgrid_tiles(
                 actor="hyodo",
                 step_index=3,
                 parent_event_id="resp1",
-                evidence_refs=["t1"],
+                evidence_refs=["t1", "does-not-exist"],
                 policy={"decision": "ALLOW", "rule_id": None, "evaluated_by": "hyodo.policy/v1"},
             ),
         ],
@@ -631,12 +637,14 @@ def test_edge_coordinates_stay_within_grid_bounds_and_skip_offgrid_tiles(
     svg_tag_match = re.search(r'<svg id="edge-overlay"[^>]*>', html)
     assert svg_tag_match is not None
     svg_tag = svg_tag_match.group(0)
-    width = int(re.search(r'width="(\d+)"', svg_tag).group(1))
-    height = int(re.search(r'height="(\d+)"', svg_tag).group(1))
+    # No server-computed geometry attributes on the <svg> itself either.
+    assert "width=" not in svg_tag
+    assert "height=" not in svg_tag
+    assert "viewBox=" not in svg_tag
 
     assert 'data-parent-edges="1"' in svg_tag  # m1 -> t1 only; resp1 is off-grid
     assert 'data-evidence-edges="1"' in svg_tag  # d1 cites t1
-    assert 'data-broken-edges="0"' in svg_tag  # nothing dangling
+    assert 'data-broken-edges="1"' in svg_tag  # d1 cites does-not-exist
     offgrid_match = re.search(r'data-offgrid-edges="(\d+)"', svg_tag)
     assert offgrid_match is not None
     assert int(offgrid_match.group(1)) == 2  # t1->resp1 and resp1->d1
@@ -645,13 +653,42 @@ def test_edge_coordinates_stay_within_grid_bounds_and_skip_offgrid_tiles(
     assert 'data-source="resp1"' not in html
     assert 'data-target="resp1"' not in html
 
-    svg_body_match = re.search(r'<svg id="edge-overlay"[^>]*>(.*?)</svg>', html, re.DOTALL)
-    assert svg_body_match is not None
-    svg_body = svg_body_match.group(1)
-    assert svg_body, "expected at least one drawn edge for this fixture"
-    for match in re.finditer(r'[xy][12]="(-?[\d.]+)"', svg_body):
-        assert 0 <= float(match.group(1)) <= max(width, height)
-    for path_d in re.findall(r'd="([^"]+)"', svg_body):
-        for x_str, y_str in re.findall(r"(-?[\d.]+),(-?[\d.]+)", path_d):
-            assert 0 <= float(x_str) <= width
-            assert 0 <= float(y_str) <= height
+    parent_path = re.search(
+        r'<path class="edge edge-parent" data-source="m1" data-target="t1" '
+        r'data-kind="parent" d="([^"]*)"',
+        html,
+    )
+    assert parent_path is not None
+    assert parent_path.group(1) == ""
+
+    evidence_path = re.search(
+        r'<path class="edge edge-evidence" data-source="t1" data-target="d1" '
+        r'data-kind="evidence" d="([^"]*)"',
+        html,
+    )
+    assert evidence_path is not None
+    assert evidence_path.group(1) == ""
+
+    broken_path = re.search(
+        r'<path class="edge edge-broken" data-source="d1" data-kind="broken" d="([^"]*)"',
+        html,
+    )
+    assert broken_path is not None
+    assert broken_path.group(1) == ""
+    assert "data-target" not in re.search(r'<path class="edge edge-broken"[^>]*>', html).group(0)
+
+
+def test_graph_script_layout_edges_function_and_csp_hash_match() -> None:
+    # Fix round 2, JS-free contract test: GRAPH_SCRIPT must carry the
+    # client-side edge-measurement function and wire it to load/resize/
+    # collapse-toggle, and its CSP sha256 allowance must still match the
+    # (regenerated) script text — no browser required to check either.
+    assert "function layoutEdges" in GRAPH_SCRIPT
+    assert "getBoundingClientRect" in GRAPH_SCRIPT
+    assert 'window.addEventListener("load", layoutEdges)' in GRAPH_SCRIPT
+    assert 'window.addEventListener("resize", layoutEdges)' in GRAPH_SCRIPT
+    assert "layoutEdges();" in GRAPH_SCRIPT
+
+    digest = base64.b64encode(hashlib.sha256(GRAPH_SCRIPT.encode("utf-8")).digest()).decode("ascii")
+    assert digest == GRAPH_SCRIPT_SHA256
+    assert f"'sha256-{GRAPH_SCRIPT_SHA256}'" in DASHBOARD_CSP
