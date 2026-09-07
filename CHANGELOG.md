@@ -18,6 +18,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   based on hosts observed and whether the required stores are present and
   readable); overall `status`/exit code stay READY/0 only when both are
   satisfied, so an empty root now correctly reports `UNOBSERVED`/exit 2.
+- `hyodo safe --scan gitleaks`: adapter used the removed `--format` flag
+  (gitleaks 8.x exits 126); now `--report-format json --report-path -` plus
+  a `version` positive control; regression test with a fake binary.
 
 ## [4.15.0] - 2026-09-07
 

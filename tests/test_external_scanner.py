@@ -21,10 +21,17 @@ from hyodo.safety import (
 )
 
 
-def _fake_run(stdout: str = "", returncode: int = 0):
-    """Build a stand-in for subprocess.run's CompletedProcess return value."""
+def _fake_run(stdout: str = "", returncode: int = 0, version_stdout: str = "9.9.9"):
+    """Build a stand-in for subprocess.run's CompletedProcess return value.
 
-    def _runner(*_args, **_kwargs):
+    gitleaks now gets a `version` positive-control call before the actual scan
+    call; this fake answers that call separately (defaulting to a successful
+    version reply) so existing scan-focused fixtures do not need to know about it.
+    """
+
+    def _runner(cmd, *_args, **_kwargs):
+        if isinstance(cmd, (list, tuple)) and "version" in cmd:
+            return SimpleNamespace(stdout=version_stdout, stderr="", returncode=0)
         return SimpleNamespace(stdout=stdout, stderr="", returncode=returncode)
 
     return _runner
@@ -54,7 +61,7 @@ def test_scanner_clean_run_yields_info_finding(monkeypatch, tmp_path):
 
     findings, source = _run_external_scanner("gitleaks", tmp_path)
 
-    assert source == "gitleaks:scan"
+    assert source == "gitleaks:scan (9.9.9)"
     assert len(findings) == 1
     assert findings[0].category == "external_scan"
     assert findings[0].severity == "info"
@@ -68,7 +75,7 @@ def test_gitleaks_json_array_maps_high_and_location(monkeypatch, tmp_path):
 
     findings, source = _run_external_scanner("gitleaks", tmp_path)
 
-    assert source == "gitleaks:scan"
+    assert source == "gitleaks:scan (9.9.9)"
     assert len(findings) == 1
     finding = findings[0]
     assert finding.category == "external_scan"
@@ -124,6 +131,26 @@ def test_scanner_timeout_reported_as_error(monkeypatch, tmp_path):
 
     findings, source = _run_external_scanner("gitleaks", tmp_path)
 
+    # gitleaks runs a `version` positive control before the scan; a timeout there
+    # is caught first and reported as a failed positive control, not a scan timeout.
+    assert source.startswith("error:")
+    assert "timed out" in source
+    assert len(findings) == 1
+    assert findings[0].label == "gitleaks_failed"
+
+
+def test_scanner_timeout_during_scan_reported_as_error(monkeypatch, tmp_path):
+    monkeypatch.setattr(safety.shutil, "which", lambda name: f"/usr/bin/{name}")
+
+    def _run(cmd, *_args, **_kwargs):
+        if isinstance(cmd, (list, tuple)) and "version" in cmd:
+            return SimpleNamespace(stdout="9.9.9", stderr="", returncode=0)
+        raise subprocess.TimeoutExpired(cmd=cmd, timeout=120)
+
+    monkeypatch.setattr(safety.subprocess, "run", _run)
+
+    findings, source = _run_external_scanner("gitleaks", tmp_path)
+
     assert findings == []
     assert source.startswith("error:gitleaks scan timed out")
 
@@ -141,7 +168,7 @@ def test_run_safety_scan_single_tool_success_shape(monkeypatch, tmp_path):
 
     for key in ("source", "findings", "rows", "risk_score", "level", "action"):
         assert key in result
-    assert result["source"] == "gitleaks:scan"
+    assert result["source"] == "gitleaks:scan (9.9.9)"
 
 
 def test_run_safety_scan_all_merges_both_tools(monkeypatch, tmp_path):
