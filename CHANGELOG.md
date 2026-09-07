@@ -9,6 +9,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- `hyodo check` now emits three onboarding/developer-experience signals via
+  a new `hyodo/dx_signals.py::collect_dx_signals`: `readme_present` (a
+  non-empty `README.md`), `start_hint_present` (README/CONTRIBUTING/
+  `docs/ONBOARDING.md`/`docs/GETTING_STARTED.md` mentions a recognized
+  start/setup command or a "Getting started"-style heading with a code
+  block), and `help_text_present` (a declared CLI entry point, verified
+  in-process against HyoDo's own Typer app when the checkout is HyoDo
+  itself, or a README `--help`/usage mention for other projects).
+  Detection is deterministic, offline, and never shells out or executes a
+  project's own binary. `hyodo check` prints these as an advisory
+  Benevolence `dx-signals` row (never fails the check) and includes them
+  under `dx_signals` in `--json` output; `hyodo score --from-check` now
+  derives Benevolence from real evidence instead of reporting it
+  `UNOBSERVED` -- see `docs/SCORE_DERIVATION.md`.
 - `hyodo score --from-check [--root R] [--json]`: derives the five
   HyoDo Integrity Score pillar inputs from `hyodo check` / `hyodo safe` /
   the test-integrity scan, run in-process (no subprocess), instead of

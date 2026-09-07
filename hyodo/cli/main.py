@@ -83,6 +83,7 @@ from hyodo.dashboard import (
     render_dashboard_html,
     render_graph_html,
 )
+from hyodo.dx_signals import DxSignals, collect_dx_signals
 from hyodo.eval import EvalInputError, run_evaluation
 from hyodo.event_graph import render_event_graph_json, validate_event_edges
 from hyodo.events import (
@@ -576,6 +577,43 @@ def _print_test_integrity_line(report: TestIntegrityReport) -> None:
         f"\nTest integrity: {report.vacuous_tests}/{report.total_tests} tests assert "
         "nothing -- see `hyodo check --json`"
     )
+
+
+def _dx_signals_gate_result(signals: DxSignals) -> GateResult:
+    """Shape `DxSignals` as an advisory Benevolence gate row.
+
+    Never fails `check`: PASS when all three signals were observed, SKIP
+    (the existing "advisory, not executed/complete" status) otherwise -- the
+    same semantics `check` already uses for gates it does not fully run.
+    """
+    observed = [
+        signals.readme_present,
+        signals.start_hint_present,
+        signals.help_text_present,
+    ]
+    names = ("readme", "start-hint", "help-text")
+    detail = ", ".join(
+        f"{name}={'yes' if ok else 'no'}" for name, ok in zip(names, observed, strict=True)
+    )
+    if all(observed):
+        return GateResult(GateStatus.PASS, detail)
+    return GateResult(GateStatus.SKIP, detail)
+
+
+def _print_dx_signals_line(signals: DxSignals, result: GateResult) -> None:
+    """Report-only Benevolence DX-signals line: never affects the exit code."""
+    style = "green" if result.status is GateStatus.PASS else "yellow"
+    console.print(f"\n[{style}]Benevolence (dx-signals): {result.message}[/{style}]")
+
+
+def _dx_signals_payload(signals: DxSignals) -> dict[str, Any]:
+    """Render `DxSignals` as the `check --json` `dx_signals` object."""
+    return {
+        "readme_present": signals.readme_present,
+        "start_hint_present": signals.start_hint_present,
+        "help_text_present": signals.help_text_present,
+        "evidence": signals.evidence,
+    }
 
 
 def _test_integrity_payload(report: TestIntegrityReport) -> dict[str, Any]:
@@ -1387,6 +1425,8 @@ def _verdict_output(
             }
             if "test_integrity" in state:
                 payload["test_integrity"] = state["test_integrity"]
+            if "dx_signals" in state:
+                payload["dx_signals"] = state["dx_signals"]
         else:
             assert captured is not None
             payload = json.loads(captured.get())
@@ -1634,6 +1674,14 @@ def check(
         _print_test_integrity_line(test_integrity_report)
         verdict_state["test_integrity"] = _test_integrity_payload(test_integrity_report)
 
+        # Report-only Benevolence DX-signals gate: additive, like test integrity
+        # above -- does not join the results/executed/failed gate list, so the
+        # "N/4 gates ran" counting is unchanged, and it never fails `check`.
+        dx_signals = collect_dx_signals(check_root)
+        dx_gate_result = _dx_signals_gate_result(dx_signals)
+        _print_dx_signals_line(dx_signals, dx_gate_result)
+        verdict_state["dx_signals"] = _dx_signals_payload(dx_signals)
+
         executed = [r for r in results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
         failed = [r for r in results if r.status is GateStatus.FAIL]
         ran, total = len(executed), len(results)
@@ -1794,14 +1842,16 @@ def _resolve_score_pillars(
 def _collect_check_observation(root: Path) -> dict[str, Any]:
     """Run the Truth/Beauty check gates in-process and shape a `check` dict.
 
-    Only the gates score_derive.py's rule table consumes are run here
-    (pyright for Truth, ruff for Beauty) -- pytest and the SBOM gate are
-    skipped since no pillar rule reads them. Onboarding/DX signals
-    (readme_present etc.) are not emitted yet -- see docs/SCORE_DERIVATION.md
-    "Known gaps" -- so Benevolence stays UNOBSERVED until they are.
+    The gates score_derive.py's rule table consumes are run here (pyright
+    for Truth, ruff for Beauty) -- pytest and the SBOM gate are skipped
+    since no pillar rule reads them. Onboarding/DX signals (readme_present,
+    start_hint_present, help_text_present) come from `collect_dx_signals`,
+    a pure filesystem/regex/in-process-import scan -- see
+    `hyodo/dx_signals.py` and docs/SCORE_DERIVATION.md.
     """
     pyright_result = run_pyright_check(root)
     ruff_result = run_ruff_check(root)
+    dx_signals = collect_dx_signals(root)
     return {
         "truth_gate": pyright_result.status.value
         if pyright_result.status in {GateStatus.PASS, GateStatus.FAIL}
@@ -1809,6 +1859,9 @@ def _collect_check_observation(root: Path) -> dict[str, Any]:
         "beauty_gate": ruff_result.status.value
         if ruff_result.status in {GateStatus.PASS, GateStatus.FAIL}
         else None,
+        "readme_present": dx_signals.readme_present,
+        "start_hint_present": dx_signals.start_hint_present,
+        "help_text_present": dx_signals.help_text_present,
     }
 
 

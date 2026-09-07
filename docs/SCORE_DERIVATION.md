@@ -27,9 +27,9 @@ enforces that every rule_id a real derivation emits is a table entry.
 | `safe.medium_findings` | Goodness | 30 | `hyodo safe` medium-severity finding count (penalty) |
 | `safe.coverage` | Goodness | 20 | `hyodo safe` scanned/scannable file ratio |
 | `check.beauty_gate` | Beauty | 100 | `hyodo check` Beauty gate (ruff lint + format) PASS/FAIL |
-| `check.readme_present` | Benevolence | 40 | README.md present (not yet emitted by `hyodo check` — see Known gaps) |
-| `check.start_hint_present` | Benevolence | 30 | onboarding entry point documented (not yet emitted) |
-| `check.help_text_present` | Benevolence | 30 | CLI help text present (not yet emitted) |
+| `check.readme_present` | Benevolence | 40 | `hyodo/dx_signals.py::collect_dx_signals` — non-empty README.md present |
+| `check.start_hint_present` | Benevolence | 30 | `collect_dx_signals` — onboarding start/setup command documented |
+| `check.help_text_present` | Benevolence | 30 | `collect_dx_signals` — CLI help text present |
 | `hyo.config_present` | Hyo | 34 | `.hyodo/gates.toml` (Bring-Your-Own-Gates) present |
 | `hyo.connect_wired` | Hyo | 33 | at least one host wired via `hyodo connect` |
 | `hyo.ledger_present` | Hyo | 33 | `.hyodo/mcp-access.jsonl` access ledger present |
@@ -74,30 +74,71 @@ show that the number came from a flag, not from evidence.
 
 ## Known gaps
 
-`hyodo check` does not currently emit onboarding/DX signals (README
-presence, an `hyodo start` hint, CLI help-text presence). Per the mapping
-this document specifies, Benevolence therefore reports `UNOBSERVED` under
-`--from-check` until `hyodo check` emits those signals — it is not defaulted
-to a neutral or optimistic number. Wiring `hyodo check` to emit
-`readme_present` / `start_hint_present` / `help_text_present` would let this
-pillar move to `PARTIAL`/`OBSERVED` without any change to
-`hyodo/score_derive.py`'s rule table.
+`hyodo check` now emits the three onboarding/DX signals Benevolence
+consumes, via `hyodo/dx_signals.py::collect_dx_signals`:
+
+- **`readme_present`** — a `README.md` (case-insensitive `readme.*`
+  accepted) exists at the project root and is non-empty (> 200 bytes of
+  stripped text).
+- **`start_hint_present`** — the README, `CONTRIBUTING.md`,
+  `docs/ONBOARDING.md`, or `docs/GETTING_STARTED.md` mentions a recognized
+  project-level start/setup command (`hyodo start`, `npm start`,
+  `make setup`, `pip install -e`, `uv sync`, `cargo run`,
+  `docker compose up`) inline or in a fenced code block, or carries a
+  "Getting started" / "Quick start" / "Installation" heading immediately
+  followed by a code block.
+- **`help_text_present`** — the project declares a CLI entry point
+  (`[project.scripts]` in `pyproject.toml`, `bin` in `package.json`, or
+  `[[bin]]` in `Cargo.toml`). When the checkout is HyoDo itself, the
+  collector imports HyoDo's own Typer app in-process and confirms every
+  registered command carries non-empty help text; for any other project it
+  never imports or executes the declared binary, and instead looks for a
+  `--help`/usage mention in the README alongside the entry point.
+
+Each signal is a plain boolean with evidence (the matching file/line or
+command) recorded in `dx_signals.evidence`; detection is fully offline and
+deterministic, and `hyodo check` never shells out or runs a project's own
+binary to compute it. Because all three keys are always emitted as booleans
+once `hyodo check` runs, Benevolence coverage is always `OBSERVED` under
+`--from-check` (its value may still be `0.0`/`PARTIAL`-looking in the
+0-100 range when some signals are false — see the calibration table below).
+
+What remains unobserved: `collect_dx_signals` checks for *presence* of an
+onboarding entry point and help declaration, not documentation *quality*
+(whether the start hint actually works, whether the help text is accurate
+or complete, or whether the README covers more than the minimum). That is
+a deliberate scope boundary, not a bug — see `hyodo/dx_signals.py` module
+docstring.
 
 ## Calibration
 
-Ran `hyodo score --from-check --json` (commit `b056cea3c406a9189e64344d0e5614d2914ebfbc`)
-against three targets:
+Ran `hyodo score --from-check --json` (commit
+`c9b1624b93ab49622d05b8865726bf3c0e2eec83`) against three targets, now that
+`hyodo check` emits the three Benevolence DX signals:
 
-| Target | Benevolence | Truth | Goodness | Hyo | Beauty | Eternity | Coverage |
-|---|---|---|---|---|---|---|---|
-| HyoDo repo itself | UNOBSERVED | 100.0 (OBSERVED) | 19.8 (OBSERVED) | 33.0 (OBSERVED) | 100.0 (OBSERVED) | 5.7664 | PARTIAL |
-| `examples/fde-evidence-spine` | UNOBSERVED | 0.0 (PARTIAL) | 100.0 (OBSERVED) | 0.0 (OBSERVED) | 0.0 (OBSERVED) | 1.7783 | PARTIAL |
-| empty temp directory | UNOBSERVED | 0.0 (PARTIAL) | 100.0 (PARTIAL) | 0.0 (OBSERVED) | 0.0 (OBSERVED) | 1.7783 | PARTIAL |
+| Target | Benevolence | Truth | Goodness | Hyo | Beauty | Eternity | F | TOTAL |
+|---|---|---|---|---|---|---|---|---|
+| HyoDo repo itself | 100.0 (OBSERVED) | 100.0 (OBSERVED) | 19.8 (OBSERVED) | 33.0 (OBSERVED) | 100.0 (OBSERVED) | 6.4377 | 43.19 | 68.88 |
+| `examples/fde-evidence-spine` | 40.0 (OBSERVED) | 0.0 (PARTIAL) | 100.0 (OBSERVED) | 0.0 (OBSERVED) | 0.0 (OBSERVED) | 2.1506 | 19.75 | 25.46 |
+| empty temp directory | 0.0 (OBSERVED) | 0.0 (PARTIAL) | 100.0 (PARTIAL) | 0.0 (OBSERVED) | 0.0 (OBSERVED) | 1.5849 | 15.58 | 17.75 |
 
 Notes on reading this table:
 
-- **Benevolence** is `UNOBSERVED` in all three rows — see Known gaps above;
-  this is expected, not a bug in the run.
+- **Benevolence** is now `OBSERVED` in all three rows (previously
+  `UNOBSERVED` for all three — see the "Known gaps" history above): the
+  HyoDo repo itself has a README with an inline `hyodo start` mention and
+  an in-process-importable Typer app with help text on every command
+  (100.0); the example checkout has a README but no recognized start hint
+  and no CLI entry point declared (40.0, README only); the empty temp
+  directory has none of the three (0.0). All three still report `OBSERVED`
+  coverage because `collect_dx_signals` always returns a definite boolean
+  for each signal — there is no third "could not tell" state at the signal
+  level, only true/false with evidence.
+- Every row now has a **TOTAL**, since all five pillars have a value (even
+  where Truth/Goodness are `PARTIAL` for the sparser targets, `PARTIAL`
+  still means "a number was computed," not "excluded" — only `UNOBSERVED`
+  pillars are excluded and block the TOTAL). No `--benevolence` override
+  was needed for any of the three rows.
 - The HyoDo repo's own **Goodness** (19.8) reflects that `hyodo safe`
   scanning the full HyoDo tree (fixtures included) finds high/medium
   findings above the penalty cap; this is `hyodo safe`'s own early-warning
@@ -107,9 +148,6 @@ Notes on reading this table:
   check and the test-integrity ratio rule intentionally does not fire when
   `total_tests == 0` (a "zero tests, zero vacuous" project must not read as
   a perfect 1.0).
-- None of the three rows has a TOTAL, since Benevolence is `UNOBSERVED` in
-  all of them — pass `--benevolence <value>` to complete the formula on any
-  of them.
 
 Re-run with `hyodo score --from-check --root <target> --json` to reproduce
 or refresh this table against a newer commit.
