@@ -111,6 +111,19 @@ from hyodo.gates import (
     render_gates_toml,
     run_user_gates,
 )
+from hyodo.mcp_config import (
+    ALL_HOSTS,
+    CHATGPT_UNOBSERVED_MESSAGE,
+    DEEP_LINK_HOSTS,
+    DEEP_LINK_LABEL,
+    MCP_HOSTS,
+    UNVERIFIED_FORMAT_LABEL,
+    plan_host,
+    write_host,
+)
+from hyodo.mcp_config import (
+    detect_hosts as detect_mcp_hosts,
+)
 from hyodo.pairing import (
     PAIRING_RELATIVE_PATH,
     PairingState,
@@ -2381,6 +2394,113 @@ def mcp_doctor(
     raise typer.Exit(0)
 
 
+@mcp_app.command("config")
+def mcp_config_cmd(
+    host: str = typer.Argument(
+        ...,
+        help="MCP host: " + ", ".join(MCP_HOSTS) + " (chatgpt reports UNOBSERVED - not live)",
+    ),
+    root: str = typer.Option(
+        ".", "--root", help="Workspace root the stdio adapter locks to (resolved to absolute)"
+    ),
+    write: bool = typer.Option(
+        False, "--write", help="Merge the entry into the host's config file (default: print only)"
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """
+    Print (or, with ``--write``, merge) the MCP client configuration that
+    registers HyoDo's local stdio adapter for one host.
+
+    No bearer token or secret ever appears here - the stdio adapter needs
+    none. Default is print-only; ``--write`` merges the entry key-level into
+    the host's config file, preserving any other servers already there. A
+    file HyoDo did not create itself gets a ``.bak`` alongside it on its
+    first write; running ``--write`` twice with no other change makes no
+    further edits.
+
+    Exit codes: print-only is always 0 unless the host is unknown or
+    ``chatgpt`` (2, UNOBSERVED - the remote connector is not live).
+    ``--write``: 0 on success (including "already up to date"), 2 on an
+    unknown/unobserved host or a write error.
+    """
+    root_path = Path(root).expanduser().resolve()
+
+    if host in ALL_HOSTS and host not in MCP_HOSTS:
+        # Only member today is "chatgpt"; kept as a set membership check so a
+        # future UNOBSERVED host does not need a second code path.
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {
+                        "ok": False,
+                        "reasons": ["remote_not_probed"],
+                        "exit_code": 2,
+                        "host": host,
+                        "message": CHATGPT_UNOBSERVED_MESSAGE,
+                    }
+                )
+            )
+        else:
+            console.print(f"[yellow]UNOBSERVED[/yellow] {host}: {CHATGPT_UNOBSERVED_MESSAGE}")
+        raise typer.Exit(2)
+
+    if host not in MCP_HOSTS:
+        message = f"unknown host: {host}. Known hosts: {', '.join(ALL_HOSTS)}"
+        if json_output:
+            console.print_json(
+                json.dumps(
+                    {"ok": False, "reasons": ["unknown_host"], "exit_code": 2, "message": message}
+                )
+            )
+        else:
+            console.print(f"[red]{message}[/red]")
+        raise typer.Exit(2)
+
+    plan = write_host(host, root_path) if write else plan_host(host, root_path)
+
+    if json_output:
+        payload: dict[str, Any] = {
+            "ok": True,
+            "reasons": [],
+            "exit_code": 0,
+            "host": host,
+            "path": str(plan.path),
+            "status": plan.status,
+            "write": write,
+            "verified": plan.verified,
+            "existed_before": plan.existed_before,
+            "will_change": plan.will_change,
+        }
+        if not write:
+            payload["content"] = plan.content
+        if plan.deep_links:
+            payload["deep_links"] = plan.deep_links
+            payload["deep_link_label"] = DEEP_LINK_LABEL
+        console.print_json(json.dumps(payload))
+        raise typer.Exit(0)
+
+    verb = "wrote" if write else "would write"
+    if plan.status == "up_to_date":
+        console.print(f"[green]up to date[/green] {host}: {plan.message}")
+    else:
+        console.print(f"[cyan]{host}[/cyan] {verb}: {plan.path}")
+        console.print("  ---")
+        for line in plan.content.splitlines():
+            # markup=False: raw file content (TOML table headers like
+            # "[mcp_servers.hyodo]") must never be parsed as Rich markup -
+            # that would silently strip the line from the preview.
+            console.print(f"  {line}", markup=False)
+        console.print("  ---")
+    if not plan.verified:
+        console.print(f"[yellow]{UNVERIFIED_FORMAT_LABEL}[/yellow]")
+    for name in DEEP_LINK_HOSTS:
+        link = plan.deep_links.get(name)
+        if link:
+            console.print(f"[dim]{name} deep link ({DEEP_LINK_LABEL}):[/dim]\n  {link}")
+    raise typer.Exit(0)
+
+
 @rules_app.command("list")
 def rules_list(
     root: str = typer.Option(".", "--root", help="Workspace root directory"),
@@ -3530,10 +3650,10 @@ def connect(
     raise typer.Exit(0)
 
 
-@app.command()
-def start():
-    """Print HyoDo onboarding guide and basic usage."""
-    guide = """
+#: Onboarding guide text kept verbatim for the non-interactive path (existing
+#: docs/tests quote this). Interactive callers see the four-step flow below
+#: instead of this block.
+_START_GUIDE = """
 [bold blue]HyoDo quick start[/bold blue]
 
 [b]HyoDo is a model-agnostic quality-gate kit for AI-assisted development.[/b]
@@ -3560,19 +3680,66 @@ Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
   Scores and scans support review. Human approval remains required.
   Event/policy are gates and evidence — not an agent runtime interceptor.
     """
-    console.print(guide)
 
-    if not sys.stdin.isatty():
-        console.print(
-            "\n[dim]Set an audience profile (vibe / engineer / professional) "
-            "non-interactively with the --audience flag on any command, the "
-            'HYODO_AUDIENCE env var, or by adding [audience] / profile = "..." '
-            "to .hyodo/config.toml.[/dim]"
-        )
-        return
+#: Order hosts are shown/asked about in - claude-code first because this
+#: process is most often itself running inside a Claude Code-family harness.
+_ONBOARDING_HOST_ORDER: tuple[str, ...] = (
+    "claude-code",
+    "claude-desktop",
+    "cursor",
+    "vscode",
+    "codex",
+)
+_FIRST_PROMPT = "Check this project"
+_STARTER_COMMANDS: tuple[str, ...] = (
+    "hyodo check",
+    "hyodo safe",
+    "hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9",
+)
 
+
+def _onboarding_detected_hosts(root: Path) -> dict[str, bool]:
+    """Merge ``connect``'s harness detection with MCP host detection.
+
+    ``claude-code`` is detected by either signal (a coding-agent hook target
+    in ``connect`` and an MCP host in ``mcp config`` are the same product).
+    """
+    hook_detected = detect_connect_targets(root)
+    mcp_detected = detect_mcp_hosts(root)
+    detected = dict(mcp_detected)
+    detected["claude-code"] = hook_detected.get("claude-code", False) or mcp_detected.get(
+        "claude-code", False
+    )
+    return detected
+
+
+def _onboarding_host_candidates(detected: dict[str, bool]) -> list[str]:
+    """At most two detected hosts, so the step-3 question stays a 1-3 choice."""
+    candidates = [host for host in _ONBOARDING_HOST_ORDER if detected.get(host)][:2]
+    return candidates or ["claude-code"]
+
+
+def _print_step1_workspace(root: Path, detected: dict[str, bool]) -> None:
+    console.print(f"\n[bold]1. Workspace:[/bold] {root}")
+    console.print("[bold]   Detected hosts:[/bold]")
+    for host in _ONBOARDING_HOST_ORDER:
+        label = "[green]detected[/green]" if detected.get(host) else "[dim]not detected[/dim]"
+        console.print(f"     {host}: {label}")
+
+
+def _print_step4_first_prompt() -> None:
+    commands = "\n".join(f"  $ {command}" for command in _STARTER_COMMANDS)
     console.print(
-        "\n[bold]Who is reading these results?[/bold]\n"
+        "\n[bold]4. Try this prompt in your connected host:[/bold]\n"
+        f'  "{_FIRST_PROMPT}"\n'
+        "\n[bold]Or run these by hand:[/bold]\n" + commands
+    )
+
+
+def _ask_audience_question(root: Path) -> str | None:
+    """Step 2: today's single audience question, unchanged."""
+    console.print(
+        "\n[bold]2. Who is reading these results?[/bold]\n"
         "  1) vibe coder\n"
         "  2) engineer\n"
         "  3) professional (law/accounting)"
@@ -3581,9 +3748,124 @@ Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
     chosen = {"1": "vibe", "2": "engineer", "3": "professional"}.get(answer)
     if chosen is None:
         console.print("[yellow]No changes made — unrecognized answer.[/yellow]")
-        return
-    config_path = write_audience_config(Path.cwd(), chosen)
+        return None
+    config_path = write_audience_config(root, chosen)
     console.print(f"[green]Wrote {config_path} with audience profile '{chosen}'.[/green]")
+    return chosen
+
+
+def _connect_host_with_confirm(root: Path, host: str) -> None:
+    """Preview, then a single yes/no confirm, then perform the write(s) for *host*.
+
+    ``claude-code`` runs both code paths (it is both a ``connect`` hook
+    target and an MCP host); every other candidate only ever reaches
+    ``mcp config`` here (``connect``'s other targets - pre-commit,
+    github-actions - are not "hosts" and stay in the advanced `hyodo connect`
+    path).
+    """
+    console.print(f"\n[bold]Preview for '{host}':[/bold]")
+    connect_plan = plan_target("claude-code", root, shadow=False) if host == "claude-code" else None
+    if connect_plan is not None:
+        console.print(f"  connect claude-code: {connect_plan.message}")
+        for planned_file in connect_plan.files:
+            console.print(f"    {planned_file.path}")
+    mcp_plan = plan_host(host, root)
+    console.print(f"  mcp config {host}: {mcp_plan.message}")
+    if mcp_plan.path is not None:
+        console.print(f"    {mcp_plan.path}")
+    if not mcp_plan.verified:
+        console.print(f"  [yellow]{UNVERIFIED_FORMAT_LABEL}[/yellow]")
+
+    answer = input("Write this now? [y/N] > ").strip().lower()
+    if answer not in ("y", "yes"):
+        console.print("[yellow]Declined — nothing written.[/yellow]")
+        return
+
+    if connect_plan is not None:
+        state = load_connect_state(root)
+        write_target("claude-code", root, shadow=False, state=state)
+        save_connect_state(root, state)
+    write_host(host, root)
+    console.print(f"[green]Connected {host}.[/green]")
+
+
+def _ask_connect_host_question(root: Path, candidates: list[str]) -> None:
+    """Step 3: one question, at most three choices (candidates + 'skip')."""
+    options = [*candidates, "skip"]
+    listing = "\n".join(f"  {index + 1}) {name}" for index, name in enumerate(options))
+    console.print(f"\n[bold]3. Connect which host now?[/bold]\n{listing}")
+    answer = input("> ").strip()
+    chosen: str | None = None
+    if answer.isdigit():
+        index = int(answer) - 1
+        if 0 <= index < len(options):
+            chosen = options[index]
+    elif answer in options:
+        chosen = answer
+    if chosen is None:
+        console.print("[yellow]No changes made — unrecognized answer.[/yellow]")
+        return
+    if chosen == "skip":
+        console.print("[yellow]Skipped — nothing written.[/yellow]")
+        return
+    _connect_host_with_confirm(root, chosen)
+
+
+def _print_noninteractive_steps(
+    root: Path, detected: dict[str, bool], candidates: list[str]
+) -> None:
+    """Non-interactive: the same four steps as plain text. Asks nothing, writes nothing."""
+    _print_step1_workspace(root, detected)
+    console.print(
+        "\n[bold]2. Audience[/bold] (vibe / engineer / professional): set with "
+        "--audience, HYODO_AUDIENCE, or \\[audience] profile in "
+        ".hyodo/config.toml. Nothing is written automatically."
+    )
+    console.print(
+        "\n[bold]3. Connect a host[/bold] (writes nothing unless you pass --write, "
+        "and for `connect`, --yes):\n"
+        "  $ hyodo connect claude-code --write --yes\n"
+        f"  $ hyodo mcp config {candidates[0]} --write"
+    )
+    _print_step4_first_prompt()
+
+
+@app.command()
+def start():
+    """
+    HyoDo's first-use onboarding flow.
+
+    Interactive: step 1 shows the workspace root and detected hosts; step 2
+    asks one audience question; step 3 asks one "connect which host now?"
+    question (at most three choices, including "skip") and, on a real
+    choice, previews the exact write(s) and asks one yes/no confirm before
+    doing anything; step 4 prints a first prompt to try and three commands
+    to run by hand. At most three questions in the whole flow; nothing is
+    written without an explicit yes.
+
+    Non-interactive (``not sys.stdin.isatty()``): prints the same four steps
+    as plain text with exact commands, asks nothing, writes nothing. Today's
+    guide text is kept here unchanged.
+    """
+    root = Path.cwd()
+    detected = _onboarding_detected_hosts(root)
+    candidates = _onboarding_host_candidates(detected)
+
+    if not sys.stdin.isatty():
+        console.print(_START_GUIDE)
+        console.print(
+            "\n[dim]Set an audience profile (vibe / engineer / professional) "
+            "non-interactively with the --audience flag on any command, the "
+            'HYODO_AUDIENCE env var, or by adding \\[audience] / profile = "..." '
+            "to .hyodo/config.toml.[/dim]"
+        )
+        _print_noninteractive_steps(root, detected, candidates)
+        return
+
+    _print_step1_workspace(root, detected)
+    _ask_audience_question(root)
+    _ask_connect_host_question(root, candidates)
+    _print_step4_first_prompt()
 
 
 @app.command(name="trinity")

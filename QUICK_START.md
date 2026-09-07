@@ -76,6 +76,25 @@ caller is responsible for stopping the agent.
 
 ## 6. Optional MCP adapter
 
+### Connect a host
+
+```bash
+hyodo start
+```
+
+`hyodo start` is the onboarding flow: it shows detected hosts, asks one
+audience question, then offers to connect one host (Claude Code, Claude
+Desktop, Cursor, VS Code, or Codex) with a preview and one yes/no confirm.
+To connect a host directly instead:
+
+```bash
+hyodo mcp config claude-code --write   # or claude-desktop / cursor / vscode / codex
+```
+
+No bearer token or secret appears in this path. `chatgpt` reports
+`UNOBSERVED` — the remote connector is contract-only, not live. See
+[`docs/ONBOARDING.md`](./docs/ONBOARDING.md) for the full host table.
+
 Install the MCP extra:
 
 ```bash
@@ -143,5 +162,6 @@ bash scripts/verify-public.sh
 - Product overview: [`README.md`](./README.md)
 - Security model: [`SECURITY.md`](./SECURITY.md)
 - Evidence model: [`PHILOSOPHY.md`](./PHILOSOPHY.md)
+- Onboarding flow and host table: [`docs/ONBOARDING.md`](./docs/ONBOARDING.md)
 - MCP design: [`docs/HYODO_MCP_CONNECTOR_DESIGN.md`](./docs/HYODO_MCP_CONNECTOR_DESIGN.md)
 - Release history: [`CHANGELOG.md`](./CHANGELOG.md)

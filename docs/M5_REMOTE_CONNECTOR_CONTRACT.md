@@ -125,6 +125,8 @@ arbitrary path, and no second policy or gate engine was introduced — every
 served tool still shells out to the `hyodo` CLI exactly as before. Digest-only
 evidence remains the default.
 
+M5-C local onboarding shipped; remote availability still UNOBSERVED.
+
 ## Current capabilities
 
 The contract advertises only the tools already served by the local adapter:
