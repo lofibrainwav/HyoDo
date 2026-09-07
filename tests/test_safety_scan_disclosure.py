@@ -11,10 +11,7 @@ green". These tests pin:
 - The `hyodo safe` text output disclosing the same numbers, with different
   phrasing depending on whether the cap actually truncated the scan.
 - The `--json` payload carrying both fields.
-- The default (no PATH) git diff/status corpus mode making no per-file
-  coverage claim at all: both fields are ``None`` and the text note omits
-  the "scanned N of M files" phrase, so a single indivisible corpus is never
-  dressed up as a counted file scan.
+- Default diff/status and single-file coverage includes skipped files.
 """
 
 from __future__ import annotations
@@ -132,3 +129,80 @@ def test_run_safety_scan_default_corpus_makes_no_file_count_claim(tmp_path: Path
 
     assert result["scanned_files"] is None
     assert result["total_scannable"] is None
+
+
+def test_default_diff_coverage(monkeypatch, tmp_path):
+    import subprocess
+
+    import hyodo.safety as safety
+
+    diff = (
+        "diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n"
+        "@@ -1 +1 @@\n-old\n+new\n"
+        "diff --git a/image.png b/image.png\nBinary files differ\n"
+    )
+    monkeypatch.setattr(
+        safety.subprocess, "run", lambda *a, **kw: subprocess.CompletedProcess(a, 0, diff, "")
+    )
+    result = run_safety_scan(cwd=tmp_path)
+    assert (result["scanned_files"], result["total_scannable"]) == (1, 2)
+
+
+def test_default_status_coverage(monkeypatch, tmp_path):
+    import subprocess
+
+    import hyodo.safety as safety
+
+    (tmp_path / "a.py").write_text("print('hello')")
+    (tmp_path / "b.png").write_bytes(b"\x00image")
+    (tmp_path / "c.py").write_text("unreadable")
+    read = safety._read_text_file
+
+    def read_file(path):
+        if path.name == "c.py":
+            raise OSError("unreadable")
+        return read(path)
+
+    monkeypatch.setattr(safety, "_read_text_file", read_file)
+    monkeypatch.setattr(
+        safety.subprocess,
+        "run",
+        lambda args, **kw: subprocess.CompletedProcess(
+            args, 0, "" if args[1] == "diff" else "?? a.py\n?? b.png\n?? c.py\n", ""
+        ),
+    )
+    result = run_safety_scan(cwd=tmp_path)
+    assert (result["scanned_files"], result["total_scannable"]) == (1, 3)
+
+
+def test_single_file_coverage(tmp_path):
+    target = tmp_path / "sample.py"
+    target.write_text("print('hello')")
+    result = run_safety_scan(str(target), cwd=tmp_path)
+    assert (result["scanned_files"], result["total_scannable"]) == (1, 1)
+    output = runner.invoke(app, ["safe", str(target), "--quiet"])
+    assert "1/1 files observed" in output.output
+    target.write_bytes(b"\x00binary")
+    result = run_safety_scan(str(target), cwd=tmp_path)
+    assert (result["scanned_files"], result["total_scannable"]) == (0, 1)
+
+
+def test_single_unreadable_coverage(monkeypatch, tmp_path):
+    import hyodo.safety as safety
+
+    target = tmp_path / "sample.py"
+    target.write_text("print('hello')")
+
+    def unreadable(*args):
+        raise OSError("unreadable")
+
+    monkeypatch.setattr(safety, "_read_text_file", unreadable)
+    result = run_safety_scan(str(target), cwd=tmp_path)
+    assert (result["scanned_files"], result["total_scannable"]) == (0, 1)
+    assert result["source"].startswith("error:")
+
+
+def test_empty_corpus_never_prints_zero_over_zero(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    output = runner.invoke(app, ["safe", "--quiet"])
+    assert "0/unknown files observed" in output.output

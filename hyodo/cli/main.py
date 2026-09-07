@@ -27,13 +27,15 @@ import subprocess
 import sys
 import threading
 import webbrowser
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager, nullcontext
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from enum import Enum
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from secrets import compare_digest, token_urlsafe
+from typing import Any
 from urllib.parse import parse_qs
 
 import typer
@@ -104,6 +106,7 @@ from hyodo.policy_trust import (
 from hyodo.report import write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
+from hyodo.verdict import explain_decision, render_verdict_line
 
 app = typer.Typer(
     name="hyodo",
@@ -1105,6 +1108,58 @@ def _print_general_results(results: list[GeneralGateResult], root: Path) -> None
         )
 
 
+@contextmanager
+def _verdict_output(
+    command: str, state: dict[str, Any], quiet: bool, explain: bool, json_output: bool
+) -> Iterator[None]:
+    """Stream default details; propagate the original command exit unchanged."""
+    with console.capture() if quiet or json_output else nullcontext() as captured:
+        try:
+            yield
+        except typer.Exit as exc:
+            exit_code = exc.exit_code
+        else:
+            exit_code = 0
+    decision = state.get("decision", {0: "PASS", 1: "FAIL"}.get(exit_code, "UNOBSERVED"))
+    detail = state.get("detail", "required evidence UNOBSERVED")
+    if command == "check":
+        detail = ", ".join(state.get("failed", [])) or (
+            "all executed gates passed" if exit_code == 0 else "required gates UNOBSERVED"
+        )
+    verdict = render_verdict_line(
+        decision, state.get("observed", 0), state.get("expected", 0), state["unit"], detail
+    )
+    if json_output:
+        if command == "check":
+            payload = {
+                "status": decision,
+                "gates_ran": state.get("observed", 0),
+                "gates_total": state.get("expected", 0),
+                "failed": state.get("failed", []),
+                "exit_code": exit_code,
+            }
+        else:
+            assert captured is not None
+            payload = json.loads(captured.get())
+        payload["verdict"] = verdict
+        console.print_json(json.dumps(payload))
+    else:
+        typer.echo(verdict)
+        if explain:
+            typer.echo("Explanation: " + explain_decision(command, decision, state.get("rule_id")))
+    raise typer.Exit(exit_code)
+
+
+def _policy_verdict_state(decision: Any) -> dict[str, Any]:
+    return {
+        "decision": decision.decision,
+        "observed": decision.coverage[0],
+        "expected": decision.coverage[1],
+        "rule_id": decision.rule_id,
+        "detail": f"trust={decision.trust_level}, " + (decision.reason or "policy checks allow"),
+    }
+
+
 @app.command()
 def check(
     path: str | None = typer.Argument(None, help="Path to file or directory"),
@@ -1113,6 +1168,9 @@ def check(
     general: bool = typer.Option(
         False, "--general", help="Run language-agnostic gates (auto-detect Python/JS/Go/Rust/Shell)"
     ),
+    quiet: bool = typer.Option(False, "--quiet", help="Print only the verdict line"),
+    explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
 ):
     """
     Run HyoDo checkout release gates (4-Gate CI).
@@ -1127,166 +1185,203 @@ def check(
     --general instead runs bounded language-agnostic syntax gates
     (Python/TS/JS/Go/Rust/Shell auto-detected, up to 50 files per language).
     """
-    console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
-    try:
-        target = resolve_check_target(path)
-    except FileNotFoundError as exc:
-        console.print(f"[red]Path not found: {exc}[/red]")
-        console.print("[yellow]This is not a validation pass.[/yellow]")
-        raise typer.Exit(2) from exc
+    verdict_state: dict[str, Any] = {"unit": "gates"}
+    with _verdict_output("check", verdict_state, quiet, explain, json_output):
+        console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
-    console.print(f"Target: {target}")
-    check_root = target if target.is_dir() else target.parent
-
-    # --general mode: language-agnostic gates (explicit opt-in, unchanged)
-    if general:
-        gen_root = check_root
-        console.print(f"[cyan]General mode: auto-detecting languages in {gen_root}[/cyan]")
         try:
-            scan_exceptions = load_scan_exceptions(gen_root)
-        except ScanExceptionsConfigError as exc:
-            console.print(f"[red]Invalid scan exceptions: {exc}[/red]")
+            target = resolve_check_target(path)
+        except FileNotFoundError as exc:
+            console.print(f"[red]Path not found: {exc}[/red]")
             console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2) from exc
-        gen_results = _run_general_gates(gen_root, verbose, scan_exceptions)
-        if scan_exceptions.general:
-            console.print(
-                f"[dim]Audited general exclusions configured: {len(scan_exceptions.general)}[/dim]"
+
+        console.print(f"Target: {target}")
+        check_root = target if target.is_dir() else target.parent
+
+        # --general mode: language-agnostic gates (explicit opt-in, unchanged)
+        if general:
+            gen_root = check_root
+            console.print(f"[cyan]General mode: auto-detecting languages in {gen_root}[/cyan]")
+            try:
+                scan_exceptions = load_scan_exceptions(gen_root)
+            except ScanExceptionsConfigError as exc:
+                console.print(f"[red]Invalid scan exceptions: {exc}[/red]")
+                console.print("[yellow]This is not a validation pass.[/yellow]")
+                raise typer.Exit(2) from exc
+            gen_results = _run_general_gates(gen_root, verbose, scan_exceptions)
+            if scan_exceptions.general:
+                console.print(
+                    f"[dim]Audited general exclusions configured: {len(scan_exceptions.general)}[/dim]"
+                )
+            verdict_state.update(
+                observed=sum(r.status in {GateStatus.PASS, GateStatus.FAIL} for r in gen_results),
+                expected=len(gen_results),
+                failed=[
+                    f"{r.language} ({r.tool})" for r in gen_results if r.status is GateStatus.FAIL
+                ],
             )
-        _print_general_results(gen_results, gen_root)
-        failed = [r for r in gen_results if r.status is GateStatus.FAIL]
-        executed = [r for r in gen_results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
+            _print_general_results(gen_results, gen_root)
+            failed = [r for r in gen_results if r.status is GateStatus.FAIL]
+            executed = [r for r in gen_results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
+            console.print("\n" + "=" * 50)
+            if not executed:
+                console.print("[bold yellow]No language gates were executed[/bold yellow]")
+                console.print("[yellow]This is not a validation pass.[/yellow]")
+                raise typer.Exit(2)
+            if failed:
+                console.print(
+                    f"[bold red]Some gates failed[/bold red] "
+                    f"({len(executed)}/{len(gen_results)} gates ran)"
+                )
+                _print_failure_guidance([(f"{r.language} ({r.tool})", r.message) for r in failed])
+                raise typer.Exit(1)
+            console.print(
+                f"[bold green]All executed gates passed "
+                f"({len(executed)}/{len(gen_results)} gates ran)[/bold green]"
+            )
+            console.print(
+                "[dim]Sampled syntax gates only (up to 50 files per language) — "
+                "not a full-project validation.[/dim]"
+            )
+            raise typer.Exit(0)
+
+        # Bring-Your-Own-Gates: a `.hyodo/gates.toml` (see `hyodo init`) takes
+        # priority over the HyoDo-checkout-only preset below.
+        try:
+            gates_config = load_gates_config(check_root)
+        except GatesConfigError as exc:
+            console.print(f"[red]{exc}[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+            raise typer.Exit(2) from exc
+
+        if gates_config is not None:
+            console.print(f"[cyan]User gates: {check_root / GATES_CONFIG_RELATIVE_PATH}[/cyan]")
+            user_results = run_user_gates(gates_config, check_root, verbose=verbose)
+            verdict_state.update(
+                observed=sum(r.status in {"PASS", "FAIL"} for r in user_results),
+                expected=len(user_results),
+                failed=[r.name for r in user_results if r.status == "FAIL"],
+            )
+            user_styles = {"PASS": "green", "FAIL": "red", "SKIP": "yellow"}
+            for user_result in user_results:
+                style = user_styles.get(user_result.status, "yellow")
+                console.print(
+                    f"  [{style}]{user_result.status}[/{style}] {user_result.name} "
+                    f"({_trilingual_pillar_label(user_result.pillar)}): {user_result.message}"
+                )
+            user_failed = [r for r in user_results if r.status == "FAIL"]
+            user_executed = [r for r in user_results if r.status in {"PASS", "FAIL"}]
+            console.print("\n" + "=" * 50)
+            if not user_executed:
+                console.print("[bold yellow]No user gates were executed[/bold yellow]")
+                console.print("[yellow]This is not a validation pass.[/yellow]")
+                raise typer.Exit(2)
+            if user_failed:
+                console.print(
+                    f"[bold red]Some gates failed[/bold red] "
+                    f"({len(user_executed)}/{len(user_results)} gates ran)"
+                )
+                _print_failure_guidance([(r.name, r.message) for r in user_failed])
+                raise typer.Exit(1)
+            console.print(
+                f"[bold green]All executed gates passed "
+                f"({len(user_executed)}/{len(user_results)} gates ran)[/bold green]"
+            )
+            console.print(
+                "[green]Gates support review readiness. Human approval still required.[/green]"
+            )
+            raise typer.Exit(0)
+
+        root = find_repo_root(target)
+        if root is None:
+            console.print(
+                "[yellow]Not a HyoDo package checkout "
+                "(requires pyproject.toml + hyodo/ at project root).[/yellow]"
+            )
+            console.print(
+                "[dim]Model-agnostic ≠ language-agnostic. "
+                "General Python project gates are not claimed in this version.[/dim]"
+            )
+            console.print(
+                "[dim]Tip: run 'hyodo init' to absorb this project's own tools as gates "
+                "(Bring-Your-Own-Gates).[/dim]"
+            )
+        else:
+            console.print(f"HyoDo checkout: {root}")
+
+        results: list[GateResult] = []
+
+        console.print("\n[1/4] Truth - Type checking...")
+        pyright_result = run_pyright_check(root, verbose)
+        _print_gate_result(pyright_result)
+        results.append(pyright_result)
+
+        console.print("\n[2/4] Beauty - Lint & Format...")
+        ruff_result = run_ruff_check(root, fix, verbose)
+        _print_gate_result(ruff_result)
+        if ruff_result.status is GateStatus.FAIL and "not found" not in ruff_result.message and fix:
+            console.print("  [yellow]   Try running with --fix to auto-fix issues[/yellow]")
+        results.append(ruff_result)
+
+        console.print("\n[3/4] Goodness - Tests...")
+        pytest_result = run_pytest_check(root, verbose)
+        _print_gate_result(pytest_result)
+        results.append(pytest_result)
+
+        console.print("\n[4/4] Eternity - Security seal...")
+        sbom_result = run_sbom_check(root, verbose)
+        _print_gate_result(sbom_result)
+        results.append(sbom_result)
+
+        executed = [r for r in results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
+        failed = [r for r in results if r.status is GateStatus.FAIL]
+        ran, total = len(executed), len(results)
+        verdict_state.update(
+            observed=ran,
+            expected=total,
+            failed=[
+                name
+                for name, result in zip(
+                    ("Truth (pyright)", "Beauty (ruff)", "Goodness (pytest)", "Eternity (SBOM)"),
+                    results,
+                    strict=True,
+                )
+                if result.status is GateStatus.FAIL
+            ],
+        )
+
         console.print("\n" + "=" * 50)
         if not executed:
-            console.print("[bold yellow]No language gates were executed[/bold yellow]")
+            console.print("[bold yellow]No project gates were executed[/bold yellow]")
             console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2)
+
         if failed:
-            console.print(
-                f"[bold red]Some gates failed[/bold red] "
-                f"({len(executed)}/{len(gen_results)} gates ran)"
+            console.print(f"[bold red]Some gates failed[/bold red] ({ran}/{total} gates ran)")
+            gate_names = (
+                "Truth (pyright)",
+                "Beauty (ruff)",
+                "Goodness (pytest)",
+                "Eternity (SBOM)",
             )
-            _print_failure_guidance([(f"{r.language} ({r.tool})", r.message) for r in failed])
+            _print_failure_guidance(
+                [
+                    (name, result.message)
+                    for name, result in zip(gate_names, results, strict=True)
+                    if result in failed
+                ]
+            )
             raise typer.Exit(1)
-        console.print(
-            f"[bold green]All executed gates passed "
-            f"({len(executed)}/{len(gen_results)} gates ran)[/bold green]"
-        )
-        console.print(
-            "[dim]Sampled syntax gates only (up to 50 files per language) — "
-            "not a full-project validation.[/dim]"
-        )
-        raise typer.Exit(0)
 
-    # Bring-Your-Own-Gates: a `.hyodo/gates.toml` (see `hyodo init`) takes
-    # priority over the HyoDo-checkout-only preset below.
-    try:
-        gates_config = load_gates_config(check_root)
-    except GatesConfigError as exc:
-        console.print(f"[red]{exc}[/red]")
-        console.print("[yellow]This is not a validation pass.[/yellow]")
-        raise typer.Exit(2) from exc
-
-    if gates_config is not None:
-        console.print(f"[cyan]User gates: {check_root / GATES_CONFIG_RELATIVE_PATH}[/cyan]")
-        user_results = run_user_gates(gates_config, check_root, verbose=verbose)
-        user_styles = {"PASS": "green", "FAIL": "red", "SKIP": "yellow"}
-        for user_result in user_results:
-            style = user_styles.get(user_result.status, "yellow")
-            console.print(
-                f"  [{style}]{user_result.status}[/{style}] {user_result.name} "
-                f"({_trilingual_pillar_label(user_result.pillar)}): {user_result.message}"
-            )
-        user_failed = [r for r in user_results if r.status == "FAIL"]
-        user_executed = [r for r in user_results if r.status in {"PASS", "FAIL"}]
-        console.print("\n" + "=" * 50)
-        if not user_executed:
-            console.print("[bold yellow]No user gates were executed[/bold yellow]")
-            console.print("[yellow]This is not a validation pass.[/yellow]")
-            raise typer.Exit(2)
-        if user_failed:
-            console.print(
-                f"[bold red]Some gates failed[/bold red] "
-                f"({len(user_executed)}/{len(user_results)} gates ran)"
-            )
-            _print_failure_guidance([(r.name, r.message) for r in user_failed])
-            raise typer.Exit(1)
         console.print(
-            f"[bold green]All executed gates passed "
-            f"({len(user_executed)}/{len(user_results)} gates ran)[/bold green]"
+            f"[bold green]All executed gates passed ({ran}/{total} gates ran)[/bold green]"
         )
         console.print(
             "[green]Gates support review readiness. Human approval still required.[/green]"
         )
         raise typer.Exit(0)
-
-    root = find_repo_root(target)
-    if root is None:
-        console.print(
-            "[yellow]Not a HyoDo package checkout "
-            "(requires pyproject.toml + hyodo/ at project root).[/yellow]"
-        )
-        console.print(
-            "[dim]Model-agnostic ≠ language-agnostic. "
-            "General Python project gates are not claimed in this version.[/dim]"
-        )
-        console.print(
-            "[dim]Tip: run 'hyodo init' to absorb this project's own tools as gates "
-            "(Bring-Your-Own-Gates).[/dim]"
-        )
-    else:
-        console.print(f"HyoDo checkout: {root}")
-
-    results: list[GateResult] = []
-
-    console.print("\n[1/4] Truth - Type checking...")
-    pyright_result = run_pyright_check(root, verbose)
-    _print_gate_result(pyright_result)
-    results.append(pyright_result)
-
-    console.print("\n[2/4] Beauty - Lint & Format...")
-    ruff_result = run_ruff_check(root, fix, verbose)
-    _print_gate_result(ruff_result)
-    if ruff_result.status is GateStatus.FAIL and "not found" not in ruff_result.message and fix:
-        console.print("  [yellow]   Try running with --fix to auto-fix issues[/yellow]")
-    results.append(ruff_result)
-
-    console.print("\n[3/4] Goodness - Tests...")
-    pytest_result = run_pytest_check(root, verbose)
-    _print_gate_result(pytest_result)
-    results.append(pytest_result)
-
-    console.print("\n[4/4] Eternity - Security seal...")
-    sbom_result = run_sbom_check(root, verbose)
-    _print_gate_result(sbom_result)
-    results.append(sbom_result)
-
-    executed = [r for r in results if r.status in {GateStatus.PASS, GateStatus.FAIL}]
-    failed = [r for r in results if r.status is GateStatus.FAIL]
-    ran, total = len(executed), len(results)
-
-    console.print("\n" + "=" * 50)
-    if not executed:
-        console.print("[bold yellow]No project gates were executed[/bold yellow]")
-        console.print("[yellow]This is not a validation pass.[/yellow]")
-        raise typer.Exit(2)
-
-    if failed:
-        console.print(f"[bold red]Some gates failed[/bold red] ({ran}/{total} gates ran)")
-        gate_names = ("Truth (pyright)", "Beauty (ruff)", "Goodness (pytest)", "Eternity (SBOM)")
-        _print_failure_guidance(
-            [
-                (name, result.message)
-                for name, result in zip(gate_names, results, strict=True)
-                if result in failed
-            ]
-        )
-        raise typer.Exit(1)
-
-    console.print(f"[bold green]All executed gates passed ({ran}/{total} gates ran)[/bold green]")
-    console.print("[green]Gates support review readiness. Human approval still required.[/green]")
-    raise typer.Exit(0)
 
 
 def _resolve_score_pillars(
@@ -1538,6 +1633,8 @@ def safe(
         "--scan",
         help="External scanner: gitleaks, trufflehog, or all (runs both)",
     ),
+    quiet: bool = typer.Option(False, "--quiet", help="Print only the verdict line"),
+    explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
 ):
     """
     Safety early-warning scan.
@@ -1561,87 +1658,117 @@ def safe(
     git diff HEAD, else git status text (not full working tree contents).
     Not a full SAST / secret-scan / dependency audit unless --scan is used.
     """
-    result = run_safety_scan(
-        path=path, strict=strict, cwd=Path.cwd(), max_files=max_files, scan_tool=scan
-    )
-    source = str(result["source"])
-    high_only = [f for f in result["findings"] if f.severity == "high"]
 
-    if json_output:
-        exit_code = (
-            2 if source.startswith(("missing:", "error:")) else (1 if strict and high_only else 0)
+    verdict_state: dict[str, Any] = {"unit": "files"}
+    with _verdict_output("safe", verdict_state, quiet, explain, json_output):
+        result = run_safety_scan(
+            path=path, strict=strict, cwd=Path.cwd(), max_files=max_files, scan_tool=scan
         )
-        payload = {
-            "source": source,
-            "risk_score": result["risk_score"],
-            "level": result["level"],
-            "action": result["action"],
-            "strict": strict,
-            "exit_code": exit_code,
-            "findings": [asdict(f) for f in result["findings"]],
-            "exceptions_applied": int(result.get("exceptions_applied", 0)),
-            "scanned_files": result.get("scanned_files"),
-            "total_scannable": result.get("total_scannable"),
-        }
-        console.print_json(json.dumps(payload))
-        raise typer.Exit(exit_code)
+        source = str(result["source"])
+        high_only = [f for f in result["findings"] if f.severity == "high"]
 
-    console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
-    console.print(f"source: {source}")
-    exceptions_applied = int(result.get("exceptions_applied", 0))
-    if exceptions_applied:
-        console.print(f"[yellow]Audited safety exceptions applied: {exceptions_applied}[/yellow]")
+        scanned = result.get("scanned_files")
+        total = result.get("total_scannable")
+        verdict_state.update(
+            observed=scanned if isinstance(scanned, int) else 0,
+            expected=total if isinstance(total, int) and total else "unknown",
+            detail=f"{len(high_only)} high findings"
+            + (" (advisory; --strict blocks)" if high_only and not strict else "")
+            + ("; file coverage UNOBSERVED" if scanned is None or total is None else ""),
+        )
+        if source.startswith(("missing:", "error:")):
+            verdict_state["detail"] = "scan target UNOBSERVED"
+        if json_output:
+            exit_code = (
+                2
+                if source.startswith(("missing:", "error:"))
+                else (1 if strict and high_only else 0)
+            )
+            payload = {
+                "source": source,
+                "risk_score": result["risk_score"],
+                "level": result["level"],
+                "action": result["action"],
+                "strict": strict,
+                "exit_code": exit_code,
+                "findings": [asdict(f) for f in result["findings"]],
+                "exceptions_applied": int(result.get("exceptions_applied", 0)),
+                "scanned_files": result.get("scanned_files"),
+                "total_scannable": result.get("total_scannable"),
+            }
+            console.print_json(json.dumps(payload))
+            raise typer.Exit(exit_code)
 
-    # missing path OR unreadable/scan IO failure — not a validation pass
-    if source.startswith("missing:"):
-        console.print("[red]Scan target not found.[/red]")
-        console.print("[yellow]This is not a validation pass.[/yellow]")
-        raise typer.Exit(2)
-    if source.startswith("error:"):
-        console.print("[red]Scan failed (read error).[/red]")
-        console.print("[yellow]This is not a validation pass.[/yellow]")
-        raise typer.Exit(2)
-
-    for check_name, status, color in result["rows"]:
-        console.print(f"  [{color}]{status}[/{color}] {check_name}")
-
-    high_findings = [f for f in result["findings"] if f.severity in {"high", "medium"}]
-    if high_findings:
-        console.print("\n[bold]Findings[/bold]")
-        for finding in high_findings[:12]:
-            loc = ""
-            if finding.path:
-                loc = f" @ {finding.path}"
-                if finding.line is not None:
-                    loc += f":{finding.line}"
-            elif finding.line is not None:
-                loc = f" @ line {finding.line}"
+        console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
+        console.print(f"source: {source}")
+        exceptions_applied = int(result.get("exceptions_applied", 0))
+        if exceptions_applied:
             console.print(
-                f"  - [{finding.severity}] {finding.category}/{finding.label}: "
-                f"{finding.detail}{loc}"
+                f"[yellow]Audited safety exceptions applied: {exceptions_applied}[/yellow]"
             )
 
-    console.print(f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}")
-    scanned_files = result.get("scanned_files")
-    total_scannable = result.get("total_scannable")
-    if isinstance(scanned_files, int) and isinstance(total_scannable, int):
-        if total_scannable > scanned_files:
-            coverage_note = (
-                f"Directory scan cap: scanned {scanned_files} of {total_scannable} files "
-                f"(cap {max_files}); raise --max-files to scan all. "
-            )
+        # missing path OR unreadable/scan IO failure — not a validation pass
+        if source.startswith("missing:"):
+            console.print("[red]Scan target not found.[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+            raise typer.Exit(2)
+        if source.startswith("error:"):
+            console.print("[red]Scan failed (read error).[/red]")
+            console.print("[yellow]This is not a validation pass.[/yellow]")
+            raise typer.Exit(2)
+
+        for check_name, status, color in result["rows"]:
+            console.print(f"  [{color}]{status}[/{color}] {check_name}")
+
+        high_findings = [f for f in result["findings"] if f.severity in {"high", "medium"}]
+        if high_findings:
+            console.print("\n[bold]Findings[/bold]")
+            for finding in high_findings[:12]:
+                loc = ""
+                if finding.path:
+                    loc = f" @ {finding.path}"
+                    if finding.line is not None:
+                        loc += f":{finding.line}"
+                elif finding.line is not None:
+                    loc = f" @ line {finding.line}"
+                console.print(
+                    f"  - [{finding.severity}] {finding.category}/{finding.label}: "
+                    f"{finding.detail}{loc}"
+                )
+
+        console.print(
+            f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}"
+        )
+        scanned_files = result.get("scanned_files")
+        total_scannable = result.get("total_scannable")
+        if isinstance(scanned_files, int) and isinstance(total_scannable, int):
+            if (
+                source.startswith("dir:")
+                and max_files > 0
+                and scanned_files >= max_files
+                and total_scannable > scanned_files
+            ):
+                coverage_note = (
+                    f"Directory scan cap: scanned {scanned_files} of {total_scannable} files "
+                    f"(cap {max_files}); raise --max-files to scan all. "
+                )
+            elif total_scannable > scanned_files:
+                coverage_note = (
+                    f"Scanned {scanned_files} of {total_scannable} files; "
+                    "skipped or unreadable file contents remain UNOBSERVED. "
+                )
+            else:
+                coverage_note = f"Scanned {scanned_files} of {total_scannable} files. "
         else:
-            coverage_note = f"Scanned {scanned_files} of {total_scannable} files. "
-    else:
-        coverage_note = ""
-    console.print(
-        "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit. "
-        f"{coverage_note}Default corpus is git diff/status when no path.[/dim]"
-    )
+            coverage_note = ""
+        console.print(
+            "[dim]Note: early warning only. Not a full SAST/secret-scan/dependency audit. "
+            f"{coverage_note}Default corpus is git diff/status when no path.[/dim]"
+        )
 
-    if strict and high_only:
-        raise typer.Exit(1)
-    raise typer.Exit(0)
+        if strict and high_only:
+            raise typer.Exit(1)
+        raise typer.Exit(0)
 
 
 @mcp_app.command("contract")
@@ -2257,6 +2384,12 @@ def event_record(
     file_path = Path(file) if file else None
     data, err = _load_event_payload(file_path, stdin_flag)
     if err in {"file_and_stdin", "missing_input"} or err is not None:
+        if policy is not None and not json_output:
+            typer.echo(
+                render_verdict_line(
+                    "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, event UNOBSERVED"
+                )
+            )
         code = 2
         reasons = [err or "load_failed"]
         if json_output:
@@ -2268,6 +2401,12 @@ def event_record(
 
     ok, reasons, normalized = validate_event(data)
     if not ok or normalized is None:
+        if policy is not None and not json_output:
+            typer.echo(
+                render_verdict_line(
+                    "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, valid event UNOBSERVED"
+                )
+            )
         if json_output:
             console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": 1}))
         else:
@@ -2284,6 +2423,12 @@ def event_record(
     if policy is not None:
         cfg, policy_err = try_load_policy(Path(policy))
         if cfg is None:
+            if not json_output:
+                typer.echo(
+                    render_verdict_line(
+                        "UNOBSERVED", 0, 0, "surfaces", "trust=UNOBSERVED, policy UNOBSERVED"
+                    )
+                )
             # Fail-closed: missing/invalid policy is unobserved, never ALLOW.
             if json_output:
                 console.print_json(
@@ -2303,6 +2448,17 @@ def event_record(
             raise typer.Exit(2)
         observed = count_run_events(root_path, normalized["run_id"])
         decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
+        if not json_output:
+            state = _policy_verdict_state(decision)
+            typer.echo(
+                render_verdict_line(
+                    decision.decision,
+                    decision.coverage[0],
+                    decision.coverage[1],
+                    "surfaces",
+                    state["detail"],
+                )
+            )
         normalized = apply_decision_to_event(normalized, decision)
         decision_label = decision.decision
         if decision.trust_level >= 2:
@@ -2540,6 +2696,8 @@ def policy_check(
         "--json",
         help="Emit machine-readable decision JSON",
     ),
+    quiet: bool = typer.Option(False, "--quiet", help="Print only the verdict line"),
+    explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
 ):
     """
     Evaluate one event against a local policy.toml.
@@ -2548,89 +2706,98 @@ def policy_check(
     3 ASK (operator decision required).
     Does not write the ledger (use ``hyodo event record --policy`` for that).
     """
-    root_path = Path(root).resolve()
-    file_path = Path(file) if file else None
-    data, err = _load_event_payload(file_path, stdin_flag)
-    if err is not None:
-        if json_output:
-            console.print_json(
-                json.dumps(
-                    {
-                        "decision": "UNOBSERVED",
-                        "rule_id": None,
-                        "reason": err,
-                        "exit_code": 2,
-                    }
-                )
-            )
-        else:
-            console.print(f"[red]Cannot load event: {err}[/red]")
-            console.print("[yellow]This is not a validation pass.[/yellow]")
-        raise typer.Exit(2)
 
-    ok, reasons, normalized = validate_event(data)
-    if not ok or normalized is None:
-        if json_output:
-            console.print_json(
-                json.dumps(
-                    {
-                        "decision": "UNOBSERVED",
-                        "rule_id": None,
-                        "reason": ";".join(reasons),
-                        "exit_code": 2,
-                    }
+    verdict_state: dict[str, Any] = {"unit": "surfaces"}
+    verdict_state.update(
+        decision="UNOBSERVED", detail="trust=UNOBSERVED, required evidence UNOBSERVED"
+    )
+    with _verdict_output("policy check", verdict_state, quiet, explain, json_output):
+        root_path = Path(root).resolve()
+        file_path = Path(file) if file else None
+        data, err = _load_event_payload(file_path, stdin_flag)
+        if err is not None:
+            if json_output:
+                console.print_json(
+                    json.dumps(
+                        {
+                            "decision": "UNOBSERVED",
+                            "rule_id": None,
+                            "reason": err,
+                            "exit_code": 2,
+                        }
+                    )
                 )
-            )
-        else:
-            console.print("[red]INVALID event — policy not evaluated.[/red]")
-            for reason in reasons:
-                console.print(f"  - {reason}")
-        raise typer.Exit(2)
+            else:
+                console.print(f"[red]Cannot load event: {err}[/red]")
+                console.print("[yellow]This is not a validation pass.[/yellow]")
+            raise typer.Exit(2)
 
-    policy_path = Path(config).resolve() if config else (root_path / POLICY_RELATIVE_PATH).resolve()
-    cfg, policy_err = try_load_policy(policy_path)
-    if cfg is None:
-        if json_output:
-            console.print_json(
-                json.dumps(
-                    {
-                        "decision": "UNOBSERVED",
-                        "rule_id": None,
-                        "reason": policy_err,
-                        "exit_code": 2,
-                    }
+        ok, reasons, normalized = validate_event(data)
+        if not ok or normalized is None:
+            if json_output:
+                console.print_json(
+                    json.dumps(
+                        {
+                            "decision": "UNOBSERVED",
+                            "rule_id": None,
+                            "reason": ";".join(reasons),
+                            "exit_code": 2,
+                        }
+                    )
                 )
-            )
-        else:
-            console.print(f"[red]Policy unobserved ({policy_err}).[/red] Not ALLOW.")
-        raise typer.Exit(2)
+            else:
+                console.print("[red]INVALID event — policy not evaluated.[/red]")
+                for reason in reasons:
+                    console.print(f"  - {reason}")
+            raise typer.Exit(2)
 
-    # Step budget is counted from the working-tree ledger, never from the
-    # caller-supplied step_index. (Same root basis as the default policy lookup.)
-    observed = count_run_events(root_path, normalized["run_id"])
-    decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
-    # 0 = ALLOW, 1 = DENY, 2 = UNOBSERVED, 3 = ASK.
-    exit_code = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision.decision]
-    if json_output:
-        payload = decision.as_dict()
-        payload["exit_code"] = exit_code
-        if decision.trust_level >= 2:
-            payload["ledger_write_required"] = True
-            payload["ledger_written"] = False
-        console.print_json(json.dumps(payload))
-    else:
-        color = "green" if decision.decision == "ALLOW" else "red"
-        console.print(f"[{color}]{decision.decision}[/{color}]")
-        if decision.rule_id:
-            console.print(f"rule_id: {decision.rule_id}")
-        if decision.reason:
-            console.print(f"reason: {decision.reason}")
-        if decision.trust_level >= 2:
-            console.print(
-                "[yellow]trust level 2+ requires the decision to be recorded — "
-                "use `hyodo event record --policy`[/yellow]"
-            )
-    raise typer.Exit(exit_code)
+        policy_path = (
+            Path(config).resolve() if config else (root_path / POLICY_RELATIVE_PATH).resolve()
+        )
+        cfg, policy_err = try_load_policy(policy_path)
+        if cfg is None:
+            if json_output:
+                console.print_json(
+                    json.dumps(
+                        {
+                            "decision": "UNOBSERVED",
+                            "rule_id": None,
+                            "reason": policy_err,
+                            "exit_code": 2,
+                        }
+                    )
+                )
+            else:
+                console.print(f"[red]Policy unobserved ({policy_err}).[/red] Not ALLOW.")
+            raise typer.Exit(2)
+
+        # Step budget is counted from the working-tree ledger, never from the
+        # caller-supplied step_index. (Same root basis as the default policy lookup.)
+        observed = count_run_events(root_path, normalized["run_id"])
+        decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
+        verdict_state.update(_policy_verdict_state(decision))
+        # 0 = ALLOW, 1 = DENY, 2 = UNOBSERVED, 3 = ASK.
+        exit_code = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}[decision.decision]
+        if json_output:
+            payload = decision.as_dict()
+            payload["exit_code"] = exit_code
+            if decision.trust_level >= 2:
+                payload["ledger_write_required"] = True
+                payload["ledger_written"] = False
+            console.print_json(json.dumps(payload))
+        else:
+            color = "green" if decision.decision == "ALLOW" else "red"
+            console.print(f"[{color}]{decision.decision}[/{color}]")
+            if decision.rule_id:
+                console.print(f"rule_id: {decision.rule_id}")
+            if decision.reason:
+                console.print(f"reason: {decision.reason}")
+            if decision.trust_level >= 2:
+                console.print(
+                    "[yellow]trust level 2+ requires the decision to be recorded — "
+                    "use `hyodo event record --policy`[/yellow]"
+                )
+        raise typer.Exit(exit_code)
 
 
 @app.command()

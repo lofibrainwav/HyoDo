@@ -172,7 +172,12 @@ def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
     return data.decode("utf-8", errors="replace")
 
 
-def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tuple[str, str]:
+def collect_scan_corpus(
+    path: str | None = None,
+    cwd: Path | None = None,
+    *,
+    coverage: dict[str, int] | None = None,
+) -> tuple[str, str]:
     """Return (corpus_text, source_description).
 
     source prefixes:
@@ -218,6 +223,12 @@ def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tup
             check=False,
         )
         if result.returncode == 0 and result.stdout.strip():
+            if coverage is not None:
+                sections = re.split(r"(?m)^diff --git ", result.stdout)[1:]
+                coverage.update(
+                    total=len(sections),
+                    scanned=sum(bool(re.search(r"(?m)^@@ ", section)) for section in sections),
+                )
             return result.stdout, "git diff HEAD"
         status = subprocess.run(
             ["git", "status", "--porcelain"],
@@ -229,7 +240,7 @@ def collect_scan_corpus(path: str | None = None, cwd: Path | None = None) -> tup
         )
         if status.returncode == 0:
             listing = status.stdout or ""
-            bodies, read_count = _read_working_tree_files(root, listing)
+            bodies, read_count = _read_working_tree_files(root, listing, coverage=coverage)
             source = "git status (no diff against HEAD)"
             if read_count:
                 source += f" + {read_count} working-tree file(s)"
@@ -259,7 +270,9 @@ def _porcelain_paths(listing: str) -> list[str]:
     return paths
 
 
-def _read_working_tree_files(root: Path, listing: str) -> tuple[str, int]:
+def _read_working_tree_files(
+    root: Path, listing: str, *, coverage: dict[str, int] | None = None
+) -> tuple[str, int]:
     """Read the contents of files named in *listing*. Returns ``(text, files_read)``.
 
     ``git diff HEAD`` is empty exactly when the only changes are untracked files, so
@@ -269,9 +282,8 @@ def _read_working_tree_files(root: Path, listing: str) -> tuple[str, int]:
     chunks: list[str] = []
     count = 0
     resolved_root = root.resolve()
+    total = 0
     for entry in _porcelain_paths(listing):
-        if count >= _DEFAULT_SCAN_CAP:
-            break
         candidate = (root / entry).resolve()
         try:
             candidate.relative_to(resolved_root)
@@ -281,8 +293,11 @@ def _read_working_tree_files(root: Path, listing: str) -> tuple[str, int]:
         # expanding it is what reaches the files inside a newly created folder.
         targets = sorted(candidate.rglob("*")) if candidate.is_dir() else [candidate]
         for target in targets:
+            if target.is_dir():
+                continue
+            total += 1
             if count >= _DEFAULT_SCAN_CAP:
-                break
+                continue
             if not is_scannable_file(target):
                 continue
             try:
@@ -290,6 +305,8 @@ def _read_working_tree_files(root: Path, listing: str) -> tuple[str, int]:
             except OSError:
                 continue
             count += 1
+    if coverage is not None:
+        coverage.update(scanned=count, total=total)
     return "\n".join(chunks), count
 
 
@@ -612,14 +629,20 @@ def _scan_directory(
 
     Caps at *max_files* files; ``max_files <= 0`` means unlimited.
 
-    Also reports how many scannable files exist under *target* in total, not
-    just how many were read — "unobserved is never green" means a partial
+    Also reports how many corpus files exist under *target*, including skipped
+    binaries and unreadable files, not just how many were read — "unobserved is never green" means a partial
     scan must say so, not just state the cap that produced it. Counting the
     full list costs a directory walk plus the binary sniff already required
     by ``is_scannable_file``; it never reads a file's full body.
     """
-    scannable_paths = [p for p in sorted(target.rglob("*")) if is_scannable_file(p)]
-    total_scannable = len(scannable_paths)
+    corpus_paths = [
+        p
+        for p in sorted(target.rglob("*"))
+        if p.is_file()
+        and not any(part.startswith(".git") or part in _SKIPPED_DIR_NAMES for part in p.parts)
+    ]
+    scannable_paths = [p for p in corpus_paths if is_scannable_file(p)]
+    total_scannable = len(corpus_paths)
     scan_targets = scannable_paths if max_files <= 0 else scannable_paths[:max_files]
 
     findings: list[Finding] = []
@@ -630,7 +653,14 @@ def _scan_directory(
         try:
             text = _read_text_file(file_path)
         except OSError:
-            return [], "", f"error:read:{file_path}", 0, 0, 0
+            return (
+                findings,
+                "\n".join(chunks),
+                f"error:read:{file_path}",
+                suppressed_count,
+                count,
+                total_scannable,
+            )
         scanned, suppressed = _apply_safety_exceptions(
             scan_text(text, path=str(file_path)), root, config
         )
@@ -663,12 +693,9 @@ def _result_payload(
 ) -> dict:
     """Assemble the scan result dict from findings — single source of truth.
 
-    ``scanned_files`` / ``total_scannable`` are ``None`` for every mode that
-    scans one indivisible corpus (a single file, an external-scanner run, or
-    the default git diff/status text): no per-file coverage claim is made
-    there. Only a directory scan, where files beyond ``max_files`` are never
-    read, passes real counts so partial coverage is visible instead of being
-    hidden behind a "fully scanned" default.
+    Counts describe observed files versus the selected corpus, including skipped
+    binaries and unreadable files in the total. External scanners and unavailable
+    corpora leave coverage unknown because no file inventory is reported.
     """
     score = risk_score(findings)
     level, action = _risk_level_action(score)
@@ -764,12 +791,18 @@ def run_safety_scan(
         if not target.is_absolute():
             target = (root / target).resolve()
         if target.is_file():
+            scanned_files, total_scannable = 0, 1
             try:
+                if target.suffix.lower() in _BINARY_SUFFIXES or _looks_binary(target):
+                    return _result_payload(
+                        f"file:{target}", [], strict, scanned_files=0, total_scannable=1
+                    )
                 text = _read_text_file(target)
             except OSError:
                 findings = []
                 source = f"error:read:{target}"
             else:
+                scanned_files = 1
                 findings, exceptions_applied = _apply_safety_exceptions(
                     scan_text(text, path=str(target)), root, exceptions
                 )
@@ -788,7 +821,10 @@ def run_safety_scan(
             findings = []
             source = f"missing:{target}"
     else:
-        corpus, source = collect_scan_corpus(path=None, cwd=root)
+        coverage: dict[str, int] = {}
+        corpus, source = collect_scan_corpus(path=None, cwd=root, coverage=coverage)
+        scanned_files = coverage.get("scanned")
+        total_scannable = coverage.get("total")
         findings = scan_text(corpus)
         findings.append(assess_rollback_signal(corpus))
 
