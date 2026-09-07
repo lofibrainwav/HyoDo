@@ -30,6 +30,11 @@ its findings overlap:
 cannot have caught a regression. `no_target_reference` and `unexplained_skip`
 still appear in `findings` but are not counted toward that number.
 
+A test function with no `assert` of its own is not flagged `no_assertion` when
+it calls a module-level helper function, defined in the same file, whose body
+contains an assertion (checked transitively up to three call hops); a helper
+imported from another module is not resolved and such a test is still flagged.
+
 ## What UNOBSERVED means
 
 A project with no discoverable `test_*.py`/`*_test.py` files reports

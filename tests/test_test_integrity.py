@@ -65,6 +65,62 @@ def test_real_computed_assertion_is_not_flagged(tmp_path: Path) -> None:
     assert not any(f.category in {"no_assertion", "constant_assertion"} for f in report.findings)
 
 
+def test_same_module_helper_with_assert_is_not_flagged(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "test_helper_ok.py",
+        "import hyodo\n\n\n"
+        "def _check_version_shape(value):\n    assert value == hyodo.__version__\n\n\n"
+        "def test_delegates_to_helper():\n    _check_version_shape(hyodo.__version__)\n",
+    )
+    report = scan_test_integrity(tmp_path)
+    assert report.vacuous_tests == 0
+    assert not any(f.function == "test_delegates_to_helper" for f in report.findings)
+
+
+def test_attribute_call_with_colliding_name_is_still_flagged(tmp_path: Path) -> None:
+    """``w.process()`` never reaches the free ``process`` helper, so no credit."""
+    _write(
+        tmp_path,
+        "test_helper_collision.py",
+        "class Widget:\n    def process(self, value):\n        return value * 2\n\n\n"
+        "def process(value):\n    assert value > 0\n\n\n"
+        "def test_calls_method_not_helper():\n    Widget().process(5)\n",
+    )
+    report = scan_test_integrity(tmp_path)
+    assert any(f.function == "test_calls_method_not_helper" for f in report.findings)
+
+
+def test_same_module_helper_without_assert_still_flagged(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "test_helper_bad.py",
+        "import hyodo\n\n\n"
+        "def _touch_version(value):\n    return value\n\n\n"
+        "def test_delegates_to_no_op_helper():\n    _touch_version(hyodo.__version__)\n",
+    )
+    report = scan_test_integrity(tmp_path)
+    findings = [f for f in report.findings if f.function == "test_delegates_to_no_op_helper"]
+    assert any(f.category == "no_assertion" for f in findings)
+
+
+def test_helper_in_another_module_is_not_resolved(tmp_path: Path) -> None:
+    _write(
+        tmp_path,
+        "_helpers.py",
+        "def check_version_shape(value):\n    assert value\n",
+    )
+    _write(
+        tmp_path,
+        "test_helper_elsewhere.py",
+        "import hyodo\nfrom _helpers import check_version_shape\n\n\n"
+        "def test_uses_other_module_helper():\n    check_version_shape(hyodo.__version__)\n",
+    )
+    report = scan_test_integrity(tmp_path)
+    findings = [f for f in report.findings if f.function == "test_uses_other_module_helper"]
+    assert any(f.category == "no_assertion" for f in findings)
+
+
 def test_unexplained_skip_end_to_end(tmp_path: Path) -> None:
     _write(
         tmp_path,
