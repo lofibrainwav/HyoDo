@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Audience profiles (`--audience vibe|engineer|professional`, `HYODO_AUDIENCE`,
+  or `[audience]` in `.hyodo/config.toml`) on `check`, `safe`, `policy check`,
+  and `event record --policy`: presentation wording only — decisions, exit
+  codes, `rule_id`s, evidence references, and `--json` payload content stay
+  byte-identical across profiles (a `--json` payload may add one key,
+  `"audience"`). See `docs/AUDIENCE.md`.
+- `hyodo start` now asks one interactive question ("Who is reading these
+  results?") to write `.hyodo/config.toml`'s audience profile; non-interactive
+  runs ask nothing and write nothing.
 - Test integrity (Phase 1-E): `hyodo check` now runs a native, model-free AST
   scan of the project's own tests (`hyodo/test_integrity.py`, reusing
   `hyodo/safe/anti_gaming.py`'s HYO-SAFE-010/011/012 rule ids) alongside its
