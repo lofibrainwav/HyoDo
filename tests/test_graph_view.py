@@ -264,7 +264,7 @@ def test_top_level_rows_for_human_hyodo_and_generic_agent() -> None:
         _node("a1", actor="agent", step_index=2),
     ]
     tree = build_actor_rows(nodes, [])
-    assert tree["order"] == ["human", "hyodo", "agent"]
+    assert [tree["rows"][key]["label"] for key in tree["order"]] == ["human", "hyodo", "agent"]
     assert all(row["parent_row"] is None for row in tree["rows"].values())
 
 
@@ -274,10 +274,50 @@ def test_agent_row_nests_under_the_actor_whose_tool_call_it_descends_from() -> N
     nodes = [parent_tool_call, sub_agent_first]
     edges = [_edge("p1", "s1")]
     tree = build_actor_rows(nodes, edges)
-    assert tree["rows"]["agent:planner_step"]["parent_row"] == "hyodo"
+    agent_row = tree["rows"]["agent:s1"]
+    assert agent_row["label"] == "agent:planner_step"
+    assert agent_row["parent_row"] == "hyodo"
 
 
 def test_agent_row_stays_top_level_without_a_cross_actor_parent() -> None:
     lone = _node("a1", actor="agent", tool_name="planner_step", step_index=0)
     tree = build_actor_rows([lone], [])
-    assert tree["rows"]["agent:planner_step"]["parent_row"] is None
+    assert tree["rows"]["agent:a1"]["parent_row"] is None
+
+
+def test_one_agent_lineage_calling_different_tools_stays_a_single_unnested_row() -> None:
+    # Regression: a real sub-agent calling pyright then pytest in sequence
+    # must render as one row, never fragment into a fabricated nested row
+    # keyed by each event's own tool.name.
+    mission = _node("m1", kind="prompt", actor="human", step_index=0)
+    first_call = _node("s1", actor="agent", kind="tool_call", tool_name="pyright", step_index=1)
+    second_call = _node(
+        "s2", actor="agent", kind="tool_result", tool_name="pytest -q", step_index=2
+    )
+    nodes = [mission, first_call, second_call]
+    edges = [_edge("m1", "s1"), _edge("s1", "s2")]
+    tree = build_actor_rows(nodes, edges)
+
+    agent_rows = [key for key in tree["order"] if key.startswith("agent:")]
+    assert len(agent_rows) == 1
+    row = tree["rows"][agent_rows[0]]
+    assert row["events"] == ["s1", "s2"]
+    assert row["label"] == "agent:pyright"
+    # m1 is a prompt, not a tool_call, so the lineage stays top-level.
+    assert row["parent_row"] is None
+
+
+def test_true_sub_agent_gets_exactly_one_nested_row_under_its_parent() -> None:
+    parent_tool_call = _node("p1", actor="hyodo", kind="tool_call", step_index=0)
+    sub_first = _node("s1", actor="agent", kind="tool_call", tool_name="planner", step_index=1)
+    sub_second = _node(
+        "s2", actor="agent", kind="tool_result", tool_name="different_tool", step_index=2
+    )
+    nodes = [parent_tool_call, sub_first, sub_second]
+    edges = [_edge("p1", "s1"), _edge("s1", "s2")]
+    tree = build_actor_rows(nodes, edges)
+
+    nested_rows = [key for key in tree["order"] if tree["rows"][key]["parent_row"] == "hyodo"]
+    assert len(nested_rows) == 1
+    row = tree["rows"][nested_rows[0]]
+    assert row["events"] == ["s1", "s2"]

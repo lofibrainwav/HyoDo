@@ -53,9 +53,13 @@ POLL_SCRIPT_SHA256 = base64.b64encode(hashlib.sha256(POLL_SCRIPT.encode("utf-8")
 # (spec section 10 rollout step (b): server-rendered MVP, shared TS renderer
 # pending). Builds the panel with textContent/createElement, never innerHTML,
 # because event fields (tool names, paths) come from the local ledger and a
-# compromised agent could have written adversarial text into them.
+# compromised agent could have written adversarial text into them. Escape
+# clears the panel and returns focus to whichever cell last had it (or the
+# first cell in the grid, if none has been focused yet), so the keyboard
+# path never strands focus after the panel is dismissed.
 GRAPH_SCRIPT = """\
 const panel = document.getElementById("event-detail");
+const DEFAULT_DETAIL = "Select an event to see its 5W1H detail.";
 const FIELDS = [
   ["Who", "who"],
   ["What", "what"],
@@ -64,8 +68,11 @@ const FIELDS = [
   ["Why", "why"],
   ["How", "how"],
 ];
-document.querySelectorAll(".cells button[data-event]").forEach((button) => {
+const cells = document.querySelectorAll(".cells button[data-event]");
+let lastFocusedCell = null;
+cells.forEach((button) => {
   const show = () => {
+    lastFocusedCell = button;
     if (!panel) return;
     let data;
     try {
@@ -85,6 +92,12 @@ document.querySelectorAll(".cells button[data-event]").forEach((button) => {
   };
   button.addEventListener("focus", show);
   button.addEventListener("click", show);
+});
+document.addEventListener("keydown", (event) => {
+  if (event.key !== "Escape") return;
+  if (panel) panel.textContent = DEFAULT_DETAIL;
+  const target = lastFocusedCell || cells[0];
+  if (target) target.focus();
 });"""
 
 GRAPH_SCRIPT_SHA256 = base64.b64encode(
@@ -462,6 +475,7 @@ def _render_actor_rows(
     def _render_row(key: str) -> str:
         """Render one row (and its nested sub-agent rows) as HTML."""
         row = rows[key]
+        label = str(row.get("label", key))
         cells = "".join(
             _event_button(node_by_id[node_id])
             for node_id in row.get("events", [])
@@ -470,10 +484,12 @@ def _render_actor_rows(
         nested = "".join(_render_row(child_key) for child_key in children.get(key, []))
         if nested:
             return (
-                f'<details class="row" open><summary>{escape(key)}</summary>'
+                f'<details class="row" open><summary>{escape(label)}</summary>'
                 f'<div class="row-cells">{cells}</div>{nested}</details>'
             )
-        return f'<div class="row"><h3>{escape(key)}</h3><div class="row-cells">{cells}</div></div>'
+        return (
+            f'<div class="row"><h3>{escape(label)}</h3><div class="row-cells">{cells}</div></div>'
+        )
 
     return "".join(_render_row(key) for key in children.get(None, []))
 
@@ -567,15 +583,24 @@ def render_graph_html(graph: dict[str, Any], *, now: datetime | None = None) -> 
     brightness = 0.25 + 0.75 * min(max(ratio, 0.0), 1.0)
     orb_classes = "orb orb-" + orb_decision.lower() + (" orb-pulse" if pulse_eligible else "")
     orb_color = DECISION_COLORS.get(orb_decision, DECISION_COLORS["UNOBSERVED"])
+    # The orb caption's total is the sum of the five column badges below —
+    # never a new number — so the breakdown line spells out those exact
+    # addends next to the total, per column, in the same fixed order.
+    breakdown = " · ".join(
+        f"{english} {coverage.get(key, {'observed': 0, 'expected': 0})['observed']}/"
+        f"{coverage.get(key, {'observed': 0, 'expected': 0})['expected']}"
+        for key, _hanja, _korean, english, _color in PILLAR_SPECS[:5]
+    )
     orb_html = (
         f'<div class="{orb_classes}" role="img" '
         f'aria-label="Core engine pulse: latest decision {escape(orb_decision)}, '
         f'{orb_cov["observed"]}/{orb_cov["expected"]} observed" '
         f'style="--decision-color:{orb_color}; --brightness:{brightness:.3f}"></div>'
-        f'<p class="orb-caption">{escape(orb_decision)} · {orb_cov["observed"]}/'
-        f"{orb_cov['expected']} observed"
+        f'<p class="orb-caption" title="{escape(breakdown)}">{escape(orb_decision)} · '
+        f"{orb_cov['observed']}/{orb_cov['expected']} observed"
         + (" · recent activity" if pulse_eligible else "")
         + "</p>"
+        f'<p class="orb-breakdown">{escape(breakdown)}</p>'
     )
 
     return f"""<!doctype html>
@@ -593,6 +618,7 @@ main {{ max-width:1180px; margin:auto; padding:28px 20px 48px }} h1 {{ margin:0;
 @keyframes hyodo-orb-pulse {{ 0%,100% {{ transform:scale(1) }} 50% {{ transform:scale(1.14) }} }}
 @media (prefers-reduced-motion:reduce) {{ .orb-pulse {{ animation:none }} }}
 .orb-caption {{ color:var(--muted); font-size:.9rem; margin:0 }}
+.orb-breakdown {{ color:var(--muted); font-size:.78rem; margin:.2rem 0 0; text-align:center }}
 .columns {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:14px; margin-bottom:18px }}
 .column {{ background:var(--surface); border:1px solid var(--line); border-top:6px solid var(--accent,#888); border-radius:12px; padding:12px; min-height:120px }}
 .column h2 {{ margin:0 0 4px; font-size:.95rem }} .column h2 span {{ color:var(--accent); font-size:.85rem }}

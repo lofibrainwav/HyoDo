@@ -270,18 +270,23 @@ def orb_state(graph: dict[str, Any]) -> dict[str, Any]:
 def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> dict[str, Any]:
     """Derive display rows and collapsible sub-agent nesting (spec section 2).
 
-    Rows are `human`, `agent:<label>`, and `hyodo` — the schema's actor
-    field stays coarse (`agent`/`human`/`hyodo`,
-    `hyodo/events.py:37 ACTORS`); `<label>` is a display-only sub-label
-    derived from the row's earliest `tool.name`, never a new schema field.
-    A row nests under another row when its earliest event's
+    A row is one actor lineage, never one event. `human` and `hyodo` are
+    each a single row (the schema's actor field stays coarse,
+    `hyodo/events.py:37 ACTORS`). An `agent` lineage is a connected run of
+    `parent_event_id` links between `agent`-actor events (`_lane_root`
+    below) — so one real sub-agent calling several differently named tools
+    in sequence stays *one* row, not one row per tool call — and is
+    labelled, display-only, from the lineage's earliest event's
+    `tool.name`; never a new schema field and never the row's identity
+    (row identity is the lineage, `tool.name` only picks its label). A row
+    nests under another row when its lineage's earliest event's
     `parent_event_id` resolves to a `tool_call` belonging to a different
-    row — entirely derived from the `parent_event_id` edge Phase 1-B
-    already ships.
+    lineage — entirely derived from the `parent_event_id` edge Phase 1-B
+    already ships; nesting is one level deep.
 
     Returns `{"order": [row_key, ...], "rows": {row_key: {...}}}` where
-    each row dict has `actor`, `events` (node ids, earliest first), and
-    `parent_row` (`None` for a top-level row).
+    each row dict has `actor`, `label` (display text), `events` (node ids,
+    earliest first), and `parent_row` (`None` for a top-level row).
     """
     parent_of: dict[str, str] = {}
     for edge in edges:
@@ -291,19 +296,49 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
                 parent_of[target] = source
     node_by_id = {node["id"]: node for node in nodes if isinstance(node.get("id"), str)}
 
-    def _label_for(node: dict[str, Any]) -> str:
-        """Display row key for *node*: raw actor, or `agent:<tool.name>`."""
-        actor = node.get("actor")
-        if actor != "agent":
-            return str(actor) if actor else "unknown"
-        tool = node.get("tool") if isinstance(node.get("tool"), dict) else {}
-        name = tool.get("name") if isinstance(tool, dict) else None
-        return f"agent:{name}" if isinstance(name, str) and name else "agent"
-
     def _sort_key(node: dict[str, Any]) -> int:
         """Sort nodes by `step_index`, treating a missing one as earliest."""
         step = node.get("step_index")
         return step if isinstance(step, int) and not isinstance(step, bool) else 0
+
+    def _lane_root(node_id: str) -> str:
+        """Walk `parent_event_id` up while the parent is also `agent`-actor.
+
+        Two `agent`-actor events belong to the same lineage (row) exactly
+        when this returns the same id for both — the actor lineage, never
+        a `tool.name`, is the row identity.
+        """
+        current = node_id
+        seen = {node_id}
+        while True:
+            parent_id = parent_of.get(current)
+            if not isinstance(parent_id, str):
+                return current
+            parent_node = node_by_id.get(parent_id)
+            if parent_node is None or parent_node.get("actor") != "agent":
+                return current
+            if parent_id in seen:
+                return current
+            seen.add(parent_id)
+            current = parent_id
+
+    def _tool_name(node: dict[str, Any]) -> str | None:
+        tool = node.get("tool") if isinstance(node.get("tool"), dict) else {}
+        name = tool.get("name") if isinstance(tool, dict) else None
+        return name if isinstance(name, str) and name else None
+
+    def _row_key_and_label(node: dict[str, Any]) -> tuple[str, str]:
+        """Stable row id + display label for *node*'s lineage (not the event itself)."""
+        actor = node.get("actor")
+        if actor != "agent":
+            label = str(actor) if actor else "unknown"
+            return label, label
+        node_id = node.get("id")
+        root_id = _lane_root(node_id) if isinstance(node_id, str) else str(node_id)
+        root_node = node_by_id.get(root_id, node)
+        tool_name = _tool_name(root_node)
+        label = f"agent:{tool_name}" if tool_name else "agent"
+        return f"agent:{root_id}", label
 
     rows: dict[str, dict[str, Any]] = {}
     order: list[str] = []
@@ -311,9 +346,14 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
         node_id = node.get("id")
         if not isinstance(node_id, str):
             continue
-        key = _label_for(node)
+        key, label = _row_key_and_label(node)
         if key not in rows:
-            rows[key] = {"actor": node.get("actor"), "events": [], "parent_row": None}
+            rows[key] = {
+                "actor": node.get("actor"),
+                "label": label,
+                "events": [],
+                "parent_row": None,
+            }
             order.append(key)
         rows[key]["events"].append(node_id)
 
@@ -325,7 +365,7 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
         parent_id = parent_of.get(first_id)
         parent_node = node_by_id.get(parent_id) if isinstance(parent_id, str) else None
         if parent_node is not None and parent_node.get("kind") == "tool_call":
-            parent_key = _label_for(parent_node)
+            parent_key, _parent_label = _row_key_and_label(parent_node)
             if parent_key != key:
                 row["parent_row"] = parent_key
 
