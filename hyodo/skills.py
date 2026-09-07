@@ -480,6 +480,16 @@ def _rules_for_manifest_entry(entry: dict[str, Any], root: Path) -> list[Rule]:
     return parse_skill_rules(skill_name, text)
 
 
+def rules_for_manifest_entry(entry: dict[str, Any], root: Path) -> list[Rule]:
+    """Public wrapper over :func:`_rules_for_manifest_entry` for cross-module reuse.
+
+    `hyodo/graph_view.py`'s actor-rings skills ring (Package 2-C) needs the
+    same live-reparsed :class:`Rule` list this module's own lens/propose
+    functions use, to compute each skill's per-pillar rule counts.
+    """
+    return _rules_for_manifest_entry(entry, root)
+
+
 @dataclass(frozen=True)
 class PillarLens:
     """One pillar's coverage row for ``hyodo skills lens``."""

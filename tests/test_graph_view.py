@@ -8,12 +8,14 @@ signals — spec sections 2-4 of
 
 from __future__ import annotations
 
+import json
 from typing import Any
 
 from hyodo.graph_view import (
     UNCLASSIFIED,
     VIRTUE_COLUMNS,
     assign_columns,
+    build_actor_rings,
     build_actor_rows,
     column_coverage,
     hyo_chain,
@@ -321,3 +323,192 @@ def test_true_sub_agent_gets_exactly_one_nested_row_under_its_parent() -> None:
     assert len(nested_rows) == 1
     row = tree["rows"][nested_rows[0]]
     assert row["events"] == ["s1", "s2"]
+
+
+# --- role / hyo_hierarchy (coordinator ruling, additive) -------------------
+
+
+def _evidence_edge(cited: str, citing: str) -> dict[str, Any]:
+    """One non-broken `evidence_refs` edge: *citing* cites *cited*."""
+    return {
+        "type": "evidence_ref",
+        "kind": "evidence",
+        "target_kind": "event",
+        "source": cited,
+        "target": citing,
+        "label": "decided_from",
+    }
+
+
+def test_human_row_role_is_always_human() -> None:
+    nodes = [_node("h1", kind="prompt", actor="human", step_index=0)]
+    tree = build_actor_rows(nodes, [])
+    assert tree["rows"]["human"]["role"] == "human"
+
+
+def test_orchestrator_role_detected_via_parent_event_id_across_actors() -> None:
+    # The `hyodo` actor's own event `p1` is the `parent_event_id` of the
+    # `agent` lineage's first event `s1` — `hyodo` spawned a child lane.
+    parent_call = _node("p1", actor="hyodo", kind="tool_call", step_index=0)
+    child_first = _node("s1", actor="agent", tool_name="planner", step_index=1)
+    nodes = [parent_call, child_first]
+    edges = [_edge("p1", "s1")]
+    tree = build_actor_rows(nodes, edges)
+    assert tree["rows"]["hyodo"]["role"] == "orchestrator"
+    assert tree["rows"]["agent:s1"]["role"] == "worker"
+
+
+def test_reviewer_role_detected_when_citing_another_actor_with_no_write_tool_calls() -> None:
+    # `hyodo` cites the agent's tool_call `t1` via evidence_refs and has no
+    # write-shaped tool call of its own -> reviewer, not worker.
+    tool_call = _node("t1", actor="agent", kind="tool_call", tool_name="pytest", step_index=0)
+    decision = _node("d1", actor="hyodo", kind="decision", decision="ALLOW", step_index=1)
+    nodes = [tool_call, decision]
+    edges = [_edge("t1", "d1"), _evidence_edge("t1", "d1")]
+    tree = build_actor_rows(nodes, edges)
+    assert tree["rows"]["hyodo"]["role"] == "reviewer"
+
+
+def test_citing_actor_with_a_write_shaped_tool_call_is_not_a_reviewer() -> None:
+    tool_call = _node("t1", actor="agent", kind="tool_call", tool_name="pytest", step_index=0)
+    writer_call = _node("w1", actor="hyodo", kind="tool_call", tool_name="file.write", step_index=1)
+    decision = _node("d1", actor="hyodo", kind="decision", decision="ALLOW", step_index=2)
+    nodes = [tool_call, writer_call, decision]
+    edges = [_evidence_edge("t1", "d1")]
+    tree = build_actor_rows(nodes, edges)
+    assert tree["rows"]["hyodo"]["role"] == "worker"
+
+
+def test_worker_with_a_disconnected_event_bumps_its_orchestrator_children_disconnected() -> None:
+    mission = _node("m1", kind="prompt", actor="human", step_index=0)
+    parent_call = _node("p1", actor="hyodo", kind="tool_call", step_index=1)
+    child_first = _node("s1", actor="agent", tool_name="planner", step_index=2)
+    nodes = [mission, parent_call, child_first]
+    # `s1` has no `parent_event_id` chain reaching the mission `m1` at all
+    # (only `p1 -> s1` is linked, and `p1` itself has no parent), so the
+    # child lane's `own_connected` is False.
+    edges = [_edge("p1", "s1")]
+    tree = build_actor_rows(nodes, edges)
+
+    child_row = tree["rows"]["agent:s1"]
+    assert child_row["role"] == "worker"
+    assert child_row["hyo_hierarchy"]["own_connected"] is False
+
+    orchestrator_row = tree["rows"]["hyodo"]
+    assert orchestrator_row["role"] == "orchestrator"
+    assert orchestrator_row["hyo_hierarchy"]["children"] == 1
+    assert orchestrator_row["hyo_hierarchy"]["children_disconnected"] == 1
+
+
+def test_hyo_hierarchy_own_connected_true_when_the_row_reaches_the_mission() -> None:
+    mission = _node("m1", kind="prompt", actor="human", step_index=0)
+    call = _node("t1", actor="agent", tool_name="pytest", step_index=1)
+    nodes = [mission, call]
+    edges = [_edge("m1", "t1")]
+    tree = build_actor_rows(nodes, edges)
+    assert tree["rows"]["agent:t1"]["hyo_hierarchy"]["own_connected"] is True
+    assert tree["rows"]["agent:t1"]["hyo_hierarchy"] == {
+        "own_connected": True,
+        "children": 0,
+        "children_disconnected": 0,
+    }
+
+
+# --- build_actor_rings (Package 2-C, spec section 5) -----------------------
+
+
+def _graph(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> dict[str, Any]:
+    return {"nodes": nodes, "edges": edges}
+
+
+def test_actor_rings_empty_root_yields_unobserved_rings_for_every_row(tmp_path) -> None:
+    nodes = [_node("h1", kind="prompt", actor="human", step_index=0)]
+    graph = _graph(nodes, [])
+    rings = build_actor_rings(graph, tmp_path)
+
+    assert set(rings.keys()) == {"human"}
+    row_rings = rings["human"]
+    assert row_rings["skills"] == {"status": "unobserved", "skills": []}
+    assert row_rings["memory"]["status"] == "unobserved"
+    assert row_rings["routines"]["status"] == "unobserved"
+    assert row_rings["tools"]["status"] == "unobserved"
+
+
+def test_actor_rings_reads_skills_manifest_and_computes_pillar_profile(tmp_path) -> None:
+    skill_path = tmp_path / "SKILL.md"
+    skill_path.write_text(
+        "## Rules\n- require test coverage for every public function\n", encoding="utf-8"
+    )
+    manifest_dir = tmp_path / ".hyodo" / "skills"
+    manifest_dir.mkdir(parents=True)
+    manifest = {
+        "schema": "hyodo.skills-manifest/v1",
+        "skills": [
+            {
+                "name": "demo-skill",
+                "source": "path:SKILL.md",
+                "content_digest": "digest",
+                "status": "ok",
+                "pillars": ["truth"],
+                "compiled_rule_ids": [],
+                "ingested_at": None,
+                "body_stored": False,
+            }
+        ],
+    }
+    (manifest_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    # A parseable but non-mechanical rule never gets a `compiled_rule_ids`
+    # entry, so re-derive the real rule id/compiled state the same way
+    # `hyodo.skills.parse_skill_rules` would, and patch the manifest to
+    # match, rather than hand-inventing an id the parser would never emit.
+    from hyodo.skills import parse_skill_rules
+
+    rules = parse_skill_rules("demo-skill", skill_path.read_text(encoding="utf-8"))
+    compiled_ids = [rule.rule_id for rule in rules if rule.compiled is not None]
+    manifest["skills"][0]["compiled_rule_ids"] = compiled_ids
+    (manifest_dir / "manifest.json").write_text(json.dumps(manifest), encoding="utf-8")
+
+    nodes = [_node("h1", kind="prompt", actor="human", step_index=0)]
+    rings = build_actor_rings(_graph(nodes, []), tmp_path)
+
+    skills_ring = rings["human"]["skills"]
+    assert skills_ring["status"] == "ok"
+    assert len(skills_ring["skills"]) == 1
+    entry = skills_ring["skills"][0]
+    assert entry["name"] == "demo-skill"
+    assert set(entry["pillar_profile"]) == {
+        "truth",
+        "goodness",
+        "beauty",
+        "benevolence",
+        "hyo",
+        "eternity",
+    }
+
+
+def test_actor_rings_memory_and_tools_reflect_this_row_only(tmp_path) -> None:
+    mission = _node("m1", kind="prompt", actor="human", step_index=0)
+    call = _node("t1", actor="agent", kind="tool_call", tool_name="pytest", step_index=1)
+    decision = _node("d1", actor="hyodo", kind="decision", decision="ALLOW", step_index=2)
+    nodes = [mission, call, decision]
+    edges = [
+        _edge("m1", "t1"),
+        _edge("t1", "d1"),
+        _evidence_edge("t1", "d1"),
+    ]
+    rings = build_actor_rings(_graph(nodes, edges), tmp_path)
+
+    hyodo_memory = rings["hyodo"]["memory"]
+    assert hyodo_memory["status"] == "ok"
+    assert hyodo_memory["events"] == ["t1"]
+
+    agent_tools = rings["agent:t1"]["tools"]
+    assert agent_tools["status"] == "ok"
+    assert agent_tools["tools"] == [{"name": "pytest", "decision": "ALLOW"}]
+
+
+def test_actor_rings_unknown_key_absent_from_the_returned_dict(tmp_path) -> None:
+    nodes = [_node("h1", kind="prompt", actor="human", step_index=0)]
+    rings = build_actor_rings(_graph(nodes, []), tmp_path)
+    assert "does-not-exist" not in rings

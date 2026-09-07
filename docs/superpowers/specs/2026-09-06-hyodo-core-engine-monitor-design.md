@@ -296,6 +296,19 @@ values ever diverge by name or by column order.
 3. **Actor rings.** Sections 2 and 5's row nesting and ring drill-down.
    Needs nothing beyond what step 2 already reads; the skills and memory
    rings stay empty pending Stage 2-A/2-B.
+
+   **Status: step (c) shipped, server-rendered, Stage 2-C.**
+   `hyodo.graph_view.build_actor_rows` carries the row nesting plus a
+   `role` (`human`/`orchestrator`/`reviewer`/`worker`) and
+   `hyo_hierarchy` annotation; `hyodo.graph_view.build_actor_rings`
+   builds the four rings per row from the ledger and local
+   `.hyodo/skills/manifest.json` / `.hyodo/chunks-manifest.json` /
+   `.hyodo/connect.json` manifests (Stage 2-A/2-B feed the skills/memory
+   rings once each ships; both stay empty, `"unobserved"`, until then).
+   `hyodo dashboard`'s `/graph` page renders every row's rings as a
+   hidden panel toggled by clicking the row's label (Escape closes it);
+   `GET /api/actor?key=<row key>` serves the same data as JSON. See
+   `docs/GRAPH_EXPORT.md`.
 4. **Audience profiles.** Section 7's wording layer. Independent of steps
    2-3's rendering; needs only the `[audience]` config surface, following
    the same override pattern Phase 1-A's `[web]`/`[trust]` fields use.

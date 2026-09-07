@@ -481,8 +481,9 @@ above is a chunk digest, never chunk text.
 ### Data model
 
 Two of this table's rows (`parent_event_id`, `evidence_refs`) are Phase
-1-B fields that do not exist in `hyodo/events.py` yet; 2-C's own
-additions build on top of them and cannot ship before 1-B does.
+1-B fields; both have existed in the `hyodo.agent-event/v1` ledger schema
+(`hyodo/events.py`) since 4.14.0. 2-C's own additions — the reverse
+index, pillar clusters, and the export bridge — build on top of them.
 
 New optional artifact, `.hyodo/graph.json`, schema
 `hyodo.graph-export/v1` — the bridge an external note system may turn

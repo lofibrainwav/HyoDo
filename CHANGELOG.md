@@ -60,6 +60,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   local truth store with the stdio adapter — no second ledger, remote
   (ChatGPT) honestly `UNOBSERVED`. `hyodo mcp contract --json` additively
   folds the same receipt in as `"continuity"`.
+- `hyodo graph export [--out .hyodo/graph.json] [--yes] [--root]` (Stage 2
+  package 2-C): writes the `hyodo.graph-export/v1` bridge artifact an
+  external note system can turn into permanent notes — nodes/edges
+  mirroring `hyodo report --format graph`, a `backlinks` reverse index,
+  and six-pillar `clusters`. `hyodo report --format graph` gains the same
+  `backlinks` field, additively; its exit contract is unchanged. See
+  `docs/GRAPH_EXPORT.md`.
+- Actor rings (Stage 2 package 2-C, core-engine-monitor spec section 5,
+  step (c)): `hyodo dashboard`'s `/graph` page now nests each actor row
+  with a derived `role` (`human`/`orchestrator`/`reviewer`/`worker`) and
+  lets you click a row's label to open its skills/memory/routines/tools
+  rings, built from the ledger and local `.hyodo/skills/manifest.json` /
+  `.hyodo/connect.json` manifests only — no network. `GET
+  /api/actor?key=<row key>` serves the same rings as JSON.
 
 ## [4.14.0] - 2026-09-07
 

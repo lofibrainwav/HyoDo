@@ -8,10 +8,19 @@ produces and returns the layout facts `hyodo/dashboard.py` renders as HTML
 Nothing here computes a composite score, a probability, or a confidence
 value, and nothing here changes a policy decision — nothing does anything
 but re-read fields the schema already carries.
+
+The one exception is :func:`build_actor_rings` (Package 2-C, step (c) of
+the core-engine-monitor rollout): it reads local, already-shipped
+artifacts (`.hyodo/skills/manifest.json`, `.hyodo/chunks-manifest.json`,
+`.hyodo/connect.json`) to fill the skills/memory/routines rings — no
+network call, ever, and no new artifact is written.
 """
 
 from __future__ import annotations
 
+import json
+from collections import Counter
+from pathlib import Path
 from typing import Any
 
 #: Fixed column order (spec section 2): Truth, Goodness, Beauty, Benevolence,
@@ -286,7 +295,32 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
 
     Returns `{"order": [row_key, ...], "rows": {row_key: {...}}}` where
     each row dict has `actor`, `label` (display text), `events` (node ids,
-    earliest first), and `parent_row` (`None` for a top-level row).
+    earliest first), `parent_row` (`None` for a top-level row), `role`
+    (coordinator ruling, additive, no schema change — see below), and
+    `hyo_hierarchy` (same ruling).
+
+    `role` is derived only from the graph, fixed precedence
+    `human > orchestrator > reviewer > worker`:
+
+    - `"human"`: the row's `actor` is `"human"`.
+    - `"orchestrator"`: some *other* row's first event's `parent_event_id`
+      points at one of this row's events (this row spawned a child lane).
+    - `"reviewer"`: this row has at least one event whose `evidence_refs`
+      cite another actor's events (an `evidence_ref` edge whose source
+      belongs to a different `actor`) *and* the row has no write-shaped
+      tool call (`tool.name` containing `write`, `edit`, `create`,
+      `delete`, `rm`, `patch`, `commit`, or `push`, case-insensitive).
+    - `"worker"`: none of the above.
+
+    `hyo_hierarchy` is `{"own_connected": bool, "children": int,
+    "children_disconnected": int}`: `own_connected` is `True` when every
+    one of this row's own events chains to its run's mission
+    (`hyo_chain`, section 3's structural Hyo check); `children` counts
+    this row's direct `parent_row` children (nesting is one level deep,
+    so no recursion is needed); `children_disconnected` counts those
+    children whose own `own_connected` is `False` — an orchestrator row
+    inherits its children's orphaned counts this way, without re-walking
+    the chain itself.
     """
     parent_of: dict[str, str] = {}
     for edge in edges:
@@ -369,4 +403,320 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
             if parent_key != key:
                 row["parent_row"] = parent_key
 
+    # Coordinator ruling (additive, no schema change): `role` and
+    # `hyo_hierarchy`, both derived only from `nodes`/`edges` already
+    # gathered above.
+    chain = hyo_chain(nodes, edges)
+    for key in order:
+        row = rows[key]
+        row["hyo_hierarchy"] = {
+            "own_connected": all(chain.get(event_id, False) for event_id in row["events"]),
+            "children": 0,
+            "children_disconnected": 0,
+        }
+    for key in order:
+        parent_key = rows[key].get("parent_row")
+        if not isinstance(parent_key, str) or parent_key not in rows:
+            continue
+        parent_hierarchy = rows[parent_key]["hyo_hierarchy"]
+        parent_hierarchy["children"] += 1
+        if not rows[key]["hyo_hierarchy"]["own_connected"]:
+            parent_hierarchy["children_disconnected"] += 1
+
+    def _has_write_tool_call(row_events: list[str]) -> bool:
+        for event_id in row_events:
+            node = node_by_id.get(event_id)
+            if node is None:
+                continue
+            tool = node.get("tool") if isinstance(node.get("tool"), dict) else {}
+            name = str(tool.get("name") or "").lower() if isinstance(tool, dict) else ""
+            if name and any(word in name for word in _WRITE_TOOL_WORDS):
+                return True
+        return False
+
+    def _cites_another_actor(row_events: list[str], actor: Any) -> bool:
+        row_event_ids = set(row_events)
+        for edge in edges:
+            if edge.get("type") != "evidence_ref" or edge.get("target") not in row_event_ids:
+                continue
+            source_id = edge.get("source")
+            source_node = node_by_id.get(source_id) if isinstance(source_id, str) else None
+            if source_node is not None and source_node.get("actor") != actor:
+                return True
+        return False
+
+    orchestrator_keys: set[str] = set()
+    for key in order:
+        row = rows[key]
+        first_events = {
+            rows[other]["events"][0] for other in order if other != key and rows[other]["events"]
+        }
+        owned_events = set(row["events"])
+        if any(parent_of.get(first_event) in owned_events for first_event in first_events):
+            orchestrator_keys.add(key)
+
+    for key in order:
+        row = rows[key]
+        if row["actor"] == "human":
+            row["role"] = "human"
+        elif key in orchestrator_keys:
+            row["role"] = "orchestrator"
+        elif _cites_another_actor(row["events"], row["actor"]) and not _has_write_tool_call(
+            row["events"]
+        ):
+            row["role"] = "reviewer"
+        else:
+            row["role"] = "worker"
+
     return {"order": order, "rows": rows}
+
+
+#: Case-insensitive substring markers for a "write-shaped" tool call
+#: (coordinator ruling, `build_actor_rows`'s reviewer-role detection).
+_WRITE_TOOL_WORDS: tuple[str, ...] = (
+    "write",
+    "edit",
+    "create",
+    "delete",
+    "rm",
+    "patch",
+    "commit",
+    "push",
+)
+
+
+def _read_json_object(path: Path) -> dict[str, Any] | None:
+    """Read one JSON object from *path*; absent/unreadable/malformed -> `None`."""
+    try:
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        data = json.loads(text)
+    except json.JSONDecodeError:
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _build_skills_ring(root: Path) -> dict[str, Any]:
+    """Skills ring (spec section 5, ring 1): one entry per ingested skill.
+
+    Reads `.hyodo/skills/manifest.json` (Stage 2-A) if present. Each entry
+    is `{"name", "rule_ids", "pillar_profile"}`: `rule_ids` is the
+    manifest's own `compiled_rule_ids` for that skill (already computed at
+    ingest time, no re-parse needed); `pillar_profile` is a six-slot count
+    of that skill's *compiled* rules per pillar
+    (`hyodo.skills.PILLARS` order), re-derived live via
+    `hyodo.skills.rules_for_manifest_entry` because the manifest itself
+    only stores rule ids and digests, never a per-pillar tally. Absent
+    manifest -> `{"status": "unobserved", "skills": []}`, per the brief
+    ("not available until skill lenses ship" note, spec section 5).
+    """
+    from hyodo.skills import PILLARS as SKILL_PILLARS
+    from hyodo.skills import load_manifest, rules_for_manifest_entry
+
+    manifest, _status = load_manifest(root)
+    if manifest is None:
+        return {"status": "unobserved", "skills": []}
+    entries = manifest.get("skills")
+    entries = entries if isinstance(entries, list) else []
+    skills: list[dict[str, Any]] = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        profile = dict.fromkeys(SKILL_PILLARS, 0)
+        for rule in rules_for_manifest_entry(entry, root):
+            if rule.compiled is None:
+                continue
+            for pillar in rule.pillars:
+                if pillar in profile:
+                    profile[pillar] += 1
+        rule_ids = entry.get("compiled_rule_ids")
+        skills.append(
+            {
+                "name": entry.get("name"),
+                "rule_ids": list(rule_ids) if isinstance(rule_ids, list) else [],
+                "pillar_profile": profile,
+            }
+        )
+    return {"status": "ok" if skills else "unobserved", "skills": skills}
+
+
+def _read_chunk_digests(root: Path) -> list[str]:
+    """Absorbed-source chunk digests from `.hyodo/chunks-manifest.json` (Stage 2-B).
+
+    2-B has not shipped yet (spec section 9's own inputs list), so this
+    reads defensively: any shape other than `{"chunks": [{"digest": ...}]}`
+    returns an empty list rather than raising. Digests only, per the
+    memory-ring rule (spec section 5, ring 2) — chunk text never crosses
+    this boundary.
+    """
+    data = _read_json_object(root / ".hyodo" / "chunks-manifest.json")
+    chunks = data.get("chunks") if isinstance(data, dict) else None
+    if not isinstance(chunks, list):
+        return []
+    digests: set[str] = set()
+    for chunk in chunks:
+        digest = chunk.get("digest") if isinstance(chunk, dict) else None
+        if isinstance(digest, str):
+            digests.add(digest)
+    return sorted(digests)
+
+
+def _build_memory_ring(
+    row_events: list[dict[str, Any]], edges: list[dict[str, Any]], root: Path
+) -> dict[str, Any]:
+    """Memory ring (spec section 5, ring 2): this row's cited events plus chunk digests.
+
+    "Events this actor cited" is read off already-validated `evidence_ref`
+    edges (never a broken ref, per `hyodo.event_graph.build_event_graph`),
+    restricted to edges whose citing event (`target`) is one of this row's
+    own `kind == "decision"` events, per the brief. Every node in this ring
+    cites the event id it came from, by construction (it *is* an event id
+    or a gate id, never new text).
+    """
+    decision_ids = {event.get("id") for event in row_events if event.get("kind") == "decision"}
+    cited: set[str] = set()
+    for edge in edges:
+        if edge.get("type") != "evidence_ref" or edge.get("target") not in decision_ids:
+            continue
+        source = edge.get("source")
+        if isinstance(source, str):
+            cited.add(source)
+    chunk_digests = _read_chunk_digests(root)
+    events = sorted(cited)
+    return {
+        "status": "ok" if events or chunk_digests else "unobserved",
+        "events": events,
+        "chunk_digests": chunk_digests,
+    }
+
+
+def _build_routines_ring(row_events: list[dict[str, Any]], root: Path) -> dict[str, Any]:
+    """Routines ring (spec section 5, ring 3): repeated tool-call patterns + connect targets.
+
+    "Repeated" is `tool.name` recurring at least twice across this row's
+    own `tool_call`/`tool_result` events (counts only, never percentages,
+    Ruling 4). `.hyodo/connect.json` (Phase 1-D) contributes the harnesses
+    already wired for this project — not actor-specific, since `connect`
+    state carries no actor attribution, so every row sees the same list.
+    """
+    names = [
+        event["tool"]["name"]
+        for event in row_events
+        if isinstance(event.get("tool"), dict) and isinstance(event["tool"].get("name"), str)
+    ]
+    counts = Counter(names)
+    tool_counts = {name: count for name, count in sorted(counts.items()) if count >= 2}
+
+    from hyodo.connect import load_connect_state
+
+    state = load_connect_state(root)
+    targets = state.get("targets")
+    connect_targets = sorted(targets.keys()) if isinstance(targets, dict) else []
+
+    return {
+        "status": "ok" if tool_counts or connect_targets else "unobserved",
+        "tool_counts": tool_counts,
+        "connect_targets": connect_targets,
+    }
+
+
+def _build_tools_ring(
+    row_events: list[dict[str, Any]],
+    all_nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+) -> dict[str, Any]:
+    """Tools ring (spec section 5, ring 4): one node per distinct `tool.name`.
+
+    Colour key is the *latest* `policy.decision` for that tool, per the
+    brief. A `decision`-kind event's own `parent_event_id` is the
+    `tool_call` it evaluates (the same convention `hyodo/dashboard.py`'s
+    fixtures and the local viewer already assume); this walks that link
+    across the *whole* graph (`all_nodes`/`edges`), not just this row,
+    because the decision event's actor is `hyodo`, never this row's own
+    actor. `"UNOBSERVED"` when no decision was ever recorded for any call
+    of that tool.
+    """
+    parent_of: dict[str, str] = {}
+    for edge in edges:
+        if edge.get("type") == "parent_event_id":
+            target, source = edge.get("target"), edge.get("source")
+            if isinstance(target, str) and isinstance(source, str):
+                parent_of[target] = source
+
+    latest_decision_by_call: dict[str, tuple[str, str]] = {}
+    for node in all_nodes:
+        if node.get("kind") != "decision":
+            continue
+        node_id = node.get("id")
+        call_id = parent_of.get(node_id) if isinstance(node_id, str) else None
+        decision = node.get("decision")
+        ts = node.get("ts")
+        if not isinstance(call_id, str) or not isinstance(decision, str) or not decision:
+            continue
+        ts_key = ts if isinstance(ts, str) else ""
+        existing = latest_decision_by_call.get(call_id)
+        if existing is None or ts_key >= existing[0]:
+            latest_decision_by_call[call_id] = (ts_key, decision)
+
+    tool_names: dict[str, list[str]] = {}
+    for event in row_events:
+        if event.get("kind") != "tool_call":
+            continue
+        tool = event.get("tool") if isinstance(event.get("tool"), dict) else {}
+        name = tool.get("name") if isinstance(tool, dict) else None
+        event_id = event.get("id")
+        if isinstance(name, str) and name and isinstance(event_id, str):
+            tool_names.setdefault(name, []).append(event_id)
+
+    tools: list[dict[str, Any]] = []
+    for name in sorted(tool_names):
+        latest_ts = ""
+        decision = "UNOBSERVED"
+        for call_id in tool_names[name]:
+            entry = latest_decision_by_call.get(call_id)
+            if entry is not None and entry[0] >= latest_ts:
+                latest_ts, decision = entry
+        tools.append({"name": name, "decision": decision})
+
+    return {"status": "ok" if tools else "unobserved", "tools": tools}
+
+
+def build_actor_rings(graph: dict[str, Any], root: Path) -> dict[str, dict[str, Any]]:
+    """Build every actor row's four-ring content (spec section 5).
+
+    `graph` is a full `hyodo.evidence-graph/v1` dict
+    (`hyodo.report.build_report_graph(root)`); `root` is the checkout
+    whose local artifacts feed the rings (never the network, per the
+    brief). Returns `{row_key: {"skills", "memory", "routines", "tools"}}`
+    for *every* row `build_actor_rows` derives from `graph`, keyed exactly
+    the way that function keys its own `rows` dict — `GET /api/actor?key=`
+    (`hyodo/dashboard.py`) looks a single key up in this dict and 404s
+    when it is absent, per Ruling 3.
+
+    Reading inward to outward (spec section 5): `skills` is the innermost
+    ring and is the same for every row (skill ingestion carries no
+    per-actor attribution in the schema); `memory`, `routines`, and
+    `tools` are each derived from that specific row's own events.
+    """
+    raw_nodes = graph.get("nodes")
+    raw_edges = graph.get("edges")
+    nodes: list[dict[str, Any]] = raw_nodes if isinstance(raw_nodes, list) else []
+    edges: list[dict[str, Any]] = raw_edges if isinstance(raw_edges, list) else []
+    node_by_id = {node["id"]: node for node in nodes if isinstance(node.get("id"), str)}
+    rows_tree = build_actor_rows(nodes, edges)
+    skills_ring = _build_skills_ring(root)
+
+    rings: dict[str, dict[str, Any]] = {}
+    for key, row in rows_tree["rows"].items():
+        row_events = [
+            node_by_id[event_id] for event_id in row.get("events", []) if event_id in node_by_id
+        ]
+        rings[key] = {
+            "skills": skills_ring,
+            "memory": _build_memory_ring(row_events, edges, root),
+            "routines": _build_routines_ring(row_events, root),
+            "tools": _build_tools_ring(row_events, nodes, edges),
+        }
+    return rings
