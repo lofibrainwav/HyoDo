@@ -4,13 +4,13 @@ Covers: profile resolution order, invalid-value handling, byte-identical
 --json payloads (minus the added "audience" key) and exit codes across
 profiles for check/safe/policy check, vibe/professional verdict lines
 carrying the same n/m figures as engineer, the vibe RED word on DENY,
---explain fallback to engineer text, rule_id parity across the three
-explanation tables, and `hyodo start`'s single-question onboarding.
+--explain fallback to engineer text, and rule_id parity across the three
+explanation tables. ``hyodo start``'s onboarding flow has its own coverage
+in ``tests/test_start_onboarding.py``.
 """
 
 from __future__ import annotations
 
-import builtins
 import json
 import uuid
 from pathlib import Path
@@ -283,41 +283,3 @@ def test_explain_falls_back_to_engineer_text_when_profile_entry_missing():
 def test_every_engineer_entry_has_vibe_and_professional_counterpart():
     assert set(EXPLANATIONS_VIBE.keys()) == set(EXPLANATIONS.keys())
     assert set(EXPLANATIONS_PROFESSIONAL.keys()) == set(EXPLANATIONS.keys())
-
-
-# --------------------------------------------------------------------------- #
-# `hyodo start`: at most one question; writes nothing non-interactively.
-# --------------------------------------------------------------------------- #
-
-
-def test_start_noninteractive_asks_nothing_and_writes_nothing(monkeypatch, tmp_path: Path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
-    cli.start()
-    assert not (tmp_path / ".hyodo" / "config.toml").exists()
-
-
-def test_start_interactive_asks_exactly_one_question_and_writes_on_explicit_answer(
-    monkeypatch, tmp_path: Path
-):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
-    prompts: list[str] = []
-
-    def fake_input(prompt: str = "") -> str:
-        prompts.append(prompt)
-        return "3"
-
-    monkeypatch.setattr(builtins, "input", fake_input)
-    cli.start()
-    assert len(prompts) == 1
-    written = (tmp_path / ".hyodo" / "config.toml").read_text(encoding="utf-8")
-    assert 'profile = "professional"' in written
-
-
-def test_start_interactive_unrecognized_answer_writes_nothing(monkeypatch, tmp_path: Path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
-    monkeypatch.setattr(builtins, "input", lambda prompt="": "banana")
-    cli.start()
-    assert not (tmp_path / ".hyodo" / "config.toml").exists()

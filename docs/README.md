@@ -17,6 +17,7 @@ language-agnostic.
 | --- | --- |
 | [../README.md](../README.md) | Product overview + exit contracts |
 | [../QUICK_START.md](../QUICK_START.md) | Install + CLI path |
+| [ONBOARDING.md](./ONBOARDING.md) | `hyodo start` first-use flow, MCP host table, `hyodo mcp config` |
 | [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
 | [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
 | [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |

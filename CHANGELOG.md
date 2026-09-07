@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-No unreleased changes.
+### Added
+
+- `hyodo mcp config <host>` (`claude-code`, `claude-desktop`, `cursor`,
+  `vscode`, `codex`): prints, or with `--write` merges key-level, the MCP
+  client configuration that registers HyoDo's local stdio adapter — no
+  bearer token, no secret, ever. `chatgpt` reports `UNOBSERVED` honestly
+  (the remote connector is not live). See `docs/ONBOARDING.md`.
+- `hyodo start` is now the first-use onboarding flow: workspace/detected
+  hosts, the existing audience question, one "connect which host now?"
+  question (at most three choices, one preview, one yes/no confirm), then a
+  first prompt to try. Non-interactive runs print the same four steps as
+  text and ask/write nothing.
 
 ## [4.14.0] - 2026-09-07
 

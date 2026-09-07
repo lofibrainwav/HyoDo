@@ -45,6 +45,40 @@ hyodo check
 `hyodo check` runs the gates recorded in `.hyodo/gates.toml`. An empty or
 malformed gate configuration is not treated as a pass — it exits `2`.
 
+## 5. Connect
+
+```bash
+hyodo start
+```
+
+`hyodo start` shows detected hosts, asks one audience question, then offers
+to connect one host with a preview and a single yes/no confirm. To connect a
+host directly:
+
+```bash
+hyodo mcp config claude-code --write
+```
+
+```bash
+hyodo mcp config cursor --write
+```
+
+```bash
+hyodo mcp config vscode --write
+```
+
+```bash
+hyodo mcp config claude-desktop --write
+```
+
+```bash
+hyodo mcp config codex --write
+```
+
+No bearer token or secret ever appears in this path. ChatGPT and the remote
+connector (`mcp.hyodo.app`) are not live yet — `hyodo mcp config chatgpt`
+reports `UNOBSERVED` honestly instead of guessing at a config format.
+
 ## Exit contracts
 
 | Command | Contract |
