@@ -6,6 +6,11 @@ Current public version: see the root `VERSION` source of truth. HyoDo preserves
 explicit `check` and `safe` exit contracts; model-agnostic does not mean
 language-agnostic.
 
+`hyodo dashboard` now also serves `GET /graph`, a local evidence-graph viewer
+(five fixed virtue columns plus a core-engine-pulse orb) rendered live from
+`.hyodo/agent-events.jsonl`; `GET /api/graph` returns the same
+`hyodo.evidence-graph/v1` JSON `hyodo report --format graph` writes.
+
 ## Start here
 
 | Doc | Purpose |

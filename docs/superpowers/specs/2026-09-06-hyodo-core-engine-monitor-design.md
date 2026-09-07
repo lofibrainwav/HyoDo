@@ -200,6 +200,14 @@ deterministic explanation table.
 
 ## 8. Shared renderer
 
+**Status: step (b) shipped server-rendered; renderer sharing pending.** The
+local viewer (`hyodo dashboard`'s `GET /graph`, `GET /api/graph`) renders the
+five columns and the orb server-side in Python (`hyodo/graph_view.py`,
+`hyodo/dashboard.py`), with a small inline vanilla-JS enhancement for
+keyboard focus and the detail panel — not the shared TypeScript module this
+section describes. That module needs a build-and-package step for the wheel
+that is a separate infrastructure change; nothing below is implemented yet.
+
 One TypeScript module renders both the public prototype and the local
 viewer. Today it lives at `site/src/graph/evidence-graph.ts` and exports a
 pure `mountEvidenceGraph(root)` entry point plus the fixture data this

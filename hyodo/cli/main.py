@@ -64,9 +64,15 @@ from hyodo.connect import (
 )
 from hyodo.connect import detect as detect_connect_targets
 from hyodo.connector_contract import build_connector_contract
-from hyodo.dashboard import PILLAR_SPECS, POLL_SCRIPT_SHA256, render_dashboard_html
+from hyodo.dashboard import (
+    GRAPH_SCRIPT_SHA256,
+    PILLAR_SPECS,
+    POLL_SCRIPT_SHA256,
+    render_dashboard_html,
+    render_graph_html,
+)
 from hyodo.eval import EvalInputError, run_evaluation
-from hyodo.event_graph import validate_event_edges
+from hyodo.event_graph import render_event_graph_json, validate_event_edges
 from hyodo.events import (
     AGENT_EVENTS_RELATIVE_PATH,
     EVENT_ID_CONFLICT,
@@ -124,7 +130,7 @@ from hyodo.policy_trust import (
     load_policy_trust,
     resolve_policy_trust_grant,
 )
-from hyodo.report import write_report
+from hyodo.report import build_report_graph, write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
 from hyodo.verdict import explain_decision, render_verdict_line
@@ -543,7 +549,7 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
 
 DASHBOARD_CSP = (
     "default-src 'none'; style-src 'unsafe-inline'; "
-    f"script-src 'sha256-{POLL_SCRIPT_SHA256}'; connect-src 'self'"
+    f"script-src 'sha256-{POLL_SCRIPT_SHA256}' 'sha256-{GRAPH_SCRIPT_SHA256}'; connect-src 'self'"
 )
 
 
@@ -624,9 +630,10 @@ class DashboardState:
 
 
 # Only these routes carry evidence read from the loopback board. The HTML
-# page at "/" is never a CORS target (a cross-origin page can only read
-# response bodies from these two JSON endpoints when the browser lets it).
-_CORS_ELIGIBLE_PATHS = frozenset({"/api/evidence", "/api/status"})
+# pages at "/" and "/graph" are never CORS targets (a cross-origin page can
+# only read response bodies from these JSON endpoints when the browser
+# lets it).
+_CORS_ELIGIBLE_PATHS = frozenset({"/api/evidence", "/api/status", "/api/graph"})
 
 
 def make_dashboard_handler(
@@ -634,6 +641,7 @@ def make_dashboard_handler(
     refresh: Callable[[], dict[str, object]] | None = None,
     refresh_token: str = "",
     allow_origins: tuple[str, ...] = (),
+    root: Path | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     """Build the loopback request handler serving the current snapshot.
 
@@ -641,6 +649,16 @@ def make_dashboard_handler(
     default, matching prior behaviour byte-for-byte: no CORS headers at
     all). No wildcard support — an origin must match one of the configured
     values exactly before ``Access-Control-Allow-Origin`` is echoed back.
+
+    ``root`` is the HyoDo checkout whose ``.hyodo/agent-events.jsonl`` feeds
+    the local evidence-graph viewer. Unlike the six-card snapshot above,
+    ``GET /graph`` and ``GET /api/graph`` read that ledger live on every
+    request via ``build_report_graph`` — the same corrupt/unreadable and
+    mission-policy handling as ``hyodo report --format graph`` — instead of
+    the cached ``DashboardState`` snapshot, so a paired ``hyodo event
+    record`` shows up on the next request without a manual re-measure.
+    When ``root`` is omitted, both routes 404 (this handler's behaviour
+    before the graph viewer shipped).
     """
     allowed_origins = frozenset(allow_origins)
 
@@ -648,6 +666,13 @@ def make_dashboard_handler(
         """Serve the dashboard's current loopback snapshot over HTTP."""
 
         def _resolve(self) -> tuple[bytes, str] | None:
+            if self.path in ("/graph", "/api/graph"):
+                if root is None:
+                    return None
+                graph = build_report_graph(root)
+                if self.path == "/graph":
+                    return render_graph_html(graph).encode("utf-8"), "text/html; charset=utf-8"
+                return render_event_graph_json(graph).encode("utf-8"), "application/json"
             page, evidence_json = state.snapshot()
             if self.path == "/":
                 return page, "text/html; charset=utf-8"
@@ -812,7 +837,9 @@ def dashboard(
     try:
         server = ThreadingHTTPServer(
             (LOOPBACK_HOST, port),
-            make_dashboard_handler(state, _refresh_evidence, refresh_token, tuple(allow_origin)),
+            make_dashboard_handler(
+                state, _refresh_evidence, refresh_token, tuple(allow_origin), root=root
+            ),
         )
     except OSError as exc:
         console.print(f"[red]Cannot bind {LOOPBACK_HOST}:{port}: {exc}[/red]")

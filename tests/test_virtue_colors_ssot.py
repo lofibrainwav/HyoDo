@@ -79,6 +79,22 @@ def test_virtue_hex_values_match_dashboard_ssot():
         )
 
 
+def test_virtue_accent_hex_dict_matches_the_dashboard_css_block():
+    """`hyodo.dashboard._VIRTUE_ACCENT_HEX` is a hand-kept second copy of the
+    literal `.name {{ --accent:#hex }}` CSS block this file's other tests
+    already parse from `hyodo/dashboard.py`'s source text (the render_graph_html
+    graph viewer looks values up by name from that dict rather than
+    re-parsing CSS). Nothing catches the two drifting apart without this
+    assertion — see the judge report's colour-SSOT-gap finding.
+    """
+    from hyodo.dashboard import _VIRTUE_ACCENT_HEX
+
+    text = DASHBOARD_PATH.read_text(encoding="utf-8")
+    css_hex = {m.group("name"): m.group("hex") for m in DASHBOARD_ACCENT_RE.finditer(text)}
+    assert css_hex, "no .accent-class { --accent:#hex } rules parsed from dashboard.py"
+    assert css_hex == _VIRTUE_ACCENT_HEX
+
+
 def test_virtue_tokens_appear_in_fixed_column_order():
     if not TOKENS_PATH.exists():
         pytest.skip("site/ is absent (sdist install) — nothing to compare")
