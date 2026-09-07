@@ -62,7 +62,10 @@ def test_dry_run_json_includes_planned_content(tmp_path: Path) -> None:
     assert payload["write"] is False
     assert payload["status"] == "would_write"
     files = payload["files"]
-    assert len(files) == 1
+    # A fresh root has no .hyodo/policy.toml, so the plan bootstraps a starter
+    # policy alongside the hooks -- the exact fix for the shadow-blocking
+    # incident (nothing to evaluate against == a hook that always blocks).
+    assert len(files) == 2
     assert files[0]["path"] == ".claude/settings.json"
     assert files[0]["existed_before"] is False
     settings = json.loads(files[0]["content"])
@@ -70,7 +73,11 @@ def test_dry_run_json_includes_planned_content(tmp_path: Path) -> None:
     post = settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
     assert pre == "hyodo policy check --stdin --hook claude-code --root ."
     assert post == "hyodo event record --stdin --hook claude-code --policy .hyodo/policy.toml"
+    assert files[1]["path"] == ".hyodo/policy.toml"
+    assert files[1]["existed_before"] is False
+    assert 'schema = "hyodo.policy/v1"' in files[1]["content"]
     assert not (tmp_path / ".claude" / "settings.json").exists()
+    assert not (tmp_path / ".hyodo" / "policy.toml").exists()
 
 
 def test_generated_claude_code_hook_json_matches_documented_shape(tmp_path: Path) -> None:
@@ -239,6 +246,88 @@ def test_shadow_has_no_effect_on_pre_commit_content(tmp_path: Path) -> None:
     assert result.exit_code == 0, result.output
     state = json.loads((tmp_path / CONNECT_RELATIVE_PATH).read_text())
     assert state["targets"]["pre-commit"]["shadow"] is False
+
+
+# --------------------------------------------------------------------------
+# Starter policy bootstrap: the incident's actual root cause was that
+# `connect claude-code` installed hooks with nothing for them to evaluate
+# (no .hyodo/policy.toml), so every hook call failed closed.
+# --------------------------------------------------------------------------
+
+
+def test_write_creates_starter_policy_when_absent(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path)]
+    )
+    assert result.exit_code == 0, result.output
+    policy_path = tmp_path / ".hyodo" / "policy.toml"
+    assert policy_path.is_file()
+    text = policy_path.read_text()
+    assert 'schema = "hyodo.policy/v1"' in text
+    assert ".env" in text
+    assert "id_rsa*" in text
+    assert ".hyodo/**" in text
+
+    state = json.loads((tmp_path / CONNECT_RELATIVE_PATH).read_text())
+    tracked_paths = {f["path"] for f in state["targets"]["claude-code"]["files"]}
+    assert ".hyodo/policy.toml" in tracked_paths
+
+
+def test_second_write_does_not_change_starter_policy(tmp_path: Path) -> None:
+    first = runner.invoke(
+        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path)]
+    )
+    assert first.exit_code == 0, first.output
+    policy_path = tmp_path / ".hyodo" / "policy.toml"
+    content_before = policy_path.read_text()
+    mtime_before = policy_path.stat().st_mtime_ns
+
+    second = runner.invoke(
+        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path), "--json"]
+    )
+    assert second.exit_code == 0, second.output
+    assert policy_path.read_text() == content_before
+    assert policy_path.stat().st_mtime_ns == mtime_before
+
+
+def test_existing_policy_is_never_overwritten(tmp_path: Path) -> None:
+    policy_dir = tmp_path / ".hyodo"
+    policy_dir.mkdir(parents=True)
+    custom_policy = 'schema = "hyodo.policy/v1"\nallowed_tools = ["Read"]\n'
+    (policy_dir / "policy.toml").write_text(custom_policy, encoding="utf-8")
+
+    result = runner.invoke(
+        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path), "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert {f["path"] for f in payload["files"]} == {".claude/settings.json"}
+    assert (policy_dir / "policy.toml").read_text() == custom_policy
+
+    state = json.loads((tmp_path / CONNECT_RELATIVE_PATH).read_text())
+    tracked_paths = {f["path"] for f in state["targets"]["claude-code"]["files"]}
+    assert ".hyodo/policy.toml" not in tracked_paths
+
+
+def test_dry_run_on_empty_root_lists_the_starter_policy(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["connect", "claude-code", "--root", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+    assert "would create: .hyodo/policy.toml" in result.output
+
+
+def test_status_reports_drift_on_tampered_starter_policy(tmp_path: Path) -> None:
+    write = runner.invoke(
+        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path)]
+    )
+    assert write.exit_code == 0, write.output
+    policy_path = tmp_path / ".hyodo" / "policy.toml"
+    policy_path.write_text(policy_path.read_text() + "\n# tampered\n", encoding="utf-8")
+
+    status = runner.invoke(app, ["connect", "--status", "--root", str(tmp_path), "--json"])
+    assert status.exit_code == 2, status.output
+    payload = json.loads(status.output)
+    drifted_paths = {t["path"] for t in payload["targets"] if t["status"] != "ok"}
+    assert ".hyodo/policy.toml" in drifted_paths
 
 
 # --------------------------------------------------------------------------
@@ -445,6 +534,135 @@ def test_event_record_shadow_requires_policy(tmp_path: Path) -> None:
     assert result.exit_code == 2, result.output
     payload = json.loads(result.output)
     assert payload["ok"] is False
+
+
+# --------------------------------------------------------------------------
+# Shadow never blocks, even when there is no policy to evaluate.
+#
+# This is the exact incident: `hyodo connect claude-code --write --shadow`
+# installs hooks that call `policy check`/`event record` with --shadow, but
+# a root with no .hyodo/policy.toml previously made both exit 2 anyway --
+# the opposite of shadow mode's documented "always exits 0" guarantee.
+# --------------------------------------------------------------------------
+
+
+def test_policy_check_shadow_missing_policy_exits_zero(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "policy",
+            "check",
+            "--stdin",
+            "--hook",
+            "claude-code",
+            "--root",
+            str(tmp_path),
+            "--shadow",
+            "--json",
+        ],
+        input=_hook_payload("PreToolUse", "evt-shadow-1", "run-shadow-1", tmp_path),
+    )
+    assert result.exit_code == 0, result.output
+    assert "[SHADOW, not blocking]" in result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "UNOBSERVED"
+    assert payload["reason"] == "policy_missing"
+    assert payload["shadow"] is True
+    assert payload["exit_code"] == 0
+
+
+def test_policy_check_shadow_malformed_payload_exits_zero(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "policy",
+            "check",
+            "--stdin",
+            "--hook",
+            "claude-code",
+            "--root",
+            str(tmp_path),
+            "--shadow",
+            "--json",
+        ],
+        input=json.dumps({"not": "a hook payload"}),
+    )
+    assert result.exit_code == 0, result.output
+    assert "[SHADOW, not blocking]" in result.stderr
+
+
+def test_policy_check_non_shadow_missing_policy_still_exits_two(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "policy",
+            "check",
+            "--stdin",
+            "--hook",
+            "claude-code",
+            "--root",
+            str(tmp_path),
+            "--json",
+        ],
+        input=_hook_payload("PreToolUse", "evt-shadow-2", "run-shadow-2", tmp_path),
+    )
+    assert result.exit_code == 2, result.output
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "UNOBSERVED"
+    assert payload["reason"] == "policy_missing"
+
+
+def test_event_record_shadow_missing_policy_exits_zero_and_records(tmp_path: Path) -> None:
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--stdin",
+            "--hook",
+            "claude-code",
+            "--policy",
+            str(tmp_path / ".hyodo" / "policy.toml"),
+            "--shadow",
+            "--root",
+            str(tmp_path),
+            "--json",
+        ],
+        input=_hook_payload("PostToolUse", "evt-shadow-3", "run-shadow-3", tmp_path),
+    )
+    assert result.exit_code == 0, result.output
+    assert "[SHADOW, not blocking]" in result.stderr
+    payload = json.loads(result.stdout)
+    assert payload["decision"] == "UNOBSERVED"
+    assert payload["shadow"] is True
+
+    ledger = tmp_path / ".hyodo" / "agent-events.jsonl"
+    events = [json.loads(line) for line in ledger.read_text().splitlines() if line.strip()]
+    assert len(events) == 1
+    assert events[0]["policy"]["shadow"] is True
+    assert events[0]["policy"]["decision"] == "UNOBSERVED"
+    assert events[0]["policy"]["reason"] == "policy_missing"
+
+
+def test_event_record_shadow_malformed_payload_exits_zero(tmp_path: Path) -> None:
+    policy_path = _write_deny_policy(tmp_path)
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--stdin",
+            "--hook",
+            "claude-code",
+            "--policy",
+            str(policy_path),
+            "--shadow",
+            "--json",
+        ],
+        input=json.dumps({"not": "a hook payload"}),
+    )
+    assert result.exit_code == 0, result.output
+    assert "[SHADOW, not blocking]" in result.stderr
 
 
 # --------------------------------------------------------------------------

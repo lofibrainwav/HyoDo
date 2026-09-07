@@ -19,7 +19,7 @@ hyodo connect [<target>] [--write] [--yes] [--shadow] [--status] [--root PATH] [
 
 | Target | File | What it does |
 | --- | --- | --- |
-| `claude-code` | `.claude/settings.json` | Adds a `PreToolUse` hook (`hyodo policy check --stdin --hook claude-code`) and a `PostToolUse` hook (`hyodo event record --stdin --hook claude-code`) |
+| `claude-code` | `.claude/settings.json`, `.hyodo/policy.toml` | Adds a `PreToolUse` hook (`hyodo policy check --stdin --hook claude-code`) and a `PostToolUse` hook (`hyodo event record --stdin --hook claude-code`); also bootstraps a permissive starter `.hyodo/policy.toml` when none exists yet, so the hooks have something to evaluate from the first tool call |
 | `pre-commit` | `.pre-commit-config.yaml` | Adds the `hyodo-check` repo entry from this project's own `.pre-commit-hooks.yaml` |
 | `github-actions` | `.github/workflows/hyodo.yml` | A workflow calling the `.github/actions/hyodo` composite action |
 | `cursor` | — | **UNOBSERVED** — no verified hook contract; `connect` never fabricates a config format |
@@ -28,7 +28,9 @@ hyodo connect [<target>] [--write] [--yes] [--shadow] [--status] [--root PATH] [
 Every file HyoDo did not create itself gets a `.bak` alongside it on its first
 write; everything HyoDo does not own in that file (other hooks, other
 pre-commit repos, other keys) is left untouched. Running `--write` twice with
-no other change makes no further edits.
+no other change makes no further edits. A `.hyodo/policy.toml` that already
+exists — written by HyoDo before or authored by the operator — is never
+overwritten; `connect` only creates one when the file is absent.
 
 The `pre-commit` and `github-actions` targets always enforce (`--shadow` has
 no effect on them); only the Claude Code `PreToolUse` gate has a shadow mode.
@@ -45,6 +47,19 @@ record`) still evaluate the real policy and print/record the real decision —
 stamped `policy.shadow: true` in the ledger — but the hook **always exits 0**,
 so nothing is blocked. It's the on-ramp for trust level 0: the evidence graph
 fills in while the operator keeps working undisturbed.
+
+**The guarantee is unconditional**: shadow never returns a blocking exit
+code, even when the policy file is missing, unreadable/invalid, or the hook
+payload cannot be mapped, and even if the ledger append itself fails. Every
+one of those cases still prints its diagnostic to stderr — prefixed
+`[SHADOW, not blocking]` — and, wherever an event exists to write it onto,
+records `policy.shadow: true` with `policy.decision: "UNOBSERVED"` and the
+reason (e.g. `policy_missing`), so the evidence graph shows exactly what
+would have blocked instead of silently going quiet. Since `connect
+claude-code` now also bootstraps a starter `.hyodo/policy.toml` (see above),
+a fresh shadow install has a policy to evaluate from the start; a policy
+file deleted or moved out from under it afterwards still cannot make shadow
+block.
 
 Leave shadow mode with a fresh, non-shadow write:
 
