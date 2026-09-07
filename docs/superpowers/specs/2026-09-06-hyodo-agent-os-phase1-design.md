@@ -7,7 +7,8 @@ gate before `writing-plans` and before any of the five PRs below open.
 
 ## Context
 
-HyoDo's public identity is becoming larger than the current CLI: hyodo.app frames
+HyoDo's public identity is becoming larger than the current CLI: hyodo.app
+frames
 HyoDo as an open-source Agent OS, and the shipped `hyodo` package is its first
 organ — the part that turns an agent's actions into observed, gated evidence.
 The chain the project is committing to is philosophy -> math -> code: the six
@@ -18,7 +19,8 @@ silent ALLOW.
 
 Today's `hyodo/policy.py` already declares an `ASK` value in `POLICY_DECISIONS`
 (`hyodo/events.py:38`) but `evaluate_policy` (`hyodo/policy.py:162-239`) never
-returns it — every event is currently `ALLOW`, `DENY`, or `UNOBSERVED`. Phase 1
+returns it — every event is currently `ALLOW`, `DENY`, or `UNOBSERVED`.
+Phase 1
 closes that gap: it gives HyoDo real judgment under uncertainty (`ASK`),
 attaches that judgment to an operator-controlled trust ladder, links agent
 events into a real evidence graph instead of a flat ledger, prints that
@@ -182,7 +184,8 @@ schema = "hyodo.policy/v1"
 
 max_steps = 20
 allowed_tools = ["search", "read_file", "list_dir", "web_fetch"]
-blocked_path_globs = ["**/.env", "**/.env.*", "**/secrets/**", "**/*credential*"]
+blocked_path_globs = ["**/.env", "**/.env.*", "**/secrets/**",
+  "**/*credential*"]
 
 # New in Phase 1 — every key below is optional; omitting [web] and [trust]
 # entirely reproduces today's ALLOW/DENY/UNOBSERVED behavior byte-for-byte.
@@ -223,7 +226,8 @@ effective level for a decision is always `min(max_level, granted_level)`.
   "granted_at": "2026-09-06T12:00:00+00:00",
   "granted_by": "human:brnestrm",
   "history": [
-    {"level": 1, "granted_at": "2026-08-01T09:00:00+00:00", "granted_by": "human:brnestrm"}
+    {"level": 1, "granted_at": "2026-08-01T09:00:00+00:00", "granted_by":
+      "human:brnestrm"}
   ]
 }
 ```
@@ -444,6 +448,9 @@ already forwards whatever exit code the subprocess produces
 
 ## Package 1-B — `feat/evidence-graph`: ledger edges, mission, URLs, graph export
 
+Status: shipped on main by PR #160 and the completion PR that carries this note;
+the public prototype page still renders fixture data.
+
 ### Data model
 
 `hyodo/events.py` schema stays `hyodo.agent-event/v1` — no version bump,
@@ -500,7 +507,7 @@ intent ever declared?), not a per-event `ALLOW`/`DENY`/`ASK` question.
 ```toml
 schema = "hyodo.policy/v1"
 
-# Phase 1-B: when true, `hyodo report` flags any run whose first event is not
+# Phase 1-B: when true, the graph report flags any run without
 # a human prompt as "intent unobserved". Off by default — mirrors
 # require_declared_paths (hyodo/policy.py:37-42): most existing ledgers were
 # never asked to declare an opening intent, so turning this on unconditionally
@@ -530,64 +537,57 @@ require_mission_prompt = false
 `hyodo/report.py` gains a third render path alongside `md`/`html`/`sarif`
 (currently gated at `hyodo/cli/main.py:2069`, `"if report_format not in
 {"md", "html", "sarif"}"` — that set grows to include `"graph"`). New schema
-id `hyodo.report-graph/v1` (a report artifact, not an event — no reason to
-reuse `hyodo.agent-event/v1`'s id).
+id `hyodo.evidence-graph/v1`. The output path is
+`.hyodo/reports/hyodo-report.graph.json`.
 
 ```json
 {
-  "schema": "hyodo.report-graph/v1",
-  "nodes": [
-    {
-      "event_id": "evt-1",
-      "run_id": "run-1",
-      "step_index": 0,
-      "ts": "2026-09-06T12:00:00+00:00",
-      "kind": "prompt",
-      "actor": "human",
-      "tool_name": null,
-      "decision": null
-    }
-  ],
-  "edges": [
-    {"from": "evt-3", "to": "evt-2", "type": "parent"},
-    {"from": "evt-3", "to": "gate:pytest@a1b2c3d4e5f6", "type": "evidence"}
-  ],
-  "orphaned_decisions": ["evt-5"],
-  "broken_edges": [],
-  "corrupt_event_lines": 0,
-  "runs_missing_mission": []
+  "schema_version": "hyodo.evidence-graph/v1",
+  "status": "READY",
+  "reason": null,
+  "nodes": [{"id": "evt-1", "type": "event", "run_id": "run-1"}],
+  "edges": [{
+    "type": "evidence_ref",
+    "kind": "evidence",
+    "source": "gate:pytest@a1b2c3d4e5f6",
+    "target": "evt-1",
+    "target_kind": "gate",
+    "label": "decided_from"
+  }],
+  "unresolved_refs": [],
+  "missions": {"run-1": "evt-1"},
+  "summary": {
+    "events": 1,
+    "edges": 1,
+    "parent_links": 0,
+    "evidence_refs": 1,
+    "gate_refs": 1,
+    "unresolved_refs": 0,
+    "corrupt_event_lines": 0,
+    "intent_unobserved_runs": []
+  }
 }
 ```
 
-- **`orphaned_decisions`** (advisory, never fails the command): `kind ==
-  "decision"` events with no `parent_event_id` declared — a decision that
-  does not say what it decided about.
-- **`broken_edges`** (fails the command — see Exit contracts): edges whose
-  target is *not* currently resolvable against the ledger. Record-time
-  validation (`validate_event_edges` above) makes it impossible for a
-  *newly recorded* event to create a dangling edge, but it cannot guarantee
-  the target stays resolvable forever — a later `corrupt_event_lines` entry
-  (an existing line that became unparseable), or a hand-edited/truncated
-  ledger, can turn a previously-valid edge into a dangling one after the
-  fact. `broken_edges` is the report's own defense-in-depth re-check against
-  the ledger *as it exists right now*, independent of what was true when
-  each event was recorded.
-- **`runs_missing_mission`**: populated only when `require_mission_prompt =
-  true`; lists `run_id`s whose lowest-`step_index` event is not `kind ==
-  "prompt"`, `actor == "human"`. For `md`/`html` formats, the same check adds
-  a line to the existing "Evidence spine" section: `"Intent: UNOBSERVED for
-  N run(s) (no declared mission prompt)"` when the flag is on and any run
-  qualifies, reusing `_collect_evidence` (`hyodo/report.py:37-76`) as the
-  single place both format families read from.
+Nodes also carry the observed event metadata, policy, and tool fields.
+Parent edges use `type: parent_event_id`, the parent as `source`, the child
+as `target`, and `label: result_of`. Evidence edges keep the referenced
+id as `source` and the citing event as `target`; `target_kind` classifies
+the reference (`event` or `gate`), retaining the shipped edge direction.
+Gate references are shape-checked only and never enter `unresolved_refs`.
+
+`missions` maps each run to its lowest-step human prompt, or null.
+`summary.intent_unobserved_runs` always lists missing missions, sorted.
+It is informational unless `require_mission_prompt` is true, when a clean
+graph becomes `UNOBSERVED` with `mission_unobserved:<first run_id>`.
+Missing or invalid policy preserves the existing graph behavior.
 
 ### Exit contracts
 
-`report --format graph`: **0** when `broken_edges` is empty (regardless of
-`orphaned_decisions` or `corrupt_event_lines`, both advisory-only); **1**
-when `broken_edges` is non-empty; **2** on write failure (`OSError`),
-unchanged from `write_report`'s existing contract (`hyodo/report.py:221-236`).
-`md`/`html`/`sarif` keep their current exit contract exactly — `report`'s
-overall exit-code shape is not renumbered, only extended for the new format.
+`report --format graph`: **0** for `READY`; **2** for `UNOBSERVED`
+(unreadable ledger, corrupt lines, edge issues, or a required missing
+mission) and write failures. Existing observation errors take precedence
+over mission absence. `md`/`html`/`sarif` keep their existing contracts.
 
 ### Failure modes
 
@@ -775,6 +775,9 @@ block** — a non-zero exit there only surfaces a warning notice.
 `.claude/settings.json` (project) or `~/.claude/settings.json` (`--global`)
 gains:
 
+Run this example from the project root with `POLICY=.hyodo/policy.toml`
+exported in the hook environment.
+
 ```json
 {
   "hooks": {
@@ -784,7 +787,8 @@ gains:
         "hooks": [
           {
             "type": "command",
-            "command": "hyodo policy check --stdin --hook claude-code --root \"$CLAUDE_PROJECT_DIR\""
+            "command":
+              "hyodo policy check --stdin --hook claude-code --root ."
           }
         ]
       }
@@ -795,7 +799,8 @@ gains:
         "hooks": [
           {
             "type": "command",
-            "command": "hyodo event record --stdin --hook claude-code --root \"$CLAUDE_PROJECT_DIR\" --policy .hyodo/policy.toml"
+            "command":
+              "hyodo event record --stdin --hook claude-code --policy $POLICY"
           }
         ]
       }
@@ -918,6 +923,8 @@ the idempotency case), 1 if any per-harness confirmation was declined and
 
 ## Package 1-E — `feat/test-integrity`: a native, unshellable signal for the Truth pillar
 
+`hyodo/safe/anti_gaming.py` (PR #161) is the AST visitor 1-E will consume.
+
 ### Why this is the honest form of "semantic test quality"
 
 HyoDo already has two pillars whose evidence cannot be faked by pointing
@@ -948,7 +955,8 @@ class VacuousTestFinding:
     path: str
     line: int
     function: str
-    category: str  # no_assertion | constant_assertion | no_target_reference | unexplained_skip
+    # no_assertion | constant_assertion | no_target_reference | unexplained_skip
+    category: str
     detail: str
 
 @dataclass(frozen=True)
@@ -956,7 +964,8 @@ class TestIntegrityReport:
     scanned_files: int
     total_files: int
     total_tests: int
-    vacuous_tests: int  # no_assertion + constant_assertion, deduplicated per function
+    # no_assertion + constant_assertion, deduplicated per function
+    vacuous_tests: int
     findings: tuple[VacuousTestFinding, ...]
 ```
 

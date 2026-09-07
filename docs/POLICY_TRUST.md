@@ -49,3 +49,14 @@ configured but `.hyodo/policy-trust.json` is missing or damaged, the
 decision is `UNOBSERVED` (`trust_grant_unobserved`), never a default grant.
 
 Exit codes are unchanged: `ALLOW` 0, `DENY` 1, `UNOBSERVED` 2, `ASK` 3.
+
+## URL credential observations
+
+Normalized `tool.urls` entries contain `domain`, `digest`, and
+`credential_shaped` (boolean or `null`). A supplied path determines the
+boolean during normalization; without a path, a supplied boolean is kept,
+otherwise the shape is `null` (unobserved).
+When neither path nor digest is supplied, `digest` is `null`.
+With the default credential boundary, a true shape means `DENY`, a missing
+shape without a legacy path means `UNOBSERVED`, and false continues normal
+policy evaluation. Paths remain absent from default ledgers and graphs.

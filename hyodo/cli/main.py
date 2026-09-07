@@ -2304,11 +2304,15 @@ def event_record(
                 if issue.get("event_id") == normalized["event_id"]
             ]
             if edge_issues:
-                reasons = [
-                    "edge_validation_failed:"
-                    f"{issue['field']}:{issue['reason']}:{issue.get('ref') or 'none'}"
-                    for issue in edge_issues
-                ]
+                reasons = list(
+                    dict.fromkeys(
+                        f"unknown_edge_target:{issue['field']}"
+                        if issue["reason"] == "unresolved_ref"
+                        else "edge_validation_failed:"
+                        f"{issue['field']}:{issue['reason']}:{issue.get('ref') or 'none'}"
+                        for issue in edge_issues
+                    )
+                )
                 if json_output:
                     console.print_json(
                         json.dumps(

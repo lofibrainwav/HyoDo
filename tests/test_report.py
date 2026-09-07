@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import app
-from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, AGENT_EVENTS_RELATIVE_PATH
+from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, AGENT_EVENTS_RELATIVE_PATH, content_digest
 
 runner = CliRunner()
 
@@ -126,7 +127,9 @@ def test_report_graph_exports_edges_and_tool_urls(tmp_path: Path) -> None:
     assert graph["summary"]["events"] == 2
     assert graph["summary"]["edges"] == 2
     assert graph["unresolved_refs"] == []
-    assert graph["nodes"][0]["tool"]["urls"] == [{"domain": "example.com", "path": "/docs"}]
+    assert graph["nodes"][0]["tool"]["urls"] == [
+        {"domain": "example.com", "digest": content_digest("/docs"), "credential_shaped": False}
+    ]
 
 
 def test_report_graph_fails_closed_on_broken_parent_ref(tmp_path: Path) -> None:
@@ -150,3 +153,52 @@ def test_report_graph_fails_closed_on_broken_parent_ref(tmp_path: Path) -> None:
             "reason": "unresolved_ref",
         }
     ]
+
+
+@pytest.mark.parametrize(
+    ("flag", "mission", "code"), [(False, False, 0), (True, False, 2), (True, True, 0)]
+)
+def test_graph_mission_policy(tmp_path, flag, mission, code):
+    folder = tmp_path / ".hyodo"
+    folder.mkdir()
+    (folder / "policy.toml").write_text(
+        'schema = "hyodo.policy/v1"\nrequire_mission_prompt = ' + str(flag).lower()
+    )
+    events = [_graph_event("tool", step_index=0)]
+    if mission:
+        for step in (3, 1, 2):
+            event = _graph_event(f"prompt-{step}", step_index=step)
+            event.update(kind="prompt", actor="human")
+            events.append(event)
+    (folder / "agent-events.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
+    assert result.exit_code == code, result.output
+    graph = json.loads((folder / "reports/hyodo-report.graph.json").read_text())
+    assert graph["missions"] == {"run-graph-1": "prompt-1" if mission else None}
+    assert graph["summary"]["intent_unobserved_runs"] == ([] if mission else ["run-graph-1"])
+    assert graph["reason"] == ("mission_unobserved:run-graph-1" if code == 2 else None)
+
+
+@pytest.mark.parametrize("config", [None, 'require_mission_prompt = "invalid"'])
+def test_graph_missing_or_invalid_policy_keeps_existing_behavior(tmp_path, config):
+    folder = tmp_path / ".hyodo"
+    folder.mkdir()
+    if config is not None:
+        (folder / "policy.toml").write_text('schema = "hyodo.policy/v1"\n' + config)
+    (folder / "agent-events.jsonl").write_text(json.dumps(_graph_event("tool")) + "\n")
+    result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
+    assert result.exit_code == 0, result.output
+
+
+def test_graph_missions_multiple_runs_and_event_target_kind():
+    from hyodo.event_graph import build_event_graph
+
+    first = _graph_event("first")
+    second = _graph_event("second", evidence_refs=["first"])
+    first["run_id"] = "z"
+    second["run_id"] = "a"
+    graph = build_event_graph([first, second])
+    assert graph["missions"] == {"z": None, "a": None}
+    assert graph["summary"]["intent_unobserved_runs"] == ["a", "z"]
+    assert graph["edges"][0]["target_kind"] == "event"
+    assert graph["summary"]["gate_refs"] == 0

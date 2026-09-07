@@ -504,7 +504,7 @@ into permanent notes:
 ```
 
 `nodes`/`edges` mirror the shape 1-B's `hyodo report --format graph`
-already designs (`hyodo.report-graph/v1`,
+already designs (`hyodo.evidence-graph/v1`,
 `docs/superpowers/specs/2026-09-06-hyodo-agent-os-phase1-design.md:536-560`).
 2-C adds two fields on top of that design, both additive under the same
 optional-fields-only convention: `backlinks`, a reverse index keyed by
@@ -576,7 +576,7 @@ command returns.
 
 ### Backward compatibility
 
-- Every field 2-C adds (`backlinks` on `hyodo.report-graph/v1`, the
+- Every field 2-C adds (`backlinks` on `hyodo.evidence-graph/v1`, the
   whole `hyodo.graph-export/v1` artifact) is new and optional; a ledger
   with none of 1-B's edge fields still produces a valid, empty-edge graph
   and export.
@@ -863,7 +863,7 @@ Constraints:
   entry already are — this design keeps them level-3-only conservatively
   until real usage shows the level-2 carve-out is missed.
 - Whether `hyodo.graph-export/v1` needs its own version lineage separate
-  from `hyodo.report-graph/v1` once an external note system depends on
+  from `hyodo.evidence-graph/v1` once an external note system depends on
   its exact shape.
 - Whether a skill `hyodo skills propose` writes should itself be
   ingestable as a skill in a later run, and if so, how to prevent a

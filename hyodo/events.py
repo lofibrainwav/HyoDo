@@ -38,6 +38,7 @@ ACTORS = frozenset({"agent", "human", "hyodo"})
 POLICY_DECISIONS = frozenset({"ALLOW", "DENY", "ASK", "UNOBSERVED"})
 
 _DIGEST_RE = re.compile(r"^[0-9a-f]{12}$")
+GATE_REF_RE = re.compile(r"^gate:[A-Za-z0-9_.\-]+@[0-9a-f]{7,64}$")
 _HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 
 #: Marker written into ``policy.reason`` when no policy was actually evaluated.
@@ -61,6 +62,20 @@ def unevaluated_policy(claimed: dict[str, Any] | None = None) -> dict[str, Any]:
     if claimed is not None:
         out["claimed"] = claimed
     return out
+
+
+_CREDENTIAL_PATH_MARKERS = ("/.git/", "/.env", "/wp-admin/")
+_CREDENTIAL_QUERY_MARKERS = ("token=", "api_key=", "secret=")
+
+
+def credential_shaped_path(path: str | None) -> bool:
+    """Return whether a URL path contains a credential-shaped marker."""
+    if not path:
+        return False
+    lowered = path.lower()
+    return any(marker in lowered for marker in _CREDENTIAL_PATH_MARKERS) or any(
+        marker in lowered for marker in _CREDENTIAL_QUERY_MARKERS
+    )
 
 
 def content_digest(text: str | bytes | None) -> str | None:
@@ -178,7 +193,27 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                         if url_path is not None and not isinstance(url_path, str):
                             urls_ok = False
                             break
-                        normalized_urls.append({"domain": entry["domain"], "path": url_path})
+                        url_digest = entry.get("digest")
+                        if url_digest is not None and not (
+                            isinstance(url_digest, str) and _DIGEST_RE.fullmatch(url_digest)
+                        ):
+                            urls_ok = False
+                            break
+                        normalized_urls.append(
+                            {
+                                "domain": entry["domain"],
+                                "digest": url_digest
+                                if url_digest is not None
+                                else content_digest(url_path)
+                                if url_path is not None
+                                else None,
+                                "credential_shaped": credential_shaped_path(url_path)
+                                if isinstance(url_path, str)
+                                else entry.get("credential_shaped")
+                                if isinstance(entry.get("credential_shaped"), bool)
+                                else None,
+                            }
+                        )
                     if not urls_ok:
                         reasons.append("invalid_field:tool.urls")
                     else:
@@ -272,7 +307,9 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
     if evidence_refs_raw is None:
         evidence_refs_raw = []
     if not isinstance(evidence_refs_raw, list) or not all(
-        _is_non_empty_str(ref) for ref in evidence_refs_raw
+        _is_non_empty_str(ref)
+        and (not ref.strip().startswith("gate:") or GATE_REF_RE.fullmatch(ref.strip()))
+        for ref in evidence_refs_raw
     ):
         reasons.append("invalid_field:evidence_refs")
     else:
@@ -329,6 +366,12 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
     # Full bodies only when provided (opt-in by presence).
     if full_bodies:
         normalized["io"] = {**io_out, **full_bodies}
+        if isinstance(tool_raw, dict):
+            for source, target in zip(
+                tool_raw.get("urls") or [], normalized["tool"]["urls"], strict=True
+            ):
+                if isinstance(source.get("path"), str):
+                    target["path"] = source["path"]
     return True, [], normalized
 
 
@@ -340,6 +383,11 @@ def strip_full_bodies(event: dict[str, Any]) -> dict[str, Any]:
         io.pop("input_text", None)
         io.pop("output_text", None)
         # Ensure digests exist if bodies were the only source (already set in validate).
+    tool = out.get("tool")
+    if isinstance(tool, dict):
+        for entry in tool.get("urls") or []:
+            if isinstance(entry, dict):
+                entry.pop("path", None)
     return out
 
 

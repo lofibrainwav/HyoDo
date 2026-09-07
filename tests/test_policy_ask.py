@@ -10,7 +10,12 @@ import uuid
 
 import pytest
 
-from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, content_digest, validate_event
+from hyodo.events import (
+    AGENT_EVENT_SCHEMA_VERSION,
+    content_digest,
+    credential_shaped_path,
+    validate_event,
+)
 from hyodo.policy import (
     POLICY_SCHEMA_ID,
     PolicyConfig,
@@ -19,7 +24,6 @@ from hyodo.policy import (
     TrustPolicy,
     WebPolicy,
     _compute_coverage,
-    _credential_shaped,
     _domain_allowed,
     _is_web_classified,
     evaluate_policy,
@@ -180,12 +184,12 @@ def test_is_web_classified_and_domain_helpers():
 
 
 def test_credential_shaped_paths():
-    assert _credential_shaped("/.git/config")
-    assert _credential_shaped("/.env")
-    assert _credential_shaped("/wp-admin/")
-    assert _credential_shaped("/v1/users?api_key=secret")
-    assert not _credential_shaped("/v1/users")
-    assert not _credential_shaped(None)
+    assert credential_shaped_path("/.git/config")
+    assert credential_shaped_path("/.env")
+    assert credential_shaped_path("/wp-admin/")
+    assert credential_shaped_path("/v1/users?api_key=secret")
+    assert not credential_shaped_path("/v1/users")
+    assert not credential_shaped_path(None)
 
 
 def test_compute_coverage_counts_applicable_surfaces():
@@ -324,3 +328,32 @@ def test_existing_policy_shape_stays_backward_compatible(tmp_path):
     with_root = evaluate_policy(event, policy, observed_steps=1, root=tmp_path)
     assert without_root.decision == with_root.decision == "ALLOW"
     assert without_root.trust_level == with_root.trust_level == 1
+
+
+@pytest.mark.parametrize("value", ["true", "false", '"yes"', "1"])
+def test_require_mission_prompt_config(tmp_path, value):
+    path = tmp_path / "policy.toml"
+    path.write_text('schema = "hyodo.policy/v1"\nrequire_mission_prompt = ' + value)
+    if value in ("true", "false"):
+        assert load_policy_config(path).require_mission_prompt is (value == "true")
+    else:
+        with pytest.raises(PolicyConfigError, match="require_mission_prompt must be a boolean"):
+            load_policy_config(path)
+
+
+def test_digest_only_url_cannot_pass_credential_boundary():
+    from hyodo.events import strip_full_bodies
+
+    event = strip_full_bodies(
+        _normalize(_web_tool_event(urls=[{"domain": "api.example.com", "digest": "abcdef123456"}]))
+    )
+    decision = evaluate_policy(event, _bare_policy(web=WebPolicy()))
+    assert decision.decision == "UNOBSERVED"
+    assert decision.rule_id == "web_credential_path_unobserved"
+
+
+def test_legacy_path_credential_deny():
+    event = _web_tool_event(urls=[{"domain": "api.example.com", "path": "/.env"}])
+    decision = evaluate_policy(event, _bare_policy(web=WebPolicy()))
+    assert decision.decision == "DENY"
+    assert decision.rule_id == "web_credential_path_denied"
