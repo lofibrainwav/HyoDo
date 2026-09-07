@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.16.0] - 2026-09-07
+
+This cycle keeps HyoDo's decisions honest about what was actually observed.
+`hyodo check` derives a Benevolence signal from real onboarding evidence
+instead of leaving it `UNOBSERVED`, and `hyodo score --from-check` derives
+all five pillar inputs from measured `check`/`safe`/test-integrity output.
+Shadow mode's "never blocks" guarantee now holds on every early exit, a
+starter policy bootstraps automatically under `hyodo connect claude-code`,
+`hyodo safe` reports its scan scope and coverage explicitly, the gitleaks
+and trufflehog adapters gain positive controls against silent CLI drift,
+and `hyodo mcp continuity` counts hook-recorded actors as hosts so a
+hook-only onboarding can reach `OBSERVED`/`READY`.
+
 ### Added
 
 - `hyodo check` now emits three onboarding/developer-experience signals via
