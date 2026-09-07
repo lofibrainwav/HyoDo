@@ -524,6 +524,10 @@ def map_claude_code_hook_payload(
         "kind": kind,
         "step_index": step_index,
         "actor": "agent",
+        # The hook already uses session_id as run_id; actor_id additionally
+        # carries the same value so two labelled agents in one run can be
+        # told apart downstream (hyodo/graph_view.py build_actor_rows).
+        "actor_id": session_id,
         "tool": tool,
     }
     if tags:

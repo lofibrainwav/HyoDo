@@ -30,6 +30,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional `actor_id` field on `hyodo.agent-event/v1` (additive; absent or
+  `null` by default): an opaque label the harness chooses (session id, seat
+  name, model alias) so two agents in one run keep separate rows instead of
+  collapsing into one. `hyodo event record --actor-id <label>` fills it in
+  when the event JSON lacks one; `--hook claude-code` sets it from the hook
+  payload's `session_id`. Carried through `hyodo report --format graph` and
+  `hyodo graph export` node output, and through the local graph viewer's
+  per-actor rows (`parent_row`/`depth`/`role` now detect nesting and
+  orchestration across labelled agent-to-agent rows, not just
+  agent-to-hyodo). HyoDo never derives identity or authorization from it.
+  See `docs/CONNECT.md`, `docs/GRAPH_EXPORT.md`.
 - `hyodo eye capture|verify` (Stage 2 package 2-D, "ephemeral visual
   evidence"): capture one screen through a BYOM tool
   (`.hyodo/config.toml`'s `[eye] command`), record an exact digest and a

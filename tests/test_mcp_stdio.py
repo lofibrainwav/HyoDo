@@ -250,6 +250,26 @@ def test_mcp_event_record_preserves_digest_only_default(tmp_path):
     assert "input_digest" in ledger
 
 
+def test_mcp_event_record_passes_through_actor_id_argument(tmp_path):
+    """The MCP tool's actor_id argument reaches --actor-id and lands on the ledger."""
+    from hyodo.events import read_agent_events
+    from hyodo.mcp_server import create_server
+
+    result = asyncio.run(
+        call_hyodo_tool(
+            create_server(tmp_path),
+            "hyodo_event_record",
+            {"event": _valid_event(), "actor_id": "planner"},
+        )
+    )
+
+    receipt = json.loads(result["stdout"])
+    assert result["exit_code"] == receipt["exit_code"] == 0
+    events, corrupt = read_agent_events(tmp_path)
+    assert corrupt == 0
+    assert events[0]["actor_id"] == "planner"
+
+
 def test_mcp_policy_preserves_unobserved_exit_and_rejects_path_escape(tmp_path):
     """Missing policy and client path traversal both stay explicit failures, never ALLOW."""
     from hyodo.mcp_server import create_server

@@ -229,11 +229,16 @@ def create_server(
         event: dict[str, Any],
         policy_path: str | None = None,
         full_body: bool = False,
+        actor_id: str | None = None,
     ) -> dict[str, Any]:
         """Record one event through ``hyodo event record`` using digest-only storage by default.
 
         ``full_body`` is a *request*, not a switch: it only takes effect when the
         operator started this server with full-body storage allowed.
+
+        ``actor_id`` is an opaque label (session id, seat name, model alias)
+        passed through to ``--actor-id`` — it only fills in when *event*
+        does not already carry one. HyoDo never derives identity from it.
         """
         args = ["event", "record", "--stdin", "--root", str(workspace), "--json"]
         if policy_path is not None:
@@ -241,6 +246,8 @@ def create_server(
                 args.extend(["--policy", str(_resolve_workspace_path(workspace, policy_path))])
             except ValueError as exc:
                 return {"exit_code": 2, "stdout": "", "stderr": "", "error": str(exc)}
+        if actor_id is not None:
+            args.extend(["--actor-id", actor_id])
         full_body_applied = bool(full_body and allow_full_body)
         if full_body_applied:
             args.append("--full-body")

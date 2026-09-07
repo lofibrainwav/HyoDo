@@ -72,14 +72,19 @@ def _graph_event(
     parent_event_id: str | None = None,
     evidence_refs: list[str] | None = None,
     step_index: int = 0,
+    actor: str = "agent",
+    actor_id: str | None = None,
+    run_id: str = "run-graph-1",
+    kind: str = "tool_call",
 ) -> dict:
     return {
         "schema_version": AGENT_EVENT_SCHEMA_VERSION,
         "event_id": event_id,
-        "run_id": "run-graph-1",
+        "run_id": run_id,
         "ts": f"2026-09-06T20:00:0{step_index}+00:00",
-        "kind": "tool_call",
-        "actor": "agent",
+        "kind": kind,
+        "actor": actor,
+        "actor_id": actor_id,
         "step_index": step_index,
         "parent_event_id": parent_event_id,
         "evidence_refs": evidence_refs or [],
@@ -130,6 +135,67 @@ def test_report_graph_exports_edges_and_tool_urls(tmp_path: Path) -> None:
     assert graph["nodes"][0]["tool"]["urls"] == [
         {"domain": "example.com", "digest": content_digest("/docs"), "credential_shaped": False}
     ]
+
+
+def test_report_graph_nodes_carry_actor_id_field(tmp_path: Path) -> None:
+    ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    events = [
+        _graph_event("no-label", step_index=0),
+        _graph_event("labelled", actor_id="planner", step_index=1),
+    ]
+    ledger.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
+
+    result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
+
+    assert result.exit_code == 0
+    summary = json.loads(result.output)
+    graph = json.loads((tmp_path / summary["result_path"]).read_text(encoding="utf-8"))
+    nodes_by_id = {node["id"]: node for node in graph["nodes"]}
+    assert nodes_by_id["no-label"]["actor_id"] is None
+    assert nodes_by_id["labelled"]["actor_id"] == "planner"
+
+
+def test_report_graph_rows_show_two_labelled_agents_and_orchestrator_nesting(
+    tmp_path: Path,
+) -> None:
+    """Demo: mission -> agent A ("planner") tool_call -> agent B ("worker")
+    whose first event's parent is A's tool_call. Two agent rows, B nests
+    under A, and A is the orchestrator.
+    """
+    ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    events = [
+        _graph_event("mission", actor="human", kind="prompt", step_index=0),
+        _graph_event(
+            "a-call",
+            actor="agent",
+            actor_id="planner",
+            parent_event_id="mission",
+            step_index=1,
+        ),
+        _graph_event(
+            "b-first",
+            actor="agent",
+            actor_id="worker",
+            parent_event_id="a-call",
+            step_index=2,
+        ),
+    ]
+    ledger.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
+
+    result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
+
+    assert result.exit_code == 0
+    summary = json.loads(result.output)
+    graph = json.loads((tmp_path / summary["result_path"]).read_text(encoding="utf-8"))
+    rows = graph["rows"]["rows"]
+    assert "agent:planner" in rows
+    assert "agent:worker" in rows
+    assert rows["agent:worker"]["parent_row"] == "agent:planner"
+    assert rows["agent:worker"]["depth"] == rows["agent:planner"]["depth"] + 1
+    assert rows["agent:planner"]["role"] == "orchestrator"
+    assert rows["agent:worker"]["role"] == "worker"
 
 
 def test_report_graph_fails_closed_on_broken_parent_ref(tmp_path: Path) -> None:

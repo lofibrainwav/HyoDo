@@ -216,6 +216,7 @@ def build_event_graph(
             "ts": event.get("ts"),
             "kind": event.get("kind"),
             "actor": event.get("actor"),
+            "actor_id": event.get("actor_id"),
             "step_index": event.get("step_index"),
             "decision": policy.get("decision"),
             "policy": {
