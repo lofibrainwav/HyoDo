@@ -18,6 +18,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from hyodo.events import credential_shaped_path
 from hyodo.policy_trust import effective_trust_level, load_policy_trust
 
 try:
@@ -29,8 +30,6 @@ POLICY_SCHEMA_ID = "hyodo.policy/v1"
 POLICY_RELATIVE_PATH = Path(".hyodo") / "policy.toml"
 _BUILTIN_WEB_TOOLS = frozenset({"web_fetch", "browser", "http", "fetch", "WebFetch", "WebSearch"})
 _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD"})
-_CREDENTIAL_PATH_MARKERS = ("/.git/", "/.env", "/wp-admin/")
-_CREDENTIAL_QUERY_MARKERS = ("token=", "api_key=", "secret=")
 
 
 class PolicyConfigError(ValueError):
@@ -67,6 +66,9 @@ class PolicyConfig:
     #: legitimate tools (search, http, …) touch no paths, and flagging all of them would
     #: push operators to delete blocked_path_globs entirely — a worse outcome.
     require_declared_paths: bool = False
+    #: Off by default because ledgers recorded before 1-B never declared an
+    #: opening intent. Reports can opt into requiring a human mission prompt.
+    require_mission_prompt: bool = False
     web: WebPolicy | None = None
     ask_tools: tuple[str, ...] = ()
     ask_threshold: int | None = None
@@ -160,6 +162,9 @@ def load_policy_config(path: Path) -> PolicyConfig:
             )
         blocked = tuple(globs)
 
+    require_mission_prompt = raw.get("require_mission_prompt", False)
+    if not isinstance(require_mission_prompt, bool):
+        raise PolicyConfigError(f"{path}: require_mission_prompt must be a boolean")
     require_declared_paths = raw.get("require_declared_paths", False)
     if not isinstance(require_declared_paths, bool):
         raise PolicyConfigError(f"{path}: require_declared_paths must be a boolean")
@@ -215,6 +220,7 @@ def load_policy_config(path: Path) -> PolicyConfig:
         allowed_tools=allowed_tools,
         blocked_path_globs=blocked,
         require_declared_paths=require_declared_paths,
+        require_mission_prompt=require_mission_prompt,
         web=web,
         ask_tools=tuple(ask_tools_raw),
         ask_threshold=ask_threshold,
@@ -264,16 +270,6 @@ def _is_web_classified(tool_name: str | None, policy: PolicyConfig) -> bool:
 def _domain_allowed(domain: str, allowed_domains: tuple[str, ...]) -> bool:
     """Return whether a domain matches an exact or wildcard allowlist entry."""
     return any(fnmatch.fnmatch(domain, pattern) for pattern in allowed_domains)
-
-
-def _credential_shaped(path: str | None) -> bool:
-    """Return whether a URL path contains a credential-shaped marker."""
-    if not path:
-        return False
-    lowered = path.lower()
-    return any(marker in lowered for marker in _CREDENTIAL_PATH_MARKERS) or any(
-        marker in lowered for marker in _CREDENTIAL_QUERY_MARKERS
-    )
 
 
 def _compute_coverage(
@@ -426,15 +422,37 @@ def evaluate_policy(
             )
         if not policy.web.allow_credential_paths:
             for entry in urls:
-                if isinstance(entry, dict) and _credential_shaped(entry.get("path")):
+                if isinstance(entry, dict) and (
+                    entry.get("credential_shaped") is True
+                    or (
+                        isinstance(entry.get("path"), str) and credential_shaped_path(entry["path"])
+                    )
+                ):
                     return PolicyDecision(
                         decision="DENY",
                         rule_id="web_credential_path_denied",
                         reason=(
-                            f"url path {entry.get('path')!r} matches a credential-shaped "
+                            f"url path {entry['path']!r} matches a credential-shaped "
                             "pattern and allow_credential_paths is false"
+                            if isinstance(entry.get("path"), str)
+                            else f"url digest {entry.get('digest')} on "
+                            f"{entry.get('domain')} is credential-shaped"
                         ),
                     )
+
+            if any(
+                not isinstance(entry, dict)
+                or (
+                    not isinstance(entry.get("path"), str)
+                    and not isinstance(entry.get("credential_shaped"), bool)
+                )
+                for entry in urls
+            ):
+                return PolicyDecision(
+                    decision="UNOBSERVED",
+                    rule_id="web_credential_path_unobserved",
+                    reason="URL path unavailable; credential path boundary cannot be checked",
+                )
 
     external_variables: list[str] = []
     unobserved_boundary: str | None = None

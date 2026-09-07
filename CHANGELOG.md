@@ -14,6 +14,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Graph edges and `hyodo report --format graph` (#160).
+- Anti-gaming AST visitor, not yet wired into a CLI command (#161).
+- Digest-only `tool.urls`, `gate:` evidence refs, `require_mission_prompt`,
+  and `unknown_edge_target` rejection reasons in the 1-B completion PR.
+
+### Changed
+
+- `tool.urls` no longer stores a plain-text path by default.
+
 - Document trust ladder, grants, and ASK exit code 3 in CLI help.
 
 ## [4.13.0] - 2026-09-06

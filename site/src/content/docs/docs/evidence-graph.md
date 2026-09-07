@@ -36,7 +36,8 @@ The two link types the graph draws — a solid elbow for "result of" and a
 dashed curve for "decided from" — map to optional `hyodo.agent-event/v1`
 fields on the source development line: `parent_event_id` and `evidence_refs`.
 `tool.urls` is also preserved in graph output so web observations can name the
-observed domain/path without storing a full response body.
+observed domain, a path digest, and a `credential_shaped` boolean (or `null`
+when unobserved) without storing the path or a full response body.
 
 `hyodo report --format graph` emits a deterministic local JSON artifact at
 `.hyodo/reports/hyodo-report.graph.json`. It is still evidence-only: broken

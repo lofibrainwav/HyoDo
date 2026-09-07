@@ -242,7 +242,13 @@ def test_validate_tool_urls_round_trip():
     )
     assert ok, reasons
     assert normalized is not None
-    assert normalized["tool"]["urls"] == [{"domain": "api.example.com", "path": "/v1/users"}]
+    assert normalized["tool"]["urls"] == [
+        {
+            "domain": "api.example.com",
+            "digest": content_digest("/v1/users"),
+            "credential_shaped": False,
+        }
+    ]
 
 
 def test_validate_tool_urls_defaults_to_empty_list():
@@ -656,9 +662,7 @@ def test_event_record_rejects_broken_parent_edge_without_appending(tmp_path: Pat
 
     assert result.exit_code == 1
     payload = json.loads(result.output)
-    assert payload["reasons"] == [
-        "edge_validation_failed:parent_event_id:unresolved_ref:missing-parent"
-    ]
+    assert payload["reasons"] == ["unknown_edge_target:parent_event_id"]
     ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
     assert not ledger.exists()
 
@@ -689,3 +693,105 @@ def test_event_record_allows_resolved_parent_and_evidence_edges(tmp_path: Path):
     assert [event["event_id"] for event in events] == ["parent", "child"]
     assert events[1]["parent_event_id"] == "parent"
     assert events[1]["evidence_refs"] == ["parent"]
+
+
+@pytest.mark.parametrize("digest", ["abcdef123456", "BAD", "a" * 13, 12])
+def test_url_explicit_digest(digest):
+    ok, reasons, normalized = validate_event(
+        _valid_event(
+            tool={"urls": [{"domain": "example.com", "path": "/private", "digest": digest}]}
+        )
+    )
+    if digest == "abcdef123456":
+        assert ok
+        assert normalized["tool"]["urls"] == [
+            {"domain": "example.com", "digest": digest, "credential_shaped": False}
+        ]
+    else:
+        assert not ok
+        assert "invalid_field:tool.urls" in reasons
+
+
+def test_url_full_body_and_graph_privacy():
+    from hyodo.event_graph import build_event_graph
+
+    raw = _valid_event(
+        io={"input_text": "body"}, tool={"urls": [{"domain": "example.com", "path": "/private"}]}
+    )
+    ok, _, event = validate_event(raw)
+    assert ok
+    assert event["tool"]["urls"][0]["path"] == "/private"
+    assert "path" not in strip_full_bodies(event)["tool"]["urls"][0]
+    for source in (raw, event, strip_full_bodies(event)):
+        url = build_event_graph([source])["nodes"][0]["tool"]["urls"][0]
+        assert url == {
+            "domain": "example.com",
+            "digest": content_digest("/private"),
+            "credential_shaped": False,
+        }
+    assert event["tool"]["urls"][0]["path"] == "/private"
+
+
+@pytest.mark.parametrize("ref", ["gate:pytest@abcdef0", "gate:x-y.z_1@" + "f" * 64])
+def test_gate_reference_record_and_graph(tmp_path, ref):
+    from hyodo.event_graph import build_event_graph
+
+    raw = _valid_event(evidence_refs=[ref])
+    ok, _, event = validate_event(raw)
+    assert ok
+    graph = build_event_graph([event])
+    assert graph["unresolved_refs"] == []
+    assert graph["summary"]["gate_refs"] == 1
+    assert graph["edges"][0]["kind"] == "evidence"
+    assert graph["edges"][0]["target_kind"] == "gate"
+    source = tmp_path / "event.json"
+    source.write_text(json.dumps(raw))
+    result = runner.invoke(
+        app, ["event", "record", "--root", str(tmp_path), "--file", str(source), "--json"]
+    )
+    assert result.exit_code == 0, result.output
+    assert len(read_agent_events(tmp_path)[0]) == 1
+
+
+@pytest.mark.parametrize(
+    "ref", ["gate:x", "gate:x@ABCDEF0", "gate:@abcdef0", "gate:x@abc", "gate:x@" + "a" * 65]
+)
+def test_malformed_gate_reference(ref):
+    ok, reasons, _ = validate_event(_valid_event(evidence_refs=[ref]))
+    assert not ok
+    assert "invalid_field:evidence_refs" in reasons
+
+
+def test_unknown_edges_deduplicate_by_field(tmp_path):
+    source = tmp_path / "event.json"
+    source.write_text(json.dumps(_valid_event(parent_event_id="missing", evidence_refs=["a", "b"])))
+    result = runner.invoke(
+        app, ["event", "record", "--root", str(tmp_path), "--file", str(source), "--json"]
+    )
+    assert result.exit_code == 1
+    assert json.loads(result.output)["reasons"] == [
+        "unknown_edge_target:parent_event_id",
+        "unknown_edge_target:evidence_refs",
+    ]
+    assert not (tmp_path / AGENT_EVENTS_RELATIVE_PATH).exists()
+
+
+@pytest.mark.parametrize(
+    ("entry", "shape"),
+    [
+        ({}, None),
+        ({"credential_shaped": True}, True),
+        ({"credential_shaped": False}, False),
+        ({"credential_shaped": "false"}, None),
+        ({"path": "/.env", "credential_shaped": False}, True),
+        ({"path": "/ordinary", "credential_shaped": True}, False),
+    ],
+)
+def test_url_shape_observation_and_missing_digest(entry, shape):
+    ok, reasons, event = validate_event(
+        _valid_event(tool={"urls": [{"domain": "example.com", **entry}]})
+    )
+    assert ok, reasons
+    url = event["tool"]["urls"][0]
+    assert url["credential_shaped"] is shape
+    assert url["digest"] == (content_digest(entry["path"]) if "path" in entry else None)

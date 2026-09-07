@@ -73,6 +73,7 @@ def _collect_evidence(root: Path) -> dict[str, Any]:
         "unevaluated": unevaluated,
         "eval_text": eval_text,
         "policy_text": policy_text,
+        "policy": policy,
         "policy_error": policy_error,
     }
 
@@ -178,6 +179,15 @@ def render_report(root: Path, report_format: str) -> tuple[str, str, dict[str, A
             corrupt=corrupt,
             ledger_unreadable=evidence["ledger_unreadable"],
         )
+        policy = evidence["policy"]
+        if (
+            policy is not None
+            and policy.require_mission_prompt
+            and graph["summary"]["intent_unobserved_runs"]
+            and graph["status"] == "READY"
+        ):
+            graph["status"] = "UNOBSERVED"
+            graph["reason"] = f"mission_unobserved:{graph['summary']['intent_unobserved_runs'][0]}"
         graph_json = render_event_graph_json(graph)
         digest = hashlib.sha256(graph_json.encode("utf-8")).hexdigest()
         summary = graph["summary"]

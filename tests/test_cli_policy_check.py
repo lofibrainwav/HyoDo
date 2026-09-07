@@ -6,6 +6,7 @@ import json
 import uuid
 from pathlib import Path
 
+import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import app
@@ -209,3 +210,46 @@ def test_policy_check_help_documents_ask_exit():
     result = runner.invoke(app, ["policy", "check", "--help"])
     assert result.exit_code == 0
     assert "3 ASK" in result.output
+
+
+@pytest.mark.parametrize(
+    ("url", "exit_code", "decision"),
+    [
+        ({"digest": "abcdef123456"}, 2, "UNOBSERVED"),
+        ({"digest": "abcdef123456", "credential_shaped": True}, 1, "DENY"),
+        ({"path": "/.env"}, 1, "DENY"),
+    ],
+)
+def test_digest_only_event_record_credential_boundary(tmp_path, url, exit_code, decision):
+    policy = _write_policy(
+        tmp_path, 'schema = "hyodo.policy/v1"\n[web]\nallowed_domains = ["allowed.example.com"]\n'
+    )
+    event = _write_event(
+        tmp_path,
+        _event(
+            {
+                "name": "web_fetch",
+                "method": "GET",
+                "urls": [{"domain": "allowed.example.com", **url}],
+            }
+        ),
+    )
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--file",
+            str(event),
+            "--root",
+            str(tmp_path),
+            "--policy",
+            str(policy),
+            "--json",
+        ],
+    )
+    assert result.exit_code == exit_code, result.output
+    ledger = json.loads((tmp_path / ".hyodo/agent-events.jsonl").read_text())
+    assert ledger["policy"]["decision"] == decision
+    assert "/.env" not in json.dumps(ledger) + result.output
+    assert "path" not in ledger["tool"]["urls"][0]

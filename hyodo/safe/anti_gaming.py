@@ -1,4 +1,7 @@
-"""AST-based inspection to prevent AI agents from gaming quality gates."""
+"""Building block for the Phase 1-E test-integrity signal (see the Phase 1 design
+spec); not yet invoked by any `hyodo` command.
+
+AST-based inspection to prevent AI agents from gaming quality gates."""
 
 import ast
 from dataclasses import dataclass

@@ -6,6 +6,8 @@ import json
 from collections import Counter
 from typing import Any
 
+from hyodo.events import content_digest, credential_shaped_path
+
 GRAPH_SCHEMA_VERSION = "hyodo.evidence-graph/v1"
 
 
@@ -123,6 +125,8 @@ def validate_event_edges(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                         reason="invalid_ref",
                     )
                 )
+            elif ref.startswith("gate:"):
+                continue
             elif ref == event_id:
                 issues.append(
                     _edge_issue(
@@ -183,10 +187,27 @@ def build_event_graph(
     event_ids = {_event_id(event) for event in events}
     event_ids.discard(None)
 
+    missions: dict[str, str | None] = {}
+    mission_steps: dict[str, int] = {}
     for event in events:
+        run_id = event.get("run_id")
+        step = event.get("step_index")
+        if isinstance(run_id, str):
+            missions.setdefault(run_id, None)
+            if (
+                event.get("kind") == "prompt"
+                and event.get("actor") == "human"
+                and isinstance(step, int)
+                and not isinstance(step, bool)
+                and (run_id not in mission_steps or step < mission_steps[run_id])
+            ):
+                missions[run_id] = _event_id(event)
+                mission_steps[run_id] = step
         event_id = _event_id(event)
         tool = _tool(event)
         policy = _policy(event)
+        urls = tool.get("urls")
+        urls = urls if isinstance(urls, list) else []
         node = {
             "id": event_id,
             "type": "event",
@@ -206,7 +227,19 @@ def build_event_graph(
                 "name": tool.get("name"),
                 "method": tool.get("method"),
                 "paths": _string_list(tool.get("paths")),
-                "urls": tool.get("urls") if isinstance(tool.get("urls"), list) else [],
+                "urls": [
+                    {
+                        "domain": entry.get("domain"),
+                        "digest": entry.get("digest") or content_digest(entry.get("path")),
+                        "credential_shaped": credential_shaped_path(entry["path"])
+                        if isinstance(entry.get("path"), str)
+                        else entry.get("credential_shaped")
+                        if isinstance(entry.get("credential_shaped"), bool)
+                        else None,
+                    }
+                    for entry in urls
+                    if isinstance(entry, dict)
+                ],
             },
         }
         nodes.append(node)
@@ -224,10 +257,12 @@ def build_event_graph(
                 }
             )
         for ref in _string_list(event.get("evidence_refs")):
-            if ref in event_ids and ref != event_id:
+            if ref.startswith("gate:") or (ref in event_ids and ref != event_id):
                 edges.append(
                     {
                         "type": "evidence_ref",
+                        "kind": "evidence",
+                        "target_kind": "gate" if ref.startswith("gate:") else "event",
                         "source": ref,
                         "target": event_id,
                         "label": "decided_from",
@@ -253,7 +288,12 @@ def build_event_graph(
         "nodes": nodes,
         "edges": edges,
         "unresolved_refs": edge_issues,
+        "missions": missions,
         "summary": {
+            "intent_unobserved_runs": sorted(
+                run for run, mission in missions.items() if mission is None
+            ),
+            "gate_refs": sum(edge.get("target_kind") == "gate" for edge in edges),
             "events": len(events),
             "edges": len(edges),
             "parent_links": sum(edge["type"] == "parent_event_id" for edge in edges),
