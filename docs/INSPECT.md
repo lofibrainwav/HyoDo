@@ -52,7 +52,8 @@ hyodo inspect <path> [--ignore <glob>]... [--remote-inventory <json-file>]...
       "mtime": "2026-09-06T11:00:00+00:00",
       "ignored": false,
       "ignore_reason": null,
-      "secret_shaped": false
+      "secret_shaped": false,
+      "symlink_target": null
     }
   ],
   "unreadable": [],
@@ -61,7 +62,13 @@ hyodo inspect <path> [--ignore <glob>]... [--remote-inventory <json-file>]...
 ```
 
 `digest` is `content_digest` (12 hex chars, `hyodo/events.py`) over the
-whole file's bytes. `mtime` is ISO-8601 UTC with a `+00:00` offset.
+whole file's bytes. `mtime` is ISO-8601 UTC with a `+00:00` offset. `path`
+is always the entry's own lexical location relative to `--root` — a
+symlink is reported under its own name, never silently under whatever it
+points at. `symlink_target` is `null` for a regular file; for a same-root
+symlink to a file it is that target's own path (relative to `--root`), so
+a symlink and the file it points at appear as two distinct `files` entries
+sharing one digest rather than one entry hiding the other.
 
 Two optional top-level keys appear only when relevant:
 
@@ -133,12 +140,17 @@ Symlinks:
 
 - A symlink whose resolved target lies outside the resolved `<path>` is
   never followed. It is excluded from both manifests and listed under
-  `unreadable` with reason `symlink_outside_root`.
+  `unreadable` with reason `symlink_outside_root`, at the symlink's **own**
+  path — never the outside target's path.
 - A symlink to a directory is never recursed into. It is listed under
   `unreadable` with reason `symlink_dir_skipped` (no directory symlink
-  recursion).
+  recursion), again at the symlink's own path.
 - A symlink to a regular file inside `<path>` is followed once, like a
-  normal file.
+  normal file: it gets its own `files` entry, at its own path, carrying the
+  target's digest and a `symlink_target` pointing at the target's own
+  entry. The target file itself still appears as a second, separate `files`
+  entry. Two entries sharing one digest is the honest report of what a
+  symlink actually is — never one entry silently standing in for the other.
 
 ## Digest mismatch between passes
 

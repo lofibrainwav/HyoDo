@@ -149,11 +149,75 @@ def test_symlink_outside_root_is_unreadable(tmp_path):
         result = run_inspect(str(root_dir), root=root_dir)
         unreadable = result.folder_manifest["unreadable"]
         assert any(u["reason"] == "symlink_outside_root" for u in unreadable)
+        # The unreadable entry names the symlink's OWN path, never the
+        # outside target's path (the bug this test guards against).
+        entry = next(u for u in unreadable if u["reason"] == "symlink_outside_root")
+        assert entry["path"] == "escape.txt"
+        assert "outside-target" not in entry["path"]
         observed, expected = result.folder_manifest["coverage"]
         assert expected == 1
         assert observed == 0
     finally:
         outside.unlink(missing_ok=True)
+
+
+def test_symlink_outside_root_under_shared_root_ancestor(tmp_path):
+    """`--root` is an ancestor of `<path>`; the reported path stays the symlink's own."""
+    outside = tmp_path / "outside-target.txt"
+    outside.write_text("outside content\n", encoding="utf-8")
+    sub_dir = tmp_path / "project" / "sub"
+    sub_dir.mkdir(parents=True)
+    link = sub_dir / "escape.txt"
+    try:
+        link.symlink_to(outside)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not supported in this environment")
+
+    result = run_inspect(str(sub_dir), root=tmp_path)
+    unreadable = result.folder_manifest["unreadable"]
+    entry = next(u for u in unreadable if u["reason"] == "symlink_outside_root")
+    assert entry["path"] == "project/sub/escape.txt"
+
+
+def test_symlink_inside_root_to_sibling_file_creates_two_distinct_entries(tmp_path):
+    """A same-root symlink to a file gets its own entry; the target keeps its own too."""
+    target_file = tmp_path / "regular.txt"
+    target_file.write_text("shared content\n", encoding="utf-8")
+    link = tmp_path / "link.txt"
+    try:
+        link.symlink_to(target_file)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not supported in this environment")
+
+    result = run_inspect(str(tmp_path), root=tmp_path)
+    files = result.folder_manifest["files"]
+    by_path = {f["path"]: f for f in files}
+
+    assert set(by_path) == {"regular.txt", "link.txt"}
+    assert by_path["regular.txt"]["symlink_target"] is None
+    assert by_path["link.txt"]["symlink_target"] == "regular.txt"
+    # Same content -> same digest, but they are two distinct entries.
+    assert by_path["regular.txt"]["digest"] == by_path["link.txt"]["digest"]
+
+    observed, expected = result.folder_manifest["coverage"]
+    assert observed == expected == 2
+
+
+def test_dir_symlink_unreadable_path_is_symlinks_own_path(tmp_path):
+    real_dir = tmp_path / "real_dir"
+    real_dir.mkdir()
+    (real_dir / "inner.txt").write_text("inner\n", encoding="utf-8")
+    link = tmp_path / "dir_link"
+    try:
+        link.symlink_to(real_dir, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlinks not supported in this environment")
+
+    result = run_inspect(str(tmp_path), root=tmp_path)
+    unreadable = result.folder_manifest["unreadable"]
+    entry = next(u for u in unreadable if u["reason"] == "symlink_dir_skipped")
+    assert entry["path"] == "dir_link"
+    assert "real_dir" not in entry["path"]
 
 
 def test_determinism_two_runs_identical_except_generated_at(tmp_path):

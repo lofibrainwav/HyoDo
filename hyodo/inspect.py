@@ -94,29 +94,45 @@ def _walk_files(root: Path) -> list[Path]:
     return results
 
 
-def _resolve_symlink_status(entry: Path, root: Path) -> str | None:
-    """Return an `unreadable` reason for a symlink that cannot be absorbed, else None.
+def _resolve_symlink_status(entry: Path, root: Path) -> tuple[str | None, Path | None]:
+    """Return (`unreadable` reason, resolved target) for one directory entry.
 
-    A symlink to a directory is never recursed into (`symlink_dir_skipped`).
-    A symlink whose resolved target lies outside the resolved root is never
-    followed (`symlink_outside_root`). A symlink inside root pointing at a
-    regular file is followed once and returns None (no special handling
-    needed beyond the normal read path).
+    A symlink to a directory is never recursed into (`symlink_dir_skipped`,
+    no resolved target). A symlink whose resolved target lies outside the
+    resolved root is never followed (`symlink_outside_root`, no resolved
+    target). A symlink inside root pointing at a regular file is followed
+    once: reason is None and the resolved target path is returned so the
+    caller can record it as `symlink_target` — never the target's own path
+    silently standing in for the symlink's.
     """
     if not entry.is_symlink():
-        return None
+        return None, None
     try:
         resolved = entry.resolve(strict=True)
     except OSError:
-        return "symlink_outside_root"
+        return "symlink_outside_root", None
     resolved_root = root.resolve()
     try:
         resolved.relative_to(resolved_root)
     except ValueError:
-        return "symlink_outside_root"
+        return "symlink_outside_root", None
     if resolved.is_dir():
-        return "symlink_dir_skipped"
-    return None
+        return "symlink_dir_skipped", None
+    return None, resolved
+
+
+def _lexical_display_path(entry: Path, root_abs: Path) -> str:
+    """Return *entry*'s own path relative to *root_abs*, POSIX, never resolving symlinks.
+
+    `root_abs` must already be an absolute (but not necessarily resolved)
+    path. Using `Path.absolute()` here (not `.resolve()`) is deliberate: a
+    symlink must be reported under its own lexical location, never under
+    whatever it happens to point at.
+    """
+    try:
+        return entry.absolute().relative_to(root_abs).as_posix()
+    except ValueError:
+        return entry.as_posix()
 
 
 def load_remote_inventory(path: str) -> dict[str, Any]:
@@ -207,6 +223,7 @@ def run_inspect(
         raise NotADirectoryError(f"not a directory: {path}")
 
     base_root = Path(root) if root is not None else Path.cwd()
+    root_abs = base_root.absolute()
 
     remote_rows: list[dict[str, Any]] = []
     for inv_path in remote_inventory_paths or []:
@@ -224,15 +241,13 @@ def run_inspect(
     expected = 0
 
     for entry in entries:
-        # Report path relative to --root, POSIX separators.
-        try:
-            display_path = entry.resolve().relative_to(base_root.resolve()).as_posix()
-        except ValueError:
-            display_path = entry.as_posix()
+        # Report path relative to --root, POSIX separators — the entry's own
+        # lexical location, never a symlink's resolved target.
+        display_path = _lexical_display_path(entry, root_abs)
         name = entry.name
         ignore_match = _is_ignored(display_path, name, ignore_patterns)
 
-        symlink_reason = _resolve_symlink_status(entry, target)
+        symlink_reason, symlink_resolved = _resolve_symlink_status(entry, target)
         if symlink_reason is not None:
             # Ignored files are entirely out of coverage scope (rule: ignore
             # excludes from chunks *and* from coverage's expected count), so an
@@ -241,6 +256,13 @@ def run_inspect(
                 expected += 1
                 unreadable.append({"path": display_path, "reason": symlink_reason})
             continue
+
+        symlink_target_display: str | None = None
+        if entry.is_symlink() and symlink_resolved is not None:
+            try:
+                symlink_target_display = symlink_resolved.relative_to(root_abs.resolve()).as_posix()
+            except ValueError:
+                symlink_target_display = symlink_resolved.as_posix()
 
         try:
             data = entry.read_bytes()
@@ -269,6 +291,7 @@ def run_inspect(
                     "ignored": True,
                     "ignore_reason": f"pattern:{ignore_match}",
                     "secret_shaped": False,
+                    "symlink_target": symlink_target_display,
                 }
             )
             continue
@@ -287,6 +310,7 @@ def run_inspect(
                 "ignored": False,
                 "ignore_reason": None,
                 "secret_shaped": secret_shaped,
+                "symlink_target": symlink_target_display,
             }
         )
 
@@ -313,10 +337,7 @@ def run_inspect(
         digest_before = pass1_digest[entry]
         digest_after = content_digest(data)
         if digest_after != digest_before:
-            try:
-                display_path = entry.resolve().relative_to(base_root.resolve()).as_posix()
-            except ValueError:
-                display_path = entry.as_posix()
+            display_path = _lexical_display_path(entry, root_abs)
             changed_during_inspect.append(
                 {
                     "path": display_path,
