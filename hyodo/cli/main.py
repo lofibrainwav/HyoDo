@@ -3065,6 +3065,13 @@ def event_record(
         help="Stamp policy.shadow=true on the recorded event (shadow-mode "
         "on-ramp installed by `hyodo connect --shadow`)",
     ),
+    actor_id: str | None = typer.Option(
+        None,
+        "--actor-id",
+        help="Opaque label (session id, seat name, model alias) for this "
+        "actor; sets actor_id when the event JSON does not already carry "
+        "one. HyoDo never derives identity from it.",
+    ),
     audience: str | None = _audience_option(),
 ):
     """
@@ -3140,6 +3147,9 @@ def event_record(
             raise typer.Exit(2)
         data = mapped.raw
         root_path = mapped.root
+
+    if actor_id is not None and isinstance(data, dict) and not data.get("actor_id"):
+        data["actor_id"] = actor_id
 
     ok, reasons, normalized = validate_event(data)
     if not ok or normalized is None:

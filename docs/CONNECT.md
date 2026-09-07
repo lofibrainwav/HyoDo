@@ -70,6 +70,13 @@ fire-and-forget there and always exits 0 once the ledger append succeeds.
 | `UNOBSERVED` | 2 |
 | malformed/unparseable hook payload | 2 |
 
+The mapped event also carries `actor_id`, set to the hook payload's own
+`session_id` — the same value already used as `run_id`. `actor_id` is an
+optional, opaque label (`hyodo.agent-event/v1`): it lets the local graph
+viewer and `hyodo report --format graph` tell two agents apart within one
+run instead of collapsing them into a single row, and HyoDo never derives
+identity or authorization from it.
+
 ## Exit codes
 
 `connect` (dry run, no target, or `<target>` preview): always 0 — a preview

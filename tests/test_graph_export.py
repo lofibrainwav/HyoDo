@@ -209,6 +209,31 @@ def test_export_with_yes_writes_the_artifact(tmp_path: Path) -> None:
     assert len(payload["nodes"]) == 2
 
 
+def test_export_nodes_mirror_report_actor_id_field(tmp_path: Path) -> None:
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="m1"),
+            _event(
+                event_id="t1",
+                kind="tool_call",
+                actor="agent",
+                actor_id="worker",
+                step_index=1,
+                parent_event_id="m1",
+            ),
+        ],
+    )
+    result = runner.invoke(app, ["graph", "export", "--yes", "--root", str(tmp_path)])
+    assert result.exit_code == 0, result.output
+
+    out_path = tmp_path / ".hyodo" / "graph.json"
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    nodes_by_id = {node["id"]: node for node in payload["nodes"]}
+    assert nodes_by_id["m1"]["actor_id"] is None
+    assert nodes_by_id["t1"]["actor_id"] == "worker"
+
+
 def test_export_custom_out_path_is_honoured(tmp_path: Path) -> None:
     _write_ledger(tmp_path, [_event()])
     result = runner.invoke(

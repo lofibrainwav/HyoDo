@@ -305,6 +305,62 @@ def test_validate_event_edge_fields_reject_invalid_shapes():
     assert "invalid_field:evidence_refs" in reasons
 
 
+def test_validate_event_actor_id_absent_normalizes_to_none():
+    ok, reasons, normalized = validate_event(_valid_event())
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["actor_id"] is None
+
+
+def test_validate_event_actor_id_null_normalizes_to_none():
+    ok, reasons, normalized = validate_event(_valid_event(actor_id=None))
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["actor_id"] is None
+
+
+def test_validate_event_actor_id_accepts_a_valid_label():
+    ok, reasons, normalized = validate_event(_valid_event(actor_id="planner-01"))
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["actor_id"] == "planner-01"
+
+
+def test_validate_event_actor_id_accepts_a_uuid_shaped_session_id():
+    session_id = str(uuid.uuid4())
+    ok, reasons, normalized = validate_event(_valid_event(actor_id=session_id))
+    assert ok, reasons
+    assert normalized["actor_id"] == session_id
+
+
+def test_validate_event_actor_id_rejects_empty_string():
+    ok, reasons, normalized = validate_event(_valid_event(actor_id=""))
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:actor_id" in reasons
+
+
+def test_validate_event_actor_id_rejects_disallowed_characters():
+    ok, reasons, normalized = validate_event(_valid_event(actor_id="seat name!"))
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:actor_id" in reasons
+
+
+def test_validate_event_actor_id_rejects_non_string():
+    ok, reasons, normalized = validate_event(_valid_event(actor_id=123))
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:actor_id" in reasons
+
+
+def test_validate_event_actor_id_rejects_over_64_chars():
+    ok, reasons, normalized = validate_event(_valid_event(actor_id="a" * 65))
+    assert not ok
+    assert normalized is None
+    assert "invalid_field:actor_id" in reasons
+
+
 # --------------------------------------------------------------------------- #
 # Policy unit (T1.9-T1.13)
 # --------------------------------------------------------------------------- #
@@ -665,6 +721,55 @@ def test_event_record_rejects_broken_parent_edge_without_appending(tmp_path: Pat
     assert payload["reasons"] == ["unknown_edge_target:parent_event_id"]
     ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
     assert not ledger.exists()
+
+
+def test_event_record_actor_id_flag_fills_in_when_json_lacks_one(tmp_path: Path):
+    event = _valid_event()
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps(event), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--root",
+            str(tmp_path),
+            "--file",
+            str(event_path),
+            "--actor-id",
+            "planner",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    events, corrupt = read_agent_events(tmp_path)
+    assert corrupt == 0
+    assert events[0]["actor_id"] == "planner"
+
+
+def test_event_record_actor_id_flag_does_not_override_an_existing_value(tmp_path: Path):
+    event = _valid_event(actor_id="worker")
+    event_path = tmp_path / "event.json"
+    event_path.write_text(json.dumps(event), encoding="utf-8")
+
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--root",
+            str(tmp_path),
+            "--file",
+            str(event_path),
+            "--actor-id",
+            "planner",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0, result.output
+    events, _corrupt = read_agent_events(tmp_path)
+    assert events[0]["actor_id"] == "worker"
 
 
 def test_event_record_allows_resolved_parent_and_evidence_edges(tmp_path: Path):

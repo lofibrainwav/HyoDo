@@ -46,6 +46,10 @@ _PHASH_RE = re.compile(r"^[0-9a-f]{16}$")
 #: ``phash_algo`` values match (see ``hyodo eye verify``).
 _PHASH_ALGO_DCT64 = "dct64"
 GATE_REF_RE = re.compile(r"^gate:[A-Za-z0-9_.\-]+@[0-9a-f]{7,64}$")
+#: An opaque label chosen by the harness (session id, seat name, model
+#: alias). HyoDo never derives identity from it — it is display/grouping
+#: metadata only, never used for authorization.
+_ACTOR_ID_RE = re.compile(r"^[A-Za-z0-9._:@-]{1,64}$")
 _HTTP_METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE"})
 
 #: Marker written into ``policy.reason`` when no policy was actually evaluated.
@@ -330,6 +334,17 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
         else:
             parent_event_id_out = parent_event_id_raw.strip()
 
+    # actor_id: optional, additive (schema v1). Absent -> None after
+    # normalization, exactly like parent_event_id. An opaque label chosen
+    # by the harness — HyoDo never derives identity from it.
+    actor_id_raw = raw.get("actor_id")
+    actor_id_out: str | None = None
+    if actor_id_raw is not None:
+        if not (isinstance(actor_id_raw, str) and _ACTOR_ID_RE.fullmatch(actor_id_raw)):
+            reasons.append("invalid_field:actor_id")
+        else:
+            actor_id_out = actor_id_raw
+
     evidence_refs_raw = raw.get("evidence_refs", [])
     evidence_refs_out: list[str] = []
     if evidence_refs_raw is None:
@@ -421,6 +436,7 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
         "kind": str(raw["kind"]).strip(),
         "step_index": int(raw["step_index"]),
         "actor": str(raw["actor"]).strip(),
+        "actor_id": actor_id_out,
         "parent_event_id": parent_event_id_out,
         "evidence_refs": evidence_refs_out,
         "tool": tool_out

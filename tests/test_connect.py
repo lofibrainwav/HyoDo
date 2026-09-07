@@ -264,6 +264,10 @@ def test_map_claude_code_hook_payload_maps_bash_tool(tmp_path: Path) -> None:
     assert mapped.raw["actor"] == "agent"
     assert mapped.raw["tool"]["name"] == "Bash"
     assert mapped.raw["tool"]["args_digest"] is not None
+    # The hook already uses session_id as run_id; actor_id additionally
+    # carries the same value (Ruling 2).
+    assert mapped.raw["actor_id"] == "run-abc"
+    assert mapped.raw["actor_id"] == mapped.raw["run_id"]
 
 
 def test_map_claude_code_hook_payload_rejects_malformed(tmp_path: Path) -> None:

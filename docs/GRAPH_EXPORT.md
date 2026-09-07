@@ -34,7 +34,11 @@ The output is one JSON object, schema `hyodo.graph-export/v1`:
 ```
 
 - `nodes` / `edges` mirror `hyodo report --format graph`'s own
-  `hyodo.evidence-graph/v1` shape (`hyodo/event_graph.py`) verbatim.
+  `hyodo.evidence-graph/v1` shape (`hyodo/event_graph.py`) verbatim,
+  including each node's `actor_id` (`null` when the event did not carry
+  one) — an optional, opaque label (session id, seat name, model alias)
+  the harness chose, letting two agents in one run keep separate rows
+  instead of collapsing into one. HyoDo never derives identity from it.
 - `backlinks` is the reverse index of every non-broken `evidence_refs`
   entry in the ledger: `{cited_event_id: [citing_event_id, ...]}`, values
   sorted, keys only for events cited at least once. `hyodo report

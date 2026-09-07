@@ -28,6 +28,7 @@ def _node(
     *,
     kind: str = "tool_call",
     actor: str = "agent",
+    actor_id: str | None = None,
     decision: str | None = None,
     rule_id: str | None = None,
     tool_name: str | None = None,
@@ -42,6 +43,7 @@ def _node(
         "ts": ts if ts is not None else f"2026-09-06T00:00:{step_index:02d}+00:00",
         "kind": kind,
         "actor": actor,
+        "actor_id": actor_id,
         "step_index": step_index,
         "decision": decision,
         "policy": {"rule_id": rule_id, "reason": None, "evaluated_by": None},
@@ -512,3 +514,83 @@ def test_actor_rings_unknown_key_absent_from_the_returned_dict(tmp_path) -> None
     nodes = [_node("h1", kind="prompt", actor="human", step_index=0)]
     rings = build_actor_rings(_graph(nodes, []), tmp_path)
     assert "does-not-exist" not in rings
+
+
+# --- build_actor_rows: actor_id row identity and nesting (owner ruling 2026-09-07) ---
+
+
+def test_two_labelled_agents_in_one_run_are_two_rows() -> None:
+    planner = _node("e1", actor="agent", actor_id="planner", step_index=0)
+    worker = _node("e2", actor="agent", actor_id="worker", step_index=1)
+    tree = build_actor_rows([planner, worker], [])
+    assert "agent:planner" in tree["rows"]
+    assert "agent:worker" in tree["rows"]
+    assert tree["rows"]["agent:planner"]["events"] == ["e1"]
+    assert tree["rows"]["agent:worker"]["events"] == ["e2"]
+    assert tree["rows"]["agent:planner"]["label"] == "agent planner"
+
+
+def test_labelled_agent_events_stay_one_row_regardless_of_topology() -> None:
+    first = _node("e1", actor="agent", actor_id="worker", kind="tool_call", step_index=0)
+    second = _node("e2", actor="agent", actor_id="worker", kind="tool_result", step_index=1)
+    tree = build_actor_rows([first, second], [_edge("e1", "e2")])
+    assert len(tree["order"]) == 1
+    assert tree["rows"]["agent:worker"]["events"] == ["e1", "e2"]
+
+
+def test_lane_root_stops_walking_at_a_differing_actor_id_boundary() -> None:
+    # `p1` (actor_id "planner") is the parent_event_id of `w1` (actor_id
+    # "worker") -- the walk must not merge them into one lineage even
+    # though both are agent-actor and directly linked.
+    planner_first = _node("p1", actor="agent", actor_id="planner", step_index=0)
+    worker_first = _node("w1", actor="agent", actor_id="worker", step_index=1)
+    tree = build_actor_rows([planner_first, worker_first], [_edge("p1", "w1")])
+    assert set(tree["order"]) == {"agent:planner", "agent:worker"}
+
+
+def test_child_row_nesting_sets_parent_row_and_depth() -> None:
+    mission = _node("m1", kind="prompt", actor="human", step_index=0)
+    planner_call = _node("p1", actor="agent", actor_id="planner", kind="tool_call", step_index=1)
+    worker_first = _node("w1", actor="agent", actor_id="worker", step_index=2)
+    nodes = [mission, planner_call, worker_first]
+    edges = [_edge("m1", "p1"), _edge("p1", "w1")]
+    tree = build_actor_rows(nodes, edges)
+
+    assert tree["rows"]["human"]["depth"] == 0
+    assert tree["rows"]["agent:planner"]["parent_row"] is None
+    assert tree["rows"]["agent:planner"]["depth"] == 0
+    assert tree["rows"]["agent:worker"]["parent_row"] == "agent:planner"
+    assert tree["rows"]["agent:worker"]["depth"] == 1
+
+
+def test_orchestrator_role_detected_across_two_labelled_agent_rows() -> None:
+    planner_call = _node("p1", actor="agent", actor_id="planner", kind="tool_call", step_index=0)
+    worker_first = _node("w1", actor="agent", actor_id="worker", step_index=1)
+    nodes = [planner_call, worker_first]
+    edges = [_edge("p1", "w1")]
+    tree = build_actor_rows(nodes, edges)
+    assert tree["rows"]["agent:planner"]["role"] == "orchestrator"
+    assert tree["rows"]["agent:worker"]["role"] == "worker"
+    assert tree["rows"]["agent:planner"]["hyo_hierarchy"]["children"] == 1
+
+
+def test_backward_compatibility_without_actor_id_matches_existing_fixture() -> None:
+    # Same fixture as
+    # test_true_sub_agent_gets_exactly_one_nested_row_under_its_parent --
+    # no actor_id anywhere, so rows/labels/nesting must be unchanged.
+    parent_tool_call = _node("p1", actor="hyodo", kind="tool_call", step_index=0)
+    sub_first = _node("s1", actor="agent", kind="tool_call", tool_name="planner", step_index=1)
+    sub_second = _node(
+        "s2", actor="agent", kind="tool_result", tool_name="different_tool", step_index=2
+    )
+    nodes = [parent_tool_call, sub_first, sub_second]
+    edges = [_edge("p1", "s1"), _edge("s1", "s2")]
+    tree = build_actor_rows(nodes, edges)
+
+    assert tree["order"] == ["hyodo", "agent:s1"]
+    assert tree["rows"]["hyodo"]["parent_row"] is None
+    assert tree["rows"]["hyodo"]["depth"] == 0
+    assert tree["rows"]["agent:s1"]["parent_row"] == "hyodo"
+    assert tree["rows"]["agent:s1"]["depth"] == 1
+    assert tree["rows"]["agent:s1"]["events"] == ["s1", "s2"]
+    assert tree["rows"]["agent:s1"]["label"] == "agent:planner"

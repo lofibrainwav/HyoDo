@@ -287,17 +287,25 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     in sequence stays *one* row, not one row per tool call — and is
     labelled, display-only, from the lineage's earliest event's
     `tool.name`; never a new schema field and never the row's identity
-    (row identity is the lineage, `tool.name` only picks its label). A row
-    nests under another row when its lineage's earliest event's
-    `parent_event_id` resolves to a `tool_call` belonging to a different
-    lineage — entirely derived from the `parent_event_id` edge Phase 1-B
-    already ships; nesting is one level deep.
+    (row identity is the lineage, `tool.name` only picks its label). When
+    an event carries the optional `actor_id` field, row identity is
+    instead `(actor, actor_id)` directly — key `agent:<actor_id>`, label
+    `agent <actor_id>` — so two differently labelled agents in one run are
+    always two rows even when one's `parent_event_id` chains into the
+    other's; `_lane_root`'s walk also stops at the first `actor_id`
+    boundary it meets, for the same reason. Absent `actor_id`, this is
+    unchanged from before that field existed. A row nests under another
+    row when its lineage's earliest event's `parent_event_id` resolves to
+    a `tool_call` belonging to a different lineage — entirely derived from
+    the `parent_event_id` edge Phase 1-B already ships.
 
     Returns `{"order": [row_key, ...], "rows": {row_key: {...}}}` where
     each row dict has `actor`, `label` (display text), `events` (node ids,
-    earliest first), `parent_row` (`None` for a top-level row), `role`
-    (coordinator ruling, additive, no schema change — see below), and
-    `hyo_hierarchy` (same ruling).
+    earliest first), `parent_row` (`None` for a top-level row), `depth`
+    (`0` for a top-level row, otherwise one more than its `parent_row`'s
+    depth — labelled `actor_id` chains can nest more than one level deep),
+    `role` (coordinator ruling, additive, no schema change — see below),
+    and `hyo_hierarchy` (same ruling).
 
     `role` is derived only from the graph, fixed precedence
     `human > orchestrator > reviewer > worker`:
@@ -316,8 +324,11 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     "children_disconnected": int}`: `own_connected` is `True` when every
     one of this row's own events chains to its run's mission
     (`hyo_chain`, section 3's structural Hyo check); `children` counts
-    this row's direct `parent_row` children (nesting is one level deep,
-    so no recursion is needed); `children_disconnected` counts those
+    this row's direct `parent_row` children only (never grandchildren —
+    an orchestrator row's own `children_disconnected` is filled in from
+    its direct children's already-computed `own_connected`, so no
+    recursive re-walk is needed even when `depth` goes past 1);
+    `children_disconnected` counts those
     children whose own `own_connected` is `False` — an orchestrator row
     inherits its children's orphaned counts this way, without re-walking
     the chain itself.
@@ -335,12 +346,19 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
         step = node.get("step_index")
         return step if isinstance(step, int) and not isinstance(step, bool) else 0
 
+    def _actor_id(node: dict[str, Any] | None) -> str | None:
+        value = node.get("actor_id") if isinstance(node, dict) else None
+        return value if isinstance(value, str) and value else None
+
     def _lane_root(node_id: str) -> str:
         """Walk `parent_event_id` up while the parent is also `agent`-actor.
 
         Two `agent`-actor events belong to the same lineage (row) exactly
         when this returns the same id for both — the actor lineage, never
-        a `tool.name`, is the row identity.
+        a `tool.name`, is the row identity. The walk also stops the moment
+        the parent event carries a different `actor_id` than the current
+        event — two labelled agents are always two rows, even when one's
+        `parent_event_id` chains into the other's.
         """
         current = node_id
         seen = {node_id}
@@ -350,6 +368,8 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
                 return current
             parent_node = node_by_id.get(parent_id)
             if parent_node is None or parent_node.get("actor") != "agent":
+                return current
+            if _actor_id(parent_node) != _actor_id(node_by_id.get(current)):
                 return current
             if parent_id in seen:
                 return current
@@ -362,11 +382,23 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
         return name if isinstance(name, str) and name else None
 
     def _row_key_and_label(node: dict[str, Any]) -> tuple[str, str]:
-        """Stable row id + display label for *node*'s lineage (not the event itself)."""
+        """Stable row id + display label for *node*'s lineage (not the event itself).
+
+        When the event carries an `actor_id`, row identity is
+        `(actor, actor_id)` directly — key `agent:<actor_id>`, label
+        `agent <actor_id>` — regardless of `parent_event_id` topology, so
+        two labelled agents (e.g. two orchestrated sub-agents in one run)
+        never collapse into one row and the same labelled agent's events
+        always land in one row. Absent `actor_id`, behaviour is unchanged
+        (lineage derived from `_lane_root`'s `parent_event_id` walk).
+        """
         actor = node.get("actor")
         if actor != "agent":
             label = str(actor) if actor else "unknown"
             return label, label
+        actor_id = _actor_id(node)
+        if actor_id is not None:
+            return f"agent:{actor_id}", f"agent {actor_id}"
         node_id = node.get("id")
         root_id = _lane_root(node_id) if isinstance(node_id, str) else str(node_id)
         root_node = node_by_id.get(root_id, node)
@@ -402,6 +434,31 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
             parent_key, _parent_label = _row_key_and_label(parent_node)
             if parent_key != key:
                 row["parent_row"] = parent_key
+
+    # `depth`: 0 for a top-level row, otherwise one more than its
+    # `parent_row`'s depth. A cycle (only reachable via a malformed/hand-
+    # edited ledger) is broken by treating the row that closes it as
+    # top-level rather than looping forever.
+    depth_by_key: dict[str, int] = {}
+
+    def _depth(key: str, seen: set[str] | None = None) -> int:
+        if key in depth_by_key:
+            return depth_by_key[key]
+        parent_key = rows.get(key, {}).get("parent_row")
+        if not isinstance(parent_key, str) or parent_key not in rows:
+            depth_by_key[key] = 0
+            return 0
+        seen = seen if seen is not None else set()
+        if key in seen:
+            depth_by_key[key] = 0
+            return 0
+        seen.add(key)
+        value = _depth(parent_key, seen) + 1
+        depth_by_key[key] = value
+        return value
+
+    for key in order:
+        rows[key]["depth"] = _depth(key)
 
     # Coordinator ruling (additive, no schema change): `role` and
     # `hyo_hierarchy`, both derived only from `nodes`/`edges` already
