@@ -471,11 +471,12 @@ def _run_external_scanner(
     tool_map = {
         "gitleaks": {
             "binary": "gitleaks",
-            "scan_args": ["detect", "--source", ".", "--no-banner", "--format", "json", "--no-git"],
+            # gitleaks 8.x has no `--format` flag; the report is emitted with
+            # `--report-format`/`--report-path` (`-` streams the report to stdout).
+            "version_args": ["version"],
         },
         "trufflehog": {
             "binary": "trufflehog",
-            "scan_args": ["git", "file://.", "--json", "--no-update"],
         },
     }
 
@@ -487,21 +488,62 @@ def _run_external_scanner(
     if not binary:
         return [], f"error:{config['binary']} {NOT_INSTALLED} (brew install {config['binary']})"
 
-    scan_cmd = [binary] + config["scan_args"]
-    if path:
-        if tool == "trufflehog":
-            scan_cmd = [binary, "git", f"file://{path}", "--json", "--no-update"]
+    source_target = str(path) if path else "."
+    if tool == "gitleaks":
+        scan_cmd = [
+            binary,
+            "detect",
+            "--source",
+            source_target,
+            "--no-banner",
+            "--report-format",
+            "json",
+            "--report-path",
+            "-",
+            "--no-git",
+        ]
+    else:
+        scan_cmd = [binary, "git", f"file://{source_target}", "--json", "--no-update"]
+
+    version_suffix = ""
+    version_args = config.get("version_args")
+    if version_args:
+        version_error: str | None = None
+        version_output = ""
+        try:
+            version_result = subprocess.run(
+                [binary, *version_args],
+                capture_output=True,
+                text=True,
+                timeout=10,
+                cwd=str(cwd),
+            )
+        except subprocess.TimeoutExpired:
+            version_error = f"{tool} version check timed out (>10s)"
+        except OSError as e:
+            version_error = f"{tool} version check failed to execute: {e}"
         else:
-            scan_cmd = [
-                binary,
-                "detect",
-                "--source",
-                str(path),
-                "--no-banner",
-                "--format",
-                "json",
-                "--no-git",
-            ]
+            version_output = version_result.stdout.strip() or version_result.stderr.strip()
+            if version_result.returncode != 0 or not version_output:
+                version_error = (
+                    f"{tool} did not answer 'version' (exit {version_result.returncode}, no output)"
+                )
+
+        if version_error is not None:
+            return [
+                Finding(
+                    category="external_scan",
+                    severity="high",
+                    label=f"{tool}_failed",
+                    detail=(
+                        f"{tool} positive control failed: {version_error} — "
+                        "binary present but not usable, scan not attempted"
+                    ),
+                    path=None,
+                    line=None,
+                )
+            ], f"error:{version_error}"
+        version_suffix = f" ({version_output})"
 
     try:
         result = subprocess.run(
@@ -517,7 +559,7 @@ def _run_external_scanner(
         return [], f"error:{tool} execution failed: {e}"
 
     findings: list[Finding] = []
-    source = f"{tool}:scan"
+    source = f"{tool}:scan{version_suffix}"
     raw = result.stdout.strip()
 
     if not raw:

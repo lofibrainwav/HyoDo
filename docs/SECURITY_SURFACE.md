@@ -154,6 +154,20 @@ when `scope` is `diff` or `status`, a follow-up hint suggesting a directory
 scan. `--quiet` suppresses both lines; `--audience` lenses never change the
 underlying `scope` or `coverage` values.
 
+### `--scan gitleaks` / `--scan trufflehog` / `--scan all`
+
+`hyodo safe --scan gitleaks` shells out to a locally installed `gitleaks`
+binary instead of the built-in regex patterns. gitleaks 8.x removed the
+older `--format json` flag; HyoDo invokes it as `detect --report-format
+json --report-path -` (report streamed to stdout) so it stays compatible
+with 8.x releases. Before scanning, HyoDo runs `gitleaks version` as a
+positive control (10s timeout): if the binary does not answer with a
+version string, the scan is reported as a high-severity `gitleaks_failed`
+finding rather than being treated as clean, and the actual scan is not
+attempted. On success the reported `source` includes the detected version,
+for example `gitleaks:scan (8.30.1)`. `--scan trufflehog` and `--scan all`
+(both tools merged) behave as documented in `hyodo safe --help`.
+
 ## Agent event ledger is opt-in evidence, not a runtime interceptor
 
 `hyodo event` / `hyodo policy` implement an **opt-in FDE evidence spine**:
