@@ -21,6 +21,7 @@ from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
     http_app_accepts_options,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from hyodo.access_ledger import AccessEntry, record_access
+from hyodo.pairing import PairingState, load_pairing, touch_last_seen, verify_token
 
 _CLI_TIMEOUT_SECONDS = 120
 _LOOPBACK_HOST = "127.0.0.1"
@@ -139,6 +140,7 @@ def create_server(
     host: str = _LOOPBACK_HOST,
     port: int = 8000,
     allow_full_body: bool = False,
+    caller_id: str | None = None,
 ) -> Any:
     """Create one root-locked MCP server without owning gate logic.
 
@@ -146,8 +148,17 @@ def create_server(
     defaults to off and can only be turned on when the server is started — never by a
     connected client. Otherwise the agent being audited could raise its own privacy
     ceiling simply by passing ``full_body=True``.
+
+    ``caller_id`` is recorded on every access-ledger entry this server instance
+    writes. The paired HTTP bridge passes its pairing's ``workspace_id`` here so
+    the ledger can attribute requests to a workspace without ever recording the
+    bearer token itself.
     """
     workspace = resolve_workspace_root(root)
+
+    def _record(tool_name: str, exit_code: int, duration_ms: int) -> None:
+        _record_access(tool_name, workspace, exit_code, duration_ms, caller_id=caller_id)
+
     server_class = get_mcp_server_class()
     constructor_kwargs: dict[str, Any] = {}
     if constructor_accepts_transport_options():
@@ -183,7 +194,7 @@ def create_server(
             "git_diff_stat": diff.strip() if diff_ok else "",
             "git_observed": status_ok and diff_ok,
         }
-        _record_access("get_local_context", workspace, result["exit_code"], elapsed_ms)
+        _record("get_local_context", result["exit_code"], elapsed_ms)
         return result
 
     @server.tool()
@@ -201,7 +212,7 @@ def create_server(
         t0 = time.monotonic()
         result = _run_cli(workspace, args)
         elapsed_ms = int((time.monotonic() - t0) * 1000)
-        _record_access("hyodo_safe", workspace, result["exit_code"], elapsed_ms)
+        _record("hyodo_safe", result["exit_code"], elapsed_ms)
         return result
 
     @server.tool()
@@ -210,7 +221,7 @@ def create_server(
         t0 = time.monotonic()
         result = _run_cli(workspace, ["check", str(workspace)])
         elapsed_ms = int((time.monotonic() - t0) * 1000)
-        _record_access("hyodo_check", workspace, result["exit_code"], elapsed_ms)
+        _record("hyodo_check", result["exit_code"], elapsed_ms)
         return result
 
     @server.tool()
@@ -244,7 +255,7 @@ def create_server(
             result["full_body_denied_reason"] = (
                 "server started without operator consent for full-body storage"
             )
-        _record_access("hyodo_event_record", workspace, result["exit_code"], elapsed_ms)
+        _record("hyodo_event_record", result["exit_code"], elapsed_ms)
         return result
 
     @server.tool()
@@ -268,7 +279,7 @@ def create_server(
             stdin=json.dumps(event),
         )
         elapsed_ms = int((time.monotonic() - t0) * 1000)
-        _record_access("hyodo_policy_check", workspace, result["exit_code"], elapsed_ms)
+        _record("hyodo_policy_check", result["exit_code"], elapsed_ms)
         return result
 
     @server.tool()
@@ -313,40 +324,97 @@ class _BearerTokenMiddleware:
         await self.app(scope, receive, send)
 
 
-def _create_http_app(root: Path, host: str, token: str | None, *, port: int) -> Any:
+class _PairedBearerMiddleware:
+    """Reject HTTP requests unless the bearer token verifies against the pairing.
+
+    Unlike :class:`_BearerTokenMiddleware`, this middleware re-reads
+    ``.hyodo/pairing.json`` from disk on every request instead of comparing
+    against a token fixed at server start. A ``hyodo mcp revoke`` therefore
+    takes effect on the very next request with no restart required.
+    """
+
+    def __init__(self, app: Any, root: Path):
+        self.app = app
+        self.root = root
+
+    async def __call__(self, scope: Any, receive: Any, send: Any) -> None:
+        if scope["type"] == "http":
+            headers = dict(scope.get("headers", []))
+            supplied = headers.get(b"authorization", b"").decode("latin-1")
+            token = supplied[len("Bearer ") :] if supplied.startswith("Bearer ") else ""
+            state = verify_token(self.root, token)
+            if state is not PairingState.PAIRED:
+                status = 503 if state is PairingState.UNOBSERVED else 401
+                body = json.dumps({"state": state.value}).encode("utf-8")
+                await send(
+                    {
+                        "type": "http.response.start",
+                        "status": status,
+                        "headers": [
+                            (b"content-type", b"application/json"),
+                            (b"content-length", str(len(body)).encode("ascii")),
+                        ],
+                    }
+                )
+                await send({"type": "http.response.body", "body": body})
+                return
+            touch_last_seen(self.root)
+        await self.app(scope, receive, send)
+
+
+def _create_http_app(
+    root: Path,
+    host: str,
+    token: str | None,
+    *,
+    port: int,
+    paired: bool = False,
+) -> Any:
     """Build one authenticated streamable-HTTP MCP app for a validated host."""
-    server = create_server(root, host=host, port=port)
+    caller_id: str | None = None
+    if paired:
+        record = load_pairing(root)
+        caller_id = record.workspace_id if record is not None else None
+    server = create_server(root, host=host, port=port, caller_id=caller_id)
     app_kwargs: dict[str, Any] = {}
     if http_app_accepts_options():
         # MCP SDK v2: transport options live on streamable_http_app().
         app_kwargs = {"json_response": True, "streamable_http_path": _MCP_PATH}
     app: Any = server.streamable_http_app(**app_kwargs)
+    if paired:
+        return _PairedBearerMiddleware(app, root)
     return _BearerTokenMiddleware(app, token) if token else app
 
 
-def create_loopback_app(root: Path, token: str | None = None, *, port: int = 8769) -> Any:
+def create_loopback_app(
+    root: Path,
+    token: str | None = None,
+    *,
+    port: int = 8769,
+    paired: bool = False,
+) -> Any:
     """Build the official streamable-HTTP MCP app for one loopback workspace."""
-    return _create_http_app(root, _LOOPBACK_HOST, token, port=port)
+    return _create_http_app(root, _LOOPBACK_HOST, token, port=port, paired=paired)
 
 
-def run_loopback(root: Path, *, port: int, token: str | None) -> None:
+def run_loopback(root: Path, *, port: int, token: str | None, paired: bool = False) -> None:
     """Serve MCP streamable HTTP only on the local IPv4 loopback interface."""
     import uvicorn
 
     uvicorn.run(
-        create_loopback_app(root, token, port=port),
+        create_loopback_app(root, token, port=port, paired=paired),
         host=_LOOPBACK_HOST,
         port=port,
         log_level="warning",
     )
 
 
-def run_tailscale(root: Path, *, host: str, port: int, token: str) -> None:
+def run_tailscale(root: Path, *, host: str, port: int, token: str, paired: bool = False) -> None:
     """Serve authenticated MCP only on one caller-validated Tailscale address."""
     import uvicorn
 
     uvicorn.run(
-        _create_http_app(root, host, token, port=port),
+        _create_http_app(root, host, token, port=port, paired=paired),
         host=host,
         port=port,
         log_level="warning",
