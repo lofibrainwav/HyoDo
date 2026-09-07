@@ -56,11 +56,11 @@ gates. No detected tooling means no invented green check.
 | Wire a coding harness to the gates | `hyodo connect` |
 | Wire an MCP host's config | `hyodo mcp config` |
 | Check host truth-store consistency | `hyodo mcp continuity` |
-| Skill lens (rules → pillar coverage) | `hyodo skills ingest` / `lens` / `propose` |
+| Skill lens (rules → pillars) | `hyodo skills ingest` / `lens` / `propose` |
 | Field-deployment folder absorption | `hyodo inspect <path>` |
 | Evidence-graph export bridge | `hyodo graph export` |
 | Ephemeral visual evidence | `hyodo eye capture` / `verify` |
-| Reader-vocabulary profile (same decision) | `--audience vibe` / `engineer` / `professional` |
+| Reader vocabulary (same decision) | `--audience vibe` / `engineer` / `professional` |
 
 ## Honest boundaries
 
