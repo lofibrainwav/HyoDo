@@ -60,11 +60,10 @@ part of what this prototype demonstrates, not an edge case it hides.
 
 The 14 events on the page are fixed, in-memory demo data. Nothing is
 uploaded, stored, or fetched from a network, and no real ledger is read.
-`hyodo report --format graph` can emit a local JSON graph artifact on the
-source development line. The CLI now includes a local viewer — `hyodo
-dashboard` serves `/graph`, reading the real ledger — on the source line, not
-yet in a published release until 4.14.0 ships. This public page remains a
-standalone fixture-data prototype and does not read a real ledger.
+Since 4.14.0 the installed CLI emits the same graph from a real ledger:
+`hyodo report --format graph` writes a local JSON artifact and `hyodo
+dashboard` serves it at `/graph`. This public page remains a standalone
+fixture-data prototype and does not read a real ledger.
 
 ## Next
 

@@ -72,7 +72,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 		<main class="eg-wrap">
 			<h1>HyoDo Evidence Graph <span class="eg-badge">Prototype</span></h1>
 
-			<p class="eg-banner" role="note"><strong>Prototype.</strong> This is demo fixture data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below mirror optional source-line graph fields, but this page still reads fixed fixture data only. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
+			<p class="eg-banner" role="note"><strong>Prototype.</strong> This is demo fixture data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below are optional <code>hyodo.agent-event/v1</code> fields shipped since 4.14.0; the installed <code>hyodo dashboard</code> renders them from your real ledger at <code>/graph</code>, while this public page reads fixed fixture data only. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
 
 			<p class="eg-key">Rows are participants, columns are step index, cells are events. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
 
