@@ -576,6 +576,230 @@ def _detect_makefile_gates(root: Path) -> dict[str, dict[str, str]]:
     return detected
 
 
+# Nested-project scan (BYOG for monorepos without root-level tooling): a
+# checkout like `apps/<name>/package.json` with nothing at the root would
+# otherwise be a silent false-empty from `hyodo init` -- no gates proposed at
+# all. The scan is bounded on both axes so it stays cheap and predictable:
+# depth (how deep under root a project marker may live) and count (how many
+# nested projects get absorbed in one `hyodo init`).
+_NESTED_MAX_DEPTH = 3
+_NESTED_MAX_PROJECTS = 10
+# A hard cap on directories visited during the walk itself, independent of
+# how many *projects* are ultimately found -- guards against a pathological
+# fan-out (thousands of sibling directories) before the project cap would
+# ever kick in.
+_NESTED_MAX_DIRS_SCANNED = 2000
+_NESTED_SKIP_DIR_NAMES = frozenset(
+    {
+        "node_modules",
+        "dist",
+        "build",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "target",
+        ".tox",
+        "vendor",
+    }
+)
+_NESTED_PROJECT_MARKERS = (
+    "package.json",
+    "pyproject.toml",
+    "tsconfig.json",
+    "Makefile",
+    "makefile",
+)
+
+
+def _is_nested_skip_dir(name: str) -> bool:
+    """Directories that never host, and are never themselves, a subproject.
+
+    Hidden directories (``.git``, ``.hyodo``, a dotfile-style venv, ...) and
+    known vendor/output directories are excluded from the walk entirely --
+    both as scan targets and as potential project roots.
+    """
+    return name.startswith(".") or name in _NESTED_SKIP_DIR_NAMES
+
+
+def _find_subproject_dirs(
+    root: Path,
+    *,
+    max_depth: int = _NESTED_MAX_DEPTH,
+    max_projects: int = _NESTED_MAX_PROJECTS,
+) -> list[Path]:
+    """Find subdirectories under *root* (excluding *root* itself) that look
+    like an independent project -- i.e. carry one of `_NESTED_PROJECT_MARKERS`.
+
+    Traversal is breadth-first so results are stable regardless of directory
+    sizes deeper in the tree, capped at *max_depth* directory levels below
+    *root* and at *max_projects* discovered projects. A directory that itself
+    matches is still descended into (a monorepo package can nest another),
+    but vendor/hidden directories are pruned unconditionally.
+    """
+    found: list[Path] = []
+    scanned = 0
+    frontier: list[tuple[Path, int]] = [(root, 0)]
+    while frontier and len(found) < max_projects:
+        current, depth = frontier.pop(0)
+        if depth >= max_depth:
+            continue
+        try:
+            children = sorted(current.iterdir(), key=lambda p: p.name)
+        except OSError:
+            continue
+        for child in children:
+            if scanned >= _NESTED_MAX_DIRS_SCANNED or len(found) >= max_projects:
+                break
+            if not child.is_dir() or _is_nested_skip_dir(child.name):
+                continue
+            scanned += 1
+            if any((child / marker).exists() for marker in _NESTED_PROJECT_MARKERS):
+                found.append(child)
+            frontier.append((child, depth + 1))
+    return found[:max_projects]
+
+
+def _nested_gate_prefix(rel: str) -> str:
+    """Turn a project-relative path into a gate-name-safe, collision-free prefix."""
+    return rel.replace("/", "-")
+
+
+def _detect_nested_package_json_gates(project_dir: Path, rel: str) -> dict[str, dict[str, str]]:
+    path = project_dir / "package.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+    scripts = data.get("scripts") if isinstance(data, dict) else None
+    if not isinstance(scripts, dict):
+        return {}
+
+    prefix = _nested_gate_prefix(rel)
+    source = f"{rel}/package.json"
+    detected: dict[str, dict[str, str]] = {}
+    test_script = scripts.get("test")
+    if (
+        isinstance(test_script, str)
+        and test_script.strip()
+        and "no test specified" not in test_script.lower()
+    ):
+        detected[f"{prefix}-npm-test"] = {
+            "pillar": "goodness",
+            "command": f"npm --prefix {rel} test",
+            "source": source,
+        }
+    lint_script = scripts.get("lint")
+    if isinstance(lint_script, str) and lint_script.strip():
+        detected[f"{prefix}-npm-lint"] = {
+            "pillar": "beauty",
+            "command": f"npm --prefix {rel} run lint",
+            "source": source,
+        }
+    return detected
+
+
+def _detect_nested_tsconfig_gates(project_dir: Path, rel: str) -> dict[str, dict[str, str]]:
+    if not (project_dir / "tsconfig.json").exists():
+        return {}
+    prefix = _nested_gate_prefix(rel)
+    return {
+        f"{prefix}-tsc": {
+            "pillar": "truth",
+            "command": f"npx tsc --noEmit -p {rel}/tsconfig.json",
+            "source": f"{rel}/tsconfig.json",
+        }
+    }
+
+
+def _detect_nested_pyproject_gates(project_dir: Path, rel: str) -> dict[str, dict[str, str]]:
+    path = project_dir / "pyproject.toml"
+    if not path.exists():
+        return {}
+    try:
+        lowered = path.read_text(encoding="utf-8").lower()
+    except OSError:
+        return {}
+
+    prefix = _nested_gate_prefix(rel)
+    source = f"{rel}/pyproject.toml"
+    detected: dict[str, dict[str, str]] = {}
+    if "pytest" in lowered:
+        detected[f"{prefix}-pytest"] = {
+            "pillar": "goodness",
+            "command": f"bash -c 'cd {rel} && pytest -q'",
+            "source": source,
+        }
+    if "mypy" in lowered:
+        detected[f"{prefix}-mypy"] = {
+            "pillar": "truth",
+            "command": f"bash -c 'cd {rel} && mypy'",
+            "source": source,
+        }
+    if "pyright" in lowered:
+        detected[f"{prefix}-pyright"] = {
+            "pillar": "truth",
+            "command": f"bash -c 'cd {rel} && pyright'",
+            "source": source,
+        }
+    if "ruff" in lowered:
+        detected[f"{prefix}-ruff"] = {
+            "pillar": "beauty",
+            "command": f"bash -c 'cd {rel} && ruff check'",
+            "source": source,
+        }
+    return detected
+
+
+def _detect_nested_makefile_gates(project_dir: Path, rel: str) -> dict[str, dict[str, str]]:
+    makefile = _find_makefile(project_dir)
+    if makefile is None:
+        return {}
+    try:
+        text = makefile.read_text(encoding="utf-8")
+    except OSError:
+        return {}
+
+    prefix = _nested_gate_prefix(rel)
+    detected: dict[str, dict[str, str]] = {}
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("test:"):
+            detected[f"{prefix}-make-test"] = {
+                "pillar": "goodness",
+                "command": f"bash -c 'cd {rel} && make test'",
+                "source": f"{rel}/{makefile.name} (test: target)",
+            }
+        elif stripped.startswith("lint:"):
+            detected[f"{prefix}-make-lint"] = {
+                "pillar": "beauty",
+                "command": f"bash -c 'cd {rel} && make lint'",
+                "source": f"{rel}/{makefile.name} (lint: target)",
+            }
+    return detected
+
+
+def _detect_nested_project_gates(root: Path) -> dict[str, dict[str, str]]:
+    """Absorb BYOG gates from subdirectories (a monorepo's apps/packages).
+
+    Additive only -- root-level detection always runs first and keeps its
+    existing (unprefixed) gate names untouched; this only fills in gates for
+    tooling that root-level detection cannot see because it lives one or more
+    directories down (e.g. ``apps/<name>/package.json`` with nothing at the
+    repo root).
+    """
+    detected: dict[str, dict[str, str]] = {}
+    for project_dir in _find_subproject_dirs(root):
+        rel = project_dir.relative_to(root).as_posix()
+        detected.update(_detect_nested_pyproject_gates(project_dir, rel))
+        detected.update(_detect_nested_package_json_gates(project_dir, rel))
+        detected.update(_detect_nested_tsconfig_gates(project_dir, rel))
+        detected.update(_detect_nested_makefile_gates(project_dir, rel))
+    return detected
+
+
 def detect_project_gates(root: Path) -> dict[str, dict[str, str]]:
     """Scan *root* for existing tool footprints and propose gates to absorb.
 
@@ -583,6 +807,14 @@ def detect_project_gates(root: Path) -> dict[str, dict[str, str]]:
     Every entry carries its detection *source* so a human can see why HyoDo
     proposed it. An unrecognized/empty checkout returns an empty mapping --
     detection is honest about finding nothing rather than guessing.
+
+    Root-level tooling (this checkout's own ``pyproject.toml``,
+    ``package.json``, ``tsconfig.json``, ``go.mod``, ``Cargo.toml``,
+    ``Makefile``) is detected first and always wins its existing gate names.
+    Subdirectories are then scanned for the same markers (excluding
+    ``node_modules``/hidden/vendor directories, depth-capped, project-count
+    capped) so a monorepo with tooling only inside ``apps/<name>/`` still
+    gets BYOG gates proposed instead of a silently empty ``gates.toml``.
     """
     detected: dict[str, dict[str, str]] = {}
     detected.update(_detect_pyproject_gates(root))
@@ -591,6 +823,7 @@ def detect_project_gates(root: Path) -> dict[str, dict[str, str]]:
     detected.update(_detect_go_gates(root))
     detected.update(_detect_cargo_gates(root))
     detected.update(_detect_makefile_gates(root))
+    detected.update(_detect_nested_project_gates(root))
     return detected
 
 
