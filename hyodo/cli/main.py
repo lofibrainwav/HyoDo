@@ -1246,6 +1246,68 @@ def _skip_missing_tool(language: str, tool: str) -> GeneralGateResult:
     return GeneralGateResult(language, tool, GateStatus.SKIP, f"{tool} not installed; skipped")
 
 
+_GENERAL_TSCONFIG_CAP = 20
+
+
+def _tsconfig_dependencies_missing(tsconfig: Path, root: Path) -> str | None:
+    """Return an honest SKIP message if *tsconfig*'s project has a
+    ``package.json`` but no installed ``node_modules``, else ``None``.
+
+    Walks from ``tsconfig.parent`` up to (and including) *root*. If a
+    ``package.json`` exists anywhere on that path but no ``node_modules``
+    directory exists anywhere on that path, the project's dependencies were
+    never installed and running ``tsc`` would fail on unresolved imports for
+    environment reasons, not a code defect (e.g. a CI runner with a global
+    tsc but no ``npm install`` step for a monorepo sub-project). If no
+    ``package.json`` exists at all on the path, this returns ``None`` and the
+    caller keeps the existing behaviour of running ``tsc`` anyway.
+    """
+    has_package_json = False
+    has_node_modules = False
+    current = tsconfig.parent
+    while True:
+        if (current / "package.json").is_file():
+            has_package_json = True
+        if (current / "node_modules").is_dir():
+            has_node_modules = True
+        if current == root or current.parent == current:
+            break
+        current = current.parent
+    if has_package_json and not has_node_modules:
+        try:
+            rel = tsconfig.relative_to(root)
+        except ValueError:
+            rel = tsconfig
+        return f"dependencies not installed (no node_modules next to {rel}); skipped"
+    return None
+
+
+def _find_tsconfigs(
+    root: Path,
+    exclusions: ScanExceptionsConfig | None = None,
+    cap: int = _GENERAL_TSCONFIG_CAP,
+) -> list[Path]:
+    """Find up to *cap* ``tsconfig.json`` files anywhere under *root* (vendor dirs pruned).
+
+    A monorepo commonly has no root-level ``tsconfig.json`` at all, only one
+    per package/app (e.g. ``apps/learning-platform/tsconfig.json``). Looking
+    only at ``root / "tsconfig.json"`` (as the previous implementation did)
+    makes every such project's TypeScript invisible to ``--general``.
+    """
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(
+            d for d in dirnames if d not in _GENERAL_SKIP_DIRS and not d.startswith(".")
+        )
+        if "tsconfig.json" in filenames:
+            candidate = Path(dirpath) / "tsconfig.json"
+            if exclusions is None or not is_general_path_excluded(candidate, root, exclusions):
+                found.append(candidate)
+                if len(found) >= cap:
+                    return found
+    return found
+
+
 def _run_general_gates(
     root: Path, verbose: bool = False, exclusions: ScanExceptionsConfig | None = None
 ) -> list[GeneralGateResult]:
@@ -1271,30 +1333,64 @@ def _run_general_gates(
 
     ts_files = _collect_files(root, (".ts", ".tsx"), exclusions=exclusions)
     js_files = _collect_files(root, (".js", ".mjs", ".cjs"), exclusions=exclusions)
-    tsconfig = root / "tsconfig.json"
-    if tsconfig.exists() and (ts_files or js_files):
-        tsc = shutil.which("tsc")
-        if tsc:
+    tsconfigs = _find_tsconfigs(root, exclusions) if (ts_files or js_files) else []
+    if tsconfigs:
+        runnable: list[tuple[Path, str]] = []
+        for tsconfig in tsconfigs:
+            try:
+                rel = tsconfig.parent.relative_to(root)
+            except ValueError:
+                rel = tsconfig.parent
+            tool = "tsc" if str(rel) == "." else f"tsc ({rel})"
+            deps_missing = _tsconfig_dependencies_missing(tsconfig, root)
+            if deps_missing:
+                results.append(GeneralGateResult("TypeScript", tool, GateStatus.SKIP, deps_missing))
+                continue
+            runnable.append((tsconfig, tool))
+        if runnable:
+            tsc = shutil.which("tsc")
+            if tsc:
+                for tsconfig, tool in runnable:
+                    results.append(
+                        _run_general_cmd(
+                            "TypeScript",
+                            tool,
+                            [tsc, "--noEmit", "-p", str(tsconfig)],
+                            root,
+                            verbose,
+                            "tsc --noEmit clean",
+                        )
+                    )
+            else:
+                results.append(
+                    GeneralGateResult(
+                        "TypeScript",
+                        "tsc",
+                        GateStatus.SKIP,
+                        f"tsc not installed; skipped ({len(runnable)} tsconfig.json found)",
+                    )
+                )
+    else:
+        if ts_files:
             results.append(
-                _run_general_cmd(
+                GeneralGateResult(
                     "TypeScript",
                     "tsc",
-                    [tsc, "--noEmit", "-p", str(tsconfig)],
-                    root,
-                    verbose,
-                    "tsc --noEmit clean",
+                    GateStatus.UNSUPPORTED,
+                    f"{len(ts_files)} TypeScript file(s) found but no tsconfig.json "
+                    "anywhere in project; type-check not executed",
                 )
             )
-        else:
-            results.append(_skip_missing_tool("TypeScript", "tsc"))
-    elif js_files:
-        node = shutil.which("node")
-        if node:
-            results.append(
-                _run_per_file_general_cmd("JavaScript", "node --check", node, "--check", js_files)
-            )
-        else:
-            results.append(_skip_missing_tool("JavaScript", "node"))
+        if js_files:
+            node = shutil.which("node")
+            if node:
+                results.append(
+                    _run_per_file_general_cmd(
+                        "JavaScript", "node --check", node, "--check", js_files
+                    )
+                )
+            else:
+                results.append(_skip_missing_tool("JavaScript", "node"))
 
     if (root / "go.mod").exists():
         go = shutil.which("go")
