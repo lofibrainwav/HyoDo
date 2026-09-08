@@ -105,6 +105,7 @@ def test_composite_action_fails_closed_with_actionable_sarif_upload_summary() ->
 
     assert upload_step["id"] == "upload_sarif"
     assert failure_step["if"] == "failure() && steps.upload_sarif.outcome == 'failure'"
+    assert "GITHUB_STEP_SUMMARY" in failure_step["run"]
     assert "SARIF" in failure_step["run"]
     assert "Next action:" in failure_step["run"]
 
@@ -130,64 +131,114 @@ def test_sarif_report_has_required_top_level_keys(tmp_path: Path) -> None:
 
     assert log["version"] == "2.1.0"
     assert log["$schema"] == SARIF_SCHEMA_URI
-    assert log["runs"]
-    assert log["runs"][0]["tool"]["driver"]["name"] == "HyoDo"
+    assert isinstance(log["runs"], list)
+    assert len(log["runs"]) == 1
+    run = log["runs"][0]
+    assert run["tool"]["driver"]["name"] == "HyoDo"
+    assert run["tool"]["driver"]["version"] == hyodo.__version__
+    assert isinstance(run["results"], list)
 
 
-def test_sarif_report_is_schema_valid(tmp_path: Path) -> None:
-    jsonschema = __import__("jsonschema")
-    result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "sarif", "--json"])
-    assert result.exit_code == 0
-    summary = json.loads(result.output)
-    sarif_path = tmp_path / summary["result_path"]
-    log = json.loads(sarif_path.read_text(encoding="utf-8"))
-    schema = json.loads(SARIF_SCHEMA_PATH.read_text(encoding="utf-8"))
-    jsonschema.Draft7Validator(schema).validate(log)
-
-
-def test_sarif_report_records_deny_as_error(tmp_path: Path) -> None:
+def test_sarif_report_surfaces_deny_as_error_results(tmp_path: Path) -> None:
     _write_deny_evidence(tmp_path)
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "sarif", "--json"])
     assert result.exit_code == 0
     summary = json.loads(result.output)
     log = json.loads((tmp_path / summary["result_path"]).read_text(encoding="utf-8"))
     results = log["runs"][0]["results"]
-    assert any(item["level"] == "error" for item in results)
-    assert any(item["ruleId"] == "HYODO-POLICY-DENY" for item in results)
+
+    deny_results = [r for r in results if r["ruleId"] == "hyodo/policy-deny"]
+    assert len(deny_results) == 1
+    assert deny_results[0]["level"] == "error"
+    rule_ids = {rule["id"] for rule in log["runs"][0]["tool"]["driver"]["rules"]}
+    assert {"hyodo/policy-deny", "hyodo/ledger-unreadable"} <= rule_ids
 
 
-def test_sarif_report_records_unreadable_ledger_as_error(tmp_path: Path) -> None:
-    hyodo_dir = tmp_path / ".hyodo"
-    hyodo_dir.mkdir()
-    (hyodo_dir / "agent-events.jsonl").write_bytes(b"\xff\xfe\x00")
+def test_sarif_report_validates_against_official_sarif_2_1_0_schema(
+    tmp_path: Path,
+) -> None:
+    """Full validation against the OASIS SARIF schema (checked in as a fixture)."""
+    import jsonschema
+
+    schema = json.loads(SARIF_SCHEMA_PATH.read_text(encoding="utf-8"))
+    _write_deny_evidence(tmp_path)
+    result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "sarif", "--json"])
+    assert result.exit_code == 0
+    summary = json.loads(result.output)
+    log = json.loads((tmp_path / summary["result_path"]).read_text(encoding="utf-8"))
+    jsonschema.validate(instance=log, schema=schema)
+
+    # An empty-evidence SARIF log is schema-valid. It is a visibility artifact,
+    # not a replacement for the fail-closed `hyodo check` command.
+    empty = runner.invoke(
+        app, ["report", "--root", str(tmp_path / "empty"), "--format", "sarif", "--json"]
+    )
+    assert empty.exit_code == 0
+    empty_summary = json.loads(empty.output)
+    empty_log = json.loads(
+        (tmp_path / "empty" / empty_summary["result_path"]).read_text(encoding="utf-8")
+    )
+    jsonschema.validate(instance=empty_log, schema=schema)
+    assert empty_log["runs"][0]["results"] == []
+
+
+def test_sarif_report_never_turns_unreadable_ledger_into_clean_run(tmp_path: Path) -> None:
+    (tmp_path / ".hyodo").mkdir()
+    # A directory where a file is expected makes the ledger unreadable — HyoDo
+    # must surface this as an error result, not a zero-event clean run.
+    (tmp_path / ".hyodo" / "agent-events.jsonl").mkdir()
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "sarif", "--json"])
     assert result.exit_code == 0
     summary = json.loads(result.output)
     log = json.loads((tmp_path / summary["result_path"]).read_text(encoding="utf-8"))
     results = log["runs"][0]["results"]
-    assert any(item["level"] == "error" for item in results)
-    assert any(item["ruleId"] == "HYODO-LEDGER-UNREADABLE" for item in results)
+    assert any(r["ruleId"] == "hyodo/ledger-unreadable" for r in results)
 
 
-# --- GitHub composite action --------------------------------------------------
+# --- Composite GitHub Action surface ------------------------------------------
 
 
-def test_composite_action_exists_and_has_required_shape() -> None:
+def test_composite_action_parses_and_is_composite() -> None:
     action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
-    assert action["name"] == "HyoDo"
     assert action["runs"]["using"] == "composite"
-    steps = action["runs"]["steps"]
-    assert any("pip install" in step.get("run", "") for step in steps)
-    assert any("hyodo check" in step.get("run", "") for step in steps)
+    assert action["name"]
+    assert action["description"]
 
 
-def test_composite_action_install_ref_is_not_a_branch() -> None:
-    """Install examples must use a release tag or immutable commit, never main."""
+def test_composite_action_installs_hyodo_from_same_pinned_ref() -> None:
     action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
-    install_step = next(step for step in action["runs"]["steps"] if "pip install" in step.get("run", ""))
-    command = install_step["run"]
-    assert "@main" not in command
-    match = re.search(r"@([^#\s]+)", command)
-    assert match is not None
-    ref = match.group(1)
-    assert re.fullmatch(r"v\d+\.\d+\.\d+|[0-9a-f]{40}", ref)
+    steps = action["runs"]["steps"]
+    install_steps = [step for step in steps if "pip install" in str(step.get("run", ""))]
+    assert install_steps, "action must install HyoDo"
+    run_block = install_steps[0]["run"]
+    assert "github.action_path" in run_block
+    assert "../../.." in run_block
+    assert "hyodo==" not in run_block
+    assert "version" not in action.get("inputs", {})
+
+
+def test_composite_action_runs_hyodo_check() -> None:
+    action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
+    run_blocks = [str(step.get("run", "")) for step in action["runs"]["steps"]]
+    assert any("hyodo check" in block for block in run_blocks)
+
+
+def test_composite_action_external_actions_are_sha_pinned() -> None:
+    action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
+    uses = [str(step["uses"]) for step in action["runs"]["steps"] if "uses" in step]
+    assert uses
+    for ref in uses:
+        assert re.fullmatch(r"[^@]+@[0-9a-f]{40}", ref), f"external action is not SHA-pinned: {ref}"
+
+
+def test_composite_action_sarif_upload_is_opt_in() -> None:
+    action = yaml.safe_load(ACTION_PATH.read_text(encoding="utf-8"))
+    assert action["inputs"]["upload-sarif"]["default"] == "false"
+    sarif_steps = [
+        step
+        for step in action["runs"]["steps"]
+        if step.get("name") in {"Render SARIF report", "Upload SARIF report"}
+    ]
+    assert len(sarif_steps) == 2
+    for step in sarif_steps:
+        assert "upload-sarif" in str(step.get("if", ""))
