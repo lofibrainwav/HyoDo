@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from click.testing import Result
 from typer.testing import CliRunner
 
 from hyodo.cli.dispatch import app
@@ -49,9 +50,8 @@ def _write_event(root: Path) -> None:
     path.write_text(json.dumps(event) + "\n", encoding="utf-8")
 
 
-def _json_output(result: object) -> dict[str, object]:
-    output = getattr(result, "output")
-    return json.loads(output)
+def _json_output(result: Result) -> dict[str, object]:
+    return json.loads(result.output)
 
 
 def test_dispatcher_preserves_existing_commands_and_adds_friction_help():
