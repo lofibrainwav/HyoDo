@@ -59,8 +59,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `https://mcp.hyodo.app/mcp` and ChatGPT stay contract-only and
   `UNOBSERVED`. The North Star is a product direction, not a live
   ChatGPT path (#204 item 32).
-- Onboarding and site quickstart: the remote connector is not live and
-  is not a shipped path next to stdio (dropped "not live yet").
+- Onboarding, site quickstart, and `hyodo mcp contract`: the remote
+  connector is not live and is not a shipped path next to stdio
+  (dropped "not live yet").
 - Site why-hyodo and the FDE example README point at `CLAIMS.md` /
   `FULL_BODY.md`.
 

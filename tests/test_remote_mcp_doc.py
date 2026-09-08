@@ -24,3 +24,9 @@ def test_m5_doc_states_remote_is_contract_only_not_stdio() -> None:
 def test_docs_index_points_at_m5_contract() -> None:
     text = (REPO_ROOT / "docs" / "README.md").read_text(encoding="utf-8")
     assert "M5_REMOTE_CONNECTOR_CONTRACT.md" in text
+
+
+def test_mcp_contract_cli_source_does_not_say_live_yet() -> None:
+    text = (REPO_ROOT / "hyodo" / "cli" / "main.py").read_text(encoding="utf-8")
+    assert "not claimed live yet" not in text
+    assert "not live yet" not in text.lower()

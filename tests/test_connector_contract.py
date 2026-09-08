@@ -86,6 +86,16 @@ def test_mcp_contract_json_is_machine_readable_and_honest() -> None:
     assert payload["availability"] == "UNOBSERVED"
 
 
+def test_mcp_contract_human_output_does_not_imply_imminent() -> None:
+    result = runner.invoke(app, ["mcp", "contract"])
+
+    assert result.exit_code == 0
+    lowered = result.output.lower()
+    assert "not live yet" not in lowered
+    assert "contract only" in lowered
+    assert "not live" in lowered
+
+
 def test_connector_capabilities_match_the_real_server(tmp_path) -> None:
     from hyodo.mcp_server import create_server
 

@@ -2667,7 +2667,7 @@ def mcp_contract(
         f"  bridge:       pairing={contract['bridge']['pairing']} "
         f"listener={contract['bridge']['listener']}"
     )
-    console.print("[yellow]Contract only: the remote connector is not claimed live yet.[/yellow]")
+    console.print("[yellow]Contract only: the remote connector is not live.[/yellow]")
 
 
 @mcp_app.command("pair")
