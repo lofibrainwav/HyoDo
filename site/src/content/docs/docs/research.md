@@ -76,9 +76,24 @@ The research program has already completed three internal stages:
 
 1. **Research framing and terminology.** The system was translated from internal operating language into human-centered agent research terms, with KRO as a typed runtime/process backbone.
 2. **Runtime experiments.** ACT / ASK / ABSTAIN scenarios and evidence-layer traces were exercised to establish a reproducible trace format.
-3. **Trace-based evaluation scaffold.** The evaluation plan covers action-routing precision, evidence coverage, decision-trace completeness, user correction rate, and runtime trace consistency.
+3. **Trace-based evaluation baseline.** A sealed benchmark baseline established a versioned dataset, scoring metrics, negative controls, and append-only benchmark evidence.
 
-The current stage is a **working-paper refresh**: update the research claim against the 2025–2026 literature, connect HyoDo friction evidence to support allocation, and produce a fresh empirical results table before any venue submission claim.
+The current stage is a **working-paper refresh**: update the research claim against the 2025–2026 literature, connect HyoDo friction evidence to support allocation, and produce a broader measured empirical results table before any venue submission claim.
+
+## Current empirical baseline — useful, but not submission-grade
+
+The existing sealed baseline is real, but intentionally small:
+
+| Provenance | n | Current result | What it actually proves |
+| --- | ---: | --- | --- |
+| Synthetic | 14 | ACT / ASK / ABSTAIN precision = 1.0 in the sealed fixture set | The benchmark machinery is deterministic against its specification-derived fixtures; **not** real-world system quality. |
+| Measured | 3 | All three are external-write cases labeled ASK | The measured trace path works, but there is no measured ACT or ABSTAIN coverage yet. |
+
+The benchmark integrity layer also passed its sealed regression suites (**9/9** vessel checks and **6/6** trace-experiment checks) and correctly surfaced one definition-to-implementation design debt around an unreachable evidence-missing decision path.
+
+That is enough to say **the evaluation vessel exists and catches at least one real design gap**. It is not enough to say ACL's support-allocation policy has been empirically validated.
+
+Before submission, the measured set must grow across task classes, risk levels, orchestration patterns, models/environments, and support levels, with genuine ACT / ASK / ABSTAIN diversity and failure cases. Synthetic perfect scores must remain separated from measured evidence.
 
 ## Updated research claim
 
