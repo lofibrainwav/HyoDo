@@ -21,6 +21,8 @@ language-agnostic.
 | [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
 | [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
 | [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |
+| [POLICY_SYNTAX.md](./POLICY_SYNTAX.md) | `hyodo.policy/v1` fields, omit-semantics, host tool names |
+| [ADOPTION.md](./ADOPTION.md) | Remaining holes, gates vs policy, Claude exit translation |
 | [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
 | [SKILLS.md](./SKILLS.md) | `hyodo skills ingest` / `lens` / `propose` — skill lens over the six pillars |
 | [INSPECT.md](./INSPECT.md) | `hyodo inspect` — field-deployment folder absorption, digests and chunks |

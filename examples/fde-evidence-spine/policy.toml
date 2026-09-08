@@ -1,5 +1,10 @@
 # HyoDo agent policy — schema hyodo.policy/v1
-# Place as .hyodo/policy.toml in a customer project (or pass --config / --policy).
+# Place as .hyodo/policy.toml (or pass --config / --policy).
+#
+# Demo names below keep sample-tool-call.json ALLOW'd.
+# Real Claude Code / Cursor names: see
+#   examples/host-policies/claude-and-cursor.policy.toml
+#   docs/POLICY_SYNTAX.md
 
 schema = "hyodo.policy/v1"
 
@@ -8,7 +13,21 @@ max_steps = 20
 
 # When set (including empty list), tool_call/tool_result must use a listed name.
 # Omit the key entirely to leave tools unrestricted by allowlist.
-allowed_tools = ["search", "read_file", "list_dir"]
+allowed_tools = [
+  # FDE demo event
+  "search",
+  "read_file",
+  "list_dir",
+  # Claude Code
+  "Read",
+  "Grep",
+  "Glob",
+  "Edit",
+  "Write",
+  "Bash",
+  "WebFetch",
+  "WebSearch",
+]
 
 # Paths declared on tool.paths that match any glob → DENY data_boundary.
 blocked_path_globs = [
@@ -32,5 +51,5 @@ blocked_path_globs = [
 # max_level = 2
 
 # Optional discretionary tool list and annotation threshold.
-# ask_tools = ["send_email", "publish_release"]
+# ask_tools = ["Bash", "Write", "WebFetch", "send_email", "publish_release"]
 # ask_threshold = 1
