@@ -23,9 +23,11 @@ Stage 1 includes `ASK` decisions, trust levels, external variables, and web
 policy. That policy layer shipped in v4.13.0 and requires no model.
 
 The [evidence graph](/evidence-graph/) is a public, browser-only prototype that
-renders fixed demo data. Since 4.14.0 the installed CLI renders the same graph
-from your real agent-event ledger (`hyodo dashboard`, `/graph`); the public
-page is not that viewer and does not read a real ledger. See
+defaults to fixed demo data. On that page you can opt in to load a local
+`hyodo.evidence-graph/v1` file in the browser; nothing is uploaded. Since
+4.14.0 the installed CLI renders the same graph from your real agent-event
+ledger (`hyodo dashboard`, `/graph`); the public page is not that viewer and
+does not read a remote ledger. See
 [its documentation](/docs/evidence-graph/) for the exact boundary.
 
 Stage 2 packages (`hyodo skills`, `hyodo inspect`, `hyodo graph export`, `hyodo eye`) ship in HyoDo 4.15.0. They record digests, hashes, and receipts only; embeddings, model calls, and capture tools remain external.
@@ -58,8 +60,9 @@ HyoDo 4.16.0 derives Benevolence and the HyoDo Integrity Score's five pillar inp
 | `hyodo mcp continuity` hook-recorded host coverage (4.16.0) | |
 
 A public [evidence-graph prototype](/evidence-graph/) shows the intended shape
-using demo fixture data. See [its documentation](/docs/evidence-graph/) for the
-source-line graph export boundary and what remains demo-only.
+using demo fixture data by default, with an opt-in local v1 file load. See
+[its documentation](/docs/evidence-graph/) for the source-line graph export
+boundary and what remains demo-only.
 
 ## Proposing roadmap work
 

@@ -18,7 +18,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 		<meta name="theme-color" content="#0b0d10" />
 		<meta
 			name="description"
-			content="A public, browser-only prototype of the HyoDo evidence graph, rendered from fixed demo data. Shows the intended visual shape and the local graph-export boundary."
+			content="A public, browser-only prototype of the HyoDo evidence graph. Defaults to fixed demo data; you can opt in to render a local hyodo.evidence-graph/v1 JSON file. Nothing is uploaded."
 		/>
 		<style>
 			/* Duplicated from index.astro's navbar/footer CSS on purpose — this
@@ -72,7 +72,13 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 		<main class="eg-wrap">
 			<h1>HyoDo Evidence Graph <span class="eg-badge">Prototype</span></h1>
 
-			<p class="eg-banner" role="note"><strong>Prototype.</strong> This is demo fixture data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below are optional <code>hyodo.agent-event/v1</code> fields shipped since 4.14.0; the installed <code>hyodo dashboard</code> renders them from your real ledger at <code>/graph</code>, while this public page reads fixed fixture data only. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
+			<p class="eg-banner" id="eg-banner" data-source="fixture" role="note" aria-live="polite"><strong>Demo fixture.</strong> This is in-memory demo data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below are optional <code>hyodo.agent-event/v1</code> fields shipped since 4.14.0; the installed <code>hyodo dashboard</code> renders them from your real ledger at <code>/graph</code>, while this public page defaults to fixed fixture data. You can opt in to render a local <code>hyodo.evidence-graph/v1</code> JSON file in this browser only. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
+
+			<div class="eg-load">
+				<label class="eg-load-label" for="eg-file">Load local <code>hyodo.evidence-graph/v1</code> JSON</label>
+				<input id="eg-file" type="file" accept="application/json" />
+				<button type="button" id="eg-reset">Show demo fixture</button>
+			</div>
 
 			<p class="eg-key">Rows are participants, columns are step index, cells are events. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
 
@@ -121,13 +127,83 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 				<p class="eg-key">The interactive grid needs JavaScript; the fixture and field meanings are documented at <a href="/docs/evidence-graph/">/docs/evidence-graph/</a>.</p>
 			</noscript>
 
-			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> (event_id, run_id, ts, kind, actor, step_index, tool, policy, optional parent_event_id/evidence_refs). This page remains fixture-only. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
+			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> events inside optional local <code>hyodo.evidence-graph/v1</code> JSON (event_id, run_id, ts, kind, actor, step_index, tool, policy, optional parent_event_id/evidence_refs). Default view is the demo fixture. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
 		</main>
 
 		<script>
-			import { mountEvidenceGraph } from '../graph/evidence-graph';
+			import { EVENTS, mountEvidenceGraph } from '../graph/evidence-graph';
+			import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../graph/from-v1';
+
 			const root = document.getElementById('eg-root');
-			if (root) mountEvidenceGraph(root);
+			const banner = document.getElementById('eg-banner');
+			const fileInput = document.getElementById('eg-file');
+			const resetBtn = document.getElementById('eg-reset');
+			const fixtureBannerHtml = banner?.innerHTML ?? '';
+
+			let dispose = () => {};
+			if (root) dispose = mountEvidenceGraph(root);
+
+			function escapeHtml(value: string): string {
+				return value
+					.replace(/&/g, '&amp;')
+					.replace(/</g, '&lt;')
+					.replace(/>/g, '&gt;')
+					.replace(/"/g, '&quot;');
+			}
+
+			function remount(events: typeof EVENTS): void {
+				dispose();
+				if (root) dispose = mountEvidenceGraph(root, events);
+			}
+
+			function showFixture(): void {
+				remount(EVENTS);
+				if (banner) {
+					banner.innerHTML = fixtureBannerHtml;
+					banner.dataset.source = 'fixture';
+				}
+			}
+
+			fileInput?.addEventListener('change', async () => {
+				const input = fileInput as HTMLInputElement;
+				const file = input.files?.[0];
+				input.value = '';
+				if (!file || !banner) return;
+
+				let parsed: unknown;
+				try {
+					parsed = JSON.parse(await file.text());
+				} catch {
+					showFixture();
+					banner.innerHTML =
+						'<strong>Load failed.</strong> That file is not valid JSON. Still showing the demo fixture. Nothing was uploaded, stored, or fetched from a network.';
+					banner.dataset.source = 'fixture';
+					return;
+				}
+
+				const info = inspectEvidenceGraphV1(parsed);
+				if (!info.ok) {
+					showFixture();
+					const why = info.reason ? ` (${escapeHtml(info.reason)})` : '';
+					banner.innerHTML =
+						`<strong>Load failed.</strong> Not a <code>hyodo.evidence-graph/v1</code> graph${why}. Still showing the demo fixture. Nothing was uploaded, stored, or fetched from a network.`;
+					banner.dataset.source = 'fixture';
+					return;
+				}
+
+				remount(fromEvidenceGraphV1(parsed));
+				const status = escapeHtml(info.status ?? 'unknown');
+				const reason = info.reason ? ` (${escapeHtml(info.reason)})` : '';
+				const unobserved =
+					info.status === 'UNOBSERVED'
+						? ' Unobserved is never a pass.'
+						: '';
+				banner.innerHTML =
+					`<strong>Local file.</strong> Showing a <code>hyodo.evidence-graph/v1</code> payload selected in this browser — not a remote ledger. Graph status: <code>${status}</code>${reason}.${unobserved} Nothing was uploaded, stored, or fetched. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>.`;
+				banner.dataset.source = 'local';
+			});
+
+			resetBtn?.addEventListener('click', () => showFixture());
 		</script>
 	</body>
 </html>

@@ -1,10 +1,10 @@
 // HyoDo Evidence Graph prototype — fixture data + renderer.
 //
-// This module renders a fixed, in-memory demo fixture (no network, no
-// storage) as a rows-by-steps grid of events connected by two kinds of
-// edges: `parentEventId` ("result of") and `evidenceRefs` ("decided
-// from"). See site/src/content/docs/docs/evidence-graph.md for the field
-// mapping and which fields are real in the shipped schema today.
+// mountEvidenceGraph(root) renders the fixed in-memory demo fixture by
+// default (no network, no storage). Pass a second argument to render
+// events mapped from a local hyodo.evidence-graph/v1 payload (see
+// from-v1.ts). See site/src/content/docs/docs/evidence-graph.md for the
+// field mapping and the public-page boundary.
 //
 // Edge geometry (rounded elbow for parent, single-bow bezier for
 // evidence, dash-vs-shape rather than color, hand-drawn broken stub) is
@@ -50,11 +50,11 @@ export interface EvidenceEvent {
 	stepIndex: number;
 	tool: { name: string; paths: string[]; urls: string[] } | null;
 	policy: { decision: Decision; ruleId: string | null; reason: string | null } | null;
-	/** Optional hyodo.agent-event/v1 field, shipped since 4.14.0 and rendered
-	 * live by `hyodo dashboard` (/graph). This page still renders fixture data. */
+	/** Optional hyodo.agent-event/v1 field, shipped since 4.14.0. Default
+	 * mount still uses fixture data; a local v1 file can supply this. */
 	parentEventId: string | null;
-	/** Optional hyodo.agent-event/v1 field, shipped since 4.14.0 and rendered
-	 * live by `hyodo dashboard` (/graph). This page still renders fixture data. */
+	/** Optional hyodo.agent-event/v1 field, shipped since 4.14.0. Default
+	 * mount still uses fixture data; a local v1 file can supply this. */
 	evidenceRefs: string[];
 	/** Prototype-only narrative used for the "why" field when policy.reason is absent. */
 	note: string;
@@ -325,8 +325,8 @@ const HOW_BY_SCHEMA_KIND: Record<SchemaEventKind, string> = {
 
 const COLUMN_WIDTH = 104;
 
-function byId(id: string): EvidenceEvent | undefined {
-	return EVENTS.find((e) => e.eventId === id);
+function byId(events: readonly EvidenceEvent[], id: string): EvidenceEvent | undefined {
+	return events.find((e) => e.eventId === id);
 }
 
 function chipGlyph(ev: EvidenceEvent): string {
@@ -403,12 +403,12 @@ function escapeHtml(value: string): string {
 const PANEL_PLACEHOLDER =
 	'<h2>5W1H</h2><p class="placeholder">Hover or focus (Tab) a cell to inspect its record — who, when, what, where, how, why.</p>';
 
-function renderPanelHtml(ev: EvidenceEvent): string {
+function renderPanelHtml(events: readonly EvidenceEvent[], ev: EvidenceEvent): string {
 	const row5 = (label: string, html: string) =>
 		`<div class="row"><b>${escapeHtml(label)}</b><span>${html}</span></div>`;
 
 	const parent = ev.parentEventId
-		? byId(ev.parentEventId)
+		? byId(events, ev.parentEventId)
 			? escapeHtml(ev.parentEventId)
 			: `<span class="broken-ref">unresolved: ${escapeHtml(ev.parentEventId)}</span>`
 		: '— (run root)';
@@ -521,7 +521,10 @@ function brokenStubPath(x: number, y: number): string {
 	return d;
 }
 
-export function mountEvidenceGraph(root: HTMLElement): () => void {
+export function mountEvidenceGraph(
+	root: HTMLElement,
+	events: readonly EvidenceEvent[] = EVENTS,
+): () => void {
 	const doc = root.ownerDocument;
 	const winOrNull = doc.defaultView;
 	if (!winOrNull) return () => {};
@@ -534,11 +537,11 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 	const gridRoot: HTMLDivElement = gridRootOrNull;
 	const svgRoot: SVGSVGElement = svgRootOrNull;
 
-	const maxStep = EVENTS.reduce((m, e) => Math.max(m, e.stepIndex), 0);
+	const maxStep = events.reduce((m, e) => Math.max(m, e.stepIndex), 0);
 	const cols = maxStep + 1;
 
 	const atCell = new Map<string, EvidenceEvent>();
-	for (const ev of EVENTS) atCell.set(`${ev.row}:${ev.stepIndex}`, ev);
+	for (const ev of events) atCell.set(`${ev.row}:${ev.stepIndex}`, ev);
 
 	// ---- build grid DOM -----------------------------------------------
 	gridRoot.innerHTML = '';
@@ -654,7 +657,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 	}
 
 	function rowIndex(id: string): number {
-		const ev = byId(id);
+		const ev = byId(events, id);
 		return ev ? ROW_ORDER.indexOf(ev.row) : -1;
 	}
 
@@ -875,7 +878,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		// Occupied-cell boxes (inset 1px; sampler adds half the stroke width) for collision testing below —
 		// rebuilt every redraw since cell positions can change on resize.
 		occupiedBoxes = new Map();
-		for (const ev of EVENTS) {
+		for (const ev of events) {
 			const r = cellRect(ev.eventId);
 			if (!r) continue;
 			occupiedBoxes.set(ev.eventId, {
@@ -890,10 +893,10 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		// co-located evidence arrow can be inset instead of overlapping it.
 		const parentTargets = new Set<string>();
 
-		for (const ev of EVENTS) {
+		for (const ev of events) {
 			const childRect = cellRect(ev.eventId);
 			if (!childRect || !ev.parentEventId) continue;
-			const parentEv = byId(ev.parentEventId);
+			const parentEv = byId(events, ev.parentEventId);
 			if (parentEv && cellRect(parentEv.eventId)) {
 				const d = orthogonalRoute(parentEv, ev, wrapRect);
 				const path = svgEl(doc, 'path', {
@@ -936,11 +939,11 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 		// not implemented here.
 		const bucketCounts = new Map<string, number>();
 
-		for (const ev of EVENTS) {
+		for (const ev of events) {
 			const childRect = cellRect(ev.eventId);
 			if (!childRect) continue;
 			for (const refId of ev.evidenceRefs) {
-				const refEv = byId(refId);
+				const refEv = byId(events, refId);
 				const sourceRect = refEv ? cellRect(refEv.eventId) : null;
 				if (!refEv || !sourceRect) continue;
 
@@ -1023,7 +1026,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 	function activate(eventId: string): void {
 		clearActive();
 		activeId = eventId;
-		const ev = byId(eventId);
+		const ev = byId(events, eventId);
 		if (!ev) return;
 
 		cellEls.get(eventId)?.classList.add('is-active');
@@ -1063,7 +1066,7 @@ export function mountEvidenceGraph(root: HTMLElement): () => void {
 			}
 		}
 
-		if (panel) panel.innerHTML = renderPanelHtml(ev);
+		if (panel) panel.innerHTML = renderPanelHtml(events, ev);
 	}
 
 	function deactivate(): void {

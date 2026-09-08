@@ -109,6 +109,11 @@ case its receipt's `reasons` array can be empty (nothing is blocking
 `hook_only_observation`, so a reader can always tell no MCP client has ever
 connected even on an otherwise-`READY` receipt.
 
+The hook is a signal, not a sandbox. What the mapper copies out of
+`tool_input`, what `allowed_tools` / `blocked_path_globs` can actually
+see, and what the host still has to enforce are in
+[`HOST_CONTRACT.md`](./HOST_CONTRACT.md).
+
 ## Exit codes
 
 `connect` (dry run, no target, or `<target>` preview): always 0 — a preview

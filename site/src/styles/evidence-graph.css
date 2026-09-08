@@ -94,6 +94,41 @@
 	color: var(--color-ask);
 }
 
+.eg-page .eg-load {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.9rem;
+	margin: 0 0 0.75rem;
+	font-size: 0.85rem;
+	color: var(--color-text-dim);
+	max-width: 62rem;
+}
+
+.eg-page .eg-load-label code {
+	font-size: 0.8em;
+}
+
+.eg-page .eg-load input[type='file'] {
+	color: var(--color-text-dim);
+	font: inherit;
+	max-width: 100%;
+}
+
+.eg-page .eg-load button {
+	background: var(--eg-card);
+	color: var(--color-text);
+	border: 1px solid var(--eg-border);
+	border-radius: 0.35rem;
+	padding: 0.3rem 0.7rem;
+	font: inherit;
+	cursor: pointer;
+}
+
+.eg-page .eg-load button:hover {
+	border-color: var(--color-text);
+}
+
 .eg-page .eg-key {
 	font-size: 0.85rem;
 	color: var(--color-text-dim);

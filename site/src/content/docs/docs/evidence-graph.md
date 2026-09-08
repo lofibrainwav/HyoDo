@@ -45,9 +45,11 @@ parents, broken evidence references, unreadable ledgers, or corrupt ledger
 lines are reported as `UNOBSERVED` instead of being converted into a clean
 graph.
 
-Release boundary: the public page still uses fixed demo fixture data and does
-not read a real ledger. Installing the latest published package may lag the
-source development line until the next release is published.
+Release boundary: the public page defaults to fixed demo fixture data and
+does not read a real ledger. On `/evidence-graph/` you can opt in to load
+a local `hyodo.evidence-graph/v1` JSON file in the browser; that is not a
+remote ledger. Installing the latest published package may lag the source
+development line until the next release is published.
 
 ## Broken links
 
@@ -58,12 +60,22 @@ part of what this prototype demonstrates, not an edge case it hides.
 
 ## Demo fixture data only
 
-The 14 events on the page are fixed, in-memory demo data. Nothing is
-uploaded, stored, or fetched from a network, and no real ledger is read.
+The 14 events on the public page are fixed, in-memory demo data. Nothing
+is uploaded, stored, or fetched from a network, and no real ledger is
+read. The default view stays on that fixture so the visual shape and the
+broken-link case stay reviewable.
+
+On `/evidence-graph/` you can opt in to load a local
+`hyodo.evidence-graph/v1` JSON file (the artifact `hyodo report --format
+graph` writes). The file is read in the browser only; it is never
+uploaded. A malformed or unknown payload does not become a green grid —
+the page keeps the fixture (or shows no events) and surfaces the graph
+`status`/`reason`. `UNOBSERVED` is never treated as a pass.
+
 Since 4.14.0 the installed CLI emits the same graph from a real ledger:
 `hyodo report --format graph` writes a local JSON artifact and `hyodo
-dashboard` serves it at `/graph`. This public page remains a standalone
-fixture-data prototype and does not read a real ledger.
+dashboard` serves it at `/graph`. That local dashboard is the live
+ledger viewer. This public page does not read a remote ledger.
 
 ## Next
 
