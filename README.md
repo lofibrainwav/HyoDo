@@ -172,7 +172,9 @@ cannot be shell-faked through `gates.toml`; see
 
 Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 
-- Docs index: [`docs/README.md`](./docs/README.md); Quick start: [`QUICK_START.md`](./QUICK_START.md); Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
+- Docs index: [`docs/README.md`](./docs/README.md)
+- Quick start: [`QUICK_START.md`](./QUICK_START.md)
+- Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
 - Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
 - Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md); Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 

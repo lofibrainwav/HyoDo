@@ -35,9 +35,7 @@ def test_mcp_contract_cli_source_does_not_say_live_yet() -> None:
 
 
 def test_mcp_design_doc_status_says_remote_is_contract_only() -> None:
-    text = (REPO_ROOT / "docs" / "HYODO_MCP_CONNECTOR_DESIGN.md").read_text(
-        encoding="utf-8"
-    )
+    text = (REPO_ROOT / "docs" / "HYODO_MCP_CONNECTOR_DESIGN.md").read_text(encoding="utf-8")
     lowered = text.lower()
     assert "contract-only" in lowered
     assert "UNOBSERVED" in text
