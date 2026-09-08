@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections import Counter
+from pathlib import Path
 from typing import Any
 
 from hyodo.events import content_digest, credential_shaped_path
@@ -183,9 +184,24 @@ def validate_event_edges(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def build_event_graph(
-    events: list[dict[str, Any]], *, corrupt: int = 0, ledger_unreadable: bool = False
+    events: list[dict[str, Any]],
+    *,
+    corrupt: int = 0,
+    ledger_unreadable: bool = False,
+    root: Path | None = None,
 ) -> dict[str, Any]:
-    """Build the public JSON graph shape from observed ledger events."""
+    """Build the public JSON graph shape from observed ledger events.
+
+    `root` (additive, schema-compatible) is the project checkout the ledger
+    was read from, when the caller has one (`hyodo.report.build_report_graph`
+    always does). It is stamped onto the returned graph as a plain string
+    path so `hyodo.graph_view.assign_columns`'s file-tool Hyo/Goodness split
+    can resolve paths against the real root instead of guessing from path
+    text — the #206 judge finding this parameter fixes — and so a consumer
+    working from the exported JSON alone (no separate `root` in scope, e.g.
+    `orb_state`) still has it. `None` when the caller has no root to give;
+    callers must not treat that as "outside root", only as "unknown".
+    """
     edge_issues = validate_event_edges(events) if not ledger_unreadable else []
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
@@ -298,6 +314,7 @@ def build_event_graph(
         "schema_version": GRAPH_SCHEMA_VERSION,
         "status": status,
         "reason": reason,
+        "root": str(root.resolve()) if root is not None else None,
         "nodes": nodes,
         "edges": edges,
         "unresolved_refs": edge_issues,

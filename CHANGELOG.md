@@ -37,16 +37,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   the unclassified gutter. Matching is now an explicit, case-insensitive
   set covering the Claude Code and Cursor/demo tool-name families
   (#204 item 26).
-
-### Fixed
-
-- `hyodo/graph_view.py`'s file-tool classification (Truth/Beauty/Hyo/
-  Goodness columns) matched only placeholder names (`read_file`,
-  `write_file`) that no real host sends; Claude Code's actual `Read`,
-  `Write`, `Edit`, `MultiEdit`, and `NotebookEdit` events fell through to
-  the unclassified gutter. Matching is now an explicit, case-insensitive
-  set covering the Claude Code and Cursor/demo tool-name families
-  (#204 item 26).
+- `hyodo/graph_view.py`'s Hyo/Goodness file-tool split treated every
+  absolute path as outside the project root, so a real Claude Code
+  `Read`/`Write`/`Edit` event — which always carries an absolute
+  `file_path` — was misclassified as Goodness even when the path sat
+  squarely inside the checkout. It now resolves paths against the real
+  project root the same way `hyodo.policy.evaluate_policy` does (shared
+  `hyodo.policy.path_outside_root` helper); the root is threaded through
+  from `hyodo report --format graph` and additively stamped onto the
+  exported graph itself, and a node with no root to check against lands
+  in the unclassified gutter instead of a silent, possibly-wrong Goodness
+  (#206 judge finding).
 
 ## [4.16.0] - 2026-09-07
 

@@ -1198,7 +1198,10 @@ def render_graph_html(
     calls this function, and a caller with no checkout on disk might not
     either) degrades to rows with no rings affordance rather than
     failing, the same "still renders, less to show" pattern as section
-    8's missing-asset fallback.
+    8's missing-asset fallback. It is also passed to `assign_columns`/
+    `orb_state` so the file-tool Hyo/Goodness split resolves paths against
+    the real checkout boundary (falling back to `graph["root"]` when this
+    parameter is omitted but the graph payload carries one).
     """
     now = now or datetime.now(timezone.utc)
     status = str(graph.get("status") or "UNOBSERVED")
@@ -1212,9 +1215,15 @@ def render_graph_html(
         node["id"]: node for node in nodes if isinstance(node.get("id"), str)
     }
 
-    assignments = {node_id: assign_columns(node) for node_id, node in node_by_id.items()}
+    effective_root = root
+    if effective_root is None:
+        graph_root = graph.get("root")
+        effective_root = Path(graph_root) if isinstance(graph_root, str) and graph_root else None
+    assignments = {
+        node_id: assign_columns(node, effective_root) for node_id, node in node_by_id.items()
+    }
     coverage = column_coverage(nodes, assignments, edges)
-    orb = orb_state(graph)
+    orb = orb_state(graph, effective_root)
     rows_tree = build_actor_rows(nodes, edges)
     rings = build_actor_rings(graph, root) if root is not None else {}
     audience = resolve_audience(root).profile if root is not None else "engineer"
