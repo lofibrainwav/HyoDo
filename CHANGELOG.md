@@ -21,6 +21,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   everything else HyoDo writes under `.hyodo/` is per-machine runtime state
   and should be ignored; this repo's own `.gitignore` now follows that split
   (`docs/CONNECT.md` "What to commit", `README.md`, `hyodo init` output).
+- Docs: fixed site/docs drift against 4.16.0 — reworded the `ANTHROPIC_PROOF.md`
+  "no separate Claude-only code path" claim to scope it to the shared gate/
+  policy engine, documented the `hyodo connect claude-code --write` starter
+  `.hyodo/policy.toml` bootstrap on the Connect site page, added `hyodo
+  safe`'s `scope`/`coverage` output fields to the site quickstart, and added
+  a `hyodo score --from-check` section to the site philosophy page.
+
+### Fixed
+
+- `hyodo/graph_view.py`'s file-tool classification (Truth/Beauty/Hyo/
+  Goodness columns) matched only placeholder names (`read_file`,
+  `write_file`) that no real host sends; Claude Code's actual `Read`,
+  `Write`, `Edit`, `MultiEdit`, and `NotebookEdit` events fell through to
+  the unclassified gutter. Matching is now an explicit, case-insensitive
+  set covering the Claude Code and Cursor/demo tool-name families
+  (#204 item 26).
 
 ### Fixed
 

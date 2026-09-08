@@ -26,6 +26,15 @@ hook contract, so `connect` never fabricates a config format.
   enforced, and the digest of every file `connect` wrote.
 - A `.bak` alongside any file HyoDo did not create itself, on its first
   write.
+- `hyodo connect claude-code --write` also bootstraps `.hyodo/policy.toml`
+  when no policy file exists yet, and tracks its digest in `connect.json`
+  the same way it tracks `.claude/settings.json` (so `--status` reports
+  drift on it too). The starter policy is permissive by default — every
+  restriction ships commented out — apart from an uncommented
+  `blocked_path_globs` list (`.env`, `*.pem`, `id_rsa*`, `.hyodo/**`). It
+  is a starting point for an operator to tighten, not a gate by itself. An
+  existing policy file — HyoDo's own or the operator's — is never
+  overwritten.
 
 ## What is never stored
 

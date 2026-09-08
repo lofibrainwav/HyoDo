@@ -38,8 +38,15 @@ whether to fix, escalate, or merge.
   `docs/EXTERNAL_CLAIM_AUDIT.md`
 
 Claude Code, or any other terminal-based coding agent, can call the same
-`hyodo` entrypoints a human runs locally — there is no separate
-Claude-only code path to keep in sync.
+`hyodo` entrypoints a human runs locally. The decision engine (gates,
+policy, scoring) is host-neutral and has exactly one implementation.
+`hyodo connect claude-code` is a thin, documented payload adapter for one
+host: `hyodo/connect.py::map_claude_code_hook_payload` translates Claude
+Code's `PreToolUse`/`PostToolUse` hook JSON into the shared
+`hyodo.agent-event/v1` shape, and `HOOK_PRE_COMMAND_PREFIX` /
+`HOOK_POST_COMMAND_PREFIX` wire that adapter into `.claude/settings.json`.
+Other hosts without a verified hook contract (`cursor`, `codex`) report
+`UNOBSERVED` from `connect` rather than getting a fabricated adapter.
 
 ## Safe public claims
 
