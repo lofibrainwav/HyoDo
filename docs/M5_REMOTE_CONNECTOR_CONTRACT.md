@@ -2,16 +2,28 @@
 
 Status: M5-A contract only. This document does not claim a live remote service.
 
+> **Not equivalent.** `hyodo mcp stdio`, loopback, and Tailscale are
+> implemented transports. `https://mcp.hyodo.app/mcp` and the ChatGPT
+> connector are contract-only, `UNOBSERVED`, and not probed in this
+> repository. They are not a shipped path next to stdio. The North Star
+> "Connect once. Use any AI" is a product direction, not a live ChatGPT
+> path.
+
 HyoDo keeps one product invariant across local and remote use:
 
 > The HyoDo CLI remains the source of gate, policy, and evidence truth.
 
 The remote connector exists to make attachment simple for ChatGPT, Claude, and
-other MCP hosts without creating a second verification stack.
+other MCP hosts without creating a second verification stack. That intent is
+not a live service.
 
 ## North Star
 
 **Connect once. Use any AI. Keep one Reality.**
+
+That line is a product direction. It is not a live ChatGPT or
+`https://mcp.hyodo.app/mcp` path — those stay contract-only and
+`UNOBSERVED`.
 
 Normal onboarding should feel like:
 

@@ -7,7 +7,7 @@ Minimal examples for the opt-in agent event ledger and local policy gate.
 - HyoDo validates events, appends an audit ledger, and can stamp ALLOW/DENY.
 - HyoDo is **not** a full tool-call interceptor or agent runtime.
 - DENY must be enforced by the caller (FDE script, MCP middleware, agent loop).
-- Default storage is **digest-only**; use `--full-body` only when raw text retention is accepted.
+- Default storage is **digest-only**; use `--full-body` only when raw text retention is accepted. Who may enable it, that HyoDo does not rotate or redact the ledger, and that a client cannot self-upgrade: [`docs/FULL_BODY.md`](../../docs/FULL_BODY.md).
 - `allowed_tools` in this example uses demo names (`search`, `read_file`).
   For a dual-host copy file (Claude Code + Cursor/demo names) see
   [`examples/host-policies/`](../host-policies/). That file is not a

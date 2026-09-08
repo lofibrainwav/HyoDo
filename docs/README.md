@@ -25,6 +25,8 @@ language-agnostic.
 | [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
 | [HOST_CONTRACT.md](./HOST_CONTRACT.md) | What the Claude Code hook mapper copies vs what the host still owns |
 | [MISREAD.md](./MISREAD.md) | Easy over-reads: missing policy, CI `check`, shadow, starter policy, trust |
+| [FULL_BODY.md](./FULL_BODY.md) | `--full-body` consent, no rotation/redaction, clients cannot self-upgrade |
+| [CLAIMS.md](./CLAIMS.md) | What public pages do not claim (no implied installed base) |
 | [../examples/host-policies/](../examples/host-policies/) | Dual-host `allowed_tools` copy file — not a Cursor/Codex hook adapter |
 | [SKILLS.md](./SKILLS.md) | `hyodo skills ingest` / `lens` / `propose` — skill lens over the six pillars |
 | [INSPECT.md](./INSPECT.md) | `hyodo inspect` — field-deployment folder absorption, digests and chunks |
@@ -34,6 +36,7 @@ language-agnostic.
 | [TEST_INTEGRITY.md](./TEST_INTEGRITY.md) | `hyodo check --strict-tests` — AST-based test-integrity scan |
 | [SCORE_DERIVATION.md](./SCORE_DERIVATION.md) | `hyodo score --from-check` — pillar derivation rule table and coverage semantics |
 | [HYODO_MCP_CONNECTOR_DESIGN.md](./HYODO_MCP_CONNECTOR_DESIGN.md) | MCP connector design, plus M1 local stdio (remote not shipped) |
+| [M5_REMOTE_CONNECTOR_CONTRACT.md](./M5_REMOTE_CONNECTOR_CONTRACT.md) | Remote `https://mcp.hyodo.app/mcp` is contract-only, not `hyodo mcp stdio` |
 | [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Implementer queue after 4.4.0 |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
 
