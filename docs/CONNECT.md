@@ -25,6 +25,11 @@ hyodo connect [<target>] [--write] [--yes] [--shadow] [--status] [--root PATH] [
 | `cursor` | — | **UNOBSERVED** — no verified hook contract; `connect` never fabricates a config format |
 | `codex` | — | **UNOBSERVED** — same reason |
 
+A dual-host `allowed_tools` copy file (Claude Code names plus Cursor/demo
+names) lives at [`examples/host-policies/`](../examples/host-policies/). It
+is an allowlist, not a hook adapter — copying it does not make `connect
+cursor` observed.
+
 Every file HyoDo did not create itself gets a `.bak` alongside it on its first
 write; everything HyoDo does not own in that file (other hooks, other
 pre-commit repos, other keys) is left untouched. Running `--write` twice with

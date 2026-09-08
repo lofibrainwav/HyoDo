@@ -4521,16 +4521,20 @@ def connect(
     raise typer.Exit(0)
 
 
-#: Onboarding guide text kept verbatim for the non-interactive path (existing
-#: docs/tests quote this). Interactive callers see the four-step flow below
-#: instead of this block.
+#: Onboarding guide text for the non-interactive path (existing docs/tests
+#: quote keywords here). Interactive callers see the four-step flow below
+#: instead of this block. Hook vs MCP wording is load-bearing (#204 item 31).
 _START_GUIDE = """
 [bold blue]HyoDo quick start[/bold blue]
 
 [b]HyoDo is a model-agnostic quality-gate kit for AI-assisted development.[/b]
 Model-agnostic means independent of the AI model or agent UI — not language-agnostic.
 
-Works with Claude Code, Codex, Grok, Gemini CLI, Cursor, or plain terminal.
+Any caller can record events and evaluate policy. Hook wiring
+(`hyodo connect`) is Claude Code, pre-commit, and GitHub Actions.
+`cursor` and `codex` stay UNOBSERVED until a verified hook contract
+exists. MCP config (`hyodo mcp config`) is a separate surface and
+includes Cursor.
 
 [bold cyan]Core commands:[/bold cyan]
   • [bold]check[/bold]  - HyoDo checkout release gates (ruff/pyright/pytest)
@@ -4776,8 +4780,9 @@ def start():
     written without an explicit yes.
 
     Non-interactive (``not sys.stdin.isatty()``): prints the same four steps
-    as plain text with exact commands, asks nothing, writes nothing. Today's
-    guide text is kept here unchanged.
+    as plain text with exact commands, asks nothing, writes nothing. The
+    guide text names the hook vs MCP split; it does not claim Cursor or
+    Codex hook coverage.
     """
     root = Path.cwd()
     detected = _onboarding_detected_hosts(root)

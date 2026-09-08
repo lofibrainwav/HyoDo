@@ -8,6 +8,10 @@ Minimal examples for the opt-in agent event ledger and local policy gate.
 - HyoDo is **not** a full tool-call interceptor or agent runtime.
 - DENY must be enforced by the caller (FDE script, MCP middleware, agent loop).
 - Default storage is **digest-only**; use `--full-body` only when raw text retention is accepted.
+- `allowed_tools` in this example uses demo names (`search`, `read_file`).
+  For a dual-host copy file (Claude Code + Cursor/demo names) see
+  [`examples/host-policies/`](../host-policies/). That file is not a
+  Cursor/Codex hook adapter; `hyodo connect cursor` stays UNOBSERVED.
 
 ## Quick try
 

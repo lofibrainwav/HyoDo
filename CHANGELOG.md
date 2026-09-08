@@ -13,6 +13,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (types, required/default, and the exact validation error `hyodo check`
   prints for each malformed value), linked from `README.md` and
   `docs/README.md`.
+- `examples/host-policies/`: a dual-host `allowed_tools` copy file listing
+  Claude Code names (`Read`, `Bash`, …) next to Cursor/demo names
+  (`read_file`, `search`, …). It is an allowlist, not a hook adapter —
+  `hyodo connect cursor` / `codex` stay UNOBSERVED (#204 item 31).
 
 ### Changed
 
@@ -21,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   everything else HyoDo writes under `.hyodo/` is per-machine runtime state
   and should be ignored; this repo's own `.gitignore` now follows that split
   (`docs/CONNECT.md` "What to commit", `README.md`, `hyodo init` output).
+- Docs/CLI: stop listing Cursor and Codex as if hook wiring shipped. The
+  start guide, Quick Start, demo script, and site quickstart now separate
+  `hyodo connect` (Claude Code / pre-commit / GitHub Actions) from
+  `hyodo mcp config` (includes Cursor). `connect cursor`/`codex` remain
+  UNOBSERVED (#204 item 31 / E.5).
 - Docs: fixed site/docs drift against 4.16.0 — reworded the `ANTHROPIC_PROOF.md`
   "no separate Claude-only code path" claim to scope it to the shared gate/
   policy engine, documented the `hyodo connect claude-code --write` starter

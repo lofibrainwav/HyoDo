@@ -8,6 +8,9 @@ max_steps = 20
 
 # When set (including empty list), tool_call/tool_result must use a listed name.
 # Omit the key entirely to leave tools unrestricted by allowlist.
+# These three names are demo/fixture names for this example event. They are
+# not Claude Code hook names. For a dual-host copy file see
+# examples/host-policies/claude-and-cursor.policy.toml.
 allowed_tools = ["search", "read_file", "list_dir"]
 
 # Paths declared on tool.paths that match any glob → DENY data_boundary.

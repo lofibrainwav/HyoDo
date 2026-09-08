@@ -83,9 +83,11 @@ hyodo start
 ```
 
 `hyodo start` is the onboarding flow: it shows detected hosts, asks one
-audience question, then offers to connect one host (Claude Code, Claude
-Desktop, Cursor, VS Code, or Codex) with a preview and one yes/no confirm.
-To connect a host directly instead:
+audience question, then offers to connect one host. Claude Code gets hook
+wiring (`hyodo connect`) plus MCP. Cursor, VS Code, Claude Desktop, and
+Codex get MCP config only. `hyodo connect cursor` and `hyodo connect
+codex` stay UNOBSERVED — no verified hook contract. To write MCP config
+directly:
 
 ```bash
 hyodo mcp config claude-code --write   # or claude-desktop / cursor / vscode / codex

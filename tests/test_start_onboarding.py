@@ -81,7 +81,9 @@ def test_noninteractive_prints_all_four_steps_with_exact_commands(
     cli.start()
     output = capsys.readouterr().out
     assert "1. Workspace" in output
-    assert str(tmp_path) in output
+    # Rich wraps long macOS pytest paths, so the full str(tmp_path) may be
+    # split across lines. The directory name is enough to bind the print.
+    assert tmp_path.name in output
     assert "2. Audience" in output
     assert "3. Connect a host" in output
     assert "hyodo connect claude-code --write --yes" in output
@@ -114,6 +116,10 @@ def test_noninteractive_keeps_todays_guide_content(monkeypatch, tmp_path: Path, 
     output = capsys.readouterr().out.lower()
     assert "quick start" in output
     assert "score" in output
+    # #204 item 31: the guide must not list Cursor/Codex as hooked hosts.
+    assert "works with claude code, codex, grok, gemini cli, cursor" not in output
+    assert "unobserved" in output
+    assert "hyodo connect" in output
 
 
 # --------------------------------------------------------------------------

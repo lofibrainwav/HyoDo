@@ -60,8 +60,10 @@ hyodo start
 ```
 
 `hyodo start` shows detected hosts, asks one audience question, then offers
-to connect one host with a preview and a single yes/no confirm. To connect a
-host directly:
+to connect one host with a preview and a single yes/no confirm. Claude Code
+gets hook wiring plus MCP; Cursor, VS Code, Claude Desktop, and Codex get
+MCP config only. `hyodo connect cursor` and `hyodo connect codex` stay
+`UNOBSERVED`. To write MCP config directly:
 
 ```bash
 hyodo mcp config claude-code --write
