@@ -85,7 +85,9 @@ def friction_preview(
     console.print(f"runs observed: {payload['observation']['runs_observed']}")
     corrupt = payload["observation"]["corrupt_lines"]
     if corrupt:
-        console.print(f"[yellow]ledger contains {corrupt} corrupt line(s); source_quality=corrupt[/yellow]")
+        console.print(
+            f"[yellow]ledger contains {corrupt} corrupt line(s); source_quality=corrupt[/yellow]"
+        )
     contributions = payload["contributions"]
     if not contributions:
         label = "UNOBSERVED" if exit_code == 2 else "No contribution records derived."
@@ -93,8 +95,12 @@ def friction_preview(
     for index, contribution in enumerate(contributions, start=1):
         console.print(f"\n[bold]Contribution {index}[/bold]")
         console.print_json(json.dumps(contribution))
-    console.print("\n[dim]Raw prompts, responses, code, diffs, paths, secrets, ids, and exact timestamps are never exported by v1.[/dim]")
-    console.print("[dim]Population evidence may influence ACL support; it cannot grant authority or override local policy/evidence gates.[/dim]")
+    console.print(
+        "\n[dim]Raw prompts, responses, code, diffs, paths, secrets, ids, and exact timestamps are never exported by v1.[/dim]"
+    )
+    console.print(
+        "[dim]Population evidence may influence ACL support; it cannot grant authority or override local policy/evidence gates.[/dim]"
+    )
     raise typer.Exit(exit_code)
 
 
@@ -122,7 +128,9 @@ def friction_on(
             if json_output:
                 console.print_json(json.dumps(payload))
             else:
-                console.print("[yellow]confirmation_required: pass --yes — nothing changed.[/yellow]")
+                console.print(
+                    "[yellow]confirmation_required: pass --yes — nothing changed.[/yellow]"
+                )
             raise typer.Exit(1)
         if not typer.confirm(
             "Enable local Friction Contribution preparation? No network upload exists in v1."
