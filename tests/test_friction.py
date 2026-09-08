@@ -83,7 +83,9 @@ def _event(
 def _write_ledger(root: Path, rows: list[object]) -> None:
     path = root / AGENT_EVENTS_RELATIVE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(json.dumps(row) if not isinstance(row, str) else row for row in rows) + "\n")
+    path.write_text(
+        "\n".join(json.dumps(row) if not isinstance(row, str) else row for row in rows) + "\n"
+    )
 
 
 def test_derived_contribution_is_strict_allowlist_and_contains_no_raw_identifiers_or_bodies():
