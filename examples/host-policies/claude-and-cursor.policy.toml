@@ -1,0 +1,114 @@
+# Host-named policy for Claude Code + Cursor.
+# Copy to .hyodo/policy.toml — or start from `hyodo connect claude-code`
+# and replace the starter. Exact tool.name match only.
+
+schema = "hyodo.policy/v1"
+
+max_steps = 40
+
+# Omit this key to leave names unrestricted. Empty list denies every tool.
+allowed_tools = [
+  # Claude Code (code.claude.com tools-reference / hook matchers)
+  "Read",
+  "Grep",
+  "Glob",
+  "Edit",
+  "Write",
+  "NotebookEdit",
+  "Bash",
+  "PowerShell",
+  "WebFetch",
+  "WebSearch",
+  "Agent",
+  "AskUserQuestion",
+  "Skill",
+  "ToolSearch",
+  "TodoWrite",
+  # Cursor — older family
+  "read_file",
+  "list_dir",
+  "grep_search",
+  "grep",
+  "file_search",
+  "glob_file_search",
+  "codebase_search",
+  "edit_file",
+  "delete_file",
+  "run_terminal_command",
+  "run_terminal_cmd",
+  "web_search",
+  "web_fetch",
+  # Cursor — newer family reported in 2026 agents
+  "SemanticSearch",
+  "StrReplace",
+  "Delete",
+  "Shell",
+  "ReadLints",
+  "EditNotebook",
+  "AskQuestion",
+  "Task",
+]
+
+blocked_path_globs = [
+  "**/.env",
+  "**/.env.*",
+  "**/.netrc",
+  "**/.npmrc",
+  "**/.pypirc",
+  "**/.ssh/**",
+  "**/.aws/**",
+  "**/.kube/**",
+  "**/.gnupg/**",
+  "**/.git/config",
+  "**/.git/credentials",
+  "**/secrets/**",
+  "**/*credential*",
+  "**/*secret*",
+  "**/*.pem",
+  "**/*.p12",
+  "**/*.key",
+  "**/id_rsa",
+  "**/id_ed25519",
+]
+
+ask_tools = [
+  "Bash",
+  "PowerShell",
+  "Shell",
+  "run_terminal_command",
+  "run_terminal_cmd",
+  "Write",
+  "Edit",
+  "NotebookEdit",
+  "edit_file",
+  "StrReplace",
+  "Delete",
+  "delete_file",
+  "WebFetch",
+  "WebSearch",
+  "web_fetch",
+  "web_search",
+  "Agent",
+  "Skill",
+  "Task",
+]
+
+ask_threshold = 1
+
+[web]
+allowed_domains = [
+  "code.claude.com",
+  "docs.anthropic.com",
+  "docs.cursor.com",
+  "cursor.com",
+  "docs.python.org",
+  "pypi.org",
+  "github.com",
+  "raw.githubusercontent.com",
+  "registry.npmjs.org",
+]
+allow_non_get = false
+allow_credential_paths = false
+
+[trust]
+max_level = 1

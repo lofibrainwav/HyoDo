@@ -1,0 +1,29 @@
+{
+  "schema_version": "hyodo.agent-event/v1",
+  "event_id": "33333333-3333-4333-8333-333333333333",
+  "run_id": "44444444-4444-4444-8444-444444444444",
+  "ts": "2026-09-08T06:00:00+00:00",
+  "kind": "tool_call",
+  "step_index": 0,
+  "actor": "agent",
+  "tool": {
+    "name": "Read",
+    "args_digest": "a94a8fe5ccb1",
+    "paths": ["README.md"]
+  },
+  "io": {
+    "input_digest": "2c624232cdd2",
+    "output_digest": null,
+    "bytes_in": 12,
+    "bytes_out": 0
+  },
+  "policy": {
+    "decision": null,
+    "rule_id": null,
+    "reason": null
+  },
+  "meta": {
+    "model": "example-model",
+    "tags": ["fde-demo", "claude-code"]
+  }
+}
