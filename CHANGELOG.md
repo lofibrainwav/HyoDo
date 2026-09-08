@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs/GATES_SYNTAX.md`: a field-by-field reference for `.hyodo/gates.toml`
+  (types, required/default, and the exact validation error `hyodo check`
+  prints for each malformed value), linked from `README.md` and
+  `docs/README.md`.
+
+### Changed
+
 - docs: clarify the `.hyodo/` tracking split — `policy.toml` and
   `gates.toml` are team-shared policy and should be committed, while
   everything else HyoDo writes under `.hyodo/` is per-machine runtime state
