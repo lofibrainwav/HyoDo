@@ -23,6 +23,7 @@ language-agnostic.
 | [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
 | [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |
 | [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
+| [../examples/host-policies/](../examples/host-policies/) | Dual-host `allowed_tools` copy file — not a Cursor/Codex hook adapter |
 | [SKILLS.md](./SKILLS.md) | `hyodo skills ingest` / `lens` / `propose` — skill lens over the six pillars |
 | [INSPECT.md](./INSPECT.md) | `hyodo inspect` — field-deployment folder absorption, digests and chunks |
 | [GRAPH_EXPORT.md](./GRAPH_EXPORT.md) | `hyodo graph export` — evidence-graph export bridge and actor rings |

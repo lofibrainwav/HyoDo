@@ -54,7 +54,9 @@ written without an explicit yes.
 
 `codex`'s `[mcp_servers.hyodo]` TOML table is a documented format, not
 verified against a live install — the same caution `hyodo connect` applies
-to the cursor/codex hook contracts.
+to the cursor/codex hook contracts. MCP config is not hook coverage.
+A dual-host `allowed_tools` copy file is at
+[`examples/host-policies/`](../examples/host-policies/).
 
 `chatgpt` always reports `UNOBSERVED`: the remote connector
 (`https://mcp.hyodo.app/mcp`) is not live. See

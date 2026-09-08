@@ -195,6 +195,7 @@ def test_start_shows_onboarding_keywords():
     assert "score" in result.output.lower()
     # Onboarding must not teach the false-STRONG partial example.
     assert "-t 0.9 -g 0.8" not in result.output.replace("\n", " ")
+    assert "works with claude code, codex, grok, gemini cli, cursor" not in result.output.lower()
 
 
 def test_trinity_shows_checklist_keywords():

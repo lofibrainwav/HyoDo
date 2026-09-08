@@ -28,7 +28,9 @@ HyoDo in 3 minutes: model-agnostic quality gates for AI-assisted code
 
 AI-assisted code is fast, but speed is not the same as trust. HyoDo is a
 quality-gate kit for making AI-generated changes inspectable before they become
-trusted code — on Claude, Codex, Grok, Gemini, Cursor, or plain terminal.
+trusted code. Any caller can record events and evaluate policy. Hook
+wiring (`hyodo connect`) is Claude Code, pre-commit, and GitHub Actions —
+not Cursor or Codex.
 
 ### 0:20-0:50 - Public surface
 

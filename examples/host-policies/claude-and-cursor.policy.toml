@@ -1,0 +1,37 @@
+# Dual-host allowed_tools copy file — schema hyodo.policy/v1
+#
+# This is an allowlist, not a hook adapter. `hyodo connect cursor` and
+# `hyodo connect codex` stay UNOBSERVED. Names are exact and case-sensitive:
+# `Read` is not `read_file`. Trim to the hosts you actually run.
+#
+# Claude Code names come from the shipped hook mapping. Cursor / demo names
+# come from this repo's fixtures and graph-view classification. Other Cursor
+# versions have used Claude-like names; if a live payload differs, add that
+# exact string — do not assume a family.
+
+schema = "hyodo.policy/v1"
+
+allowed_tools = [
+  # Claude Code (hyodo connect claude-code)
+  "Read",
+  "Write",
+  "Edit",
+  "MultiEdit",
+  "NotebookEdit",
+  "Bash",
+  "WebFetch",
+  "WebSearch",
+  # Cursor / demo / this repo's fixtures (not a verified Cursor hook)
+  "read_file",
+  "write_file",
+  "edit_file",
+  "search",
+  "list_dir",
+]
+
+blocked_path_globs = [
+  "**/.env",
+  "**/.env.*",
+  "**/secrets/**",
+  "**/*credential*",
+]
