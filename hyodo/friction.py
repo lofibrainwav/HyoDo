@@ -89,7 +89,10 @@ FRICTION_CONTRIBUTION_SCHEMA: dict[str, Any] = {
     "properties": {
         "schema": {"const": FRICTION_CONTRIBUTION_SCHEMA_VERSION},
         "source_schema": {"const": AGENT_EVENT_SCHEMA_VERSION},
-        "hyodo_version": {"type": "string", "pattern": r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$"},
+        "hyodo_version": {
+            "type": "string",
+            "pattern": r"^[0-9]+\.[0-9]+\.[0-9]+(?:[-+][A-Za-z0-9.-]+)?$",
+        },
         "task_class": {"enum": sorted(TASK_CLASSES)},
         "risk_bucket": {"enum": sorted(RISK_BUCKETS)},
         "orchestration_pattern": {"enum": sorted(ORCHESTRATION_PATTERNS)},
@@ -216,9 +219,7 @@ def _task_class(events: list[dict[str, Any]]) -> str:
                 if candidate in TASK_CLASSES and candidate != "unknown":
                     return candidate
     methods = {
-        method
-        for event in events
-        if isinstance((method := _tool(event).get("method")), str)
+        method for event in events if isinstance((method := _tool(event).get("method")), str)
     }
     if methods & {"POST", "PUT", "PATCH", "DELETE"}:
         return "external_write"
@@ -243,8 +244,7 @@ def _risk_bucket(events: list[dict[str, Any]]) -> str:
         urls = tool.get("urls")
         if isinstance(urls, list):
             credential_shaped = credential_shaped or any(
-                isinstance(entry, dict) and entry.get("credential_shaped") is True
-                for entry in urls
+                isinstance(entry, dict) and entry.get("credential_shaped") is True for entry in urls
             )
     if credential_shaped or "DELETE" in methods:
         return "high"
