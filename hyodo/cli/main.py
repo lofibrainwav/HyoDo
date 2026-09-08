@@ -1246,6 +1246,96 @@ def _skip_missing_tool(language: str, tool: str) -> GeneralGateResult:
     return GeneralGateResult(language, tool, GateStatus.SKIP, f"{tool} not installed; skipped")
 
 
+_GENERAL_TSCONFIG_CAP = 20
+
+
+def _tsconfig_dependencies_missing(tsconfig: Path, root: Path) -> str | None:
+    """Return an honest SKIP message if *tsconfig*'s project has a
+    ``package.json`` but no installed ``node_modules``, else ``None``.
+
+    Walks from ``tsconfig.parent`` up to (and including) *root*. If a
+    ``package.json`` exists anywhere on that path but no ``node_modules``
+    directory exists anywhere on that path, the project's dependencies were
+    never installed and running ``tsc`` would fail on unresolved imports for
+    environment reasons, not a code defect (e.g. a CI runner with a global
+    tsc but no ``npm install`` step for a monorepo sub-project). If no
+    ``package.json`` exists at all on the path, this returns ``None`` and the
+    caller keeps the existing behaviour of running ``tsc`` anyway.
+    """
+    has_package_json = False
+    has_node_modules = False
+    current = tsconfig.parent
+    while True:
+        if (current / "package.json").is_file():
+            has_package_json = True
+        if (current / "node_modules").is_dir():
+            has_node_modules = True
+        if current == root or current.parent == current:
+            break
+        current = current.parent
+    if has_package_json and not has_node_modules:
+        try:
+            rel = tsconfig.relative_to(root)
+        except ValueError:
+            rel = tsconfig
+        return f"dependencies not installed (no node_modules next to {rel}); skipped"
+    return None
+
+
+def _find_tsconfigs(
+    root: Path,
+    exclusions: ScanExceptionsConfig | None = None,
+    cap: int = _GENERAL_TSCONFIG_CAP,
+) -> list[Path]:
+    """Find up to *cap* ``tsconfig.json`` files anywhere under *root* (vendor dirs pruned).
+
+    A monorepo commonly has no root-level ``tsconfig.json`` at all, only one
+    per package/app (e.g. ``apps/learning-platform/tsconfig.json``). Looking
+    only at ``root / "tsconfig.json"`` (as the previous implementation did)
+    makes every such project's TypeScript invisible to ``--general``.
+    """
+    found: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(
+            d for d in dirnames if d not in _GENERAL_SKIP_DIRS and not d.startswith(".")
+        )
+        if "tsconfig.json" in filenames:
+            candidate = Path(dirpath) / "tsconfig.json"
+            if exclusions is None or not is_general_path_excluded(candidate, root, exclusions):
+                found.append(candidate)
+                if len(found) >= cap:
+                    return found
+    return found
+
+
+def _resolve_tsc_binary(start: Path, root: Path) -> str | None:
+    """Resolve a ``tsc`` binary for a tsconfig at *start*, monorepo-aware.
+
+    A package inside a monorepo commonly gets TypeScript only as a local
+    devDependency (``apps/<name>/node_modules/.bin/tsc``), never installed
+    globally or exposed on PATH. Looking only at ``shutil.which("tsc")`` (as
+    the previous implementation did) made every such package's TypeScript
+    silently SKIP instead of actually type-checking.
+
+    Walks from *start* up to (and including) *root* looking for
+    ``node_modules/.bin/tsc`` at each level -- the same resolution order
+    Node tooling itself uses -- and falls back to PATH only if none is found.
+    """
+    try:
+        root_resolved = root.resolve()
+        current = start.resolve()
+    except OSError:
+        return shutil.which("tsc")
+    while True:
+        candidate = current / "node_modules" / ".bin" / "tsc"
+        if candidate.is_file() and os.access(candidate, os.X_OK):
+            return str(candidate)
+        if current == root_resolved or current.parent == current:
+            break
+        current = current.parent
+    return shutil.which("tsc")
+
+
 def _run_general_gates(
     root: Path, verbose: bool = False, exclusions: ScanExceptionsConfig | None = None
 ) -> list[GeneralGateResult]:
@@ -1271,30 +1361,78 @@ def _run_general_gates(
 
     ts_files = _collect_files(root, (".ts", ".tsx"), exclusions=exclusions)
     js_files = _collect_files(root, (".js", ".mjs", ".cjs"), exclusions=exclusions)
-    tsconfig = root / "tsconfig.json"
-    if tsconfig.exists() and (ts_files or js_files):
-        tsc = shutil.which("tsc")
-        if tsc:
+    tsconfigs = _find_tsconfigs(root, exclusions) if (ts_files or js_files) else []
+    if tsconfigs:
+        runnable: list[tuple[Path, str]] = []
+        for tsconfig in tsconfigs:
+            try:
+                rel = tsconfig.parent.relative_to(root)
+            except ValueError:
+                rel = tsconfig.parent
+            tool = "tsc" if str(rel) == "." else f"tsc ({rel})"
+            deps_missing = _tsconfig_dependencies_missing(tsconfig, root)
+            if deps_missing:
+                results.append(GeneralGateResult("TypeScript", tool, GateStatus.SKIP, deps_missing))
+                continue
+            runnable.append((tsconfig, tool))
+        if runnable:
+            resolved = [
+                (tsconfig, tool, _resolve_tsc_binary(tsconfig.parent, root))
+                for tsconfig, tool in runnable
+            ]
+            if any(tsc for _, _, tsc in resolved):
+                for tsconfig, tool, tsc in resolved:
+                    if tsc:
+                        results.append(
+                            _run_general_cmd(
+                                "TypeScript",
+                                tool,
+                                [tsc, "--noEmit", "-p", str(tsconfig)],
+                                root,
+                                verbose,
+                                "tsc --noEmit clean",
+                            )
+                        )
+                    else:
+                        results.append(
+                            GeneralGateResult(
+                                "TypeScript",
+                                tool,
+                                GateStatus.SKIP,
+                                "tsc not installed (checked node_modules/.bin up to project root, "
+                                "and PATH); skipped",
+                            )
+                        )
+            else:
+                results.append(
+                    GeneralGateResult(
+                        "TypeScript",
+                        "tsc",
+                        GateStatus.SKIP,
+                        f"tsc not installed; skipped ({len(runnable)} tsconfig.json found)",
+                    )
+                )
+    else:
+        if ts_files:
             results.append(
-                _run_general_cmd(
+                GeneralGateResult(
                     "TypeScript",
                     "tsc",
-                    [tsc, "--noEmit", "-p", str(tsconfig)],
-                    root,
-                    verbose,
-                    "tsc --noEmit clean",
+                    GateStatus.UNSUPPORTED,
+                    f"{len(ts_files)} TypeScript file(s) found but no tsconfig.json "
+                    "anywhere in project; type-check not executed",
                 )
             )
-        else:
-            results.append(_skip_missing_tool("TypeScript", "tsc"))
-    elif js_files:
-        node = shutil.which("node")
-        if node:
-            results.append(
-                _run_per_file_general_cmd("JavaScript", "node --check", node, "--check", js_files)
-            )
-        else:
-            results.append(_skip_missing_tool("JavaScript", "node"))
+        if js_files:
+            node = shutil.which("node")
+            if node:
+                results.append(
+                    _run_per_file_general_cmd(
+                        "JavaScript", "node --check", node, "--check", js_files
+                    )
+                )
+            else:
+                results.append(_skip_missing_tool("JavaScript", "node"))
 
     if (root / "go.mod").exists():
         go = shutil.which("go")
@@ -1607,20 +1745,75 @@ def check(
 
         root = find_repo_root(target)
         if root is None:
+            # Neither a HyoDo package checkout nor a BYOG .hyodo/gates.toml was
+            # found. Do not give up on measurement -- fall back to the same
+            # built-in, language-agnostic sampled gates `--general` runs, but
+            # say plainly this is a sample fallback, not a full-project BYOG
+            # gate run, so it never reads as the same-caliber verdict.
             console.print(
                 "[yellow]Not a HyoDo package checkout "
                 "(requires pyproject.toml + hyodo/ at project root).[/yellow]"
             )
             console.print(
-                "[dim]Model-agnostic ≠ language-agnostic. "
-                "General Python project gates are not claimed in this version.[/dim]"
-            )
-            console.print(
                 "[dim]Tip: run 'hyodo init' to absorb this project's own tools as gates "
                 "(Bring-Your-Own-Gates).[/dim]"
             )
-        else:
-            console.print(f"HyoDo checkout: {root}")
+            console.print(
+                "[cyan]Default gates (built-in, sampled) — no project gates found; "
+                "run 'hyodo init' for BYOG[/cyan]"
+            )
+            try:
+                scan_exceptions = load_scan_exceptions(check_root)
+            except ScanExceptionsConfigError as exc:
+                console.print(f"[red]Invalid scan exceptions: {exc}[/red]")
+                console.print("[yellow]This is not a validation pass.[/yellow]")
+                raise typer.Exit(2) from exc
+            gen_results = _run_general_gates(check_root, verbose, scan_exceptions)
+            if scan_exceptions.general:
+                console.print(
+                    f"[dim]Audited general exclusions configured: "
+                    f"{len(scan_exceptions.general)}[/dim]"
+                )
+            verdict_state.update(
+                observed=sum(r.status in {GateStatus.PASS, GateStatus.FAIL} for r in gen_results),
+                expected=len(gen_results),
+                failed=[
+                    f"{r.language} ({r.tool})" for r in gen_results if r.status is GateStatus.FAIL
+                ],
+                sampled=True,
+            )
+            _print_general_results(gen_results, check_root)
+            gen_failed = [r for r in gen_results if r.status is GateStatus.FAIL]
+            gen_executed = [
+                r for r in gen_results if r.status in {GateStatus.PASS, GateStatus.FAIL}
+            ]
+            console.print("\n" + "=" * 50)
+            if not gen_executed:
+                # Keep the wording the public smoke contract greps for
+                # (smoke.yml "empty-directory check is not a false green").
+                console.print("[bold yellow]No project gates were executed[/bold yellow]")
+                console.print("[yellow]This is not a validation pass.[/yellow]")
+                raise typer.Exit(2)
+            if gen_failed:
+                console.print(
+                    f"[bold red]Some default gates failed[/bold red] "
+                    f"({len(gen_executed)}/{len(gen_results)} gates ran, built-in sampled)"
+                )
+                _print_failure_guidance(
+                    [(f"{r.language} ({r.tool})", r.message) for r in gen_failed]
+                )
+                raise typer.Exit(1)
+            console.print(
+                f"[bold green]All executed default gates passed "
+                f"({len(gen_executed)}/{len(gen_results)} gates ran)[/bold green]"
+            )
+            console.print(
+                "[dim]Default gates (built-in, sampled) — up to 50 files per language, "
+                "not a full-project BYOG validation. Run 'hyodo init' for BYOG.[/dim]"
+            )
+            raise typer.Exit(0)
+
+        console.print(f"HyoDo checkout: {root}")
 
         results: list[GateResult] = []
 

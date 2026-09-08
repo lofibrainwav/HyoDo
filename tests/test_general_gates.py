@@ -13,7 +13,9 @@ by design in this file).
 
 from __future__ import annotations
 
+import stat
 from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -131,6 +133,143 @@ def test_run_general_gates_shell_syntax_error_fails(tmp_path: Path):
     shell_results = [r for r in results if r.language == "Shell"]
     assert len(shell_results) == 1
     assert shell_results[0].status is GateStatus.FAIL
+
+
+# --------------------------------------------------------------------------- #
+# _run_general_gates - TypeScript monorepo (nested tsconfig.json, no root one)
+# --------------------------------------------------------------------------- #
+
+
+def test_general_gates_detects_nested_tsconfig_without_root_one(tmp_path: Path):
+    """A monorepo with only apps/<name>/tsconfig.json (no root tsconfig.json)
+    must not have its TypeScript silently unobserved.
+
+    Regression for the false-green bug: previously ``_run_general_gates`` only
+    ever looked at ``root / "tsconfig.json"``, so a nested-only tsconfig meant
+    the TypeScript files were never even reported, let alone type-checked.
+    """
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    app_dir = tmp_path / "apps" / "learning-platform"
+    app_dir.mkdir(parents=True)
+    (app_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (app_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1, "nested tsconfig.json must surface a TypeScript gate result"
+    # PASS/FAIL if tsc is installed and actually ran it; SKIP if tsc is absent
+    # from this environment -- either way it must never be silently missing.
+    assert ts_results[0].status in {GateStatus.PASS, GateStatus.FAIL, GateStatus.SKIP}
+
+
+def test_general_gates_ts_files_without_any_tsconfig_is_honest_not_pass(tmp_path: Path):
+    """TypeScript files with no tsconfig.json anywhere must be reported as
+    UNSUPPORTED (honestly unchecked), never silently absent (false PASS)."""
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    (tmp_path / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.UNSUPPORTED
+    assert "tsconfig.json" in ts_results[0].message
+
+
+def test_general_gates_nested_tsconfig_without_node_modules_skips_honestly(tmp_path: Path):
+    """A discovered tsconfig.json whose project has a package.json but no
+    installed node_modules must SKIP with an honest "dependencies not
+    installed" message, never run tsc and report a false FAIL.
+
+    Regression for the HyoDo repo's own CI job ("Composite action consumer
+    smoke"): the runner has a global tsc but site/node_modules is never
+    installed there, so tsc fails on unresolved package imports even though
+    nothing is actually broken in the code -- that's an environment-not-
+    prepared condition, not a code defect.
+    """
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    (site_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (site_dir / "package.json").write_text('{"name": "site"}\n', encoding="utf-8")
+    (site_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+    # Deliberately no node_modules anywhere on the path from site_dir to root.
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.SKIP
+    assert "dependencies" in ts_results[0].message
+
+
+def test_general_gates_nested_tsconfig_with_node_modules_not_skipped_for_deps(tmp_path: Path):
+    """Control case: the same layout but with node_modules present must NOT
+    be skipped for the "dependencies not installed" reason -- it must be
+    treated as a normally runnable project (PASS/FAIL if tsc is installed,
+    or the existing whole-tool "tsc not installed" SKIP otherwise)."""
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    (site_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (site_dir / "package.json").write_text('{"name": "site"}\n', encoding="utf-8")
+    (site_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+    (site_dir / "node_modules").mkdir()
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert "dependencies" not in ts_results[0].message
+
+
+def _write_fake_tsc(bin_path: Path) -> None:
+    """Write an executable fake ``tsc`` that exits 0 (fast fake, no real tsc)."""
+    bin_path.parent.mkdir(parents=True, exist_ok=True)
+    bin_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    bin_path.chmod(bin_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def test_general_gates_prefers_local_node_modules_tsc_over_path(tmp_path: Path, monkeypatch):
+    """A monorepo package with its own ``node_modules/.bin/tsc`` must be typechecked
+    with that local binary even when no ``tsc`` is on PATH at all (JDK real-world
+    shape: root has no tsc, apps/learning-platform/node_modules/.bin/tsc does).
+
+    Regression: the previous implementation only ever called ``shutil.which("tsc")``,
+    so a project with tsc installed solely as a local devDependency (never globally,
+    never on PATH) was silently SKIPped instead of actually type-checked.
+    """
+    app_dir = tmp_path / "apps" / "learning-platform"
+    app_dir.mkdir(parents=True)
+    (app_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (app_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+    _write_fake_tsc(app_dir / "node_modules" / ".bin" / "tsc")
+
+    # No tsc anywhere on PATH -- the only way this can pass is local resolution.
+    with patch("hyodo.cli.main.shutil.which", return_value=None):
+        results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.PASS, ts_results[0].message
+    assert "not installed" not in ts_results[0].message
+
+
+def test_general_gates_falls_back_to_path_tsc_when_no_local_one(tmp_path: Path):
+    """No local node_modules/.bin/tsc anywhere from tsconfig up to root -> PATH tsc used."""
+    (tmp_path / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+
+    fake_tsc = tmp_path / "fake-path-bin" / "tsc"
+    _write_fake_tsc(fake_tsc)
+
+    with patch("hyodo.cli.main.shutil.which", return_value=str(fake_tsc)):
+        results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.PASS, ts_results[0].message
 
 
 # --------------------------------------------------------------------------- #

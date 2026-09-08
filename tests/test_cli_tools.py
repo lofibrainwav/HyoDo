@@ -221,24 +221,78 @@ def test_check_missing_path_exit_2():
     assert "not a validation pass" in result.output.lower() or "Path not found" in result.output
 
 
-def test_check_empty_dir_not_false_green(tmp_path):
+def test_check_empty_dir_still_unobserved_exit_2(tmp_path):
+    """An empty dir has no HyoDo checkout, no BYOG gates.toml, and nothing for the
+    built-in default (general) gates to sample either -- still honest UNOBSERVED/2,
+    never a false green.
+
+    Behavior change (2026-09-07): previously this path printed
+    "Not a HyoDo package checkout" guidance and fell through to the always-SKIP
+    HyoDo-checkout preset. It now falls back to the same built-in general gates
+    `--general` runs, which for a truly empty dir still find zero supported
+    languages. The summary line keeps the wording "No project gates were
+    executed" because the public smoke workflow greps for it; exit code 2
+    (UNOBSERVED) is unchanged.
+    """
     result = runner.invoke(app, ["check", str(tmp_path)])
     assert result.exit_code == 2
     assert "No project gates were executed" in result.output
+    assert "This is not a validation pass" in result.output
     assert "All gates passed" not in result.output
     assert "All executed gates passed" not in result.output
+    assert "All executed default gates passed" not in result.output
 
 
-def test_check_generic_python_project_not_false_green(tmp_path):
+def test_check_generic_python_project_uses_sampled_default_gates(tmp_path):
+    """A generic project (no .hyodo/gates.toml, not a HyoDo checkout) with a
+    syntactically valid Python file must not be given up on -- it gets the
+    built-in default (general) gates, clearly labeled as a sample, not a BYOG
+    validation.
+
+    Behavior change (2026-09-07): previously any project lacking both a HyoDo
+    checkout footprint and a .hyodo/gates.toml was UNOBSERVED/exit 2 no matter
+    what it actually contained (see git history for this test's prior
+    "not_false_green" exit-2 assertion). It now runs the same sampled
+    general gates `--general` exposes, so a project with real, parseable
+    Python source now honestly PASSes (exit 0) instead of being reported
+    as unmeasured.
+    """
     (tmp_path / "pyproject.toml").write_text('[project]\nname="x"\nversion="0"\n', encoding="utf-8")
     (tmp_path / "tests").mkdir()
     (tmp_path / "tests" / "test_x.py").write_text(
         "def test_x():\n    assert True\n", encoding="utf-8"
     )
     result = runner.invoke(app, ["check", str(tmp_path)])
-    assert result.exit_code == 2
-    assert "No project gates were executed" in result.output
-    assert "All gates passed" not in result.output
+    output = result.output.replace("\n", "")
+    assert result.exit_code == 0
+    assert "Default gates (built-in, sampled)" in output
+    assert "All executed default gates passed" in output
+    assert "not a full-project BYOG validation" in output
+
+
+def test_check_generic_python_project_with_syntax_error_still_fails(tmp_path):
+    """The default sampled fallback must still honestly FAIL on broken syntax,
+    not just PASS everything unconditionally."""
+    (tmp_path / "pyproject.toml").write_text('[project]\nname="x"\nversion="0"\n', encoding="utf-8")
+    (tmp_path / "broken.py").write_text("def f(:\n    pass\n", encoding="utf-8")
+    result = runner.invoke(app, ["check", str(tmp_path)])
+    assert result.exit_code == 1
+    assert "Some default gates failed" in result.output
+
+
+def test_check_gates_toml_present_skips_default_fallback(tmp_path):
+    """When a project has its own .hyodo/gates.toml (BYOG), the built-in default
+    (general) fallback must step aside -- discovered project tools always win
+    over the sampled built-in ones."""
+    (tmp_path / ".hyodo").mkdir()
+    (tmp_path / ".hyodo" / "gates.toml").write_text(
+        'schema = "hyodo.gates/v1"\n\n[gates.ok]\npillar = "goodness"\ncommand = "true"\n',
+        encoding="utf-8",
+    )
+    result = runner.invoke(app, ["check", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "User gates:" in result.output
+    assert "Default gates (built-in, sampled)" not in result.output
 
 
 def test_check_path_targets_hyodo_checkout_from_other_cwd(tmp_path):

@@ -450,3 +450,131 @@ def test_render_gates_toml_includes_native_pillar_note() -> None:
     assert 'schema = "hyodo.gates/v1"' in rendered
     assert "HyoDo measures them natively" in rendered
     assert "[gates.tests]" in rendered
+
+
+# ---------------------------------------------------------------------------
+# detect_project_gates -- nested subprojects (monorepo without root tooling)
+# ---------------------------------------------------------------------------
+
+
+def test_detect_project_gates_nested_package_json_no_root_tool(tmp_path: Path) -> None:
+    """A monorepo with no root package.json but a nested app must still be
+    detected -- the root-only scan previously left this entirely blank
+    (false green: no BYOG gates proposed at all)."""
+    app_dir = tmp_path / "apps" / "learning-platform"
+    app_dir.mkdir(parents=True)
+    (app_dir / "package.json").write_text(
+        """{"name": "app", "scripts": {"test": "vitest run", "typecheck": "tsc --noEmit"}}""",
+        encoding="utf-8",
+    )
+    (app_dir / "tsconfig.json").write_text("{}", encoding="utf-8")
+
+    detected = detect_project_gates(tmp_path)
+
+    assert detected["apps-learning-platform-npm-test"] == {
+        "pillar": "goodness",
+        "command": "npm --prefix apps/learning-platform test",
+        "source": "apps/learning-platform/package.json",
+    }
+    assert detected["apps-learning-platform-tsc"]["pillar"] == "truth"
+    assert (
+        "npx tsc --noEmit -p apps/learning-platform/tsconfig.json"
+        in detected["apps-learning-platform-tsc"]["command"]
+    )
+    # no lint script in the fixture -> no lint gate proposed
+    assert "apps-learning-platform-npm-lint" not in detected
+
+
+def test_detect_project_gates_nested_pyproject(tmp_path: Path) -> None:
+    sub = tmp_path / "services" / "worker"
+    sub.mkdir(parents=True)
+    (sub / "pyproject.toml").write_text(
+        """
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff"]
+""",
+        encoding="utf-8",
+    )
+
+    detected = detect_project_gates(tmp_path)
+
+    assert detected["services-worker-pytest"]["pillar"] == "goodness"
+    assert "cd services/worker" in detected["services-worker-pytest"]["command"]
+    assert detected["services-worker-ruff"]["pillar"] == "beauty"
+
+
+def test_detect_project_gates_nested_makefile(tmp_path: Path) -> None:
+    sub = tmp_path / "tools" / "cli"
+    sub.mkdir(parents=True)
+    (sub / "Makefile").write_text("test:\n\techo hi\n", encoding="utf-8")
+
+    detected = detect_project_gates(tmp_path)
+
+    assert detected["tools-cli-make-test"]["pillar"] == "goodness"
+    assert "cd tools/cli" in detected["tools-cli-make-test"]["command"]
+
+
+def test_detect_project_gates_nested_excludes_node_modules_and_hidden(tmp_path: Path) -> None:
+    vendored = tmp_path / "node_modules" / "some-pkg"
+    vendored.mkdir(parents=True)
+    (vendored / "package.json").write_text(
+        """{"name": "vendored", "scripts": {"test": "echo vendored"}}""", encoding="utf-8"
+    )
+    hidden = tmp_path / ".hidden" / "app"
+    hidden.mkdir(parents=True)
+    (hidden / "package.json").write_text(
+        """{"name": "hidden", "scripts": {"test": "echo hidden"}}""", encoding="utf-8"
+    )
+
+    detected = detect_project_gates(tmp_path)
+
+    assert detected == {}
+
+
+def test_detect_project_gates_root_tool_still_wins_and_nested_still_added(tmp_path: Path) -> None:
+    """Root tooling keeps its existing (unprefixed) gate names and behavior;
+    nested tooling is additive, never replacing the root-priority gates."""
+    (tmp_path / "package.json").write_text(
+        """{"name": "root", "scripts": {"test": "jest"}}""", encoding="utf-8"
+    )
+    app_dir = tmp_path / "apps" / "web"
+    app_dir.mkdir(parents=True)
+    (app_dir / "package.json").write_text(
+        """{"name": "web", "scripts": {"test": "vitest run"}}""", encoding="utf-8"
+    )
+
+    detected = detect_project_gates(tmp_path)
+
+    assert detected["npm-test"] == {
+        "pillar": "goodness",
+        "command": "npm test",
+        "source": "package.json",
+    }
+    assert detected["apps-web-npm-test"]["command"] == "npm --prefix apps/web test"
+
+
+def test_detect_project_gates_nested_depth_cap(tmp_path: Path) -> None:
+    """Deeper than the depth cap (3) is not scanned."""
+    too_deep = tmp_path / "a" / "b" / "c" / "d"
+    too_deep.mkdir(parents=True)
+    (too_deep / "package.json").write_text(
+        """{"name": "deep", "scripts": {"test": "echo deep"}}""", encoding="utf-8"
+    )
+
+    detected = detect_project_gates(tmp_path)
+
+    assert detected == {}
+
+
+def test_detect_project_gates_nested_project_cap(tmp_path: Path) -> None:
+    """More than 10 nested projects: only the cap is absorbed, never crashes."""
+    for i in range(15):
+        sub = tmp_path / f"pkg{i:02d}"
+        sub.mkdir()
+        (sub / "package.json").write_text(
+            f"""{{"name": "pkg{i}", "scripts": {{"test": "echo {i}"}}}}""", encoding="utf-8"
+        )
+
+    detected = detect_project_gates(tmp_path)
+    npm_test_gates = [name for name in detected if name.endswith("-npm-test")]
+    assert len(npm_test_gates) <= 10
