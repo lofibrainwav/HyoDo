@@ -37,6 +37,7 @@ export default defineConfig({
 				{ label: 'Graph Export', slug: 'docs/graph-export' },
 				{ label: 'Eye', slug: 'docs/eye' },
 				{ label: 'Connect', slug: 'docs/connect' },
+				{ label: 'Research', slug: 'docs/research' },
 				{ label: 'Roadmap', slug: 'docs/roadmap' },
 				{ label: 'Trust', slug: 'docs/trust' },
 			],
