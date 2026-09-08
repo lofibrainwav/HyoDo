@@ -21,6 +21,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   everything else HyoDo writes under `.hyodo/` is per-machine runtime state
   and should be ignored; this repo's own `.gitignore` now follows that split
   (`docs/CONNECT.md` "What to commit", `README.md`, `hyodo init` output).
+- Docs: fixed site/docs drift against 4.16.0 — reworded the `ANTHROPIC_PROOF.md`
+  "no separate Claude-only code path" claim to scope it to the shared gate/
+  policy engine, documented the `hyodo connect claude-code --write` starter
+  `.hyodo/policy.toml` bootstrap on the Connect site page, added `hyodo
+  safe`'s `scope`/`coverage` output fields to the site quickstart, and added
+  a `hyodo score --from-check` section to the site philosophy page.
 
 ### Fixed
 

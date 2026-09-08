@@ -72,6 +72,25 @@ def calculate_geometric_mean(values: list[float]) -> float:
 does not invent a strong signal via a silent fill-in of 1.0 for whatever was
 not measured.
 
+### Deriving the five inputs (`hyodo score --from-check`)
+
+`hyodo score` normally requires the caller to supply all five pillar
+values by hand. `hyodo score --from-check [--root R] [--json]` derives
+those same five inputs instead, in-process (no subprocess calls), from
+what `hyodo check`, `hyodo safe`, and the test-integrity scan already
+observed about a checkout. `hyodo/score_derive.py` defines a literal
+`PILLAR_RULE_TABLE` (`rule_id -> pillar + max weight`) so every number has
+a named source, and each pillar reports its own coverage —
+`OBSERVED` / `PARTIAL` / `UNOBSERVED` — alongside its value. An
+`UNOBSERVED` pillar reports `None`, never a smuggled 0 or 100, and is
+excluded from the Eternity geometric-mean term rather than defaulted; when
+any pillar is `UNOBSERVED`, the command withholds the combined TOTAL score
+and names which pillar(s) still need an explicit `--benevolence 0.8`-style
+flag to complete it. The HyoDo Integrity Score formula itself is unchanged
+by `--from-check` — it only proposes inputs — and the command still prints
+"review signal, not automatic approval." See `docs/SCORE_DERIVATION.md`
+for the full rule table and a calibration run.
+
 ## 4. The code
 
 The mathematics above is what an optional review score does. The exit codes

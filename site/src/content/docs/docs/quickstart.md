@@ -25,6 +25,14 @@ exit non-zero on a high-severity finding instead of only reporting.
 Use `--explain` for a stored explanation, `--quiet` for only the verdict,
 or `--json` for a machine-readable receipt. These flags preserve exit codes.
 
+Output also reports what was actually scanned: a `scope` field (`diff` /
+`status` / `file` / `directory` / `external` / `none`) and a `coverage`
+field (`FULL` / `PARTIAL` / `UNOBSERVED`), both present in `--json` and
+printed in text mode as `Scope: <scope> · Coverage: <coverage>
+(<scanned>/<total> files)`. A directory scan defaults to a 40-file cap —
+`Coverage: PARTIAL` with a lower scanned-of-total count means raise
+`--max-files` (or pass `0` for unlimited) to see the rest.
+
 ## 3. Absorb your existing checks
 
 ```bash
