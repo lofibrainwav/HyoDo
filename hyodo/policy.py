@@ -308,6 +308,28 @@ def _domain_allowed(domain: str, allowed_domains: tuple[str, ...]) -> bool:
     return any(fnmatch.fnmatch(domain, pattern) for pattern in allowed_domains)
 
 
+def path_outside_root(path_value: str, root: Path) -> bool:
+    """Return whether *path_value* resolves outside *root*.
+
+    Public (not `_`-prefixed) because it is the one implementation of the
+    project-boundary check: `evaluate_policy` uses it for the
+    ``path_outside_root:`` external variable above, and
+    `hyodo.graph_view._is_outside_root` imports it so the local evidence-graph
+    viewer classifies exactly the paths policy would flag — the same
+    absolute-path-that-happens-to-sit-under-root case reads as inside in
+    both places, and an escaping ``..`` reads as outside in both. A relative
+    *path_value* is resolved against *root* first; an absolute one is
+    resolved as-is and checked against *root* directly.
+    """
+    candidate = Path(path_value)
+    resolved = candidate if candidate.is_absolute() else root / candidate
+    try:
+        resolved.resolve().relative_to(root.resolve())
+    except ValueError:
+        return True
+    return False
+
+
 def _compute_coverage(
     policy: PolicyConfig,
     kind: Any,
@@ -513,11 +535,7 @@ def evaluate_policy(
         for path_value in paths:
             if not isinstance(path_value, str) or not path_value:
                 continue
-            candidate = Path(path_value)
-            resolved = candidate if candidate.is_absolute() else root / candidate
-            try:
-                resolved.resolve().relative_to(root.resolve())
-            except ValueError:
+            if path_outside_root(path_value, root):
                 external_variables.append(f"path_outside_root:{path_value}")
 
     if is_tool_event and _is_web_classified(tool_name, policy):

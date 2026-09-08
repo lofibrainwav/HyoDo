@@ -268,3 +268,76 @@ def test_graph_missions_multiple_runs_and_event_target_kind():
     assert graph["summary"]["intent_unobserved_runs"] == ["a", "z"]
     assert graph["edges"][0]["target_kind"] == "event"
     assert graph["summary"]["gate_refs"] == 0
+
+
+# --------------------------------------------------------------------------
+# #206 judge finding, end to end: the Claude Code hook mapping
+# (`hyodo/connect.py:map_claude_code_hook_payload`) always sends an
+# absolute `file_path`, so a real Claude Code Read/Write/Edit event must
+# still classify as Hyo when that absolute path sits inside the project
+# checkout — not Goodness, the bug this PR fixes.
+# --------------------------------------------------------------------------
+
+
+def test_graph_carries_root_and_classifies_absolute_inside_path_as_hyo(tmp_path: Path):
+    from hyodo.graph_view import assign_columns
+    from hyodo.report import build_report_graph
+
+    inside_path = tmp_path / "hyodo" / "dashboard.py"
+    payload = json.dumps(
+        {
+            "session_id": "run-graph-root",
+            "tool_use_id": "evt-graph-root",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Read",
+            "tool_input": {"file_path": str(inside_path)},
+            "cwd": str(tmp_path),
+        }
+    )
+    result = runner.invoke(
+        app, ["event", "record", "--stdin", "--hook", "claude-code", "--json"], input=payload
+    )
+    assert result.exit_code == 0, result.output
+
+    graph = build_report_graph(tmp_path)
+    assert graph["root"] == str(tmp_path.resolve())
+    tool_nodes = [node for node in graph["nodes"] if node["kind"] == "tool_call"]
+    assert len(tool_nodes) == 1
+
+    # Root resolved explicitly (the normal `assign_columns(node, root)` call
+    # every production call site now makes): Hyo, not the old "any absolute
+    # path is outside" guess.
+    assert assign_columns(tool_nodes[0], tmp_path) == ["hyo"]
+    # The graph's own embedded `root` field works just as well for a
+    # consumer with no separate root in scope.
+    assert assign_columns(tool_nodes[0], Path(graph["root"])) == ["hyo"]
+    # With no root available at all, the node is unclassified, never a
+    # silent Goodness guess.
+    assert assign_columns(tool_nodes[0]) == ["unclassified"]
+
+
+def test_graph_classifies_absolute_outside_path_as_goodness(tmp_path: Path):
+    from hyodo.graph_view import assign_columns
+    from hyodo.report import build_report_graph
+
+    outside_root = tmp_path / "checkout"
+    outside_root.mkdir()
+    payload = json.dumps(
+        {
+            "session_id": "run-graph-outside",
+            "tool_use_id": "evt-graph-outside",
+            "hook_event_name": "PreToolUse",
+            "tool_name": "Write",
+            "tool_input": {"file_path": str(tmp_path / "elsewhere" / "secret.txt")},
+            "cwd": str(outside_root),
+        }
+    )
+    result = runner.invoke(
+        app, ["event", "record", "--stdin", "--hook", "claude-code", "--json"], input=payload
+    )
+    assert result.exit_code == 0, result.output
+
+    graph = build_report_graph(outside_root)
+    tool_nodes = [node for node in graph["nodes"] if node["kind"] == "tool_call"]
+    assert len(tool_nodes) == 1
+    assert assign_columns(tool_nodes[0], outside_root) == ["seon"]

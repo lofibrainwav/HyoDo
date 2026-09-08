@@ -9,6 +9,7 @@ signals — spec sections 2-4 of
 from __future__ import annotations
 
 import json
+from pathlib import Path
 from typing import Any
 
 from hyodo.graph_view import (
@@ -132,29 +133,35 @@ def test_model_response_without_output_digest_carries_no_column_and_is_not_uncla
     assert assign_columns(_node("e1", kind="model_response")) == []
 
 
+#: A fixed fake checkout used across the file-tool tests below — never
+#: touched on disk (`Path.resolve()` normalizes lexically; it does not
+#: require the path to exist).
+_ROOT = Path("/repo")
+
+
 def test_read_file_inside_root_maps_to_hyo() -> None:
     node = _node("e1", tool_name="read_file", paths=["hyodo/dashboard.py"])
-    assert assign_columns(node) == ["hyo"]
+    assert assign_columns(node, _ROOT) == ["hyo"]
 
 
 def test_write_file_outside_root_maps_to_goodness_not_hyo() -> None:
     node = _node("e1", tool_name="write_file", paths=["/etc/passwd"])
-    assert assign_columns(node) == ["seon"]
+    assert assign_columns(node, _ROOT) == ["seon"]
 
 
 def test_write_file_dotdot_path_maps_to_goodness_not_hyo() -> None:
     node = _node("e1", tool_name="write_file", paths=["../outside/secret.txt"])
-    assert assign_columns(node) == ["seon"]
+    assert assign_columns(node, _ROOT) == ["seon"]
 
 
 def test_edit_ask_decision_maps_to_goodness_even_inside_root() -> None:
     node = _node("e1", tool_name="edit", decision="ASK", paths=["hyodo/dashboard.py"])
-    assert assign_columns(node) == ["seon"]
+    assert assign_columns(node, _ROOT) == ["seon"]
 
 
 def test_edit_deny_decision_maps_to_goodness_even_inside_root() -> None:
     node = _node("e1", tool_name="edit", decision="DENY", paths=["hyodo/dashboard.py"])
-    assert assign_columns(node) == ["seon"]
+    assert assign_columns(node, _ROOT) == ["seon"]
 
 
 def test_web_fetch_maps_to_goodness() -> None:
@@ -168,11 +175,46 @@ def test_claude_code_file_tool_names_map_to_hyo_inside_root() -> None:
     # matching must be case-insensitive against the real names.
     for name in ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit"):
         node = _node("e1", tool_name=name, paths=["hyodo/dashboard.py"])
-        assert assign_columns(node) == ["hyo"], name
+        assert assign_columns(node, _ROOT) == ["hyo"], name
 
 
 def test_claude_code_file_tool_name_outside_root_maps_to_goodness() -> None:
     node = _node("e1", tool_name="Write", paths=["/etc/passwd"])
+    assert assign_columns(node, _ROOT) == ["seon"]
+
+
+def test_claude_code_absolute_path_inside_root_maps_to_hyo_not_goodness() -> None:
+    # #206 judge finding: the Claude Code hook mapping
+    # (`hyodo/connect.py:map_claude_code_hook_payload`) always sends an
+    # absolute `file_path`, so every real Read/Write/Edit event carries an
+    # absolute path that is nonetheless *inside* the project checkout. The
+    # old heuristic read any leading "/" as "outside" and misclassified
+    # every one of these as Goodness; resolving against the real root (as
+    # `hyodo.policy.evaluate_policy` always did) must read this as Hyo.
+    node = _node("e1", tool_name="Read", paths=[str(_ROOT / "hyodo" / "dashboard.py")])
+    assert assign_columns(node, _ROOT) == ["hyo"]
+
+
+def test_claude_code_absolute_path_outside_root_still_maps_to_goodness() -> None:
+    node = _node("e1", tool_name="Read", paths=["/etc/passwd"])
+    assert assign_columns(node, _ROOT) == ["seon"]
+
+
+def test_file_tool_event_with_no_root_available_is_unclassified_not_goodness() -> None:
+    # When the graph payload carries no root at all (an older export, or a
+    # caller with no checkout on disk), the column split must not guess —
+    # neither Hyo nor Goodness is asserted, so the node lands in the
+    # unclassified gutter instead of a silent, possibly-wrong Goodness.
+    node = _node("e1", tool_name="Read", paths=["/etc/passwd"])
+    assert assign_columns(node) == [UNCLASSIFIED]
+    node_relative = _node("e1", tool_name="Read", paths=["hyodo/dashboard.py"])
+    assert assign_columns(node_relative) == [UNCLASSIFIED]
+
+
+def test_file_tool_ask_deny_decision_maps_to_goodness_even_with_no_root() -> None:
+    # The ASK/DENY decision override does not need root at all — it is the
+    # decision itself, not a path-boundary inference.
+    node = _node("e1", tool_name="Edit", decision="ASK", paths=["/etc/passwd"])
     assert assign_columns(node) == ["seon"]
 
 

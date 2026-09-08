@@ -23,6 +23,8 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from hyodo.policy import path_outside_root
+
 #: Fixed column order (spec section 2): Truth, Goodness, Beauty, Benevolence,
 #: Hyo. Eternity is not a column — it is read off the orb (section 4).
 VIRTUE_COLUMNS: tuple[str, ...] = ("jin", "seon", "mi", "in", "hyo")
@@ -102,26 +104,34 @@ def _matches(name: str, patterns: tuple[str, ...]) -> bool:
     return bool(name) and any(pattern in name for pattern in patterns)
 
 
-def _is_outside_root(paths: list[Any]) -> bool:
-    """`True` when any of *paths* is plainly outside a project checkout.
+def _is_outside_root(paths: list[Any], root: Path | None) -> bool | None:
+    """Return whether any of *paths* resolves outside *root*.
 
-    A pure heuristic over the path text alone (`assign_columns` has no
-    `root` to resolve against, unlike `hyodo.policy.evaluate_policy`,
-    which does): an absolute path, a home-relative `~` path, or a `..`
-    segment anywhere in it reads as "outside" the same way
-    `hyodo.policy`'s own `path_outside_root:` variable does.
+    `True`/`False` mirror `hyodo.policy.evaluate_policy`'s own
+    ``path_outside_root:`` check exactly (`hyodo.policy.path_outside_root`,
+    the one shared implementation) — an absolute path that happens to sit
+    under *root* reads as inside, not outside, the same way policy reads
+    it; only a path that actually resolves elsewhere (a `..` escape, a
+    different absolute tree entirely) reads as outside.
+
+    `None` means "unknown": *root* was not available to resolve against
+    (`assign_columns` was called on a graph payload with no `root` field
+    and no root passed explicitly). The caller must not guess Hyo or
+    Goodness in that case — the #206 judge finding this PR fixes was
+    exactly that guess (every absolute path silently read as outside root
+    regardless of where the real project root was).
     """
+    if root is None:
+        return None
     for path in paths:
         if not isinstance(path, str) or not path:
             continue
-        if path.startswith("/") or path.startswith("~"):
-            return True
-        if ".." in path.replace("\\", "/").split("/"):
+        if path_outside_root(path, root):
             return True
     return False
 
 
-def assign_columns(node: dict[str, Any]) -> list[str]:
+def assign_columns(node: dict[str, Any], root: Path | None = None) -> list[str]:
     """Place one graph node (spec section 3's event -> virtue mapping table).
 
     `node` is one entry of `build_event_graph(...)["nodes"]`. Returns the
@@ -133,6 +143,16 @@ def assign_columns(node: dict[str, Any]) -> list[str]:
     feeds the time axis, but nothing was measured to classify, so it is
     never counted against the unclassified gutter either. Any other event
     matching no row returns `[UNCLASSIFIED]`.
+
+    `root` is the project checkout the file-tool Hyo/Goodness split
+    resolves paths against (`_is_outside_root`, mirroring
+    `hyodo.policy.evaluate_policy`'s own boundary check) — pass the same
+    `root` the caller already resolved the ledger with (`build_event_graph`
+    also stamps it onto the graph payload's own ``root`` field for a
+    caller working from the JSON alone, e.g. `orb_state`). Omitting it does
+    not fall back to guessing from the path text: a file-tool event with no
+    root to check against lands in the unclassified gutter (unless another
+    row also matches it), never silently Hyo or Goodness.
     """
     kind = node.get("kind")
     policy = node.get("policy") if isinstance(node.get("policy"), dict) else {}
@@ -164,10 +184,17 @@ def assign_columns(node: dict[str, Any]) -> list[str]:
         if name in _FILE_TOOL_NAMES:
             raw_paths = tool.get("paths") if isinstance(tool, dict) else None
             paths = raw_paths if isinstance(raw_paths, list) else []
-            if node.get("decision") in ("ASK", "DENY") or _is_outside_root(paths):
+            if node.get("decision") in ("ASK", "DENY"):
                 _add("seon")
             else:
-                _add("hyo")
+                outside = _is_outside_root(paths, root)
+                if outside is True:
+                    _add("seon")
+                elif outside is False:
+                    _add("hyo")
+                # outside is None: root unknown, do not guess — this row
+                # neither adds Hyo nor Goodness, so the node falls through
+                # to the unclassified gutter unless another row matches it.
         if _matches(name, _WEB_TOOL_PATTERNS):
             _add("seon")
     if kind == "error":
@@ -303,7 +330,7 @@ def column_coverage(
     return coverage
 
 
-def orb_state(graph: dict[str, Any]) -> dict[str, Any]:
+def orb_state(graph: dict[str, Any], root: Path | None = None) -> dict[str, Any]:
     """The orb's three signals (spec section 4), each read off existing facts.
 
     `graph` is a full `hyodo.evidence-graph/v1` dict
@@ -317,13 +344,22 @@ def orb_state(graph: dict[str, Any]) -> dict[str, Any]:
       only a second rendering of numbers already on the page.
     - `latest_ts`: the most recent `ts` across every node (any kind), for
       the pulse decay; `None` when there are no timestamped nodes.
+
+    `root` overrides the checkout `assign_columns`'s file-tool Hyo/Goodness
+    split resolves paths against; when omitted, this falls back to the
+    graph payload's own ``root`` field (`build_event_graph` stamps it
+    there) so a caller working from the JSON alone still classifies real
+    paths correctly instead of guessing from path text.
     """
     raw_nodes = graph.get("nodes")
     raw_edges = graph.get("edges")
     nodes: list[dict[str, Any]] = raw_nodes if isinstance(raw_nodes, list) else []
     edges: list[dict[str, Any]] = raw_edges if isinstance(raw_edges, list) else []
+    if root is None:
+        graph_root = graph.get("root")
+        root = Path(graph_root) if isinstance(graph_root, str) and graph_root else None
     assignments = {
-        node["id"]: assign_columns(node) for node in nodes if isinstance(node.get("id"), str)
+        node["id"]: assign_columns(node, root) for node in nodes if isinstance(node.get("id"), str)
     }
     coverage = column_coverage(nodes, assignments, edges)
     total_observed = sum(entry["observed"] for entry in coverage.values())

@@ -176,12 +176,19 @@ def build_report_graph(root: Path, evidence: dict[str, Any] | None = None) -> di
     `hyodo.graph_view.build_actor_rows`) — the same rows the ``/graph``
     page and the actor-rings endpoint (`GET /api/actor`) render from.
     Neither field changes this function's ``status``/``reason`` contract.
+
+    `build_event_graph` also stamps *root* itself onto the graph as a
+    plain string (``graph["root"]``) so `hyodo.graph_view.assign_columns`'s
+    file-tool Hyo/Goodness split resolves paths against the real checkout
+    boundary the same way `hyodo.policy.evaluate_policy` does, rather than
+    guessing from the path text (absolute vs. relative).
     """
     evidence = evidence if evidence is not None else _collect_evidence(root)
     graph = build_event_graph(
         evidence["events"],
         corrupt=evidence["corrupt"],
         ledger_unreadable=evidence["ledger_unreadable"],
+        root=root,
     )
     policy = evidence["policy"]
     if (
