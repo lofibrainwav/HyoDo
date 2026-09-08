@@ -175,6 +175,53 @@ def test_general_gates_ts_files_without_any_tsconfig_is_honest_not_pass(tmp_path
     assert "tsconfig.json" in ts_results[0].message
 
 
+def test_general_gates_nested_tsconfig_without_node_modules_skips_honestly(tmp_path: Path):
+    """A discovered tsconfig.json whose project has a package.json but no
+    installed node_modules must SKIP with an honest "dependencies not
+    installed" message, never run tsc and report a false FAIL.
+
+    Regression for the HyoDo repo's own CI job ("Composite action consumer
+    smoke"): the runner has a global tsc but site/node_modules is never
+    installed there, so tsc fails on unresolved package imports even though
+    nothing is actually broken in the code -- that's an environment-not-
+    prepared condition, not a code defect.
+    """
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    (site_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (site_dir / "package.json").write_text('{"name": "site"}\n', encoding="utf-8")
+    (site_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+    # Deliberately no node_modules anywhere on the path from site_dir to root.
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.SKIP
+    assert "dependencies" in ts_results[0].message
+
+
+def test_general_gates_nested_tsconfig_with_node_modules_not_skipped_for_deps(tmp_path: Path):
+    """Control case: the same layout but with node_modules present must NOT
+    be skipped for the "dependencies not installed" reason -- it must be
+    treated as a normally runnable project (PASS/FAIL if tsc is installed,
+    or the existing whole-tool "tsc not installed" SKIP otherwise)."""
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    site_dir = tmp_path / "site"
+    site_dir.mkdir()
+    (site_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (site_dir / "package.json").write_text('{"name": "site"}\n', encoding="utf-8")
+    (site_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+    (site_dir / "node_modules").mkdir()
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert "dependencies" not in ts_results[0].message
+
+
 # --------------------------------------------------------------------------- #
 # CLI: hyodo check --general
 # --------------------------------------------------------------------------- #
