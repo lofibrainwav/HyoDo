@@ -13,7 +13,9 @@ by design in this file).
 
 from __future__ import annotations
 
+import stat
 from pathlib import Path
+from unittest.mock import patch
 
 from typer.testing import CliRunner
 
@@ -220,6 +222,54 @@ def test_general_gates_nested_tsconfig_with_node_modules_not_skipped_for_deps(tm
     ts_results = [r for r in results if r.language == "TypeScript"]
     assert len(ts_results) == 1
     assert "dependencies" not in ts_results[0].message
+
+
+def _write_fake_tsc(bin_path: Path) -> None:
+    """Write an executable fake ``tsc`` that exits 0 (fast fake, no real tsc)."""
+    bin_path.parent.mkdir(parents=True, exist_ok=True)
+    bin_path.write_text("#!/bin/sh\nexit 0\n", encoding="utf-8")
+    bin_path.chmod(bin_path.stat().st_mode | stat.S_IEXEC | stat.S_IXGRP | stat.S_IXOTH)
+
+
+def test_general_gates_prefers_local_node_modules_tsc_over_path(tmp_path: Path, monkeypatch):
+    """A monorepo package with its own ``node_modules/.bin/tsc`` must be typechecked
+    with that local binary even when no ``tsc`` is on PATH at all (JDK real-world
+    shape: root has no tsc, apps/learning-platform/node_modules/.bin/tsc does).
+
+    Regression: the previous implementation only ever called ``shutil.which("tsc")``,
+    so a project with tsc installed solely as a local devDependency (never globally,
+    never on PATH) was silently SKIPped instead of actually type-checked.
+    """
+    app_dir = tmp_path / "apps" / "learning-platform"
+    app_dir.mkdir(parents=True)
+    (app_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (app_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+    _write_fake_tsc(app_dir / "node_modules" / ".bin" / "tsc")
+
+    # No tsc anywhere on PATH -- the only way this can pass is local resolution.
+    with patch("hyodo.cli.main.shutil.which", return_value=None):
+        results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.PASS, ts_results[0].message
+    assert "not installed" not in ts_results[0].message
+
+
+def test_general_gates_falls_back_to_path_tsc_when_no_local_one(tmp_path: Path):
+    """No local node_modules/.bin/tsc anywhere from tsconfig up to root -> PATH tsc used."""
+    (tmp_path / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (tmp_path / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+
+    fake_tsc = tmp_path / "fake-path-bin" / "tsc"
+    _write_fake_tsc(fake_tsc)
+
+    with patch("hyodo.cli.main.shutil.which", return_value=str(fake_tsc)):
+        results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.PASS, ts_results[0].message
 
 
 # --------------------------------------------------------------------------- #
