@@ -1789,7 +1789,9 @@ def check(
             ]
             console.print("\n" + "=" * 50)
             if not gen_executed:
-                console.print("[bold yellow]No language gates were executed[/bold yellow]")
+                # Keep the wording the public smoke contract greps for
+                # (smoke.yml "empty-directory check is not a false green").
+                console.print("[bold yellow]No project gates were executed[/bold yellow]")
                 console.print("[yellow]This is not a validation pass.[/yellow]")
                 raise typer.Exit(2)
             if gen_failed:

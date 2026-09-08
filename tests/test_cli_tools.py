@@ -228,14 +228,16 @@ def test_check_empty_dir_still_unobserved_exit_2(tmp_path):
 
     Behavior change (2026-09-07): previously this path printed
     "Not a HyoDo package checkout" guidance and fell through to the always-SKIP
-    HyoDo-checkout preset, landing on "No project gates were executed". It now
-    falls back to the same built-in general gates `--general` runs, which for a
-    truly empty dir still find zero supported languages, so the message becomes
-    "No language gates were executed" -- exit code 2 (UNOBSERVED) is unchanged.
+    HyoDo-checkout preset. It now falls back to the same built-in general gates
+    `--general` runs, which for a truly empty dir still find zero supported
+    languages. The summary line keeps the wording "No project gates were
+    executed" because the public smoke workflow greps for it; exit code 2
+    (UNOBSERVED) is unchanged.
     """
     result = runner.invoke(app, ["check", str(tmp_path)])
     assert result.exit_code == 2
-    assert "No language gates were executed" in result.output
+    assert "No project gates were executed" in result.output
+    assert "This is not a validation pass" in result.output
     assert "All gates passed" not in result.output
     assert "All executed gates passed" not in result.output
     assert "All executed default gates passed" not in result.output
