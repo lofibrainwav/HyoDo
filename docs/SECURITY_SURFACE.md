@@ -183,7 +183,10 @@ documented in `hyodo safe --help`.
 - Events are caller-supplied JSON (`hyodo.agent-event/v1`); HyoDo does not
   monkey-patch model SDKs or automatically intercept tool calls.
 - Default ledger storage is **digest-only** (`.hyodo/agent-events.jsonl`).
-  Full prompt/tool bodies are written only with `--full-body`.
+  Full prompt/tool bodies are written only with `--full-body`. See
+  [`docs/FULL_BODY.md`](FULL_BODY.md) for who may enable it, that the
+  ledger is not rotated or redacted, and that a client cannot
+  self-upgrade. `hyodo mcp serve` has no `--allow-full-body`.
 - Policy DENY is recorded for audit; **the agent runtime must enforce stop**.
 - Missing or invalid policy is **unobserved** (exit 2), never silent ALLOW.
 - No network export, encryption, or cloud telemetry in this surface.
@@ -210,6 +213,9 @@ hyodo` dependency set does not include the MCP SDK.
 - No public `0.0.0.0` listener is supported. A Vercel gate executor remains
   out of scope. Second-device tailnet operation is an operator dogfood step,
   not a package claim until observed.
+- `https://mcp.hyodo.app/mcp` and ChatGPT are contract-only,
+  `UNOBSERVED`, and not equivalent to `hyodo mcp stdio`. See
+  [`docs/M5_REMOTE_CONNECTOR_CONTRACT.md`](M5_REMOTE_CONNECTOR_CONTRACT.md).
 
 ## Release pipeline: Trusted Publishing + provenance
 
@@ -282,4 +288,8 @@ python scripts/release/check_version_sync.py
   publish flow details
 - [`docs/EXTERNAL_CLAIM_AUDIT.md`](EXTERNAL_CLAIM_AUDIT.md) — audit of
   externally-facing claims
+- [`docs/CLAIMS.md`](CLAIMS.md) — what public pages do not claim
+- [`docs/FULL_BODY.md`](FULL_BODY.md) — full-body ledger consent and retention
+- [`docs/M5_REMOTE_CONNECTOR_CONTRACT.md`](M5_REMOTE_CONNECTOR_CONTRACT.md)
+  — remote MCP is contract-only, not a shipped path next to stdio
 - [`.github/dependabot.yml`](../.github/dependabot.yml) — update scope

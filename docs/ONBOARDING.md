@@ -115,5 +115,7 @@ M5-D section.
   `docs/M5_REMOTE_CONNECTOR_CONTRACT.md`.
 - `hyodo dashboard --open` — the local evidence-graph viewer.
 
+`hyodo mcp stdio` / `serve` are not `mcp.hyodo.app`.
+
 None of this onboarding flow changes those contracts; it only gives a
 shorter default path to the same writes.

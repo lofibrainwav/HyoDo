@@ -27,6 +27,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Public `/evidence-graph/` can opt in to render a local
   `hyodo.evidence-graph/v1` JSON file in the browser (no upload, no
   remote ledger). The default view stays the 14-event demo fixture.
+- `docs/FULL_BODY.md`: who may enable `--full-body` /
+  `--allow-full-body`, that the ledger is not rotated or redacted, and
+  that MCP clients cannot self-upgrade (`hyodo mcp serve` has no
+  `--allow-full-body`) (#204 item 33).
+- `docs/CLAIMS.md`: what public pages do not claim — no implied
+  installed base, star count, or "teams using HyoDo"; the PyPI badge is
+  a version string; the Integrity Score is not social proof
+  (#204 item 34).
 
 ### Changed
 
@@ -46,6 +54,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `.hyodo/policy.toml` bootstrap on the Connect site page, added `hyodo
   safe`'s `scope`/`coverage` output fields to the site quickstart, and added
   a `hyodo score --from-check` section to the site philosophy page.
+- `docs/M5_REMOTE_CONNECTOR_CONTRACT.md`: boxed "Not equivalent" —
+  `hyodo mcp stdio` / loopback / Tailscale are implemented;
+  `https://mcp.hyodo.app/mcp` and ChatGPT stay contract-only and
+  `UNOBSERVED`. The North Star is a product direction, not a live
+  ChatGPT path (#204 item 32).
+- Onboarding and site quickstart: the remote connector is not live and
+  is not a shipped path next to stdio (dropped "not live yet").
+- Site why-hyodo and the FDE example README point at `CLAIMS.md` /
+  `FULL_BODY.md`.
 
 ### Fixed
 

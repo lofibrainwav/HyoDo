@@ -65,3 +65,10 @@ not "trusted because `max_level` says so." Level 2+ with external
 variables and no observed ledger is `UNOBSERVED`
 (`autorun_level2` / `autorun_level3`). A missing or damaged grant file
 is `trust_grant_unobserved`.
+
+## Demo `search` / `read_file` names are fixtures
+
+Tests and `examples/fde-evidence-spine/` pin `search` and `read_file` on
+purpose. Those are not Claude Code names (`Read`, `Bash`). Do not rewrite
+the fixtures to "match production." The dual-host copy file is
+[`examples/host-policies/`](../examples/host-policies/).

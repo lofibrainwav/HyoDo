@@ -36,3 +36,5 @@ whoever is running the agent.
 
 - [Quickstart](/docs/quickstart/)
 - [Trust](/docs/trust/)
+
+HyoDo does not claim an installed base; see `docs/CLAIMS.md`.

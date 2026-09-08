@@ -86,8 +86,10 @@ hyodo mcp config codex --write
 ```
 
 No bearer token or secret ever appears in this path. ChatGPT and the remote
-connector (`mcp.hyodo.app`) are not live yet — `hyodo mcp config chatgpt`
-reports `UNOBSERVED` honestly instead of guessing at a config format.
+connector (`mcp.hyodo.app`) are not live — they are contract-only,
+`UNOBSERVED`, and not a shipped path next to `hyodo mcp stdio`.
+`hyodo mcp config chatgpt` reports `UNOBSERVED` honestly instead of
+guessing at a config format.
 
 ## Exit contracts
 
