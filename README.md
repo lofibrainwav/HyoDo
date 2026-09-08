@@ -90,11 +90,8 @@ that contains it (not `v4.11.0`); SARIF upload needs `security-events: write`.
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
 ```
 
-For project-specific gates:
-
 ```bash
-hyodo init
-hyodo check
+hyodo init && hyodo check
 ```
 
 `init` can absorb pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, and
@@ -138,8 +135,8 @@ hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
   --token "$HYODO_MCP_TOKEN" --root .          # private-network connector
 ```
 
-The MCP adapter uses the same CLI contracts rather than creating a second
-policy engine. MCP SDK v1 and v2 are both exercised in CI.
+The MCP adapter uses the same CLI contracts rather than a second engine.
+SDK v1/v2 are in CI. `mcp.hyodo.app` is contract-only, not this path.
 
 ## Exit contracts
 
@@ -171,7 +168,9 @@ cannot be shell-faked through `gates.toml`; see
 
 Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 
-- Quick start: [`QUICK_START.md`](./QUICK_START.md); Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
+- Docs index: [`docs/README.md`](./docs/README.md)
+- Quick start: [`QUICK_START.md`](./QUICK_START.md)
+- Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
 - Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
 - Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md); Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 

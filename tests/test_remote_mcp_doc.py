@@ -19,6 +19,8 @@ def test_m5_doc_states_remote_is_contract_only_not_stdio() -> None:
     assert "mcp.hyodo.app is live" not in lowered
     assert "remote connector is live" not in lowered
     assert "not live yet" not in lowered
+    assert "until m5-b serves" not in lowered
+    assert "intends to serve" not in lowered
 
 
 def test_docs_index_points_at_m5_contract() -> None:
@@ -30,3 +32,20 @@ def test_mcp_contract_cli_source_does_not_say_live_yet() -> None:
     text = (REPO_ROOT / "hyodo" / "cli" / "main.py").read_text(encoding="utf-8")
     assert "not claimed live yet" not in text
     assert "not live yet" not in text.lower()
+
+
+def test_mcp_design_doc_status_says_remote_is_contract_only() -> None:
+    text = (REPO_ROOT / "docs" / "HYODO_MCP_CONNECTOR_DESIGN.md").read_text(encoding="utf-8")
+    lowered = text.lower()
+    assert "contract-only" in lowered
+    assert "UNOBSERVED" in text
+    assert "start at **M1**" not in text
+    assert "local status" in lowered or "are shipped" in lowered
+
+
+def test_connector_contract_module_does_not_imply_imminent_remote() -> None:
+    text = (REPO_ROOT / "hyodo" / "connector_contract.py").read_text(encoding="utf-8")
+    lowered = text.lower()
+    assert "intends to serve" not in lowered
+    assert "until a later phase" not in lowered
+    assert "UNOBSERVED" in text

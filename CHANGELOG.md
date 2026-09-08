@@ -64,6 +64,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (dropped "not live yet").
 - Site why-hyodo and the FDE example README point at `CLAIMS.md` /
   `FULL_BODY.md`.
+- `docs/CODEX_HANDOFF_NEXT.md`: replace the stale 4.4.0 "next is M1"
+  queue with current implementer notes. Local stdio/loopback/Tailscale,
+  `schema`/`eval`/`report`, and `hyodo dashboard /graph` are shipped;
+  remote ChatGPT / `mcp.hyodo.app` stay contract-only.
+- `docs/M5_REMOTE_CONNECTOR_CONTRACT.md` and
+  `hyodo/connector_contract.py`: drop "Until M5-B serves" /
+  "intends to serve" wording. M5-B is the local bridge; remote
+  availability is still never probed.
+- README points at `docs/README.md` and states that
+  `https://mcp.hyodo.app/mcp` is not the stdio/serve path.
 
 ### Fixed
 

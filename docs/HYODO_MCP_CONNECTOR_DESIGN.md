@@ -1,8 +1,10 @@
 # HyoDo MCP Connector Architecture (Design v1)
 
-**Status:** Design SSOT — not a delivery promise.  
-**Date:** 2026-07-22  
-**Applies to:** public package (PyPI) + kingdom dogfood (Tailscale host)  
+**Status:** Design SSOT — not a delivery promise. Local transports T0
+stdio, T1 loopback, and T2 Tailscale are shipped. `https://mcp.hyodo.app/mcp`
+is contract-only and `UNOBSERVED`.
+**Date:** 2026-07-22 (status line updated 2026-09-08)
+**Applies to:** public package (PyPI) + kingdom dogfood (Tailscale host)
 **Depends on:** HyoDo CLI ≥ 4.4.0 (evidence spine, BYOG, fail-closed exits)
 
 This document defines how HyoDo becomes an **optional MCP connector** that
@@ -324,7 +326,14 @@ Access ledger is append-only; default **off** for T0 to keep local friction low;
 
 ## 14. Delivery phases (implementation order)
 
-Each phase has acceptance tests; no phase claims the next.
+Each phase had acceptance tests; no phase claims the next.
+
+**Local status (see root `VERSION`):** M1 stdio, M2 loopback, M3 Tailscale,
+and M4 `hyodo mcp doctor` / access ledger / agent-rules are shipped. FDE
+schema / eval / report are shipped as CLI. `https://mcp.hyodo.app/mcp` is
+not an M-phase below — it stays contract-only and `UNOBSERVED`.
+
+The phase text below is the original acceptance bar, kept for audit.
 
 ### Phase M0 — Design seal (this document)
 
@@ -384,7 +393,8 @@ Each phase has acceptance tests; no phase claims the next.
 | Wraps local `hyodo` CLI | “Full agent interceptor” |
 | Digest-default ledgers | “Encrypted multi-tenant SaaS audit” |
 
-Update `EXTERNAL_CLAIM_AUDIT.md` when M1 ships.
+M1 shipped on the local surface. Remote `https://mcp.hyodo.app/mcp` is
+still contract-only; do not treat this design as a live ChatGPT path.
 
 ---
 
@@ -449,5 +459,6 @@ A release is complete for connector work only when:
 | --- | --- | --- |
 | v1 | 2026-07-22 | Initial full design (public + Tailscale family + non-goals) |
 
-Implementation queue for Codex (or next agent): **`docs/CODEX_HANDOFF_NEXT.md`**.  
-GitHub tracking: issue **#95**. Phase M0 design is sealed; start at **M1**.
+Current implementer notes: **`docs/CODEX_HANDOFF_NEXT.md`**. Local M1–M4
+(stdio, loopback, Tailscale, doctor) are shipped; remote
+`https://mcp.hyodo.app/mcp` stays contract-only. GitHub tracking: issue **#95**.

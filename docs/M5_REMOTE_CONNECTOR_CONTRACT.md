@@ -13,9 +13,9 @@ HyoDo keeps one product invariant across local and remote use:
 
 > The HyoDo CLI remains the source of gate, policy, and evidence truth.
 
-The remote connector exists to make attachment simple for ChatGPT, Claude, and
-other MCP hosts without creating a second verification stack. That intent is
-not a live service.
+The remote connector is specified so attachment can stay simple for ChatGPT,
+Claude, and other MCP hosts without a second verification stack. That
+specification is not a live service.
 
 ## North Star
 
@@ -42,7 +42,7 @@ JSON, or local port numbers for the normal path.
 
 `hyodo mcp contract --json` emits `hyodo.connector-contract/v1`.
 
-Until M5-B serves and probes the endpoint, it must report:
+Remote availability is never probed here. The machine contract must report:
 
 ```text
 status       CONTRACT_ONLY
