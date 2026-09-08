@@ -68,9 +68,11 @@ def test_pre_commit_hook_entry_matches_shipped_console_script() -> None:
     assert "check" in hook["entry"].split()
 
     # The console script is declared in pyproject.toml; if packaging ever drops
-    # it, every consumer's pre-commit run would fail at environment setup.
+    # it, every consumer's pre-commit run would fail at environment setup. The
+    # dispatcher preserves the mature main app and only attaches additive
+    # sub-apps such as `hyodo friction`.
     pyproject = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
-    assert 'hyodo = "hyodo.cli.main:app"' in pyproject
+    assert 'hyodo = "hyodo.cli.dispatch:app"' in pyproject
 
 
 def test_pre_commit_hook_declares_non_blocking_metadata() -> None:

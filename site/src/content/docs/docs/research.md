@@ -66,7 +66,7 @@ HyoDo v4.16.0 already provides a local-first surface for gates, event records, p
 
 The next empirical step is to derive friction signals locally and test whether they predict when more or less support is useful.
 
-A future population prior may use **explicitly opted-in, privacy-transformed friction contributions**. The proposed contract is derived-metrics-first: raw prompts, model responses, source code, diffs, credentials, file paths, email bodies, and raw event bodies are not population features by default.
+A future population prior may use **explicitly opted-in, privacy-transformed friction contributions**. The local-only [Friction Contribution v1](/docs/friction-contribution/) contract now defines the derived measurement surface before any collector exists. Raw prompts, model responses, source code, diffs, credentials, file paths, email bodies, and raw event bodies are not population features by default.
 
 Before any population signal is consumed by ACL, it must pass validation, aggregation, versioning, and bias / poisoning checks.
 
