@@ -2216,15 +2216,34 @@ def safe(
 
         scanned = result.get("scanned_files")
         total = result.get("total_scannable")
+        coverage = result.get("coverage", "UNOBSERVED")
+        partial_note = ""
+        if coverage == "PARTIAL" and isinstance(scanned, int) and isinstance(total, int):
+            unscanned = total - scanned
+            partial_note = (
+                f"; {unscanned} file(s) unscanned (coverage PARTIAL — pass --max-files 0 "
+                "to scan all)"
+            )
         verdict_state.update(
             observed=scanned if isinstance(scanned, int) else 0,
             expected=total if isinstance(total, int) and total else "unknown",
             detail=f"{len(high_only)} high findings"
             + (" (advisory; --strict blocks)" if high_only and not strict else "")
-            + ("; file coverage UNOBSERVED" if scanned is None or total is None else ""),
+            + ("; file coverage UNOBSERVED" if scanned is None or total is None else "")
+            + partial_note,
         )
         if source.startswith(("missing:", "error:")):
             verdict_state["detail"] = "scan target UNOBSERVED"
+            verdict_state["decision"] = "UNOBSERVED"
+        elif strict and high_only:
+            verdict_state["decision"] = "FAIL"
+        elif coverage == "PARTIAL":
+            # A capped/partial scan is not a clean pass: a reader (or a CI gate
+            # reading only the verdict line) must not mistake "40/161 files
+            # observed" for a full scan that found nothing.
+            verdict_state["decision"] = "PARTIAL"
+        else:
+            verdict_state["decision"] = "PASS"
         if json_output:
             exit_code = (
                 2
