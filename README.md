@@ -38,6 +38,11 @@ hyodo check
 tools you already use and writes `.hyodo/gates.toml`; `check` then runs those
 gates. No detected tooling means no invented green check.
 
+`.hyodo/gates.toml` and `.hyodo/policy.toml` are team-shared policy — commit
+them. Everything else HyoDo writes under `.hyodo/` is per-machine runtime
+state and should stay out of version control; see [`docs/CONNECT.md` "What
+to commit"](docs/CONNECT.md#what-to-commit) for the `.gitignore` split.
+
 ## What it does
 
 | Need | HyoDo surface |
