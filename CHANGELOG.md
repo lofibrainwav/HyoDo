@@ -17,6 +17,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Claude Code names (`Read`, `Bash`, …) next to Cursor/demo names
   (`read_file`, `search`, …). It is an allowlist, not a hook adapter —
   `hyodo connect cursor` / `codex` stay UNOBSERVED (#204 item 31).
+- `docs/HOST_CONTRACT.md`: what the Claude Code hook mapper copies
+  (`file_path` / `url` / `command` digest) versus what the host still
+  owns — no `Bash(rm *)` matcher, empty `tool.paths` skip
+  `blocked_path_globs`, missing URL shape is not ALLOW (#204 items 17–21, 23).
+- `docs/MISREAD.md`: easy over-reads of missing policy, CI `hyodo check`,
+  one Claude session, shadow mode, the starter policy, and local trust
+  grants (#204 items 8–14).
+- Public `/evidence-graph/` can opt in to render a local
+  `hyodo.evidence-graph/v1` JSON file in the browser (no upload, no
+  remote ledger). The default view stays the 14-event demo fixture.
 
 ### Changed
 

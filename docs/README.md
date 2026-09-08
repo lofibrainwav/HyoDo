@@ -23,6 +23,8 @@ language-agnostic.
 | [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
 | [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |
 | [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
+| [HOST_CONTRACT.md](./HOST_CONTRACT.md) | What the Claude Code hook mapper copies vs what the host still owns |
+| [MISREAD.md](./MISREAD.md) | Easy over-reads: missing policy, CI `check`, shadow, starter policy, trust |
 | [../examples/host-policies/](../examples/host-policies/) | Dual-host `allowed_tools` copy file — not a Cursor/Codex hook adapter |
 | [SKILLS.md](./SKILLS.md) | `hyodo skills ingest` / `lens` / `propose` — skill lens over the six pillars |
 | [INSPECT.md](./INSPECT.md) | `hyodo inspect` — field-deployment folder absorption, digests and chunks |
