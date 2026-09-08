@@ -134,6 +134,48 @@ def test_run_general_gates_shell_syntax_error_fails(tmp_path: Path):
 
 
 # --------------------------------------------------------------------------- #
+# _run_general_gates - TypeScript monorepo (nested tsconfig.json, no root one)
+# --------------------------------------------------------------------------- #
+
+
+def test_general_gates_detects_nested_tsconfig_without_root_one(tmp_path: Path):
+    """A monorepo with only apps/<name>/tsconfig.json (no root tsconfig.json)
+    must not have its TypeScript silently unobserved.
+
+    Regression for the false-green bug: previously ``_run_general_gates`` only
+    ever looked at ``root / "tsconfig.json"``, so a nested-only tsconfig meant
+    the TypeScript files were never even reported, let alone type-checked.
+    """
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    app_dir = tmp_path / "apps" / "learning-platform"
+    app_dir.mkdir(parents=True)
+    (app_dir / "tsconfig.json").write_text("{}\n", encoding="utf-8")
+    (app_dir / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1, "nested tsconfig.json must surface a TypeScript gate result"
+    # PASS/FAIL if tsc is installed and actually ran it; SKIP if tsc is absent
+    # from this environment -- either way it must never be silently missing.
+    assert ts_results[0].status in {GateStatus.PASS, GateStatus.FAIL, GateStatus.SKIP}
+
+
+def test_general_gates_ts_files_without_any_tsconfig_is_honest_not_pass(tmp_path: Path):
+    """TypeScript files with no tsconfig.json anywhere must be reported as
+    UNSUPPORTED (honestly unchecked), never silently absent (false PASS)."""
+    (tmp_path / "ok.py").write_text("x = 1\n")
+    (tmp_path / "index.ts").write_text("const x: number = 1;\n", encoding="utf-8")
+
+    results = _run_general_gates(tmp_path)
+
+    ts_results = [r for r in results if r.language == "TypeScript"]
+    assert len(ts_results) == 1
+    assert ts_results[0].status is GateStatus.UNSUPPORTED
+    assert "tsconfig.json" in ts_results[0].message
+
+
+# --------------------------------------------------------------------------- #
 # CLI: hyodo check --general
 # --------------------------------------------------------------------------- #
 
