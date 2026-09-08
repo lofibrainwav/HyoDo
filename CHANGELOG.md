@@ -9,6 +9,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+### Changed
+
+### Fixed
+
+## [4.17.0] - 2026-09-08
+
+Instrumentation release: the CLI gains a local-only friction preview so a
+real agent run can be measured under an explicit version string, and the
+post-4.16.0 false-green fixes for monorepo TypeScript, capped `safe` scans,
+and gate-less targets ship together with the documentation honesty pass.
+
+### Added
+
+- `hyodo friction` (local-only Friction Contribution v1): `status`,
+  `preview`, `on --yes`, `off`, and `contract` derive a coarse
+  `hyodo.friction-contribution/v1` record from the local
+  `hyodo.agent-event/v1` ledger. OFF by default; `on` enables local
+  preparation only and persists `network_consent: false`. There is no
+  collector endpoint, uploader, or network transport in this release, and
+  raw goals, ids, prompts, code, and paths are never copied into the record
+  (`docs/FRICTION_CONTRIBUTION.md`, site `docs/friction-contribution`) (#216).
+- Site `docs/research`: the Adaptive Collaboration Layer (ACL) working
+  research note — three-question separation (Authority / Support
+  allocation / Evidence Gate), the invariant that population evidence never
+  grants execution authority, and an honest empirical baseline. It is a
+  working note, not a claim of peer review or venue acceptance (#215).
+
 - `docs/GATES_SYNTAX.md`: a field-by-field reference for `.hyodo/gates.toml`
   (types, required/default, and the exact validation error `hyodo check`
   prints for each malformed value), linked from `README.md` and
@@ -37,6 +64,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   (#204 item 34).
 
 ### Changed
+
+- The installed `hyodo` console script now resolves to
+  `hyodo.cli.dispatch:app`, which wraps the unchanged `hyodo.cli.main`
+  surface and registers the `friction` sub-app; every existing command and
+  callback registration is intact (#216).
+- `hyodo check` on a target that is neither a HyoDo checkout nor carries
+  `.hyodo/gates.toml` now runs the built-in, language-agnostic general gates
+  labelled "Default gates (built-in, sampled)" with an explicit
+  "not a full-project BYOG validation" note, instead of exiting 2 with
+  guidance only. A `gates.toml` or HyoDo checkout still bypasses the
+  fallback, and a target with no supported files is still UNOBSERVED (#202).
 
 - docs: clarify the `.hyodo/` tracking split — `policy.toml` and
   `gates.toml` are team-shared policy and should be committed, while
@@ -77,6 +115,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `hyodo check --general` looked for `tsconfig.json` only at the project
+  root, so a monorepo whose TypeScript lived under `apps/*/` was never
+  observed and still read PASS. Nested tsconfig files are now discovered
+  (capped at 20, same walk rules as file collection), `tsc --noEmit -p` runs
+  per project, `tsc` is resolved from the nearest `node_modules/.bin` before
+  PATH, a project whose dependencies are not installed is SKIP, and `.ts`
+  files with no tsconfig are UNSUPPORTED (#199, #202).
+- `hyodo init` detects BYOG tools in nested project directories instead of
+  only at the root (#201).
+- `hyodo safe <dir>` with the default 40-file cap already reported
+  `coverage: PARTIAL` but the verdict line still began with `HYODO PASS`.
+  The decision is now set explicitly (missing/error → UNOBSERVED, strict +
+  high → FAIL, capped → PARTIAL, else PASS) and the detail names how many
+  files were left unscanned. Exit codes are unchanged (#200).
+
 - `hyodo/graph_view.py`'s file-tool classification (Truth/Beauty/Hyo/
   Goodness columns) matched only placeholder names (`read_file`,
   `write_file`) that no real host sends; Claude Code's actual `Read`,
@@ -95,6 +148,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   exported graph itself, and a node with no root to check against lands
   in the unclassified gutter instead of a silent, possibly-wrong Goodness
   (#206 judge finding).
+
+### Evidence
+
+- Release chain receipt is recorded in `docs/releases/4.17.0.md` after the
+  signed tag, GitHub Release, SBOM/SHA-256 assets, PyPI OIDC publish, and
+  install smoke complete.
 
 ## [4.16.0] - 2026-09-07
 
