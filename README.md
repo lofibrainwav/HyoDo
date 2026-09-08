@@ -140,6 +140,7 @@ hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
 
 The MCP adapter uses the same CLI contracts rather than creating a second
 policy engine. MCP SDK v1 and v2 are both exercised in CI.
+`https://mcp.hyodo.app/mcp` is contract-only, not this stdio/serve path.
 
 ## Exit contracts
 
@@ -171,7 +172,7 @@ cannot be shell-faked through `gates.toml`; see
 
 Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 
-- Quick start: [`QUICK_START.md`](./QUICK_START.md); Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
+- Docs index: [`docs/README.md`](./docs/README.md); Quick start: [`QUICK_START.md`](./QUICK_START.md); Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
 - Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
 - Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md); Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 

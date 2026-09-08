@@ -1,8 +1,8 @@
 """Public contract for HyoDo M5 remote-connector onboarding.
 
-This module describes the connector that M5 intends to serve. It does not
-claim that the remote endpoint is live. Runtime availability stays explicitly
-UNOBSERVED until a later phase provides and probes the service.
+This module emits the connector declaration. It does not claim the remote
+endpoint is live. Runtime availability stays UNOBSERVED because this code
+never probes DNS, OAuth, or routing.
 """
 
 from __future__ import annotations
