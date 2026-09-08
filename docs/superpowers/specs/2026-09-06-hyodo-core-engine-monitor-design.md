@@ -154,8 +154,8 @@ itself — each called out below.
 | `tool_call`/`tool_result` | test runner (`run_tests`, `pytest`, `test*`, `jest`, `vitest`, `mocha`) | any | any | **Truth** — amended: a test run proves a claim, it is not itself the policy decision that gated it |
 | `tool_call`/`tool_result` | formatter | any | any | Beauty |
 | `tool_call`/`tool_result` | doc/onboarding tools | any | any | Benevolence |
-| `tool_call`/`tool_result` | `read_file`, `write_file`, `edit` | not `ASK`/`DENY`, path inside the checkout | any | **Hyo** — new row: the file touch itself is the boundary-relevant fact |
-| `tool_call`/`tool_result` | `read_file`, `write_file`, `edit` | `ASK`/`DENY`, or the path is outside the checkout | any | **Goodness** — new row: the policy decision is the salient fact, not the file touch |
+| `tool_call`/`tool_result` | `Read`/`Write`/`Edit`/`MultiEdit`/`NotebookEdit` (Claude Code), `read_file`/`write_file`/`edit_file`/`edit` (Cursor/demo) | not `ASK`/`DENY`, path inside the checkout | any | **Hyo** — new row: the file touch itself is the boundary-relevant fact |
+| `tool_call`/`tool_result` | `Read`/`Write`/`Edit`/`MultiEdit`/`NotebookEdit` (Claude Code), `read_file`/`write_file`/`edit_file`/`edit` (Cursor/demo) | `ASK`/`DENY`, or the path is outside the checkout | any | **Goodness** — new row: the policy decision is the salient fact, not the file touch |
 | `tool_call`/`tool_result` | `web_fetch`, `browser`, `http` | any | any | **Goodness** — new row: exactly the kind of action `evaluate_policy` gates |
 | any | any | any | `data_boundary`, `data_boundary_undeclared` | Hyo |
 | any | any | any | `web_credential_path_denied`, `web_credential_path_unobserved` | Goodness + Hyo |

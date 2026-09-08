@@ -60,7 +60,32 @@ _DOC_PATTERNS: tuple[str, ...] = ("doc", "readme", "onboard", "changelog")
 #: event (it touches the project's own boundary) unless it was ASK/DENY-
 #: gated or the path itself sits outside the checkout, in which case the
 #: decision is the salient fact, not the file touch.
-_FILE_TOOL_PATTERNS: tuple[str, ...] = ("read_file", "write_file", "edit")
+#:
+#: #204 item 26: the original two entries here (`read_file`, `write_file`)
+#: were placeholder/demo names that no real host ever sends, so a real
+#: Claude Code transcript's `Read`/`Write`/`NotebookEdit` events fell
+#: through to the unclassified gutter instead of Hyo/Goodness. This is an
+#: exact (post-lowercasing) name set, not a substring list like the other
+#: `_..._PATTERNS` tuples above — `read`/`write` as *substrings* would
+#: also match unrelated names such as `readme` or `already_written`, which
+#: `_DOC_PATTERNS` already owns. Two host families are covered:
+#: - Claude Code (`Read`, `Write`, `Edit`, `MultiEdit`, `NotebookEdit`)
+#: - Cursor and this repo's own fixtures/demo tooling (`read_file`,
+#:   `write_file`, `edit_file`, bare `edit`)
+_FILE_TOOL_NAMES: frozenset[str] = frozenset(
+    {
+        # Claude Code.
+        "read",
+        "write",
+        "edit",
+        "multiedit",
+        "notebookedit",
+        # Cursor / demo / this repo's own fixtures.
+        "read_file",
+        "write_file",
+        "edit_file",
+    }
+)
 #: Owner review round 2 (brief finding 3): a network fetch is a Goodness
 #: event (it is exactly the kind of action `evaluate_policy` gates).
 _WEB_TOOL_PATTERNS: tuple[str, ...] = ("web_fetch", "browser", "http")
@@ -136,7 +161,7 @@ def assign_columns(node: dict[str, Any]) -> list[str]:
             _add("mi")
         if _matches(name, _DOC_PATTERNS):
             _add("in")
-        if _matches(name, _FILE_TOOL_PATTERNS):
+        if name in _FILE_TOOL_NAMES:
             raw_paths = tool.get("paths") if isinstance(tool, dict) else None
             paths = raw_paths if isinstance(raw_paths, list) else []
             if node.get("decision") in ("ASK", "DENY") or _is_outside_root(paths):
