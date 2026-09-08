@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   set covering the Claude Code and Cursor/demo tool-name families
   (#204 item 26).
 
+### Fixed
+
+- `hyodo/graph_view.py`'s file-tool classification (Truth/Beauty/Hyo/
+  Goodness columns) matched only placeholder names (`read_file`,
+  `write_file`) that no real host sends; Claude Code's actual `Read`,
+  `Write`, `Edit`, `MultiEdit`, and `NotebookEdit` events fell through to
+  the unclassified gutter. Matching is now an explicit, case-insensitive
+  set covering the Claude Code and Cursor/demo tool-name families
+  (#204 item 26).
+
 ## [4.16.0] - 2026-09-07
 
 This cycle keeps HyoDo's decisions honest about what was actually observed.
