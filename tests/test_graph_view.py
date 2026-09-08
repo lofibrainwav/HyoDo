@@ -162,6 +162,37 @@ def test_web_fetch_maps_to_goodness() -> None:
         assert assign_columns(_node("e1", tool_name=name)) == ["seon"]
 
 
+def test_claude_code_file_tool_names_map_to_hyo_inside_root() -> None:
+    # #204 item 26: `read_file`/`write_file` were placeholder names no real
+    # host sends. Claude Code sends these bare, case-varied verbs instead;
+    # matching must be case-insensitive against the real names.
+    for name in ("Read", "Write", "Edit", "MultiEdit", "NotebookEdit"):
+        node = _node("e1", tool_name=name, paths=["hyodo/dashboard.py"])
+        assert assign_columns(node) == ["hyo"], name
+
+
+def test_claude_code_file_tool_name_outside_root_maps_to_goodness() -> None:
+    node = _node("e1", tool_name="Write", paths=["/etc/passwd"])
+    assert assign_columns(node) == ["seon"]
+
+
+def test_readme_tool_name_is_doc_only_not_also_a_file_tool() -> None:
+    # File-tool matching is an exact (post-lowercasing) name set, not a
+    # "read"/"write" substring — a substring check would also fire on
+    # `readme`, double-counting it under Hyo/Goodness on top of doc's own
+    # Benevolence row.
+    node = _node("e1", tool_name="update_readme", paths=["README.md"])
+    assert assign_columns(node) == ["in"]
+
+
+def test_bash_and_web_search_tool_names_are_not_file_tools() -> None:
+    # Guards against over-broad substring matching (e.g. a naive "read"/
+    # "write" substring would also fire on unrelated names) swallowing
+    # non-file tool calls into the Hyo/Goodness file-tool rows.
+    assert assign_columns(_node("e1", tool_name="Bash")) == [UNCLASSIFIED]
+    assert assign_columns(_node("e1", tool_name="WebSearch")) == [UNCLASSIFIED]
+
+
 def test_unmatched_event_lands_in_the_unclassified_gutter() -> None:
     node = _node("e1", tool_name="mystery_internal_tool")
     assert assign_columns(node) == [UNCLASSIFIED]
