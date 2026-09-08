@@ -1139,6 +1139,11 @@ def init(
     console.print("  1. Review/edit .hyodo/gates.toml")
     console.print("  2. hyodo check              # runs the absorbed gates")
     console.print("  3. hyodo dashboard --open   # view evidence")
+    console.print(
+        "\n[dim]Commit .hyodo/gates.toml (and .hyodo/policy.toml if you use "
+        "`hyodo connect`); everything else under .hyodo/ is per-machine "
+        "runtime state — see docs/CONNECT.md 'What to commit'.[/dim]"
+    )
     raise typer.Exit(0)
 
 

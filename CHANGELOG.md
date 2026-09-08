@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+- docs: clarify the `.hyodo/` tracking split — `policy.toml` and
+  `gates.toml` are team-shared policy and should be committed, while
+  everything else HyoDo writes under `.hyodo/` is per-machine runtime state
+  and should be ignored; this repo's own `.gitignore` now follows that split
+  (`docs/CONNECT.md` "What to commit", `README.md`, `hyodo init` output).
+
 ## [4.16.0] - 2026-09-07
 
 This cycle keeps HyoDo's decisions honest about what was actually observed.

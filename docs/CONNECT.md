@@ -117,6 +117,28 @@ State lives at `.hyodo/connect.json` (schema `hyodo.connect/v1`): which
 targets were written, when, shadow or enforced, and the digest of every file
 `connect` wrote — the source `--status` reads back.
 
+## What to commit
+
+`.hyodo/` mixes team-shared policy with per-machine runtime state. Track the
+policy files everyone should share; ignore everything `connect` and the
+other HyoDo commands write as a local ledger:
+
+| Commit (team-shared policy) | Ignore (per-machine runtime) |
+| --- | --- |
+| `.hyodo/policy.toml` | `.hyodo/connect.json` |
+| `.hyodo/gates.toml` | `.hyodo/policy-trust.json` |
+| | `.hyodo/agent-events.jsonl` |
+| | `.hyodo/reports/` |
+| | everything else HyoDo writes under `.hyodo/` (manifests, config, evidence exports, and similar generated files) |
+
+A `.gitignore` that keeps the two policy files while ignoring the rest:
+
+```gitignore
+.hyodo/*
+!.hyodo/policy.toml
+!.hyodo/gates.toml
+```
+
 ## Known limitation
 
 The pre-commit `rev` and the GitHub Actions composite-action ref are pinned

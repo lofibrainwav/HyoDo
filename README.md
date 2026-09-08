@@ -38,6 +38,10 @@ hyodo check
 tools you already use and writes `.hyodo/gates.toml`; `check` then runs those
 gates. No detected tooling means no invented green check.
 
+Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep
+the rest of `.hyodo/` out of version control — see
+[what to commit](docs/CONNECT.md#what-to-commit) for the `.gitignore` split.
+
 ## What it does
 
 | Need | HyoDo surface |
@@ -124,18 +128,11 @@ example. Policy trust levels are documented in [docs/POLICY_TRUST.md](docs/POLIC
 
 ## Optional MCP
 
-Local stdio:
-
 ```bash
 pip install 'hyodo[mcp]'
-hyodo mcp stdio --root .
-```
-
-Private-network connector:
-
-```bash
+hyodo mcp stdio --root .                       # local stdio
 hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
-  --token "$HYODO_MCP_TOKEN" --root .
+  --token "$HYODO_MCP_TOKEN" --root .          # private-network connector
 ```
 
 The MCP adapter uses the same CLI contracts rather than creating a second
