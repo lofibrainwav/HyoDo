@@ -91,7 +91,7 @@ mutation = [
 ]
 
 [project.scripts]
-hyodo = "hyodo.cli.main:app"
+hyodo = "hyodo.cli.dispatch:app"
 
 [project.urls]
 Homepage = "https://github.com/lofibrainwav/HyoDo"
