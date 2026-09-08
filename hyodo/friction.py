@@ -126,6 +126,7 @@ class FrictionState:
     consent_scope: str = "local_only_v1"
 
     def as_dict(self) -> dict[str, Any]:
+        """Serialize the local state without adding network authority."""
         return {
             "schema": FRICTION_STATE_SCHEMA_VERSION,
             "enabled": self.enabled,
