@@ -48,8 +48,8 @@ The useful capability is not recalling a proverb on command. It is having releva
 
 For example:
 
-- **“백지장도 맞들면 낫다”** — even a sheet of paper is easier to lift together — can suggest more parallel workers when work is independently decomposable.
-- **“사공이 많으면 배가 산으로 간다”** — too many boatmen send the boat up the mountain — can warn against multiple competing decision owners or writers.
+- **Romanized Korean: “Baekjijangdo matdeulmyeon natda”** — even a sheet of paper is easier to lift together — can suggest more parallel workers when work is independently decomposable.
+- **Romanized Korean: “Sagongi maneumyeon baega saneuro ganda”** — too many boatmen send the boat up the mountain — can warn against multiple competing decision owners or writers.
 
 These are not contradictory rules. They are contextual lenses. The same system may use broad parallel exploration, converge to one plan, then execute with a single authority line and many independent workers.
 
