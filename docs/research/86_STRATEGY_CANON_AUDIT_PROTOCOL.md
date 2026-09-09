@@ -4,6 +4,11 @@ Status: working research protocol
 
 Purpose: preserve the existing KINGDOM 86-strategy canon while separating the canon as KINGDOM currently declares it, historical source evidence, later interpretations, KINGDOM-specific interpretation, and empirical evidence.
 
+Related protocols:
+
+- [`WISDOM_REFLEX_DECISION_PROTOCOL.md`](./WISDOM_REFLEX_DECISION_PROTOCOL.md)
+- [`WISDOM_REFLEX_SERIAL_PARALLEL_EXECUTION_PLAN.md`](./WISDOM_REFLEX_SERIAL_PARALLEL_EXECUTION_PLAN.md)
+
 ## 1. Canon boundary
 
 The current KINGDOM strategy skill describes the 86-strategy system as a **7-source ROOT**:
