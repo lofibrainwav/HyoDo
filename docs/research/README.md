@@ -60,15 +60,16 @@ PARALLEL: replication / external hostile review / privacy-authority audit
 SERIAL: promotion decision
 ```
 
-The plan defines serial barriers and parallel lanes for:
+Current parallel lanes before the first Wisdom benchmark:
 
-- 86/86 source auditing;
-- interpretation Zettelkasten collection;
-- external hostile research;
-- HyoDo/KINGDOM measurement readiness;
-- benchmark execution;
-- independent replication;
-- final evidence adjudication and promotion.
+```text
+A — 86/86 historical/source audit
+B — interpretation Zettelkasten collection
+C — hostile related-work / null-baseline audit
+D — HyoDo + KINGDOM measurement readiness
+```
+
+All four lanes stop at one serial barrier: **audited canon manifest + conflict register + frozen research snapshot**.
 
 ## Current non-claims
 
@@ -95,6 +96,6 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 1. Freeze an exact KINGDOM/HyoDo research snapshot.
 2. Audit the existing 86/86 canon without renumbering or inventing entries.
 3. Collect attributed interpretations as append-only Zettels.
-4. Keep HyoDo measurement readiness moving in parallel.
+4. Keep hostile external review and HyoDo measurement readiness moving in parallel.
 5. Converge once through a single registrar/adjudicator.
-6. Only then freeze and run a falsifiable benchmark.
+6. Freeze the benchmark object and only then run the falsifiable Wisdom experiment.
