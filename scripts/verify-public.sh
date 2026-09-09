@@ -29,11 +29,12 @@ echo "python: $PYTHON ($($PYTHON --version 2>&1))"
 # ensure editable install for CLI
 $PYTHON -m pip install -e ".[dev]" -q
 
-HYODO="${BINDIR:+$BINDIR/}hyodo"
-if [[ ! -x "$HYODO" ]]; then
-  HYODO="$PYTHON -m hyodo.cli.main"
+if [[ -n "$BINDIR" && -x "$BINDIR/hyodo" ]]; then
+  HYODO=("$BINDIR/hyodo")
+else
+  HYODO=("$PYTHON" -m hyodo.cli.main)
 fi
-echo "hyodo: $HYODO"
+echo "hyodo: ${HYODO[*]}"
 
 echo "-- version sync --"
 $PYTHON scripts/release/check_version_sync.py
@@ -54,7 +55,11 @@ bash -n install.sh
 bash -n install_interactive.sh
 
 echo "-- package build --"
-VERIFY_DIR="$(mktemp -d \"${TMPDIR:-/tmp}/hyodo-public-verify.XXXXXX\")"
+VERIFY_PARENT="${TMPDIR:-/tmp}"
+if [[ ! -d "$VERIFY_PARENT" ]]; then
+  VERIFY_PARENT="/tmp"
+fi
+VERIFY_DIR="$(mktemp -d "$VERIFY_PARENT/hyodo-public-verify.XXXXXX")"
 echo "verification artifacts: $VERIFY_DIR"
 # Upgrade explicitly: a stale local twine (<7) cannot parse Metadata-Version 2.5
 # sdist metadata produced by current hatchling and fails `twine check` spuriously.
@@ -111,7 +116,7 @@ echo "-- CLI smoke --"
 # The working environment remains editable; the wheel smoke uses its own venv.
 # HyoDo checkout: expect executed gates to pass (never the false-green "All gates passed" alone)
 set +e
-$HYODO check >"$VERIFY_DIR/check.out" 2>&1
+"${HYODO[@]}" check >"$VERIFY_DIR/check.out" 2>&1
 CHECK_EC=$?
 set -e
 grep -q "All executed gates passed" "$VERIFY_DIR/check.out"
@@ -120,7 +125,7 @@ test "$CHECK_EC" -eq 0
 EMPTY_DIR="$VERIFY_DIR/empty"
 mkdir "$EMPTY_DIR"
 set +e
-$HYODO check "$EMPTY_DIR" >"$VERIFY_DIR/check-empty.out" 2>&1
+"${HYODO[@]}" check "$EMPTY_DIR" >"$VERIFY_DIR/check-empty.out" 2>&1
 EMPTY_EC=$?
 set -e
 test "$EMPTY_EC" -eq 2
@@ -130,13 +135,13 @@ if grep -q "All gates passed" "$VERIFY_DIR/check-empty.out"; then
   echo "ERROR: false-green 'All gates passed' on empty tree"
   exit 1
 fi
-$HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9 >"$VERIFY_DIR/score.out"
+"${HYODO[@]}" score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9 >"$VERIFY_DIR/score.out"
 grep -q "REVIEW_SIGNAL" "$VERIFY_DIR/score.out"
 printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' >"$VERIFY_DIR/safe-fixture.txt"
 set +e
-$HYODO safe "$VERIFY_DIR/safe-fixture.txt" >"$VERIFY_DIR/safe.out" 2>&1
+"${HYODO[@]}" safe "$VERIFY_DIR/safe-fixture.txt" >"$VERIFY_DIR/safe.out" 2>&1
 SAFE_EC=$?
-$HYODO safe --strict "$VERIFY_DIR/safe-fixture.txt" >"$VERIFY_DIR/safe-strict.out" 2>&1
+"${HYODO[@]}" safe --strict "$VERIFY_DIR/safe-fixture.txt" >"$VERIFY_DIR/safe-strict.out" 2>&1
 SAFE_STRICT_EC=$?
 set -e
 test "$SAFE_EC" -eq 0
