@@ -71,7 +71,7 @@ C — hostile related-work / null-baseline audit
 D — HyoDo + KINGDOM measurement readiness
 ```
 
-All four lanes stop at one serial barrier: **audited canon manifest + conflict register + frozen research snapshot**.
+All four lanes stop at one serial barrier: **audited canon manifest + conflict register + frozen research snapshot**. Parallel workers submit evidence; a single registrar/adjudicator owns the canonical convergence write.
 
 ## Current non-claims
 
