@@ -15,13 +15,13 @@ The public product boundary is fixed below. The [Measured Run #1 receipt](https:
 
 | Capability | Status | Evidence boundary |
 | --- | --- | --- |
-| gates / ledger / friction preview | SHIPPED | Local gates, `hyodo.agent-event/v1` ledger, and local-only preview/export. |
-| Graph v1 | SHIPPED (site is DEMO FIXTURE) | `hyodo dashboard` reads the local ledger; the public site uses fixed demo data. |
-| Graph v2 join | NOT BUILT | No Graph v2 join runtime or shipped viewer; the SCC helper is a fixture oracle only. |
-| Cursor/Codex hooks | UNOBSERVED | No directly verified host adapter evidence. |
-| remote MCP / ChatGPT | CONTRACT ONLY | Contract surface exists; hosted runtime is not observed. |
-| ACL runtime / Wisdom Reflex | RESEARCH | Research hypothesis and protocol; no automatic router. |
-| friction collector | NOT BUILT | Preview is local-only; network transport is disabled and no collector/uploader exists. |
+| gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
+| Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
+| Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
+| Cursor/Codex hooks | UNOBSERVED | No verified host adapter. |
+| remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
+| friction collector | NOT BUILT | No collector/uploader; transport disabled. |
 
 HyoDo measures what happened. ACL asks a different question:
 
