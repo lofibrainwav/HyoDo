@@ -60,6 +60,8 @@ PARALLEL: replication / external hostile review / privacy-authority audit
 SERIAL: promotion decision
 ```
 
+**Do not start the large parallel lanes before the initial exact snapshot is frozen.** Otherwise different workers may unknowingly audit different versions of KINGDOM, EROS, or the 86 canon and create false disagreement.
+
 Current parallel lanes before the first Wisdom benchmark:
 
 ```text
