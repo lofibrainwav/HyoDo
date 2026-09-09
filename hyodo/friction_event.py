@@ -30,9 +30,7 @@ FRICTION_TYPES = frozenset(
         "verification_failure",
     }
 )
-FRICTION_CLASSES = frozenset(
-    {"avoidable", "protective", "chosen_growth", "structural", "unknown"}
-)
+FRICTION_CLASSES = frozenset({"avoidable", "protective", "chosen_growth", "structural", "unknown"})
 
 _COUNT_RULES = (
     ("human_interventions", "human_intervention"),

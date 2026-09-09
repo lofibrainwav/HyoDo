@@ -84,9 +84,7 @@ def test_join_adapter_exposes_dependencies_without_mutating_ledger() -> None:
 
 def test_invalid_sidecar_is_visible_and_not_exposed_to_graph_adapter() -> None:
     events = [{"event_id": "J", "run_id": "run-1"}]
-    adapted, issues = join_adapter_events(
-        events, [_observation(depends_on=["J", "A"])]
-    )
+    adapted, issues = join_adapter_events(events, [_observation(depends_on=["J", "A"])])
 
     assert adapted == events
     assert issues == [

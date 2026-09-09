@@ -71,9 +71,7 @@ def test_explicit_signals_derive_decomposable_events() -> None:
 
 def test_blocked_and_rollback_are_state_derived() -> None:
     blocked, blocked_reasons = derive_friction_events(_observation(state="blocked"))
-    rolled_back, rollback_reasons = derive_friction_events(
-        _observation(state="rolled_back")
-    )
+    rolled_back, rollback_reasons = derive_friction_events(_observation(state="rolled_back"))
 
     assert blocked_reasons == []
     assert rollback_reasons == []
