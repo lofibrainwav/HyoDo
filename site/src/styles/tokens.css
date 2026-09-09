@@ -38,3 +38,30 @@
 	--color-edge-evidence: #0ea5e9;
 	--color-edge-broken: #ff5c5c;
 }
+
+/* The landing page and standalone evidence-graph page both use a compact
+   public navbar. Keep the product/research links readable on phone-width
+   screens and drop only external destinations when horizontal space is tight.
+   Higher specificity intentionally wins over each page's duplicated inline
+   navbar rules. */
+@media (max-width: 560px) {
+	body .navbar {
+		padding: 0.8rem 1rem;
+	}
+
+	body .navbar .nav-links {
+		gap: 0.75rem;
+		font-size: 0.82rem;
+	}
+
+	body .navbar .nav-links a[href^='https://'] {
+		display: none;
+	}
+}
+
+@media (max-width: 360px) {
+	body .navbar .nav-links {
+		gap: 0.55rem;
+		font-size: 0.78rem;
+	}
+}

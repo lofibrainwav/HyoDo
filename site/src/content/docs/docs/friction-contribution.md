@@ -3,7 +3,7 @@ title: Friction Contribution
 description: Privacy-first local friction derivation for future ACL research priors.
 ---
 
-> **Local only in v1.** HyoDo does not upload friction data in this release. Network transport is disabled.
+> **Version boundary.** The `hyodo friction` command is introduced in **HyoDo 4.17.0**. HyoDo 4.16.x and earlier do not expose this command. Friction Contribution v1 is local only: HyoDo does not upload friction data, and network transport is disabled.
 
 # Friction Contribution v1
 
@@ -23,6 +23,20 @@ local preview only
 The point is to define the sensor contract **before** any population collector
 exists.
 
+## Check the instrument before using it
+
+```bash
+hyodo --version
+hyodo friction --help
+```
+
+If `hyodo --version` reports 4.16.x or earlier, `hyodo friction` is not part of
+that installation. Upgrade to a 4.17.0-or-newer release before following the
+commands below. **Release channels can publish at different times:** do not
+infer that a package index already serves 4.17.0 from a source-tree version or
+a GitHub Release. The installed `hyodo --version` and command help are the
+runtime boundary that matters.
+
 ## OFF by default
 
 ```bash
@@ -35,7 +49,7 @@ hyodo friction contract --json
 
 `friction on` means **prepare derived contribution records locally**. It is not
 network consent. The local state explicitly records `network_consent: false`,
-and this release has no upload transport.
+and Friction Contribution v1 has no upload transport.
 
 A future collector must request fresh, separate consent rather than inheriting
 this local setting.
@@ -48,7 +62,7 @@ The strict v1 schema allows coarse fields such as:
 {
   "schema": "hyodo.friction-contribution/v1",
   "source_schema": "hyodo.agent-event/v1",
-  "hyodo_version": "4.16.0",
+  "hyodo_version": "4.17.0",
   "task_class": "code_change",
   "risk_bucket": "medium",
   "orchestration_pattern": "fanout",
@@ -85,6 +99,18 @@ then discarded from the contribution shape.
 Exact model names are reduced to a coarse provider class. Unknown evidence is
 reported as `unknown` or `unobserved` instead of being guessed.
 
+## Measurement boundary
+
+Friction Contribution v1 derives coarse operational signals such as retry,
+rework, intervention, wait, resource-conflict, evidence-completeness, and
+outcome buckets. It does **not** automatically decide whether an observed
+friction episode was **necessary**, **productive**, or **avoidable**.
+
+Those categories are research labels. Classifying them defensibly may require
+outcome context, causal comparison, independent review, or human annotation.
+A lower retry count, for example, is not automatically a better outcome if the
+missing retry would have caught an error.
+
 ## Measured policy only
 
 Caller-asserted `ALLOW` / `DENY` / `ASK` claims do not become friction
@@ -103,21 +129,19 @@ Population evidence → override local policy       ❌
 Population evidence → override Evidence Gate      ❌
 ```
 
-Population experience can eventually help answer **how much support?** It
-cannot answer **whether this action is authorized?**
+Population experience can eventually help answer **what support profile is
+useful here?** It cannot answer **whether this action is authorized?**
 
 That separation keeps the research model aligned with HyoDo/KINGDOM:
 
 - **EROS / Authority — whether?**
-- **ACL — how much support?**
+- **ACL — what support profile?**
 - **Evidence Gate — done?**
 
 ## No collector yet
 
 v1 deliberately ships without a telemetry endpoint, uploader, installation
-identifier, population-prior download, or automatic ACL level change. The
+identifier, population-prior download, or automatic ACL support change. The
 first goal is an inspectable, reproducible local measurement contract.
 
-See the [Research](/docs/research/) note for the ACL evaluation direction, and
-the repository's `docs/FRICTION_CONTRIBUTION.md` for the detailed protocol
-boundary.
+See the [ACL field note](/docs/acl/) for the Wisdom Reflex and collaboration-topology hypothesis, the [Research](/docs/research/) page for the broader empirical program, and the repository's `docs/FRICTION_CONTRIBUTION.md` for the detailed protocol boundary.
