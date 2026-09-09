@@ -2,7 +2,7 @@
 
 Status: working research documentation
 
-This directory separates the research object, the proposed decision experiment, and the serial/parallel execution contract. Read them in this order.
+This directory separates the research object, the proposed decision experiment, and the serial/parallel execution contract. Read them in this order. The public `/docs/acl/` page remains a high-level field note; these repository protocols are the stricter research contracts.
 
 ## 1. Canon first — what is being studied
 
