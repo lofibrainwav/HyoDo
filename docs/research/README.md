@@ -132,3 +132,16 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 5. Freeze the benchmark object and evaluation policy.
 6. Only then run the falsifiable Wisdom benchmark.
 7. Treat safe evolution, IFC enforcement expansion, and cryptographic attestation as later phases that require measured need and separate promotion evidence.
+
+## Document hierarchy
+
+When two documents appear to disagree, resolve them in this order:
+
+1. shipped/runtime authority contracts and exact code behavior;
+2. this top-level technical roadmap;
+3. the canon audit protocol;
+4. the Wisdom decision experiment protocol;
+5. the serial/parallel execution plan;
+6. public field notes and external-review summaries.
+
+A lower-level research note may refine implementation detail, but it must not silently override a higher-level authority or roadmap boundary.
