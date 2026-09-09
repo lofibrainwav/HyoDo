@@ -51,6 +51,8 @@ def test_acl_and_research_explain_their_distinct_roles() -> None:
     research = RESEARCH.read_text(encoding="utf-8")
     assert "Reader map." in acl
     assert "Reader map." in research
-    assert "Wisdom Reflex" in acl
-    assert "broader empirical program" in acl
+    assert "focused field note" in acl
+    assert "](/docs/research/)" in acl
+    assert "broader empirical program" in research
     assert "benchmark status" in research
+    assert "](/docs/acl/)" in research
