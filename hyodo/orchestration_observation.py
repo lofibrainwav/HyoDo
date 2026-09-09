@@ -127,18 +127,27 @@ def validate_orchestration_observation(
 
 def join_adapter_events(
     events: Iterable[object], observations: Iterable[object]
-) -> list[dict[str, Any]]:
-    """Return event copies with sidecar dependencies exposed to Graph v2 helpers.
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Expose sidecar dependencies to Graph v2 helpers without silent drops.
 
-    The source ledger rows are never mutated.  ``parent_event_ids`` is an adapter
-    field understood by the Graph v2 SCC oracle from PR #228; it is not written
-    back into ``hyodo.agent-event/v1``.
+    The source ledger rows are never mutated. ``parent_event_ids`` is a transient
+    adapter field understood by the Graph v2 SCC oracle from PR #228; it is not
+    written back into ``hyodo.agent-event/v1``. Invalid observations are returned
+    as explicit issues rather than being mistaken for an absent dependency.
     """
 
     by_event_id: dict[str, list[str]] = {}
+    issues: list[dict[str, Any]] = []
     for raw in observations:
-        ok, _, normalized = validate_orchestration_observation(raw)
+        ok, reasons, normalized = validate_orchestration_observation(raw)
         if not ok or normalized is None:
+            observation_id = raw.get("observation_id") if isinstance(raw, dict) else None
+            issues.append(
+                {
+                    "observation_id": observation_id,
+                    "reasons": list(reasons),
+                }
+            )
             continue
         by_event_id[normalized["event_id"]] = normalized["depends_on"]
 
@@ -151,7 +160,7 @@ def join_adapter_events(
         if isinstance(event_id, str) and event_id in by_event_id:
             event["parent_event_ids"] = list(by_event_id[event_id])
         adapted.append(event)
-    return adapted
+    return adapted, issues
 
 
 __all__ = [
