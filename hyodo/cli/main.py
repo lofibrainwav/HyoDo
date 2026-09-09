@@ -1553,11 +1553,19 @@ def _verdict_output(
         state["unit"],
         detail,
     )
+    sampled_limitation = (
+        f"Sampled syntax gates only (up to {_GENERAL_FILE_CAP} files per language); "
+        "not a full-project validation"
+        if command == "check" and state.get("sampled")
+        else ""
+    )
     if json_output:
         # --json content stays byte-identical across profiles: the profile
         # is surfaced only as the added "audience" key, never by reflavoring
         # an existing field (including "verdict").
         verdict = render_verdict_line(*verdict_args, audience="engineer")
+        if sampled_limitation:
+            verdict += f"; {sampled_limitation}"
         if command == "check":
             payload = {
                 "status": decision,
@@ -1566,6 +1574,8 @@ def _verdict_output(
                 "failed": state.get("failed", []),
                 "exit_code": exit_code,
             }
+            if sampled_limitation:
+                payload.update(sampled=True, scope="sampled_syntax", limitation=sampled_limitation)
             if "test_integrity" in state:
                 payload["test_integrity"] = state["test_integrity"]
             if "dx_signals" in state:
@@ -1578,6 +1588,8 @@ def _verdict_output(
         console.print_json(json.dumps(payload))
     else:
         verdict = render_verdict_line(*verdict_args, audience=profile.profile)
+        if sampled_limitation:
+            verdict += f"; {sampled_limitation}"
         typer.echo(verdict)
         if explain:
             typer.echo(
@@ -1629,10 +1641,13 @@ def check(
 
     Resolution order: --general (explicit opt-in) -> .hyodo/gates.toml
     (Bring-Your-Own-Gates, if present -- see `hyodo init`) -> HyoDo checkout
-    preset (Pyright -> Ruff -> pytest -> SBOM) -> guidance.
+    preset (Pyright -> Ruff -> pytest -> SBOM) -> built-in sampled fallback.
 
     --general instead runs bounded language-agnostic syntax gates
     (Python/TS/JS/Go/Rust/Shell auto-detected, up to 50 files per language).
+    The same sampled gates run by default outside a HyoDo checkout when no
+    BYOG configuration exists. They are not a full-project validation.
+    No executed gates exits 2; failed gates exit 1; executed gates all passing exit 0.
 
     A fifth, report-only computation (test integrity: are the tests asserting
     anything observable?) always runs alongside the HyoDo-checkout preset gates;
@@ -1675,6 +1690,7 @@ def check(
                 failed=[
                     f"{r.language} ({r.tool})" for r in gen_results if r.status is GateStatus.FAIL
                 ],
+                sampled=True,
             )
             _print_general_results(gen_results, gen_root)
             failed = [r for r in gen_results if r.status is GateStatus.FAIL]

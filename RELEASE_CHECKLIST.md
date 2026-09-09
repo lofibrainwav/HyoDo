@@ -36,7 +36,12 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 - [ ] `hyodo --version` matches `VERSION`
 - [ ] `hyodo score` emits REVIEW_SIGNAL (not approval)
 - [ ] `hyodo safe` flags secret fixtures; `--strict` exits 1 on high findings
-- [ ] Empty/non-HyoDo `hyodo check` exits 2 (not false green)
+- [ ] Empty/no-executable-gates `hyodo check` exits 2 (not false green)
+- [ ] Outside a HyoDo checkout, `check` uses `.hyodo/gates.toml` (BYOG) when present;
+      otherwise it falls back to the same bounded sampled syntax gates as `--general`
+- [ ] Sampled checks preserve scope and limitations in normal, `--json`, and `--quiet`
+      output; failed gates exit 1, executed gates all passing exit 0, and neither
+      outcome claims full-project validation
 - [ ] Sdist ships only the public `hyodo` package
 
 ### CI and smoke (GitHub Actions)

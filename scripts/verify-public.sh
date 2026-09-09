@@ -54,22 +54,24 @@ bash -n install.sh
 bash -n install_interactive.sh
 
 echo "-- package build --"
-rm -rf dist build
+VERIFY_DIR="$(mktemp -d \"${TMPDIR:-/tmp}/hyodo-public-verify.XXXXXX\")"
+echo "verification artifacts: $VERIFY_DIR"
 # Upgrade explicitly: a stale local twine (<7) cannot parse Metadata-Version 2.5
 # sdist metadata produced by current hatchling and fails `twine check` spuriously.
 $PYTHON -m pip install -q --upgrade build twine
-$PYTHON -m build
+$PYTHON -m build --outdir "$VERIFY_DIR/dist"
 # `dist/` also contains the CycloneDX SBOM, which is a release evidence
 # asset rather than a Python distribution.  Keep Twine scoped to artifacts
 # that it can validate as uploadable package files.
-$PYTHON -m twine check dist/*.whl dist/*.tar.gz
+$PYTHON -m twine check "$VERIFY_DIR"/dist/*.whl "$VERIFY_DIR"/dist/*.tar.gz
 
 echo "-- sdist must not ship afo_core --"
-$PYTHON - <<'PY'
+$PYTHON - "$VERIFY_DIR/dist" <<'PY'
+import sys
 import tarfile
 from pathlib import Path
 
-sdists = list(Path("dist").glob("*.tar.gz"))
+sdists = list(Path(sys.argv[1]).glob("*.tar.gz"))
 assert sdists, "no sdist found"
 with tarfile.open(sdists[0]) as t:
     names = t.getnames()
@@ -84,10 +86,17 @@ print(f"sdist ok: {sdists[0].name} ({size} bytes), {len(names)} entries")
 PY
 
 echo "-- wheel install smoke --"
-$PYTHON -m pip install -q --force-reinstall "dist/hyodo-${EXPECTED_VERSION}-py3-none-any.whl"
-$HYODO --version | grep -F "$EXPECTED_VERSION"
-$PYTHON - <<PY
+$PYTHON -m venv "$VERIFY_DIR/wheel-venv"
+WHEEL_PYTHON="$VERIFY_DIR/wheel-venv/bin/python"
+"$WHEEL_PYTHON" -m pip install -q "$VERIFY_DIR/dist/hyodo-${EXPECTED_VERSION}-py3-none-any.whl"
+(
+cd "$VERIFY_DIR"
+"$VERIFY_DIR/wheel-venv/bin/hyodo" --version | grep -F "$EXPECTED_VERSION"
+"$WHEEL_PYTHON" -I - <<PY
 import hyodo
+import sys
+from pathlib import Path
+assert Path(hyodo.__file__).resolve().is_relative_to(Path(sys.prefix).resolve())
 assert hyodo.__version__ == "${EXPECTED_VERSION}", hyodo.__version__
 from hyodo import is_strong_review_signal, calculate_hygook_v5_score
 assert is_strong_review_signal(95, 5) is True
@@ -96,42 +105,43 @@ f, s = calculate_hygook_v5_score(1, 1, 1, 1, 1)
 assert round(f, 2) == 60.00 and round(s, 2) == 10.00
 print("wheel import API ok")
 PY
+)
 
 echo "-- CLI smoke --"
-# reinstall editable so `hyodo check` uses the working tree sources
-$PYTHON -m pip install -e ".[dev]" -q
+# The working environment remains editable; the wheel smoke uses its own venv.
 # HyoDo checkout: expect executed gates to pass (never the false-green "All gates passed" alone)
 set +e
-$HYODO check >/tmp/hyodo-check.out 2>&1
+$HYODO check >"$VERIFY_DIR/check.out" 2>&1
 CHECK_EC=$?
 set -e
-grep -q "All executed gates passed" /tmp/hyodo-check.out
+grep -q "All executed gates passed" "$VERIFY_DIR/check.out"
 test "$CHECK_EC" -eq 0
 # Empty/non-HyoDo tree must not false-green
-EMPTY_DIR="$(mktemp -d)"
+EMPTY_DIR="$VERIFY_DIR/empty"
+mkdir "$EMPTY_DIR"
 set +e
-$HYODO check "$EMPTY_DIR" >/tmp/hyodo-check-empty.out 2>&1
+$HYODO check "$EMPTY_DIR" >"$VERIFY_DIR/check-empty.out" 2>&1
 EMPTY_EC=$?
 set -e
 test "$EMPTY_EC" -eq 2
-grep -q "No project gates were executed" /tmp/hyodo-check-empty.out
-grep -q "This is not a validation pass" /tmp/hyodo-check-empty.out
-if grep -q "All gates passed" /tmp/hyodo-check-empty.out; then
+grep -q "No project gates were executed" "$VERIFY_DIR/check-empty.out"
+grep -q "This is not a validation pass" "$VERIFY_DIR/check-empty.out"
+if grep -q "All gates passed" "$VERIFY_DIR/check-empty.out"; then
   echo "ERROR: false-green 'All gates passed' on empty tree"
   exit 1
 fi
-$HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9 >/tmp/hyodo-score.out
-grep -q "REVIEW_SIGNAL" /tmp/hyodo-score.out
-printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' >/tmp/hyodo-safe-fixture.txt
+$HYODO score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9 >"$VERIFY_DIR/score.out"
+grep -q "REVIEW_SIGNAL" "$VERIFY_DIR/score.out"
+printf 'token = ghp_abcdefghijklmnopqrstuvwxyz012345\n' >"$VERIFY_DIR/safe-fixture.txt"
 set +e
-$HYODO safe /tmp/hyodo-safe-fixture.txt >/tmp/hyodo-safe.out 2>&1
+$HYODO safe "$VERIFY_DIR/safe-fixture.txt" >"$VERIFY_DIR/safe.out" 2>&1
 SAFE_EC=$?
-$HYODO safe --strict /tmp/hyodo-safe-fixture.txt >/tmp/hyodo-safe-strict.out 2>&1
+$HYODO safe --strict "$VERIFY_DIR/safe-fixture.txt" >"$VERIFY_DIR/safe-strict.out" 2>&1
 SAFE_STRICT_EC=$?
 set -e
 test "$SAFE_EC" -eq 0
 test "$SAFE_STRICT_EC" -eq 1
-grep -Eq "secret|Risk|high|caution" /tmp/hyodo-safe.out
+grep -Eq "secret|Risk|high|caution" "$VERIFY_DIR/safe.out"
 
 echo "-- claim regression (public surfaces) --"
 if grep -rEn "Auto-approve|AUTO_RUN|Proceed immediately|Candidate for approval" \

@@ -13,6 +13,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [4.18.0] - 2026-09-09
+
+Release readiness and measured execution preparation: sampled checks now
+preserve their scope in compact output, and public verification validates
+artifacts from an isolated wheel installation.
+
+### Added
+
+- Regression coverage for sampled fallback output and BYOG boundaries.
+
+### Changed
+
+- `hyodo check --json` and `--quiet` disclose bounded sampled syntax checks.
+- Public verification builds into an isolated directory and tests a clean wheel environment.
+
 ## [4.17.0] - 2026-09-08
 
 Instrumentation release: the CLI gains a local-only friction preview so a
