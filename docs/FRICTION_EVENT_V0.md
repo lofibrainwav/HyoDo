@@ -29,6 +29,9 @@ measurement:
 It does not add prompt text, response text, model strings, tool arguments,
 paths, or execution credentials.
 
+Invalid sidecar observations are returned as explicit adapter issues. They are
+never silently treated as an empty or successfully observed dependency set.
+
 ## Graph v2 adapter
 
 `join_adapter_events()` returns copies of observed ledger events and adds a
