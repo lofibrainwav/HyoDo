@@ -45,9 +45,13 @@ The immediate objective is not IFC enforcement, autonomous skill evolution, RL t
 The immediate objective is a reproducible measured baseline:
 
 ```text
+freeze exact research-source snapshot
+        ↓
 HyoDo 4.17.0 released and installable
         ↓
 KINGDOM Observation Contract v1 merged under existing authority boundaries
+        ↓
+freeze exact Measured Run #1 execution snapshot
         ↓
 local-only observer explicitly enabled
         ↓
@@ -57,6 +61,13 @@ HyoDo friction/evidence preview
         ↓
 Measured Run #1 receipt
 ```
+
+There are therefore **two different freezes**:
+
+1. **Research-source freeze** — pins the canon/EROS/KINGDOM/HyoDo objects that parallel source and interpretation workers are auditing.
+2. **Measured-run execution freeze** — pins the exact merged runtime used for a real measurement receipt.
+
+Do not confuse them. The first must occur before large parallel 86/Wisdom audit lanes. The second occurs after the observation bridge is merged and immediately before the real measured run.
 
 No later roadmap phase should be promoted because it is fashionable or supported by an adjacent paper. Promotion requires local evidence that the additional layer solves a measured problem.
 
@@ -68,20 +79,22 @@ Create the first trustworthy KINGDOM -> HyoDo measured execution trace while fre
 
 ### Required work
 
+- freeze the exact KINGDOM/canon/EROS/HyoDo research-source snapshot before large parallel audit work;
 - close the public ACL/research documentation hardening PR on an exact green head;
 - verify HyoDo 4.17.0 through an actual installed CLI readback;
 - merge KINGDOM Observation Contract v1 only after its exact-head CI remains green and local governance requirements are satisfied;
+- pin the exact merged KINGDOM + HyoDo execution snapshot for Measured Run #1;
 - enable only the existing local-only friction state;
 - execute a real, useful KINGDOM task;
 - record HyoDo events and generate a friction preview;
-- preserve privacy and authority invariants;
-- freeze the exact KINGDOM/HyoDo/canon/EROS research snapshot before confirmatory Wisdom evaluation.
+- preserve privacy and authority invariants.
 
 ### Phase-0 acceptance evidence
 
 At minimum capture:
 
-- exact KINGDOM commit SHA;
+- exact research-source snapshot pointers;
+- exact Measured Run #1 KINGDOM commit SHA;
 - exact HyoDo version/commit;
 - observer contract version;
 - consent state showing local-only / no network contribution;
@@ -285,7 +298,7 @@ The 86/Wisdom work proceeds beside, not inside, the HyoDo runtime expansion.
 
 ```text
 SERIAL
-freeze exact research snapshot
+freeze exact research-source snapshot
         ↓
 PARALLEL
 A 86/86 historical/source audit
@@ -311,6 +324,8 @@ replication / hostile review / privacy-authority audit
 SERIAL
 promotion decision
 ```
+
+The Measured Run #1 execution snapshot is a separate runtime receipt and can be prepared inside lane D once the observation bridge is merged. It does not authorize changing the already frozen source/canon object being audited by lanes A-C.
 
 Core doctrine:
 
@@ -351,19 +366,35 @@ If one answer is missing, the capability remains research/shadow/adaptor status.
 ## 11. Current priority order
 
 ```text
-P0  close exact-head docs/ACL hardening
-P0  verify installed HyoDo 4.17.0
-P0  merge KINGDOM Observation Contract v1 under clean governance
-P0  produce Measured Run #1
+SERIAL P0-A
+freeze exact research-source snapshot
 
-P1  freeze research snapshot
-P1  audit 86/86 provenance in parallel
-P1  collect interpretation Zettels in parallel
-P1  continue hostile baseline research in parallel
+PARALLEL P0/P1 lanes after that freeze
+A 86/86 provenance audit
+B interpretation Zettelkasten collection
+C hostile baseline / related-work research
+D measurement readiness:
+  - close exact-head docs/ACL hardening
+  - verify installed HyoDo 4.17.0
+  - merge KINGDOM Observation Contract v1 under clean governance
+  - freeze exact Measured Run #1 execution snapshot
+  - produce Measured Run #1
 
-P2  freeze and run the falsifiable Wisdom benchmark
-P3  consider safe evolution only if repeated evidence supports it
-P4  consider distributed IFC/ZK attestation only when a measured use case requires it
+SERIAL C1
+reconcile source/interpretation conflicts and freeze audited manifest
+
+SERIAL S1
+freeze falsifiable Wisdom benchmark + evaluation policy
+
+PARALLEL P2
+run matched benchmark conditions / seeds / independent verification
+
+SERIAL C2/C3
+adjudicate evidence and decide promotion
+
+FUTURE
+consider safe evolution only if repeated evidence supports it
+consider distributed IFC/ZK attestation only when a measured use case requires it
 ```
 
 ## 12. Roadmap anti-drift rule
