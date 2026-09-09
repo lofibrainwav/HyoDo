@@ -197,7 +197,7 @@ For every disagreement, preserve the disagreement rather than force false consen
 Example:
 
 ```yaml
-current_kingdom_label: 손자병법
+current_kingdom_label: The Art of War / Sunzi tradition
 primary_source_status: disputed
 source_candidate_A: ...
 source_candidate_B: ...
