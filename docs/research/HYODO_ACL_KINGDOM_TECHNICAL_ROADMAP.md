@@ -2,6 +2,7 @@
 
 Status: working roadmap
 Date: 2026-09-08
+Last measured update: 2026-09-08 PT / 2026-09-09 UTC
 
 Purpose: preserve the agreed system boundaries, sequencing, and promotion gates so new research ideas do not silently turn HyoDo into a monolithic orchestrator or move unmeasured hypotheses into production.
 
@@ -38,72 +39,154 @@ wisdom/population evidence -> recommendation               allowed
 wisdom/population evidence -> policy/Evidence Gate bypass  forbidden
 ```
 
-## 2. Current gate: close the baseline before expansion
+## 2. Current gate: complete Evidence Pack v1 before expansion
 
 The immediate objective is not IFC enforcement, autonomous skill evolution, RL training, dynamic topology deployment, or zero-knowledge circuits.
 
-The immediate objective is a reproducible measured baseline:
+The immediate objective is **Evidence Pack v1**: a small but attributable set of real KINGDOM executions that proves what HyoDo can and cannot observe across materially different outcomes.
+
+Measured progress is now:
 
 ```text
-freeze exact research-source snapshot
+research-source snapshot boundary defined
         ↓
-HyoDo 4.17.0 released and installable
+HyoDo 4.17.0 released and installable                         OBSERVED
         ↓
-KINGDOM Observation Contract v1 merged under existing authority boundaries
+KINGDOM Observation Contract v1 merged                        OBSERVED
         ↓
-freeze exact Measured Run #1 execution snapshot
+Measured Run #1 — infrastructure/provider failure             OBSERVED
         ↓
-local-only observer explicitly enabled
+observer fidelity repair — single-agent serial classification OBSERVED
         ↓
-one real KINGDOM task
+Measured Run #2 — output/verification quality failure         OBSERVED
         ↓
-HyoDo friction/evidence preview
+Coder coarse terminal truth (ok + closed status enum)         OBSERVED
         ↓
-Measured Run #1 receipt
+Measured Run #2b — same execution behavior, unknown -> fail   OBSERVED
+        ↓
+target-run attribution isolation                              NEXT
+        ↓
+Measured Run #3 — successful real execution                   REQUIRED
+        ↓
+sensor coverage matrix + Run #1/#2/#2b/#3 receipts           REQUIRED
+        ↓
+Evidence Pack v1                                              PHASE-0 GATE
 ```
 
-There are therefore **two different freezes**:
+There are **two different freezes**:
 
 1. **Research-source freeze** — pins the canon/EROS/KINGDOM/HyoDo objects that parallel source and interpretation workers are auditing.
-2. **Measured-run execution freeze** — pins the exact merged runtime used for a real measurement receipt.
+2. **Measured-run execution freeze** — pins the exact merged runtime used for each real measurement receipt.
 
-Do not confuse them. The first must occur before large parallel 86/Wisdom audit lanes. The second occurs after the observation bridge is merged and immediately before the real measured run.
+Do not confuse them. The first must occur before large parallel 86/Wisdom audit lanes. The second occurs immediately before each measured execution and must be recorded in the evidence receipt.
 
 No later roadmap phase should be promoted because it is fashionable or supported by an adjacent paper. Promotion requires local evidence that the additional layer solves a measured problem.
 
-## 3. Phase 0 — Baseline closure and measured reality
+## 3. Phase 0 — Baseline closure through Evidence Pack v1
 
 ### Goal
 
-Create the first trustworthy KINGDOM -> HyoDo measured execution trace while freezing the research object used by the 86/Wisdom work.
+Produce a citation-quality baseline that includes failure from infrastructure, failure from output/verification quality, a controlled sensor correction, and one successful execution — with attribution, privacy, authority non-interference, and known sensor gaps made explicit.
 
-### Required work
+### Measured state so far
 
-- freeze the exact KINGDOM/canon/EROS/HyoDo research-source snapshot before large parallel audit work;
-- close the public ACL/research documentation hardening PR on an exact green head;
-- verify HyoDo 4.17.0 through an actual installed CLI readback;
-- merge KINGDOM Observation Contract v1 only after its exact-head CI remains green and local governance requirements are satisfied;
-- pin the exact merged KINGDOM + HyoDo execution snapshot for Measured Run #1;
-- enable only the existing local-only friction state;
-- execute a real, useful KINGDOM task;
-- record HyoDo events and generate a friction preview;
-- preserve privacy and authority invariants.
+#### Run #1 — infrastructure/provider failure
+
+Observed baseline properties:
+
+- real KINGDOM execution trace reached HyoDo;
+- 16 HyoDo ledger events were recorded;
+- prohibited raw-field leakage observed: 0;
+- policy decision/evaluator remained unevaluated/null;
+- execution failed before useful Coder output because the critical LLM chain was unavailable;
+- outcome remained `unknown` because terminal producer truth was not yet present;
+- the first observer version misclassified the single-agent execution as `multi_actor_serial`.
+
+Interpretation: useful failure sample and sensor-discovery baseline, not a successful task sample.
+
+#### Run #2 — output/verification quality failure
+
+After observer fidelity repair and LLM-chain recovery:
+
+- the execution advanced through 18 pipeline steps;
+- Coder produced output;
+- Reviewer rejected the result 8 times;
+- the run remained a real execution failure;
+- single-agent attribution mapped to one actor and `orchestration_pattern=serial`;
+- prohibited raw leakage remained 0;
+- HyoDo outcome remained `unknown` because the producer still did not emit terminal truth;
+- retry/rework/review rejection/iteration detail remained unobserved because Observation Contract v1 only consumes the four Coder lifecycle channels.
+
+Interpretation: the failure axis moved from model availability to output/verification quality while the privacy and authority boundaries remained intact.
+
+#### Coder terminal-truth correction
+
+KINGDOM then added only coarse terminal truth to existing Coder lifecycle traces:
+
+```text
+task-finished -> ok: boolean + closed canonical status enum
+run-finished  -> ok: boolean + closed canonical status enum
+```
+
+The change did not add raw error text, generated code, reviewer prose, paths, prompts, responses, retry behavior, scheduling changes, EROS changes, or Evidence Gate changes.
+
+#### Run #2b — controlled sensor remeasurement
+
+The same failing fixture was rerun after the terminal-truth change.
+
+Observed comparison:
+
+```text
+execution steps           18 -> 18
+Reviewer rejections        8 -> 8
+iterations                 3 -> 3
+execution result        FAIL -> FAIL
+HyoDo outcome        unknown -> fail (for new-code target runs)
+raw leakage               0 -> 0
+```
+
+This is the first measured evidence that HyoDo can classify a real KINGDOM failure as `fail` while execution behavior remains unchanged.
+
+Run #2b also exposed the remaining attribution problem: unrelated processes shared the same `kingdom:events` stream, so the measurement contained both new-code target runs and unrelated old-code runs. Schema differences made them distinguishable after the fact, but that is not a durable attribution contract.
+
+### Remaining Phase-0 work
+
+1. **Target-run attribution isolation**
+   - filter the observation bridge by an explicit target KINGDOM run before privacy mapping;
+   - unrelated runs must not affect event counts, actor tracking, or HyoDo output;
+   - raw producer run id must remain local and absent from HyoDo events/receipts;
+   - filtered measurement must not corrupt the normal observer's persisted cursor/tracker state.
+2. **Measured Run #3 — successful sample**
+   - choose a small, real, high-probability task;
+   - freeze exact KINGDOM/HyoDo execution versions;
+   - use the attribution-isolated observation path;
+   - obtain a real successful outcome sample.
+3. **Sensor coverage matrix**
+   - mark each desired signal as OBSERVED, PARTIAL, or UNOBSERVED;
+   - distinguish missing producer vocabulary from intentionally excluded channels;
+   - keep Reviewer coarse verdict, retry/rework, iteration detail, model/provider identity, and resource-conflict signals honest if still unwired.
+4. **Evidence Pack v1 seal**
+   - bundle Run #1, Run #2, Run #2b, Run #3, exact version pointers, privacy/authority checks, and the sensor coverage matrix;
+   - record residual limitations rather than repairing them post hoc inside the pack.
 
 ### Phase-0 acceptance evidence
 
 At minimum capture:
 
 - exact research-source snapshot pointers;
-- exact Measured Run #1 KINGDOM commit SHA;
+- exact KINGDOM commit SHA for every measured run;
 - exact HyoDo version/commit;
-- observer contract version;
+- observer contract/filter version;
 - consent state showing local-only / no network contribution;
+- explicit stream/run attribution boundary for Run #3;
 - event count and event schema version;
 - serial/fanout structure that is actually observable;
-- retry/rework/intervention/verification signals when present;
+- measured terminal outcome where producer truth exists;
+- retry/rework/intervention/reviewer/verification signals only when actually wired;
 - evidence completeness and missing-data notes;
-- proof that the observer did not mutate execution authority;
-- privacy review showing prohibited raw fields were not copied.
+- proof that the observer/filter did not mutate execution authority or behavior;
+- privacy review showing prohibited raw fields were not copied;
+- sensor coverage matrix across the sealed runs.
 
 ### Phase-0 non-goals
 
@@ -115,7 +198,8 @@ Do not add yet:
 - GRPO or other RL training;
 - a production DyTopo-style router;
 - zk-MCP/Circom circuits;
-- an automatic Wisdom Reflex runtime.
+- an automatic Wisdom Reflex runtime;
+- automatic Reviewer intervention or policy authority because Reviewer telemetry becomes observable.
 
 ## 4. Phase 1 — Observation and passive-shadow seams
 
@@ -163,9 +247,9 @@ The prior study's reported cost reduction is a baseline to reproduce or beat, no
 
 The Evidence Gate must remain an evidence/completion gate, not a token-budget controller.
 
-### 4.3 Skill/topology observation
+### 4.3 Skill/topology/reviewer observation
 
-Before adopting a new orchestration standard or router, measure:
+Before adopting a new orchestration standard or router, measure only signals that have explicit producers and documented privacy transforms:
 
 - skill invocation identity/version;
 - explicit versus bulk-prompt skill activation;
@@ -173,7 +257,10 @@ Before adopting a new orchestration standard or router, measure:
 - messages/rounds/tokens/latency;
 - stalls and handoffs;
 - verification outcomes;
-- failures and retries.
+- failures and retries;
+- optional coarse Reviewer verdict (`approved` / `rejected`) as a separate producer lane if later justified.
+
+Reviewer verdict must remain distinct from Coder terminal truth. Observing `rejected` must not itself grant Reviewer new authority or change the execution result path.
 
 Agent Skills compatibility may be useful as an adapter. Swarm Skills, SkillForge, and DyTopo remain research references/baselines until local matched evidence supports promotion.
 
@@ -304,7 +391,7 @@ PARALLEL
 A 86/86 historical/source audit
 B interpretation Zettelkasten collection
 C hostile related-work and null-baseline research
-D HyoDo/KINGDOM measurement readiness
+D Evidence Pack v1 completion / HyoDo-KINGDOM measurement readiness
         ↓
 SERIAL
 conflict reconciliation + audited manifest
@@ -325,7 +412,7 @@ SERIAL
 promotion decision
 ```
 
-The Measured Run #1 execution snapshot is a separate runtime receipt and can be prepared inside lane D once the observation bridge is merged. It does not authorize changing the already frozen source/canon object being audited by lanes A-C.
+Each measured-run execution snapshot is a separate runtime receipt inside lane D. It does not authorize changing the already frozen source/canon object being audited by lanes A-C.
 
 Core doctrine:
 
@@ -366,19 +453,33 @@ If one answer is missing, the capability remains research/shadow/adaptor status.
 ## 11. Current priority order
 
 ```text
-SERIAL P0-A
-freeze exact research-source snapshot
+OBSERVED / SEALED
+HyoDo 4.17.0 release
+Observation Contract v1
+Measured Run #1
+observer fidelity correction
+Measured Run #2
+Coder terminal truth correction
+Measured Run #2b unknown -> fail validation
 
-PARALLEL P0/P1 lanes after that freeze
+SERIAL P0 — NOW
+target-run attribution isolation
+        ↓
+freeze exact Run #3 execution snapshot
+        ↓
+Measured Run #3 successful sample
+        ↓
+sensor coverage matrix
+        ↓
+Evidence Pack v1 seal
+        ↓
+Phase 0 COMPLETE
+
+PARALLEL RESEARCH LANES
 A 86/86 provenance audit
 B interpretation Zettelkasten collection
 C hostile baseline / related-work research
-D measurement readiness:
-  - close exact-head docs/ACL hardening
-  - verify installed HyoDo 4.17.0
-  - merge KINGDOM Observation Contract v1 under clean governance
-  - freeze exact Measured Run #1 execution snapshot
-  - produce Measured Run #1
+D Evidence Pack / measurement completion
 
 SERIAL C1
 reconcile source/interpretation conflicts and freeze audited manifest
@@ -433,4 +534,4 @@ Then decide whether it belongs in NOW, SHADOW, EXPERIMENT, or FUTURE based on me
 
 ## 14. One-line roadmap
 
-> **Measure reality first; compare alternatives in shadow; promote only verified improvements; keep execution, authority, evidence, and observation as separate planes.**
+> **Measure reality first; isolate attribution before citation; compare alternatives in shadow; promote only verified improvements; keep execution, authority, evidence, and observation as separate planes.**
