@@ -18,7 +18,8 @@ It defines:
 - append-only Zettelkasten interpretation records;
 - existing KINGDOM primary-principle + checking-principle doctrine;
 - generated-suggestion labeling;
-- anti-contamination and authority boundaries.
+- anti-contamination and authority boundaries;
+- a single-writer registrar/adjudicator for canonical convergence.
 
 ## 2. Decision experiment — what is new research
 
