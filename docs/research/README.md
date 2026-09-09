@@ -22,6 +22,7 @@ It defines:
 - Phase 3 proposal-first safe evolution;
 - Phase 4 distributed privacy / cryptographic attestation;
 - the NOW / SHADOW / EXPERIMENT / FUTURE promotion discipline;
+- roadmap status labels such as SHIPPED, OBSERVED, READY, SHADOW, EXPERIMENT, FUTURE, BLOCKED, and UNOBSERVED;
 - the rule that new SOTA research may change candidate technologies but must not silently collapse system ownership or skip evidence gates.
 
 Current top-level doctrine:
@@ -138,7 +139,7 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 When two documents appear to disagree, resolve them in this order:
 
 1. shipped/runtime authority contracts and exact code behavior;
-2. this top-level technical roadmap;
+2. the top-level technical roadmap;
 3. the canon audit protocol;
 4. the Wisdom decision experiment protocol;
 5. the serial/parallel execution plan;
