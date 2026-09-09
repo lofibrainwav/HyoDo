@@ -16,7 +16,7 @@ import json
 import os
 import stat
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -26,6 +26,8 @@ from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, read_agent_events
 FRICTION_CONTRIBUTION_SCHEMA_VERSION = "hyodo.friction-contribution/v1"
 FRICTION_STATE_SCHEMA_VERSION = "hyodo.friction-state/v1"
 FRICTION_STATE_RELATIVE_PATH = Path(".hyodo") / "friction-contribution.json"
+FRICTION_EXPORT_SCHEMA_VERSION = "hyodo.friction-export/v1"
+FRICTION_EXPORT_RELATIVE_PATH = Path(".hyodo") / "friction-export.json"
 NETWORK_TRANSPORT = "disabled"
 
 TASK_CLASSES = frozenset(
@@ -613,3 +615,41 @@ def preview_payload(root: Path, *, run_id: str | None = None) -> dict[str, Any]:
             "may_override_evidence_gate": False,
         },
     }
+
+
+def friction_export_payload(
+    root: Path, *, run_id: str | None = None, exported_at: str | None = None
+) -> dict[str, Any]:
+    """Build the local export envelope from the exact preview payload.
+
+    ``exported_at`` is envelope metadata only. It is injectable for deterministic
+    tests and never carries a run id or any contribution identity.
+    """
+
+    preview = preview_payload(root, run_id=run_id)
+    return {
+        "schema": FRICTION_EXPORT_SCHEMA_VERSION,
+        "hyodo_version": __version__,
+        "exported_at": exported_at or datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "consent": {
+            "enabled": preview["enabled"],
+            "network_consent": False,
+            "scope": preview["consent_scope"],
+        },
+        "observation": preview["observation"],
+        "contributions": preview["contributions"],
+        "never_export": preview["never_export"],
+        "authority": preview["authority"],
+    }
+
+
+def write_friction_export(path: Path, payload: dict[str, Any]) -> None:
+    """Atomically write one owner-readable local export artifact."""
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    os.chmod(tmp, 0o600)
+    os.replace(tmp, path)
+    if stat.S_IMODE(path.stat().st_mode) != 0o600:
+        os.chmod(path, 0o600)

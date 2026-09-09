@@ -59,6 +59,21 @@ the rest of `.hyodo/` out of version control — see
 | Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
 | Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
+## Current claim lock
+
+This matrix is the current product boundary. The Measured Run #1 receipt is
+[`docs/research/MEASURED_RUN_1_2026-09-08.md`](./docs/research/MEASURED_RUN_1_2026-09-08.md).
+
+| Capability | Status | Evidence boundary |
+| --- | --- | --- |
+| gates / ledger / friction preview | SHIPPED | Local gates, `hyodo.agent-event/v1` ledger, and local-only preview/export. |
+| Graph v1 | SHIPPED (site is DEMO FIXTURE) | `hyodo dashboard` reads the local ledger; the public site uses fixed demo data. |
+| Graph v2 join | NOT BUILT | No Graph v2 join runtime or shipped viewer; the SCC helper is a fixture oracle only. |
+| Cursor/Codex hooks | UNOBSERVED | No directly verified host adapter evidence. |
+| remote MCP / ChatGPT | CONTRACT ONLY | Contract surface exists; hosted runtime is not observed. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Research hypothesis and protocol; no automatic router. |
+| friction collector | NOT BUILT | Preview is local-only; network transport is disabled and no collector/uploader exists. |
+
 ## Honest boundaries
 
 HyoDo is deliberately narrow:

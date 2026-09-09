@@ -25,9 +25,34 @@ It defines:
 - roadmap status labels such as SHIPPED, OBSERVED, READY, SHADOW, EXPERIMENT, FUTURE, BLOCKED, and UNOBSERVED;
 - the rule that new SOTA research may change candidate technologies but must not silently collapse system ownership or skip evidence gates.
 
+The post-baseline topology freeze is recorded in
+[`GRAPH_V2_JOIN_SPEC.md`](./GRAPH_V2_JOIN_SPEC.md), with five deterministic
+fixtures under [`tests/fixtures/graph-v2-join/`](../../tests/fixtures/graph-v2-join/).
+Lane C is implemented by the local-only `hyodo friction export` command. It
+writes `.hyodo/friction-export.json` (or an explicit `--out` path) only after
+`friction on` and `--yes`; it never uploads. [`LANE_C_EXPORT.json`](./LANE_C_EXPORT.json)
+is a research-lane status record, not the export artifact, and remains
+`UNOBSERVED` until an external confirmation run exists.
+
 Current top-level doctrine:
 
 > **Measure reality first; compare alternatives in shadow; promote only verified improvements; keep execution, authority, evidence, and observation as separate planes.**
+
+## Current claim lock
+
+This matrix is the shared product boundary for the root README, public site,
+and research page. The [Measured Run #1 receipt](./MEASURED_RUN_1_2026-09-08.md)
+is the execution evidence; this table does not turn it into an ACL result.
+
+| Capability | Status | Evidence boundary |
+| --- | --- | --- |
+| gates / ledger / friction preview | SHIPPED | Local gates, `hyodo.agent-event/v1` ledger, and local-only preview/export. |
+| Graph v1 | SHIPPED (site is DEMO FIXTURE) | `hyodo dashboard` reads the local ledger; the public site uses fixed demo data. |
+| Graph v2 join | NOT BUILT | No Graph v2 join runtime or shipped viewer; the SCC helper is a fixture oracle only. |
+| Cursor/Codex hooks | UNOBSERVED | No directly verified host adapter evidence. |
+| remote MCP / ChatGPT | CONTRACT ONLY | Contract surface exists; hosted runtime is not observed. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Research hypothesis and protocol; no automatic router. |
+| friction collector | NOT BUILT | Preview is local-only; network transport is disabled and no collector/uploader exists. |
 
 ## 1. Canon first — what is being studied
 

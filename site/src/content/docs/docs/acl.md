@@ -9,6 +9,20 @@ description: A working field note on evidence-grounded support profiles, human w
 
 **Reader map.** This page is the focused field note for the **Wisdom Reflex + collaboration-topology** hypothesis. See [Research](/docs/research/) for the broader ACL empirical program, sealed benchmark baseline, related work, and publication status. See [Friction Contribution](/docs/friction-contribution/) for the local measurement contract.
 
+## Current claim lock
+
+The public product boundary is fixed below. The [Measured Run #1 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md) records one observed KINGDOM/HyoDo execution; it is not a claim of ACL effectiveness.
+
+| Capability | Status | Evidence boundary |
+| --- | --- | --- |
+| gates / ledger / friction preview | SHIPPED | Local gates, `hyodo.agent-event/v1` ledger, and local-only preview/export. |
+| Graph v1 | SHIPPED (site is DEMO FIXTURE) | `hyodo dashboard` reads the local ledger; the public site uses fixed demo data. |
+| Graph v2 join | NOT BUILT | No Graph v2 join runtime or shipped viewer; the SCC helper is a fixture oracle only. |
+| Cursor/Codex hooks | UNOBSERVED | No directly verified host adapter evidence. |
+| remote MCP / ChatGPT | CONTRACT ONLY | Contract surface exists; hosted runtime is not observed. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Research hypothesis and protocol; no automatic router. |
+| friction collector | NOT BUILT | Preview is local-only; network transport is disabled and no collector/uploader exists. |
+
 HyoDo measures what happened. ACL asks a different question:
 
 > **What support profile should this human–AI workflow receive in this context?**
@@ -231,7 +245,7 @@ The current command doctrine is still primarily keyword-driven and currently sta
 
 ## Evidence status: do not count fixtures as reality
 
-The observation bridge’s own contract explicitly distinguishes CI fixtures from measured production evidence. At the snapshot for this field note, **Measured KINGDOM ↔ HyoDo Run #1 is not yet counted**.
+The observation bridge’s own contract explicitly distinguishes CI fixtures from measured production evidence. **Measured KINGDOM ↔ HyoDo Run #1 is now counted as an observability baseline only**; it does not establish ACL effectiveness, a friction reduction, or a Wisdom Reflex result. See the [receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md).
 
 That is the next scientific gate. A useful result is allowed to be disappointing — for example, missing evidence completeness, unexpectedly sequential execution, or no measurable friction reduction. Those are measurements, not failures to hide.
 

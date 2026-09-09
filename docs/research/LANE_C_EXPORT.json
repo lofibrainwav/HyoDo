@@ -1,0 +1,16 @@
+{
+  "schema": "hyodo.research-lane-export/v1",
+  "lane": "C",
+  "scope": "hostile related-work and null-baseline audit",
+  "status": "UNOBSERVED",
+  "artifact": ".hyodo/friction-export.json",
+  "command": "hyodo friction export [--out FILE] [--run-id ID] --yes",
+  "claims": [],
+  "evidence_refs": [],
+  "authority": "recommendation_only",
+  "notes": [
+    "This file is a research-lane status record, not the local export artifact.",
+    "No external confirmation run or null-baseline result is asserted here.",
+    "This file preserves the lane boundary after Measured Run #1; it is not a product capability or promotion decision."
+  ]
+}

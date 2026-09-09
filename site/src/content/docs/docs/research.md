@@ -62,6 +62,20 @@ Candidate conditioning signals include:
 
 The output is a **support recommendation**, not an authorization token. The research should not assume that support can be compressed into one scalar until data shows that doing so preserves the useful distinctions among oversight, verification, explanation, exploration, and resource budget.
 
+## Current claim lock
+
+The public product boundary is fixed below. The [Measured Run #1 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md) records the observed KINGDOM/HyoDo execution; it is not a claim of ACL effectiveness.
+
+| Capability | Status | Evidence boundary |
+| --- | --- | --- |
+| gates / ledger / friction preview | SHIPPED | Local gates, `hyodo.agent-event/v1` ledger, and local-only preview/export. |
+| Graph v1 | SHIPPED (site is DEMO FIXTURE) | `hyodo dashboard` reads the local ledger; the public site uses fixed demo data. |
+| Graph v2 join | NOT BUILT | No Graph v2 join runtime or shipped viewer; the SCC helper is a fixture oracle only. |
+| Cursor/Codex hooks | UNOBSERVED | No directly verified host adapter evidence. |
+| remote MCP / ChatGPT | CONTRACT ONLY | Contract surface exists; hosted runtime is not observed. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Research hypothesis and protocol; no automatic router. |
+| friction collector | NOT BUILT | Preview is local-only; network transport is disabled and no collector/uploader exists. |
+
 ## Instrument version boundary
 
 HyoDo's local evidence, gate, policy, report, and inspection surfaces predate the friction instrument. The `hyodo friction` command is introduced in **HyoDo 4.17.0**; HyoDo 4.16.x and earlier do not expose that command.
