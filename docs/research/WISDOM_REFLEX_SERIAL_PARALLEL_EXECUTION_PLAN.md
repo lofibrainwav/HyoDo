@@ -45,10 +45,10 @@ parallel plans             allowed
 parallel independent runs  allowed
 parallel final authority   forbidden
 parallel canon writers     forbidden
-parallel Evidence Gates    forbidden as competing final truth
+competing final truth      forbidden
 ```
 
-Independent verifiers may run in parallel; the final completion state is still produced through the governed Evidence Gate / adjudication path.
+Independent verifiers may run in parallel. The final completion state is still produced through one governed adjudication / Evidence Gate path.
 
 ## 3. Stage graph
 
@@ -117,7 +117,7 @@ Split the 86 entries into independent audit batches. Parallel workers may check:
 - ambiguity, mistranslation, or anachronism;
 - independent secondary scholarship.
 
-Recommended decomposition:
+Recommended operational decomposition:
 
 ```text
 worker A: canon 1–15
@@ -129,9 +129,9 @@ worker F: canon 74–86
 worker G: adversarial spot-check across all source families
 ```
 
-Numbers are operational batches, not new canon groupings.
+These ranges are workload batches only, not new canon groupings.
 
-Each worker outputs evidence records only. They do not rewrite canonical IDs/names.
+Each worker outputs evidence records. They do not rewrite canonical IDs/names.
 
 ## 6. P2 — Interpretation Zettelkasten (PARALLEL)
 
@@ -386,6 +386,25 @@ the experimental object must be frozen for reproducibility
 results from parallel lanes must be reconciled
 ```
 
-## 18. One-line doctrine
+## 18. Operational application to the current project
+
+Run these lanes together now:
+
+```text
+PARALLEL LANE A — 86/86 source audit
+PARALLEL LANE B — interpretation Zettelkasten collection
+PARALLEL LANE C — hostile external related-work / baseline audit
+PARALLEL LANE D — HyoDo 4.17 + KINGDOM #773 measurement readiness
+```
+
+Then stop at one barrier:
+
+```text
+SERIAL BARRIER — audited canon manifest + conflict register + frozen research snapshot
+```
+
+Only after that barrier start the confirmatory Wisdom benchmark.
+
+## 19. One-line doctrine
 
 > **Parallelize evidence gathering and independent trials; serialize truth registration, authority, convergence, and promotion.**
