@@ -32,7 +32,10 @@ hyodo friction --help
 
 If `hyodo --version` reports 4.16.x or earlier, `hyodo friction` is not part of
 that installation. Upgrade to a 4.17.0-or-newer release before following the
-commands below.
+commands below. **Release channels can publish at different times:** do not
+infer that a package index already serves 4.17.0 from a source-tree version or
+a GitHub Release. The installed `hyodo --version` and command help are the
+runtime boundary that matters.
 
 ## OFF by default
 
