@@ -110,8 +110,11 @@ The Wisdom Reflex is an additional hypothesis, not an assumed ingredient: a prov
 ## Related work we have to beat or complement
 
 - [HILA — Adaptive Collaboration with Humans (2026)](https://arxiv.org/abs/2603.07972) learns a metacognitive policy for autonomous solving versus human deferral in multi-agent systems.
+- [HAAS — Human-AI Adaptive Symbiosis (2026)](https://arxiv.org/abs/2605.02832) is a particularly close comparator: governance constraints define feasible actions first, then a contextual-bandit learner selects among five human/AI collaboration modes from outcome feedback. ACL therefore has to show value beyond policy-aware adaptive task allocation, not merely reproduce it with different terminology.
+- [Balancing autonomy and oversight in reliable agentic AI (2026)](https://doi.org/10.1007/s44163-026-01373-2) treats human oversight as a dynamically allocated resource rather than a fixed checkpoint and evaluates a three-way routing policy on 5,000 synthetic enterprise tasks. Its reliance on synthetic tasks and confidence proxies also provides a useful methodological comparison for ACL's planned measured-runtime evidence.
 - [Levels of Autonomy for AI Agents (2025)](https://arxiv.org/abs/2506.12469) defines five autonomy levels through changing human roles: operator, collaborator, consultant, approver, and observer.
 - [Measuring AI agent autonomy in practice (Anthropic, 2026)](https://www.anthropic.com/research/measuring-agent-autonomy) measures real human–agent autonomy patterns across millions of interactions.
+- [AI Agents Push Humans Out of the Loop (2026)](https://arxiv.org/abs/2608.23642) argues that agent design can degrade the cognitive capacities required for effective human oversight. ACL should therefore treat human cognitive burden and skill preservation as possible outcomes, not assume that fewer interventions are automatically better.
 - [Towards a Science of Scaling Agent Systems](https://arxiv.org/abs/2512.08296) shows that coordination topology must match measurable task properties and that multi-agent overhead can harm sequential work.
 - [Imagining and building wise machines: the centrality of AI metacognition](https://pubmed.ncbi.nlm.nih.gov/41760502/) treats intellectual humility, perspective-taking, and context adaptability as metacognitive strategy-selection capabilities.
 - [LATTICE (2026)](https://doi.org/10.3389/frai.2026.1800407) separates planning, execution, and governance with deterministic policy enforcement and auditable authorization.
@@ -127,6 +130,7 @@ The next public-quality evaluation should report, at minimum:
 | --- | --- |
 | Support-profile quality | Did ACL recommend an appropriate combination of oversight, verification, explanation, exploration, and budget? |
 | Human intervention rate | Did the system reduce unnecessary intervention? |
+| Human cognitive burden / retention | Did support allocation preserve the operator's ability to notice, judge, and recover from agent errors rather than merely reduce clicks? |
 | Rework / retry rate | Did lower support increase recovery work? |
 | Verification failure rate | Did support allocation preserve evidence quality? |
 | Evidence completeness | Was the claimed outcome backed by traceable evidence? |
@@ -188,6 +192,7 @@ The public artifact should ultimately include:
 - benchmark fixtures that do not contain private user data;
 - evaluation and ablation scripts;
 - latency / token / compute accounting;
+- human cognitive-burden measures where human oversight is part of the claim;
 - failure cases, null results, and contradictory evidence; and
 - corpus provenance plus counter-principle links for any Wisdom Reflex experiment.
 
