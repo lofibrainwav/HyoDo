@@ -397,7 +397,25 @@ consider safe evolution only if repeated evidence supports it
 consider distributed IFC/ZK attestation only when a measured use case requires it
 ```
 
-## 12. Roadmap anti-drift rule
+## 12. Status labels
+
+Use these labels in future roadmap updates so ideas do not drift into implied implementation:
+
+```text
+SHIPPED     implemented and released
+OBSERVED    directly verified in the current target state
+READY       prerequisites satisfied but not yet promoted/executed
+IN_PROGRESS active work with incomplete evidence
+SHADOW      recommendation/evaluation path causally excluded from authority
+EXPERIMENT  falsifiable research condition
+FUTURE      intentionally deferred candidate
+BLOCKED     cannot proceed until an explicit dependency is satisfied
+UNOBSERVED  not directly verified
+```
+
+A paper result is never `SHIPPED` or `OBSERVED` for HyoDo merely because the paper reports it.
+
+## 13. Roadmap anti-drift rule
 
 New external research may change the candidate technology list, but it must not silently change system ownership or phase order.
 
@@ -413,6 +431,6 @@ completion truth                     -> Evidence Gate candidate
 
 Then decide whether it belongs in NOW, SHADOW, EXPERIMENT, or FUTURE based on measured evidence.
 
-## 13. One-line roadmap
+## 14. One-line roadmap
 
 > **Measure reality first; compare alternatives in shadow; promote only verified improvements; keep execution, authority, evidence, and observation as separate planes.**
