@@ -151,9 +151,10 @@ and gate-less targets ship together with the documentation honesty pass.
 
 ### Evidence
 
-- Release chain receipt is recorded in `docs/releases/4.17.0.md` after the
-  signed tag, GitHub Release, SBOM/SHA-256 assets, PyPI OIDC publish, and
-  install smoke complete.
+- Signed verified tag `v4.17.0` (`624529b0` -> `72d1e1fe`), Release
+  Evidence run `34294515940` (SBOM + SHA-256 attached while draft), Publish
+  run `34298944143` (PyPI OIDC, provenance present for wheel and sdist,
+  install smoke on Python 3.14.7). Full receipt: `docs/releases/4.17.0.md`.
 
 ## [4.16.0] - 2026-09-07
 
