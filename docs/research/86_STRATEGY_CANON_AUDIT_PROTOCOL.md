@@ -92,6 +92,8 @@ Interpretation notes are append-only research objects. They should preserve prov
 
 Popularity is not truth. Citation count is not contextual fitness. A widely repeated interpretation may remain low-confidence if it is weakly grounded or performs poorly in measured use.
 
+Parallel workers may collect source evidence and Zettels independently, but they submit them to one registrar/adjudicator. Canonical convergence is single-writer: no parallel worker may directly rewrite the shared canon manifest.
+
 ## 5. Existing counter-principle doctrine versus new research work
 
 KINGDOM already declares a strategy application rule of **one primary principle plus one checking/counter principle** for a judgment. That existing doctrine must be preserved as prior system behavior rather than presented as a new ACL invention.
