@@ -4,7 +4,7 @@ Status: working research protocol
 
 Purpose: preserve the current research design for testing whether a fixed strategy canon plus plural interpretations can improve contextual recommendations without transferring execution authority or silently redefining the existing KINGDOM EROS system.
 
-Execution topology: see [`WISDOM_REFLEX_SERIAL_PARALLEL_EXECUTION_PLAN.md`](./WISDOM_REFLEX_SERIAL_PARALLEL_EXECUTION_PLAN.md). The operating rule is to parallelize evidence gathering and independent trials while serializing truth registration, authority, convergence, and promotion.
+Execution topology: see [`WISDOM_REFLEX_SERIAL_PARALLEL_EXECUTION_PLAN.md`](./WISDOM_REFLEX_SERIAL_PARALLEL_EXECUTION_PLAN.md). The operating rule is to parallelize evidence gathering and independent trials while serializing truth registration, authority, convergence, and promotion. Parallel workers may produce evidence and competing interpretations; one registrar/adjudicator owns the canonical convergence write.
 
 ## 1. What is existing versus proposed
 
