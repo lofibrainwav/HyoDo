@@ -51,7 +51,7 @@ jobs:
 
       - name: Validate package metadata
         run: |
-          python -m twine check dist/*
+          python -m twine check dist/*.whl dist/*.tar.gz
 
       - name: Guard sdist (no afo_core)
         run: |

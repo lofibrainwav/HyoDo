@@ -137,7 +137,7 @@ jobs:
         run: python -m build
 
       - name: Twine check
-        run: python -m twine check dist/*
+        run: python -m twine check dist/*.whl dist/*.tar.gz
 
       - name: Guard sdist (no afo_core)
         run: |
