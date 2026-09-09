@@ -132,9 +132,18 @@ def join_adapter_events(
 
     The source ledger rows are never mutated. ``parent_event_ids`` is a transient
     adapter field understood by the Graph v2 SCC oracle from PR #228; it is not
-    written back into ``hyodo.agent-event/v1``. Invalid observations are returned
-    as explicit issues rather than being mistaken for an absent dependency.
+    written back into ``hyodo.agent-event/v1``. Invalid, duplicate, or unresolved
+    observations are returned as explicit issues rather than being mistaken for
+    an absent dependency.
     """
+
+    adapted = [dict(event) for event in events if isinstance(event, Mapping)]
+    event_ids = {
+        event_id.strip()
+        for event in adapted
+        for event_id in [event.get("event_id")]
+        if isinstance(event_id, str) and event_id.strip()
+    }
 
     by_event_id: dict[str, list[str]] = {}
     issues: list[dict[str, Any]] = []
@@ -149,17 +158,40 @@ def join_adapter_events(
                 }
             )
             continue
-        by_event_id[normalized["event_id"]] = normalized["depends_on"]
 
-    adapted: list[dict[str, Any]] = []
-    for raw_event in events:
-        if not isinstance(raw_event, Mapping):
+        observation_id = normalized["observation_id"]
+        event_id = normalized["event_id"]
+        if event_id not in event_ids:
+            issues.append(
+                {
+                    "observation_id": observation_id,
+                    "reasons": [f"unresolved_event_id:{event_id}"],
+                }
+            )
             continue
-        event = dict(raw_event)
+        if event_id in by_event_id:
+            issues.append(
+                {
+                    "observation_id": observation_id,
+                    "reasons": [f"duplicate_observation_event_id:{event_id}"],
+                }
+            )
+            continue
+
+        unresolved = [ref for ref in normalized["depends_on"] if ref not in event_ids]
+        if unresolved:
+            issues.append(
+                {
+                    "observation_id": observation_id,
+                    "reasons": [f"unresolved_dependency:{ref}" for ref in unresolved],
+                }
+            )
+        by_event_id[event_id] = normalized["depends_on"]
+
+    for event in adapted:
         event_id = event.get("event_id")
         if isinstance(event_id, str) and event_id in by_event_id:
             event["parent_event_ids"] = list(by_event_id[event_id])
-        adapted.append(event)
     return adapted, issues
 
 
