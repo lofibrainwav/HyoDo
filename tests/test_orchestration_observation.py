@@ -71,9 +71,10 @@ def test_join_adapter_exposes_dependencies_without_mutating_ledger() -> None:
     ]
     before = deepcopy(events)
 
-    adapted = join_adapter_events(events, [_observation()])
+    adapted, issues = join_adapter_events(events, [_observation()])
     nodes, edges = hyodo_parent_edges(adapted)
 
+    assert issues == []
     assert events == before
     assert "parent_event_ids" not in events[2]
     assert adapted[2]["parent_event_ids"] == ["A", "B"]
@@ -81,8 +82,16 @@ def test_join_adapter_exposes_dependencies_without_mutating_ledger() -> None:
     assert edges == [("J", "A"), ("J", "B")]
 
 
-def test_invalid_sidecar_is_not_exposed_to_graph_adapter() -> None:
+def test_invalid_sidecar_is_visible_and_not_exposed_to_graph_adapter() -> None:
     events = [{"event_id": "J", "run_id": "run-1"}]
-    adapted = join_adapter_events(events, [_observation(depends_on=["J", "A"])])
+    adapted, issues = join_adapter_events(
+        events, [_observation(depends_on=["J", "A"])]
+    )
 
     assert adapted == events
+    assert issues == [
+        {
+            "observation_id": "obs-j",
+            "reasons": ["invalid_field:depends_on:self"],
+        }
+    ]
