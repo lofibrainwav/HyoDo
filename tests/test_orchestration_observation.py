@@ -136,7 +136,10 @@ def test_duplicate_sidecar_for_event_is_visible_and_first_wins() -> None:
 def test_sidecar_for_missing_event_is_visible() -> None:
     events = [{"event_id": "A", "run_id": "run-1"}]
 
-    adapted, issues = join_adapter_events(events, [_observation(depends_on=[])])
+    adapted, issues = join_adapter_events(
+        events,
+        [_observation(depends_on=[], join_policy=None)],
+    )
 
     assert adapted == events
     assert issues == [
