@@ -1,6 +1,7 @@
 # FrictionEvent v0 and orchestration observation
 
-Status: **experimental contract on a stacked development branch**.
+Status: **experimental contract included in the HyoDo 4.18.0 candidate**.
+It is measured evidence, not a calibrated score and not execution authority.
 
 This layer observes execution. It does not schedule agents, grant authority,
 change policy decisions, or define a calibrated friction score.
