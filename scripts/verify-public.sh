@@ -59,7 +59,10 @@ rm -rf dist build
 # sdist metadata produced by current hatchling and fails `twine check` spuriously.
 $PYTHON -m pip install -q --upgrade build twine
 $PYTHON -m build
-$PYTHON -m twine check dist/*
+# `dist/` also contains the CycloneDX SBOM, which is a release evidence
+# asset rather than a Python distribution.  Keep Twine scoped to artifacts
+# that it can validate as uploadable package files.
+$PYTHON -m twine check dist/*.whl dist/*.tar.gz
 
 echo "-- sdist must not ship afo_core --"
 $PYTHON - <<'PY'
