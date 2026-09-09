@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import stat
 from pathlib import Path
 
 from click.testing import Result
@@ -10,7 +11,7 @@ from typer.testing import CliRunner
 
 from hyodo.cli.dispatch import app
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH
-from hyodo.friction import FRICTION_STATE_RELATIVE_PATH
+from hyodo.friction import FRICTION_EXPORT_RELATIVE_PATH, FRICTION_STATE_RELATIVE_PATH
 
 runner = CliRunner()
 
@@ -164,3 +165,166 @@ def test_contract_is_strict_and_has_no_identity_fields():
     properties = schema["properties"]
     for forbidden in ("run_id", "event_id", "actor_id", "timestamp", "prompt", "path"):
         assert forbidden not in properties
+
+
+def test_export_requires_enabled_state_and_never_writes_when_disabled(tmp_path: Path):
+    result = runner.invoke(
+        app,
+        ["friction", "export", "--root", str(tmp_path), "--yes", "--json"],
+    )
+    assert result.exit_code == 1
+    assert _json_output(result)["reason"] == "export_disabled: run friction on first"
+    assert not (tmp_path / FRICTION_EXPORT_RELATIVE_PATH).exists()
+
+
+def test_export_requires_yes_in_noninteractive_mode(tmp_path: Path):
+    runner.invoke(app, ["friction", "on", "--root", str(tmp_path), "--yes"])
+    result = runner.invoke(app, ["friction", "export", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 1
+    assert _json_output(result)["reason"] == "confirmation_required: pass --yes"
+    assert not (tmp_path / FRICTION_EXPORT_RELATIVE_PATH).exists()
+
+
+def test_export_writes_preview_objects_to_a_separate_private_local_file(tmp_path: Path):
+    _write_event(tmp_path)
+    runner.invoke(app, ["friction", "on", "--root", str(tmp_path), "--yes"])
+    preview = runner.invoke(
+        app,
+        [
+            "friction",
+            "preview",
+            "--root",
+            str(tmp_path),
+            "--run-id",
+            "private-run-id",
+            "--json",
+        ],
+    )
+    assert preview.exit_code == 0
+    result = runner.invoke(
+        app,
+        [
+            "friction",
+            "export",
+            "--root",
+            str(tmp_path),
+            "--run-id",
+            "private-run-id",
+            "--yes",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 0
+    export_path = tmp_path / FRICTION_EXPORT_RELATIVE_PATH
+    assert export_path.exists()
+    assert stat.S_IMODE(export_path.stat().st_mode) == 0o600
+
+    payload = json.loads(export_path.read_text(encoding="utf-8"))
+    assert set(payload) == {
+        "schema",
+        "hyodo_version",
+        "exported_at",
+        "consent",
+        "observation",
+        "contributions",
+        "never_export",
+        "authority",
+    }
+    assert payload["schema"] == "hyodo.friction-export/v1"
+    assert payload["consent"] == {
+        "enabled": True,
+        "network_consent": False,
+        "scope": "local_only_v1",
+    }
+    assert payload["observation"]["network_transport"] == "disabled"
+    assert payload["contributions"][0]["schema"] == "hyodo.friction-contribution/v1"
+    assert payload["contributions"] == _json_output(preview)["contributions"]
+    assert "private-run-id" not in export_path.read_text(encoding="utf-8")
+    for forbidden in (
+        "private-event-id",
+        "private-seat",
+        "/private/customer/payment.py",
+        "PROMPT SECRET",
+        "CUSTOMER SOURCE CODE",
+        "claude-private-build",
+    ):
+        assert forbidden not in export_path.read_text(encoding="utf-8")
+    assert not (tmp_path / FRICTION_STATE_RELATIVE_PATH).samefile(export_path)
+
+
+def test_export_unreadable_ledger_fails_closed_without_creating_file(tmp_path: Path):
+    runner.invoke(app, ["friction", "on", "--root", str(tmp_path), "--yes"])
+    ledger = tmp_path / ".hyodo" / "agent-events.jsonl"
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    ledger.write_bytes(b"\xff\xfe")
+    result = runner.invoke(
+        app,
+        ["friction", "export", "--root", str(tmp_path), "--yes", "--json"],
+    )
+    assert result.exit_code == 2
+    assert _json_output(result)["reason"] == "ledger_unreadable"
+    assert not (tmp_path / FRICTION_EXPORT_RELATIVE_PATH).exists()
+
+
+def test_export_honors_explicit_out_path_without_changing_envelope_contract(tmp_path: Path):
+    _write_event(tmp_path)
+    runner.invoke(app, ["friction", "on", "--root", str(tmp_path), "--yes"])
+    output_path = tmp_path / "review" / "friction.json"
+    result = runner.invoke(
+        app,
+        [
+            "friction",
+            "export",
+            "--root",
+            str(tmp_path),
+            "--out",
+            str(output_path),
+            "--yes",
+        ],
+    )
+    assert result.exit_code == 0
+    payload = json.loads(output_path.read_text(encoding="utf-8"))
+    assert payload["schema"] == "hyodo.friction-export/v1"
+    assert set(payload["contributions"][0]) == {
+        "schema",
+        "source_schema",
+        "hyodo_version",
+        "task_class",
+        "risk_bucket",
+        "orchestration_pattern",
+        "event_count_bucket",
+        "parallelism_bucket",
+        "retry_bucket",
+        "rework_bucket",
+        "verification_failure_bucket",
+        "human_intervention_bucket",
+        "approval_wait_bucket",
+        "resource_conflict_bucket",
+        "evidence_completeness",
+        "outcome",
+        "provider_class",
+        "source_quality",
+    }
+
+
+def test_export_rejects_state_file_as_output_path(tmp_path: Path):
+    _write_event(tmp_path)
+    runner.invoke(app, ["friction", "on", "--root", str(tmp_path), "--yes"])
+    state_path = tmp_path / FRICTION_STATE_RELATIVE_PATH
+    before = state_path.read_text(encoding="utf-8")
+    result = runner.invoke(
+        app,
+        [
+            "friction",
+            "export",
+            "--root",
+            str(tmp_path),
+            "--out",
+            str(state_path),
+            "--yes",
+            "--json",
+        ],
+    )
+    assert result.exit_code == 1
+    assert _json_output(result)["reason"] == "export_path_conflicts_with_state"
+    assert state_path.read_text(encoding="utf-8") == before

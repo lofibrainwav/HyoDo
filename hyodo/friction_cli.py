@@ -11,17 +11,20 @@ from rich.console import Console
 from rich.panel import Panel
 
 from hyodo.friction import (
+    FRICTION_EXPORT_RELATIVE_PATH,
     FRICTION_STATE_RELATIVE_PATH,
     NETWORK_TRANSPORT,
     contribution_contract,
+    friction_export_payload,
     load_friction_state,
     preview_payload,
     save_friction_state,
+    write_friction_export,
 )
 
 app = typer.Typer(
     name="friction",
-    help="Local-only friction contribution preview and consent state",
+    help="Local-only friction contribution preview, export, and consent state",
     add_completion=False,
 )
 console = Console()
@@ -102,6 +105,87 @@ def friction_preview(
         "[dim]Population evidence may influence ACL support; it cannot grant authority or override local policy/evidence gates.[/dim]"
     )
     raise typer.Exit(exit_code)
+
+
+@app.command("export")
+def friction_export(
+    root: str = typer.Option(".", "--root", help="Workspace root that owns the event ledger"),
+    out: str | None = typer.Option(
+        None,
+        "--out",
+        help="Local JSON output path (default: .hyodo/friction-export.json)",
+    ),
+    run_id: str | None = typer.Option(
+        None,
+        "--run-id",
+        help="Local selection filter only. The run id is never written to the export.",
+    ),
+    yes: bool = typer.Option(
+        False,
+        "--yes",
+        help="Explicitly confirm the local file write",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit machine-readable JSON"),
+) -> None:
+    """Write the preview contribution envelope to a local file only."""
+
+    root_path = _root_or_exit(root)
+    state = load_friction_state(root_path)
+
+    def _refuse(reason: str, exit_code: int) -> None:
+        payload = {
+            "ok": False,
+            "reason": reason,
+            "exit_code": exit_code,
+            "network_transport": NETWORK_TRANSPORT,
+            "nothing_transmitted": True,
+        }
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[yellow]{reason} — nothing written.[/yellow]")
+        raise typer.Exit(exit_code)
+
+    if not state.enabled:
+        _refuse("export_disabled: run friction on first", 1)
+
+    if not yes:
+        if not sys.stdin.isatty():
+            _refuse("confirmation_required: pass --yes", 1)
+        if not typer.confirm("Write the local friction export? No network upload exists in v1."):
+            _refuse("confirmation_declined", 1)
+
+    payload = friction_export_payload(root_path, run_id=run_id)
+    if payload["observation"]["source"] == "unreadable":
+        _refuse("ledger_unreadable", 2)
+
+    output_path = (
+        root_path / FRICTION_EXPORT_RELATIVE_PATH
+        if out is None
+        else Path(out).expanduser().resolve()
+    )
+    if output_path == (root_path / FRICTION_STATE_RELATIVE_PATH).resolve():
+        _refuse("export_path_conflicts_with_state", 1)
+    try:
+        write_friction_export(output_path, payload)
+    except OSError:
+        _refuse("export_write_failed", 2)
+
+    result = {
+        "ok": True,
+        "schema": payload["schema"],
+        "output": str(output_path),
+        "contributions": len(payload["contributions"]),
+        "network_transport": NETWORK_TRANSPORT,
+        "nothing_transmitted": True,
+        "exit_code": 0,
+    }
+    if json_output:
+        console.print_json(json.dumps(result))
+    else:
+        console.print(f"[green]EXPORTED[/green] local friction data to {output_path}")
+        console.print("[bold]Network transport remains DISABLED.[/bold]")
+    raise typer.Exit(0)
 
 
 @app.command("on")

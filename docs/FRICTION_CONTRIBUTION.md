@@ -8,8 +8,8 @@ background uploader, hosted dataset write, or network transport.
 agent-events.jsonl
       ↓ local derivation only
 hyodo.friction-contribution/v1
-      ↓
-preview on this machine
+      ↓ preview or explicit local export
+hyodo.friction-export/v1
 ```
 
 ## Consent boundary
@@ -20,6 +20,7 @@ Friction Contribution is **OFF by default**.
 hyodo friction status
 hyodo friction preview
 hyodo friction on --yes
+hyodo friction export --yes
 hyodo friction off
 hyodo friction contract
 ```
@@ -35,7 +36,39 @@ local `enabled` flag.
 
 `hyodo friction preview` works even while contribution preparation is OFF so an
 operator can inspect the exact derived record before opting in locally. The
-preview never sends data.
+preview never sends data. `hyodo friction export` is the separate Lane C file
+write: it requires `enabled=true` and explicit `--yes`, and defaults to
+`.hyodo/friction-export.json`. It never uploads the file.
+
+In a non-interactive shell, export without `--yes` refuses with
+`confirmation_required` and writes nothing. Export while disabled also writes
+nothing. An unreadable ledger refuses the write with exit code 2.
+
+The state file `.hyodo/friction-contribution.json` contains only local
+preparation state. It never accumulates contribution rows. The export file is
+a separate envelope with schema `hyodo.friction-export/v1`:
+
+```json
+{
+  "schema": "hyodo.friction-export/v1",
+  "hyodo_version": "4.17.0",
+  "exported_at": "2026-09-09T00:00:00+00:00",
+  "consent": {
+    "enabled": true,
+    "network_consent": false,
+    "scope": "local_only_v1"
+  },
+  "observation": {},
+  "contributions": [],
+  "never_export": [],
+  "authority": {}
+}
+```
+
+The export reuses the preview's observation and contribution objects. It does
+not add `run_id`, `event_id`, `actor_id`, paths, prompts, model strings, raw
+arguments, or ledger rows. `exported_at` exists only on the envelope; it is not
+added to the fixed 18-field contribution contract.
 
 ## Strict contribution shape
 

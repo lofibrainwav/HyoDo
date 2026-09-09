@@ -59,6 +59,20 @@ the rest of `.hyodo/` out of version control — see
 | Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
 | Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
+## Current claim lock
+
+Measured Run #1: [receipt](./docs/research/MEASURED_RUN_1_2026-09-08.md).
+
+| Capability | Status | Evidence boundary |
+| --- | --- | --- |
+| gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
+| Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
+| Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
+| Cursor/Codex hooks | UNOBSERVED | No verified host adapter. |
+| remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
+| friction collector | NOT BUILT | No collector/uploader; transport disabled. |
+
 ## Honest boundaries
 
 HyoDo is deliberately narrow:
@@ -83,8 +97,7 @@ HyoDo is deliberately narrow:
 - run: hyodo safe --strict --json
 ```
 
-The composite action installs HyoDo from its pinned ref. Pin a signed release
-that contains it (not `v4.11.0`); SARIF upload needs `security-events: write`.
+Composite action: pin a signed ref; SARIF needs `security-events: write`.
 
 ```yaml
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
@@ -149,20 +162,7 @@ SDK v1/v2 are in CI. `mcp.hyodo.app` is contract-only, not this path.
 
 ## Engineering model
 
-HyoDo's internal review model maps six evidence areas:
-
-| Area | Pillar | Measured by |
-| --- | --- | --- |
-| Static types | Truth (眞 / 진) | Command gate |
-| Tests + safety | Goodness (善 / 선) | Tests + `safe` |
-| Lint / format | Beauty (美 / 미) | Command gate |
-| Public surface | Benevolence (仁 / 인) | Native AST scan |
-| Data privacy | Hyo (孝 / 효) | Native consent/data scan |
-| Audit trail | Yeong (永 / 영) | Local ledger |
-
-Command gates can be absorbed from existing tooling. Native evidence pillars
-cannot be shell-faked through `gates.toml`; see
-[`PHILOSOPHY.md`](./PHILOSOPHY.md) for score naming and formula lineage.
+See [`PHILOSOPHY.md`](./PHILOSOPHY.md) for evidence pillars and score lineage.
 
 ## Install and support
 

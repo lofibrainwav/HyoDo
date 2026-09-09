@@ -1,0 +1,14 @@
+{
+  "schema": "hyodo.graph-v2-join-fixture/v1",
+  "fixture": "unresolved-parent",
+  "nodes": ["A"],
+  "edges": [
+    {"child": "A", "parent": "does-not-exist"}
+  ],
+  "expected": {
+    "acyclic": true,
+    "components": [["A"]],
+    "cycle_reasons": [],
+    "unresolved_refs": ["does-not-exist"]
+  }
+}

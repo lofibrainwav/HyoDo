@@ -5,8 +5,8 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.16.0 is the latest published release. Main is preparing the 4.17.0
-development cycle.
+HyoDo 4.17.0 is the latest published release. Main is maintaining the
+4.17.0 baseline.
 
 Landed and released:
 

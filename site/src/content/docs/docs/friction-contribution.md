@@ -16,8 +16,8 @@ local agent events
 local friction derivation
       ↓
 strict allow-listed contribution
-      ↓
-local preview only
+      ↓ preview or explicit local export
+hyodo.friction-export/v1
 ```
 
 The point is to define the sensor contract **before** any population collector
@@ -43,6 +43,7 @@ runtime boundary that matters.
 hyodo friction status
 hyodo friction preview
 hyodo friction on --yes
+hyodo friction export --yes
 hyodo friction off
 hyodo friction contract --json
 ```
@@ -53,6 +54,17 @@ and Friction Contribution v1 has no upload transport.
 
 A future collector must request fresh, separate consent rather than inheriting
 this local setting.
+
+`hyodo friction export` is the separate Lane C local-file step. It requires
+`enabled=true` and explicit `--yes`, writes `.hyodo/friction-export.json` by
+default (or the user-provided `--out` path), and never uploads. Disabled state,
+missing confirmation in a non-TTY, or an unreadable ledger fail closed without
+silently writing an artifact.
+
+The export envelope uses `hyodo.friction-export/v1` and reuses the preview's
+observation and 18-field contribution objects. It keeps `exported_at` at the
+envelope level and never adds run ids, event ids, actor ids, paths, prompts,
+raw arguments, or ledger rows.
 
 ## What a contribution may contain
 
@@ -142,6 +154,7 @@ That separation keeps the research model aligned with HyoDo/KINGDOM:
 
 v1 deliberately ships without a telemetry endpoint, uploader, installation
 identifier, population-prior download, or automatic ACL support change. The
-first goal is an inspectable, reproducible local measurement contract.
+export is a local, explicit file write only; it is not a collector. The first
+goal is an inspectable, reproducible local measurement contract.
 
 See the [ACL field note](/docs/acl/) for the Wisdom Reflex and collaboration-topology hypothesis, the [Research](/docs/research/) page for the broader empirical program, and the repository's `docs/FRICTION_CONTRIBUTION.md` for the detailed protocol boundary.

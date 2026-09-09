@@ -1,0 +1,16 @@
+{
+  "schema": "hyodo.graph-v2-join-fixture/v1",
+  "fixture": "diamond-join",
+  "nodes": ["A", "B", "E", "J"],
+  "edges": [
+    {"child": "J", "parent": "A"},
+    {"child": "J", "parent": "B"},
+    {"child": "E", "parent": "J"}
+  ],
+  "expected": {
+    "acyclic": true,
+    "components": [["A"], ["B"], ["E"], ["J"]],
+    "cycle_reasons": [],
+    "unresolved_refs": []
+  }
+}

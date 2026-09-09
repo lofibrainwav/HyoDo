@@ -1,0 +1,15 @@
+{
+  "schema": "hyodo.graph-v2-join-fixture/v1",
+  "fixture": "linear-chain",
+  "nodes": ["A", "B", "C"],
+  "edges": [
+    {"child": "C", "parent": "B"},
+    {"child": "B", "parent": "A"}
+  ],
+  "expected": {
+    "acyclic": true,
+    "components": [["A"], ["B"], ["C"]],
+    "cycle_reasons": [],
+    "unresolved_refs": []
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "schema": "hyodo.graph-v2-join-fixture/v1",
+  "fixture": "triangle-cycle",
+  "nodes": ["c1", "c2", "c3"],
+  "edges": [
+    {"child": "c1", "parent": "c3"},
+    {"child": "c3", "parent": "c2"},
+    {"child": "c2", "parent": "c1"}
+  ],
+  "expected": {
+    "acyclic": false,
+    "components": [["c1", "c2", "c3"]],
+    "cycle_reasons": ["join_cycle", "join_cycle_edge"],
+    "unresolved_refs": []
+  }
+}
