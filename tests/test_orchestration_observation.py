@@ -95,3 +95,53 @@ def test_invalid_sidecar_is_visible_and_not_exposed_to_graph_adapter() -> None:
             "reasons": ["invalid_field:depends_on:self"],
         }
     ]
+
+
+def test_unresolved_dependency_is_visible() -> None:
+    events = [
+        {"event_id": "A", "run_id": "run-1"},
+        {"event_id": "J", "run_id": "run-1"},
+    ]
+
+    adapted, issues = join_adapter_events(events, [_observation()])
+
+    assert adapted[1]["parent_event_ids"] == ["A", "B"]
+    assert issues == [
+        {
+            "observation_id": "obs-j",
+            "reasons": ["unresolved_dependency:B"],
+        }
+    ]
+
+
+def test_duplicate_sidecar_for_event_is_visible_and_first_wins() -> None:
+    events = [
+        {"event_id": "A", "run_id": "run-1"},
+        {"event_id": "B", "run_id": "run-1"},
+        {"event_id": "J", "run_id": "run-1"},
+    ]
+    duplicate = _observation(observation_id="obs-j-2", depends_on=["A", "B"])
+
+    adapted, issues = join_adapter_events(events, [_observation(), duplicate])
+
+    assert adapted[2]["parent_event_ids"] == ["A", "B"]
+    assert issues == [
+        {
+            "observation_id": "obs-j-2",
+            "reasons": ["duplicate_observation_event_id:J"],
+        }
+    ]
+
+
+def test_sidecar_for_missing_event_is_visible() -> None:
+    events = [{"event_id": "A", "run_id": "run-1"}]
+
+    adapted, issues = join_adapter_events(events, [_observation(depends_on=[])])
+
+    assert adapted == events
+    assert issues == [
+        {
+            "observation_id": "obs-j",
+            "reasons": ["unresolved_event_id:J"],
+        }
+    ]
