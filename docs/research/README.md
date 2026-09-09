@@ -42,6 +42,24 @@ Core rule:
 
 > **Parallelize evidence gathering and independent trials; serialize truth registration, authority, convergence, and promotion.**
 
+Practical rhythm:
+
+```text
+SERIAL: freeze exact research snapshot
+        ↓
+PARALLEL: source audit + interpretation collection + hostile external research + measurement readiness
+        ↓
+SERIAL: reconcile conflicts and freeze benchmark object
+        ↓
+PARALLEL: matched benchmark conditions / seeds / independent verification
+        ↓
+SERIAL: evidence adjudication
+        ↓
+PARALLEL: replication / external hostile review / privacy-authority audit
+        ↓
+SERIAL: promotion decision
+```
+
 The plan defines serial barriers and parallel lanes for:
 
 - 86/86 source auditing;
@@ -66,10 +84,10 @@ Until measured evidence exists, do not claim:
 ## Authority invariant
 
 ```text
-wisdom / history / population evidence → recommendation     allowed
-wisdom / history / population evidence → execution authority forbidden
-wisdom / history / population evidence → local policy bypass forbidden
-wisdom / history / population evidence → Evidence Gate override forbidden
+wisdom / history / population evidence → recommendation          allowed
+wisdom / history / population evidence → execution authority     forbidden
+wisdom / history / population evidence → local policy bypass     forbidden
+wisdom / history / population evidence → Evidence Gate override  forbidden
 ```
 
 ## Immediate next scientific gate
@@ -78,4 +96,5 @@ wisdom / history / population evidence → Evidence Gate override forbidden
 2. Audit the existing 86/86 canon without renumbering or inventing entries.
 3. Collect attributed interpretations as append-only Zettels.
 4. Keep HyoDo measurement readiness moving in parallel.
-5. Only then freeze and run a falsifiable benchmark.
+5. Converge once through a single registrar/adjudicator.
+6. Only then freeze and run a falsifiable benchmark.
