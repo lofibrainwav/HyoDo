@@ -14,6 +14,7 @@ from typing import Any
 from hyodo.audience import resolve_audience
 from hyodo.graph_view import (
     UNCLASSIFIED,
+    UNMEASURED,
     VIRTUE_COLUMNS,
     assign_columns,
     build_actor_rings,
@@ -1490,18 +1491,35 @@ def render_graph_html(
     grid_rows_html = _render_grid_rows(rows_tree, grid_cells, node_by_id, rings, flat_keys)
     edge_overlay_html = _render_edge_overlay(graph, anchors)
 
-    unclassified_ids = [
-        node_id for node_id, columns in assignments.items() if columns == [UNCLASSIFIED]
-    ]
-    gutter_html = ""
-    if unclassified_ids:
-        gutter_cells = "".join(_event_button(node_by_id[node_id]) for node_id in unclassified_ids)
-        gutter_html = (
-            '<section class="gutter" aria-label="Unclassified events">'
-            "<h2>Unclassified</h2>"
-            f'<div class="cells">{gutter_cells}</div>'
+    # Two gutters, because they are two different problems. `UNCLASSIFIED`
+    # means the mapping table had no row for evidence the event really did
+    # record -- fix the table. `UNMEASURED` means the event recorded
+    # nothing to classify -- fix the recording. Merging them hides which
+    # one you are looking at, and makes a recording gap look like an
+    # argument for a tool-name row.
+    def _gutter(sentinel: str, heading: str, caption: str) -> str:
+        node_ids = [node_id for node_id, columns in assignments.items() if columns == [sentinel]]
+        if not node_ids:
+            return ""
+        cells = "".join(_event_button(node_by_id[node_id]) for node_id in node_ids)
+        return (
+            f'<section class="gutter" data-gutter-count="{len(node_ids)}"'
+            f' aria-label="{escape(heading)} events">'
+            f'<h2>{escape(heading)} <span class="gutter-count">{len(node_ids)}</span></h2>'
+            f'<p class="gutter-note">{escape(caption)}</p>'
+            f'<div class="cells">{cells}</div>'
             "</section>"
         )
+
+    gutter_html = _gutter(
+        UNCLASSIFIED,
+        "Unclassified",
+        "Evidence was recorded; no mapping row matched it.",
+    ) + _gutter(
+        UNMEASURED,
+        "Unmeasured",
+        "Nothing was recorded on these events to classify.",
+    )
 
     all_ts = [_parse_iso_ts(node.get("ts")) for node in nodes]
     known_ts = sorted(ts for ts in all_ts if ts is not None)
@@ -1586,7 +1604,13 @@ button {{ font:inherit; border:1px solid var(--line); background:var(--surface);
 .edge-overlay {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible }}
 .edge.edge-active {{ stroke-width:3 }}
 .cells {{ display:flex; flex-wrap:wrap; gap:6px }}
-.gutter {{ margin-bottom:18px }} .gutter h2 {{ font-size:.95rem }}
+.gutter {{ margin-bottom:18px }} .gutter h2 {{ font-size:.95rem; margin-bottom:2px }}
+/* Not var(--muted): this viewer's token block is the pre-redesign light
+   palette, while `body` below paints a #0f0e12 ground with a literal.
+   --muted (#5b6475) lands at 3.23:1 there. #aaa9ab measures 8.22:1 on
+   the ground these actually render against. */
+.gutter-count {{ font-family:var(--mono); font-weight:400; color:#aaa9ab }}
+.gutter-note {{ margin:0 0 8px; color:#aaa9ab; font-size:.76rem }}
 button[hidden], .grid-row[hidden] {{ display:none }}
 .detail {{ margin-top:20px; border:1px solid var(--line); border-radius:12px; padding:14px; background:var(--surface); min-height:80px }} .detail p {{ margin:.25rem 0 }}
 .actor-rings[hidden] {{ display:none }}

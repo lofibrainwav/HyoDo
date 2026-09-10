@@ -36,6 +36,11 @@ VIRTUE_COLUMNS: tuple[str, ...] = ("jin", "seon", "mi", "in", "hyo")
 #: purpose and is not unclassified.
 UNCLASSIFIED = "unclassified"
 
+#: Gutter sentinel for an event that carries nothing classification can
+#: read. Distinct from `UNCLASSIFIED`, which means the table has no row for
+#: evidence the event really did record.
+UNMEASURED = "unmeasured"
+
 #: Section 3 table, row 4: "type-check, lint tools" -> Truth.
 _TYPECHECK_LINT_PATTERNS: tuple[str, ...] = (
     "typecheck",
@@ -131,6 +136,48 @@ def _is_outside_root(paths: list[Any], root: Path | None) -> bool | None:
     return False
 
 
+def _mapping_field(node: dict[str, Any], key: str) -> dict[str, Any]:
+    """`node[key]` when it is a mapping, else an empty one."""
+    value = node.get(key)
+    return value if isinstance(value, dict) else {}
+
+
+def carries_measured_evidence(node: dict[str, Any]) -> bool:
+    """Whether *node* recorded anything classification could read.
+
+    Separates two failures that `UNCLASSIFIED` used to report as one. A
+    node the table cannot place is a mapping gap only if the event
+    actually carried evidence to place; an event that recorded nothing is
+    a *recording* gap, and blaming the table for it invites the one fix
+    that must never be made -- a row keyed on the tool's name.
+
+    Measured across every local ledger (108 events), 53 of the 63 gutter
+    events were this second kind: `paths`, `urls`, `method`, `rule_id` and
+    `output_digest` all absent, arguments already reduced to
+    `args_digest` by the schema's own privacy minimization.
+
+    The tool's name and `meta.tags` are deliberately *not* evidence. Both
+    are labels the host chose -- the name is what something is called, not
+    what it did, and the tags observed in real ledgers (`kingdom`, `run3`,
+    `pr-214`) say which run an event belonged to. Counting either would
+    make every event look measured and erase the distinction entirely.
+
+    `urls` and `method` are counted even though no row consumes them yet:
+    the question is whether the event recorded a measurement, not whether
+    today's table happens to read it.
+    """
+    tool = _mapping_field(node, "tool")
+    io = _mapping_field(node, "io")
+    policy = _mapping_field(node, "policy")
+    return bool(
+        tool.get("paths")
+        or tool.get("urls")
+        or tool.get("method")
+        or policy.get("rule_id")
+        or io.get("output_digest")
+    )
+
+
 def assign_columns(node: dict[str, Any], root: Path | None = None) -> list[str]:
     """Place one graph node (spec section 3's event -> virtue mapping table).
 
@@ -224,7 +271,10 @@ def assign_columns(node: dict[str, Any], root: Path | None = None) -> list[str]:
         _add("hyo")
 
     if not matched:
-        return [UNCLASSIFIED]
+        # Two different gaps, kept apart: the table had no row for evidence
+        # this event did record, versus the event recording nothing to
+        # classify at all (`carries_measured_evidence`).
+        return [UNCLASSIFIED] if carries_measured_evidence(node) else [UNMEASURED]
     # Keep the fixed column order regardless of the order rows matched in.
     return [column for column in VIRTUE_COLUMNS if column in matched]
 
