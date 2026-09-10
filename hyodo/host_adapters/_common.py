@@ -26,6 +26,14 @@ def _event_id(payload: dict[str, Any], host: str, event_name: str) -> str | None
     return f"{host}:{event_name}:{digest}" if digest else None
 
 
+def _digestable(value: Any) -> str | None:
+    if isinstance(value, str) and value:
+        return value
+    if isinstance(value, (dict, list, int, float, bool)):
+        return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
+    return None
+
+
 def map_tool_payload(
     payload: Any,
     default_root: Path,
@@ -54,14 +62,16 @@ def map_tool_payload(
         step_index = 0
         tags.append("step_index:unobserved")
     tool_input = payload.get("tool_input")
-    if not isinstance(tool_input, dict):
+    if not isinstance(tool_input, (dict, str)):
         tool_input = {}
     tool_name = _nonempty(payload.get("tool_name")) or event_name
     tool: dict[str, Any] = {"name": tool_name}
-    command = tool_input.get("command")
-    if isinstance(command, str) and command:
-        tool["args_digest"] = content_digest(command)
-    file_path = tool_input.get("file_path")
+    command = tool_input.get("command") if isinstance(tool_input, dict) else None
+    file_path = tool_input.get("file_path") if isinstance(tool_input, dict) else None
+    args_value = command if isinstance(command, str) and command else tool_input
+    args_text = _digestable(args_value)
+    if args_text:
+        tool["args_digest"] = content_digest(args_text)
     if isinstance(file_path, str) and file_path:
         tool["paths"] = [file_path]
     raw: dict[str, Any] = {
@@ -77,6 +87,15 @@ def map_tool_payload(
         "meta": {"tags": tags},
     }
     duration = payload.get("duration")
+    io: dict[str, Any] = {}
     if isinstance(duration, int) and not isinstance(duration, bool) and duration >= 0:
-        raw["io"] = {"duration_ms": duration}
+        io["duration_ms"] = duration
+    output = payload.get("output")
+    if output is None:
+        output = payload.get("result_json")
+    output_text = _digestable(output)
+    if output_text:
+        io["output_digest"] = content_digest(output_text)
+    if io:
+        raw["io"] = io
     return MappedHookEvent(raw=raw, root=root), None

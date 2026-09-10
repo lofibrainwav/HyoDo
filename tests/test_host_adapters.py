@@ -49,6 +49,49 @@ def test_cursor_specialized_hook_can_correlate_without_native_tool_id() -> None:
     assert str(event.raw["event_id"]).startswith("cursor:beforeShellExecution:")
 
 
+def test_cursor_specialized_hooks_preserve_real_payload_shapes() -> None:
+    shell, error = map_cursor_hook_payload(
+        {
+            "hook_event_name": "beforeShellExecution",
+            "conversation_id": "cursor-session",
+            "command": "printf shell",
+        },
+        Path("/tmp"),
+    )
+    assert error is None
+    assert shell is not None
+    assert shell.raw["tool"]["args_digest"]
+
+    mcp, error = map_cursor_hook_payload(
+        {
+            "hook_event_name": "afterMCPExecution",
+            "conversation_id": "cursor-session",
+            "tool_name": "search",
+            "tool_input": '{"query":"hyodo"}',
+            "result_json": {"ok": True},
+        },
+        Path("/tmp"),
+    )
+    assert error is None
+    assert mcp is not None
+    assert mcp.raw["kind"] == "tool_result"
+    assert mcp.raw["io"]["output_digest"]
+
+    edit, error = map_cursor_hook_payload(
+        {
+            "hook_event_name": "afterFileEdit",
+            "conversation_id": "cursor-session",
+            "file_path": "src/main.py",
+            "edits": [{"oldString": "a", "newString": "b"}],
+        },
+        Path("/tmp"),
+    )
+    assert error is None
+    assert edit is not None
+    assert edit.raw["tool"]["paths"] == ["src/main.py"]
+    assert validate_event(edit.raw)[0] is True
+
+
 def test_codex_pre_and_post_events_are_canonical() -> None:
     event, error = map_codex_hook_payload(_codex(), Path("/tmp"))
     assert error is None
