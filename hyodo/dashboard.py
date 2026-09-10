@@ -88,17 +88,19 @@ const FIELDS = [
   ["Why", "why"],
   ["How", "how"],
 ];
-const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event]");
+const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event], .daw-cell button[data-event]");
 let lastFocusedCell = null;
 function highlightEdges(eventId) {
-  document.querySelectorAll("#edge-overlay .edge").forEach((edge) => {
-    const active = eventId && (edge.dataset.source === eventId || edge.dataset.target === eventId);
+  document.querySelectorAll("#daw-edge-overlay .edge, #edge-overlay .edge").forEach((edge) => {
+    const source = edge.dataset.dawSource || edge.dataset.source;
+    const target = edge.dataset.dawTarget || edge.dataset.target;
+    const active = eventId && (source === eventId || target === eventId);
     edge.classList.toggle("edge-active", Boolean(active));
   });
 }
 function layoutEdges() {
   const svg = document.getElementById("edge-overlay");
-  const container = document.querySelector(".grid-rows");
+  const container = document.querySelector(".daw-rows, .grid-rows");
   if (!svg || !container) return;
   const containerRect = container.getBoundingClientRect();
   const tiles = new Map();
@@ -114,9 +116,11 @@ function layoutEdges() {
       midY: (r.top + r.bottom) / 2 - containerRect.top,
     });
   });
-  svg.querySelectorAll("path[data-source]").forEach((path) => {
+  svg.querySelectorAll("path[data-source], path[data-daw-source]").forEach((path) => {
     const kind = path.dataset.kind;
-    const source = tiles.get(path.dataset.source);
+    const sourceId = path.dataset.dawSource || path.dataset.source;
+    const targetId = path.dataset.dawTarget || path.dataset.target;
+    const source = tiles.get(sourceId);
     if (!source) {
       path.setAttribute("d", "");
       return;
@@ -127,7 +131,7 @@ function layoutEdges() {
       path.setAttribute("d", "M" + x1 + "," + y1 + " L" + (x1 + 24) + "," + y1);
       return;
     }
-    const target = tiles.get(path.dataset.target);
+    const target = tiles.get(targetId);
     if (!target) {
       path.setAttribute("d", "");
       return;
@@ -766,7 +770,7 @@ def _event_button(node: dict[str, Any]) -> str:
         f"cell-{str(decision).lower()}" if isinstance(decision, str) and decision else "cell-plain"
     )
     return (
-        f'<button type="button" class="{cell_class}" data-event-id="{node_id}" '
+        f'<button type="button" class="{cell_class}" data-event-id="{node_id}" data-event-kind="{escape(str(node.get("kind") or "event"))}" '
         f'data-event="{detail}" title="{title}">{escape(label)}</button>'
     )
 
@@ -982,7 +986,9 @@ def _build_grid_cells(
     return flat_keys, cells, anchors
 
 
-def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) -> str:
+def _render_edge_overlay(
+    graph: dict[str, Any], anchored_ids: dict[str, Any], *, overlay_id: str = "edge-overlay"
+) -> str:
     """SVG overlay skeleton (brief finding 2; fix round 2, coordinator
     live-screenshot review): the server only classifies and counts edges;
     real tile-to-tile geometry is measured client-side.
@@ -1025,9 +1031,15 @@ def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) ->
         target_ok = isinstance(target, str) and target in anchored_ids
         if edge.get("type") == "parent_event_id":
             if source_ok and target_ok:
+                source_attr = (
+                    "data-daw-source" if overlay_id == "daw-edge-overlay" else "data-source"
+                )
+                target_attr = (
+                    "data-daw-target" if overlay_id == "daw-edge-overlay" else "data-target"
+                )
                 parts.append(
-                    f'<path class="edge edge-parent" data-source="{escape(str(source))}" '
-                    f'data-target="{escape(str(target))}" data-kind="parent" d="" '
+                    f'<path class="edge edge-parent" {source_attr}="{escape(str(source))}" '
+                    f'{target_attr}="{escape(str(target))}" data-kind="parent" d="" '
                     f'fill="none" stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5"/>'
                 )
                 parent_count += 1
@@ -1035,9 +1047,15 @@ def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) ->
                 offgrid_count += 1
         elif edge.get("type") == "evidence_ref":
             if source_ok and target_ok:
+                source_attr = (
+                    "data-daw-source" if overlay_id == "daw-edge-overlay" else "data-source"
+                )
+                target_attr = (
+                    "data-daw-target" if overlay_id == "daw-edge-overlay" else "data-target"
+                )
                 parts.append(
-                    f'<path class="edge edge-evidence" data-source="{escape(str(source))}" '
-                    f'data-target="{escape(str(target))}" data-kind="evidence" d="" '
+                    f'<path class="edge edge-evidence" {source_attr}="{escape(str(source))}" '
+                    f'{target_attr}="{escape(str(target))}" data-kind="evidence" d="" '
                     f'fill="none" stroke="{EDGE_COLORS["evidence"]}" stroke-width="1.5" '
                     'stroke-dasharray="4 3"/>'
                 )
@@ -1048,15 +1066,16 @@ def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) ->
     for issue in graph.get("unresolved_refs") or []:
         event_id = issue.get("event_id") if isinstance(issue, dict) else None
         if isinstance(event_id, str) and event_id in anchored_ids:
+            source_attr = "data-daw-source" if overlay_id == "daw-edge-overlay" else "data-source"
             parts.append(
-                f'<path class="edge edge-broken" data-source="{escape(event_id)}" '
+                f'<path class="edge edge-broken" {source_attr}="{escape(event_id)}" '
                 f'data-kind="broken" d="" fill="none" stroke="{EDGE_COLORS["broken"]}" '
                 'stroke-width="2"/>'
             )
             broken_count += 1
 
     return (
-        '<svg id="edge-overlay" class="edge-overlay" role="img" aria-hidden="true" '
+        f'<svg id="{escape(overlay_id)}" class="edge-overlay" role="img" aria-hidden="true" '
         f'data-parent-edges="{parent_count}" data-evidence-edges="{evidence_count}" '
         f'data-broken-edges="{broken_count}" data-offgrid-edges="{offgrid_count}">'
         + "".join(parts)
@@ -1191,6 +1210,112 @@ def _render_grid_rows(
     )
 
 
+def _daw_track(node: dict[str, Any]) -> tuple[str, str]:
+    """Choose a display-only DAW lane from observed event identity.
+
+    This is intentionally not added to the event schema. A graph viewer needs
+    a readable arrangement even when the producer only supplies the coarse
+    ``actor`` field; the event id/tool name are already recorded evidence and
+    are sufficient for a stable local presentation lane.
+    """
+    node_id = str(node.get("id") or "").lower()
+    tool = node.get("tool") if isinstance(node.get("tool"), dict) else {}
+    tool_name = str(tool.get("name") or "").lower() if isinstance(tool, dict) else ""
+    actor = str(node.get("actor") or "").lower()
+    if actor == "human":
+        return "operator", "OPERATOR"
+    if "parallel" in node_id:
+        return "parallel", "PARALLEL"
+    if "join" in node_id:
+        return "join", "DAG JOIN"
+    if "retry" in node_id or "false" in tool_name or "true" in tool_name:
+        return "retry", "RETRY / REWORK"
+    if "wait" in node_id or "wait" in tool_name:
+        return "wait", "WAIT"
+    if "unresolved" in node_id or "unresolved" in tool_name:
+        return "unresolved", "UNRESOLVED"
+    if actor == "agent":
+        return "execution", "EXECUTION"
+    return "observation", "OBSERVATION"
+
+
+def _render_daw_timeline(
+    nodes: list[dict[str, Any]], edges: list[dict[str, Any]], edge_overlay: str = ""
+) -> tuple[str, dict[str, tuple[int, int, int]]]:
+    """Render the user-facing DAW timeline and return edge anchor membership."""
+    valid_nodes = [node for node in nodes if isinstance(node.get("id"), str)]
+    max_step = max(
+        (node.get("step_index") for node in valid_nodes if isinstance(node.get("step_index"), int)),
+        default=0,
+    )
+    columns = max_step + 1
+    track_order = [
+        "operator",
+        "execution",
+        "parallel",
+        "join",
+        "retry",
+        "wait",
+        "unresolved",
+        "observation",
+    ]
+    track_labels = {
+        "operator": "OPERATOR",
+        "execution": "EXECUTION",
+        "parallel": "PARALLEL",
+        "join": "DAG JOIN",
+        "retry": "RETRY / REWORK",
+        "wait": "WAIT",
+        "unresolved": "UNRESOLVED",
+        "observation": "OBSERVATION",
+    }
+    buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    track_seen: set[str] = set()
+    anchors: dict[str, tuple[int, int, int]] = {}
+    for node in sorted(
+        valid_nodes, key=lambda item: (item.get("step_index", 0), str(item.get("ts", "")))
+    ):
+        track, _label = _daw_track(node)
+        track_seen.add(track)
+        step = node.get("step_index") if isinstance(node.get("step_index"), int) else 0
+        buckets.setdefault((track, step), []).append(node)
+
+    visible_tracks = [track for track in track_order if track in track_seen]
+    parts = [
+        '<section class="daw-console" aria-label="Evidence session timeline">',
+        '<div class="daw-console-head"><div><span class="daw-kicker">EVIDENCE SESSION / LIVE READBACK</span>'
+        '<h2>Run timeline</h2></div><div class="daw-legend"><span><i class="legend-call"></i>CALL</span>'
+        '<span><i class="legend-result"></i>RESULT</span><span><i class="legend-human"></i>HUMAN</span></div></div>',
+        f'<div class="daw-rows" style="--daw-columns:{columns}">',
+        '<div class="daw-ruler"><div class="daw-track-label">TRACK / SIGNAL</div>'
+        + "".join(
+            f'<div class="daw-step">t{index}<small>{index:02d}</small></div>'
+            for index in range(columns)
+        )
+        + "</div>",
+    ]
+    for row_index, track in enumerate(visible_tracks):
+        label = track_labels[track]
+        parts.append(
+            f'<div class="daw-row" data-daw-track="{escape(track)}"><div class="daw-track-label">'
+            f'<span class="track-led track-{escape(track)}"></span>{escape(label)}<small>{row_index:02d}</small></div>'
+        )
+        for step in range(columns):
+            events = buckets.get((track, step), [])
+            if not events:
+                parts.append('<div class="daw-cell daw-empty"></div>')
+                continue
+            parts.append('<div class="daw-cell">')
+            for tile_index, node in enumerate(events):
+                node_id = str(node["id"])
+                anchors[node_id] = (row_index, step, tile_index)
+                parts.append(_event_button(node))
+            parts.append("</div>")
+        parts.append("</div>")
+    parts.extend([edge_overlay, "</div>", "</section>"])
+    return "".join(parts), anchors
+
+
 def render_graph_html(
     graph: dict[str, Any], *, now: datetime | None = None, root: Path | None = None
 ) -> str:
@@ -1259,6 +1384,10 @@ def render_graph_html(
         if nodes and not has_mission
         else ""
     )
+
+    _daw_preview, daw_anchors = _render_daw_timeline(nodes, edges)
+    daw_edge_overlay = _render_edge_overlay(graph, daw_anchors, overlay_id="daw-edge-overlay")
+    daw_html, _ = _render_daw_timeline(nodes, edges, daw_edge_overlay)
 
     # Brief finding 1: one grid, columns x actor rows, each event a tile at
     # (its column, its row) — replaces the old two-separate-lists layout
@@ -1386,16 +1515,66 @@ button[hidden], .grid-row[hidden] {{ display:none }}
 .ring-layer li {{ border-left:3px solid var(--tint,var(--ring-color)); padding:1px 0 1px 6px; margin:2px 0 }}
 .ring-layer li.ring-more {{ color:var(--muted); border-left-color:var(--line) }}
 .ring-note {{ font-size:.75rem; color:var(--muted); margin:0 0 4px }}
+
+/* DAW / instrument-console presentation. The legacy virtue grid stays in
+   the DOM for contract compatibility, but the operator-facing graph is the
+   measured event timeline below. */
+.legacy-orb, .legacy-proof-grid, .legacy-proof-gutter {{ display:none }}
+body {{ background:#0b0d0e; color:#e8ece9; font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace }}
+main {{ max-width:1480px; padding:28px 28px 56px }}
+header {{ border-bottom:1px solid #343a38; padding-bottom:18px; margin-bottom:20px }}
+h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3vw,2.5rem) }}
+.meta, .meta a {{ color:#8d9792 }}
+.unobserved-notice {{ border-radius:0; background:#321d1d; color:#ffb5a9; border:1px solid #9d4d43 }}
+.daw-console {{ position:relative; overflow:auto; border:1px solid #3b4440; background:#111514; box-shadow:0 18px 50px #0008; padding:18px; margin:4px 0 16px }}
+.daw-console-head {{ display:flex; justify-content:space-between; align-items:end; gap:20px; border-bottom:1px solid #303734; padding:2px 0 14px; min-width:980px }}
+.daw-kicker {{ color:#8fbd73; font-size:.68rem; letter-spacing:.16em }}
+.daw-console h2 {{ margin:5px 0 0; font-size:1.25rem; letter-spacing:.05em; text-transform:uppercase }}
+.daw-legend {{ display:flex; gap:14px; color:#929c96; font-size:.68rem; letter-spacing:.08em }}
+.daw-legend i {{ display:inline-block; width:8px; height:8px; margin-right:5px; background:#82bd69 }}
+.daw-legend .legend-result {{ background:#d5a04c }}
+.daw-legend .legend-human {{ background:#de7868 }}
+.daw-rows {{ position:relative; min-width:1060px; padding-top:14px }}
+.daw-ruler, .daw-row {{ display:grid; grid-template-columns:190px repeat(var(--daw-columns), minmax(104px,1fr)); min-width:1060px }}
+.daw-ruler {{ color:#7c8881; font-size:.68rem; letter-spacing:.09em; border-bottom:1px solid #3b4440 }}
+.daw-step {{ padding:0 8px 8px; border-left:1px solid #2c3431; font-variant-numeric:tabular-nums }}
+.daw-step small {{ display:block; color:#4f5b55; margin-top:3px }}
+.daw-track-label {{ display:flex; align-items:center; gap:7px; padding:0 10px; color:#aab4ae; font-size:.69rem; letter-spacing:.08em; border-right:1px solid #343c38 }}
+.daw-track-label small {{ margin-left:auto; color:#4d5852 }}
+.daw-row {{ min-height:78px; border-bottom:1px solid #2a312e }}
+.daw-cell {{ min-height:78px; padding:7px 5px; border-left:1px solid #252d29; display:flex; flex-direction:column; gap:4px; justify-content:center }}
+.daw-empty {{ background:repeating-linear-gradient(135deg,transparent 0 8px,#ffffff03 8px 9px) }}
+.daw-cell button {{ width:100%; min-width:0; border-radius:0; border:1px solid #4b5750; background:#1a211e; color:#dce5df; padding:8px 7px; font-size:.66rem; letter-spacing:.02em; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer }}
+.daw-cell button:hover, .daw-cell button:focus-visible {{ border-color:#d9ead7; background:#26332c }}
+.daw-cell button[data-event-kind="tool_call"] {{ border-left:3px solid #82bd69 }}
+.daw-cell button[data-event-kind="tool_result"] {{ border-left:3px solid #d5a04c }}
+.daw-cell button[data-event-kind="prompt"] {{ border-left:3px solid #de7868 }}
+.daw-cell button[data-event-kind="decision"] {{ border-left:3px solid #b8a5eb }}
+.track-led {{ width:7px; height:7px; flex:0 0 auto; background:#82bd69; box-shadow:0 0 8px #82bd69 }}
+.track-parallel, .track-join {{ background:#72a9d5; box-shadow:0 0 8px #72a9d5 }}
+.track-retry {{ background:#d5a04c; box-shadow:0 0 8px #d5a04c }}
+.track-wait {{ background:#b8a5eb; box-shadow:0 0 8px #b8a5eb }}
+.track-unresolved {{ background:#de7868; box-shadow:0 0 8px #de7868 }}
+.track-operator {{ background:#f0b36c; box-shadow:0 0 8px #f0b36c }}
+.daw-rows .edge-overlay {{ z-index:3 }}
+.daw-rows .edge {{ stroke:#82bd69; opacity:.68 }}
+.daw-rows .edge-evidence {{ stroke:#d5a04c; stroke-dasharray:4 3 }}
+.daw-rows .edge-broken {{ stroke:#de7868 }}
+.daw-rows .edge.edge-active {{ stroke-width:3; opacity:1; filter:drop-shadow(0 0 4px currentColor) }}
+.detail {{ border-radius:0; background:#111514; border-color:#3b4440; color:#cdd8d1; font-size:.75rem; min-height:86px }}
+@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} }}
+@media (prefers-reduced-motion:reduce) {{ .daw-cell button {{ transition:none }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
 {notice_html}
-<section class="orb-wrap">{orb_html}</section>
-<div class="grid-wrap">
+<section class="orb-wrap legacy-orb">{orb_html}</section>
+{daw_html}
+<div class="grid-wrap legacy-proof-grid">
 <div class="grid-graph">
 <div class="grid-headrow"><div class="grid-corner"></div>{column_headers}</div>
 <div class="grid-rows">{grid_rows_html}{edge_overlay_html}</div>
 </div>
 {time_ruler_html}
 </div>
-{gutter_html}
+<div class="legacy-proof-gutter">{gutter_html}</div>
 <section id="event-detail" class="detail" aria-live="polite"><p>Select an event to see its 5W1H detail.</p></section>
 </main><script>{GRAPH_SCRIPT}</script></body></html>"""
