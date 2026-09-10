@@ -24,6 +24,7 @@ language-agnostic.
 | [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |
 | [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
 | [HOST_CONTRACT.md](./HOST_CONTRACT.md) | What the Claude Code hook mapper copies vs what the host still owns |
+| [HOST_ADAPTERS.md](./HOST_ADAPTERS.md) | Native Cursor/Codex adapter boundary and live-canary contract |
 | [MISREAD.md](./MISREAD.md) | Easy over-reads: missing policy, CI `check`, shadow, starter policy, trust |
 | [FULL_BODY.md](./FULL_BODY.md) | `--full-body` consent, no rotation/redaction, clients cannot self-upgrade |
 | [CLAIMS.md](./CLAIMS.md) | What public pages do not claim (no implied installed base) |
