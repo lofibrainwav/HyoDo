@@ -313,19 +313,20 @@ PILLAR_SPECS: tuple[tuple[str, str, str, str, str], ...] = (
     ("yeong", "永", "영", "Eternity", "indigo"),
 )
 
-# PILLAR_SPECS colour name -> hex, kept byte-identical to the literal
-# `.name {{ --accent:#hex }}` rules in the CSS block inside
-# render_dashboard_html below. tests/test_virtue_colors_ssot.py parses that
-# CSS block's literal text as the SSOT (not this dict), so this is a second,
-# hand-kept-in-sync copy the graph viewer (render_graph_html) can look up by
-# name without re-parsing CSS text.
-_VIRTUE_ACCENT_HEX: dict[str, str] = {
-    "blue": "#2563eb",
-    "green": "#059669",
-    "purple": "#7c3aed",
-    "orange": "#ea580c",
-    "gold": "#ca8a04",
-    "indigo": "#4f46e5",
+# PILLAR_SPECS colour name -> (light-surface hex, dark-surface hex), kept
+# byte-identical to the literal `.name {{ --accent:L; --accent:light-dark(L,D) }}`
+# rules in the CSS blocks below. Two values are required, not stylistic: a
+# single hex cannot clear WCAG AA as text on both a near-white card and a
+# near-black one. tests/test_virtue_colors_ssot.py parses the CSS literal as
+# the SSOT (not this dict) and recomputes the contrast of both values against
+# the surfaces it also parses, so a later surface change re-runs the check.
+_VIRTUE_ACCENT_HEX: dict[str, tuple[str, str]] = {
+    "blue": ("#2563eb", "#4f81ef"),
+    "green": ("#04825b", "#059b6c"),
+    "purple": ("#7c3aed", "#9e6df2"),
+    "orange": ("#c84b0a", "#ea580c"),
+    "gold": ("#986803", "#ca8a04"),
+    "indigo": ("#4f46e5", "#7e77ec"),
 }
 
 # hyodo/dashboard.py had no existing ALLOW/ASK/DENY/UNOBSERVED colours to
@@ -680,7 +681,8 @@ button {{ border:2px solid var(--line); border-radius:0; background:var(--signal
 .measurement-status {{ display:inline-block; color:var(--ink); font:700 .72rem var(--mono); text-transform:uppercase }}
 .grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:18px }} .card {{ position:relative; background:var(--surface); border:2px solid var(--line); border-radius:0; padding:18px; min-height:218px; box-shadow:4px 4px 0 var(--line) }}
 .card::before {{ content:""; position:absolute; top:0; left:0; width:28px; height:6px; background:var(--accent) }}
-.blue {{ --accent:#2563eb }} .green {{ --accent:#059669 }} .purple {{ --accent:#7c3aed }} .orange {{ --accent:#ea580c }} .gold {{ --accent:#ca8a04 }} .indigo {{ --accent:#4f46e5 }}
+.blue {{ --accent:#2563eb }} .green {{ --accent:#04825b }} .purple {{ --accent:#7c3aed }} .orange {{ --accent:#c84b0a }} .gold {{ --accent:#986803 }} .indigo {{ --accent:#4f46e5 }}
+@media (prefers-color-scheme: dark) {{ .blue {{ --accent:#4f81ef }} .green {{ --accent:#059b6c }} .purple {{ --accent:#9e6df2 }} .orange {{ --accent:#ea580c }} .gold {{ --accent:#ca8a04 }} .indigo {{ --accent:#7e77ec }} }}
 h2 {{ display:flex; justify-content:space-between; gap:12px; align-items:baseline; margin:0 0 18px; font-size:1rem; letter-spacing:-.02em }} h2 span {{ color:var(--accent); font:800 .82rem var(--mono); letter-spacing:.08em }}
 ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} li strong {{ font:800 .86rem var(--mono); text-align:right; overflow-wrap:anywhere }} .metric-label {{ font-size:.84rem }} small,.reference {{ grid-column:1/-1; color:var(--muted); font: .68rem/1.35 var(--mono) }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:800; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0; font-size:.8rem }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }} @media (prefers-reduced-motion:reduce) {{ * {{ scroll-behavior:auto }} }}
@@ -806,7 +808,10 @@ def _dominant_pillar_hex(profile: Any) -> str:
             best_pillar = pillar
     if best_pillar is None:
         return _NO_DOMINANT_PILLAR_HEX
-    return _VIRTUE_ACCENT_HEX[_PILLAR_FULLNAME_TO_ACCENT[best_pillar]]
+    light, dark = _VIRTUE_ACCENT_HEX[_PILLAR_FULLNAME_TO_ACCENT[best_pillar]]
+    # This tint is inlined into an element's style attribute, where a media
+    # query cannot reach it, so the theme choice has to travel with the value.
+    return f"light-dark({light},{dark})"
 
 
 def _ring_items(ring: Any, layer: str) -> list[tuple[str, str]]:
@@ -1139,7 +1144,7 @@ def _render_column_header(
         question_html = f'<p class="column-question">{escape(question)}</p>'
     return (
         f'<div class="grid-colhead" data-column="{escape(key)}">'
-        f'<h2 id="col-{escape(key)}" style="--accent:{_VIRTUE_ACCENT_HEX[color]}">'
+        f'<h2 id="col-{escape(key)}" class="{escape(color)}">'
         f'<span lang="ko">{escape(hanja)} {escape(korean)}</span> {escape(english)}</h2>'
         f'<p class="coverage">{cov["observed"]}/{cov["expected"]} observed</p>'
         f"{extra_note_html}{question_html}</div>"
@@ -1523,6 +1528,8 @@ main {{ max-width:1180px; margin:auto; padding:28px 20px 48px }} h1 {{ margin:0;
 .grid-graph {{ display:inline-block; min-width:{GRID_LABEL_WIDTH + 5 * GRID_COLUMN_WIDTH}px; border:1px solid var(--line); border-radius:12px; background:var(--surface) }}
 .grid-headrow, .grid-row {{ display:flex }}
 .grid-corner {{ width:{GRID_LABEL_WIDTH}px; flex:0 0 auto; border-bottom:1px solid var(--line) }}
+.blue {{ --accent:#2563eb }} .green {{ --accent:#04825b }} .purple {{ --accent:#7c3aed }} .orange {{ --accent:#c84b0a }} .gold {{ --accent:#986803 }} .indigo {{ --accent:#4f46e5 }}
+@media (prefers-color-scheme: dark) {{ .blue {{ --accent:#4f81ef }} .green {{ --accent:#059b6c }} .purple {{ --accent:#9e6df2 }} .orange {{ --accent:#ea580c }} .gold {{ --accent:#ca8a04 }} .indigo {{ --accent:#7e77ec }} }}
 .grid-colhead {{ width:{GRID_COLUMN_WIDTH}px; flex:0 0 auto; border-bottom:1px solid var(--line); border-left:1px solid var(--line-soft); padding:10px; border-top:6px solid var(--accent,#888) }}
 .grid-colhead h2 {{ margin:0 0 4px; font-size:.95rem }} .grid-colhead h2 span {{ color:var(--accent); font-size:.85rem }}
 .coverage {{ margin:0 0 6px; color:var(--muted); font-size:.85rem }} .column-note, .column-question {{ font-size:.78rem; color:var(--muted); margin:2px 0 0 }}
