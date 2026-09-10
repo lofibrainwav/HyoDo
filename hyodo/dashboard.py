@@ -1558,7 +1558,7 @@ h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-step small {{ display:block; color:#4f5b55; margin-top:3px }}
 .daw-track-label {{ display:flex; align-items:center; gap:7px; padding:0 10px; color:#aab4ae; font-size:.69rem; letter-spacing:.08em; border-right:1px solid #343c38 }}
 .daw-track-label small {{ margin-left:auto; color:#4d5852 }}
-.daw-row {{ min-height:78px; border-bottom:1px solid #2a312e }}
+.daw-row {{ min-height:78px; margin:8px 0; border:1px solid #2a312e; border-radius:4px; background:#101513; overflow:visible }}
 .daw-cell {{ min-height:78px; padding:7px 5px; border-left:1px solid #252d29; display:flex; flex-direction:column; gap:4px; justify-content:center }}
 .daw-cell.daw-cluster {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; gap:7px; padding:9px 7px; background:#0d1210; box-shadow:inset 0 0 0 1px #344139 }}
 .daw-empty {{ background:repeating-linear-gradient(135deg,transparent 0 8px,#ffffff03 8px 9px) }}
