@@ -312,14 +312,41 @@ PILLAR_SPECS: tuple[tuple[str, str, str, str, str], ...] = (
 # CSS block's literal text as the SSOT (not this dict), so this is a second,
 # hand-kept-in-sync copy the graph viewer (render_graph_html) can look up by
 # name without re-parsing CSS text.
-_VIRTUE_ACCENT_HEX: dict[str, str] = {
-    "blue": "#2563eb",
-    "green": "#059669",
-    "purple": "#7c3aed",
-    "orange": "#ea580c",
-    "gold": "#ca8a04",
-    "indigo": "#4f46e5",
+#: Virtue accent -> (light-theme hex, dark-theme hex).
+#:
+#: One hex per virtue cannot work. The accent is rendered as text (the hanja
+#: label, the reference line) so WCAG AA applies at 4.5:1, and the two surfaces
+#: pull in opposite directions: clearing 4.5:1 against the light surface (#fff)
+#: caps relative luminance at 0.183, while clearing it against the dark surface
+#: (#161b28) floors it at 0.225. Those windows do not overlap at any hue or
+#: saturation, so a single value always failed one theme -- before this pair
+#: existed, all six failed at least one (blue 3.33 and indigo 2.73 on dark,
+#: gold 2.94 and orange 3.56 on light).
+#:
+#: Each colour keeps its previous value on the theme where it already passed;
+#: only the failing side moved, and only far enough to clear 4.6:1.
+_VIRTUE_ACCENT_HEX: dict[str, tuple[str, str]] = {
+    "blue": ("#2563eb", "#4f81ef"),
+    "green": ("#04855d", "#05986b"),
+    "purple": ("#7c3aed", "#9b69f1"),
+    "orange": ("#ca4c0a", "#ea580c"),
+    "gold": ("#9d6b03", "#ca8a04"),
+    "indigo": ("#4f46e5", "#7e77ec"),
 }
+
+
+def _accent_css(color: str) -> str:
+    """CSS value for a virtue accent, resolved per theme by the browser.
+
+    `light-dark()` carries both values in one declaration, which is what lets
+    inline `style="--accent:..."` attributes stay theme-aware -- an inline
+    declaration would otherwise beat any `prefers-color-scheme` rule. The
+    dashboard already sets `color-scheme: light dark` on `:root`, which is what
+    `light-dark()` reads.
+    """
+    light, dark = _VIRTUE_ACCENT_HEX[color]
+    return f"light-dark({light},{dark})"
+
 
 # hyodo/dashboard.py had no existing ALLOW/ASK/DENY/UNOBSERVED colours to
 # reuse, so this PR defines them once here (per the implementer brief).
@@ -658,7 +685,7 @@ def render_dashboard_html(
 main {{ max-width:1180px; margin:auto; padding:28px 20px 48px }} header {{ display:flex; justify-content:space-between; gap:24px; align-items:start; margin-bottom:24px }}
 h1 {{ margin:0; font-size:clamp(1.7rem,4vw,2.5rem) }} .meta {{ color:var(--muted); margin:.35rem 0 0 }} .legend {{ font-size:.9rem; color:var(--muted); text-align:right }} .legend a {{ color:inherit }} .controls {{ display:grid; gap:6px; margin:0 0 24px }} button {{ width:max-content; border:1px solid var(--accent,#2563eb); border-radius:8px; background:#2563eb; color:white; cursor:pointer; font:inherit; padding:9px 12px }} button:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }}
 .grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px }} .card {{ background:var(--surface); border:1px solid var(--line); border-top:7px solid var(--accent); border-radius:14px; padding:18px; min-height:210px; box-shadow:0 2px 9px #15244a0a }}
-.blue {{ --accent:#2563eb }} .green {{ --accent:#059669 }} .purple {{ --accent:#7c3aed }} .orange {{ --accent:#ea580c }} .gold {{ --accent:#ca8a04 }} .indigo {{ --accent:#4f46e5 }}
+.blue {{ --accent:light-dark(#2563eb,#4f81ef) }} .green {{ --accent:light-dark(#04855d,#05986b) }} .purple {{ --accent:light-dark(#7c3aed,#9b69f1) }} .orange {{ --accent:light-dark(#ca4c0a,#ea580c) }} .gold {{ --accent:light-dark(#9d6b03,#ca8a04) }} .indigo {{ --accent:light-dark(#4f46e5,#7e77ec) }}
 h2 {{ margin:0 0 14px; font-size:1.1rem }} h2 span {{ color:var(--accent); font-size:1rem; letter-spacing:.02em }} ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} small,.reference {{ grid-column:1/-1; color:var(--muted); font-size:.82rem }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:700; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0 }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }} @media (prefers-reduced-motion:reduce) {{ * {{ scroll-behavior:auto }} }}
 @media (max-width:820px) {{ header {{ display:block }} .legend {{ text-align:left; margin-top:10px }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
@@ -783,7 +810,7 @@ def _dominant_pillar_hex(profile: Any) -> str:
             best_pillar = pillar
     if best_pillar is None:
         return _NO_DOMINANT_PILLAR_HEX
-    return _VIRTUE_ACCENT_HEX[_PILLAR_FULLNAME_TO_ACCENT[best_pillar]]
+    return _accent_css(_PILLAR_FULLNAME_TO_ACCENT[best_pillar])
 
 
 def _ring_items(ring: Any, layer: str) -> list[tuple[str, str]]:
@@ -1094,7 +1121,7 @@ def _render_column_header(
         question_html = f'<p class="column-question">{escape(question)}</p>'
     return (
         f'<div class="grid-colhead" data-column="{escape(key)}">'
-        f'<h2 id="col-{escape(key)}" style="--accent:{_VIRTUE_ACCENT_HEX[color]}">'
+        f'<h2 id="col-{escape(key)}" style="--accent:{_accent_css(color)}">'
         f'<span lang="ko">{escape(hanja)} {escape(korean)}</span> {escape(english)}</h2>'
         f'<p class="coverage">{cov["observed"]}/{cov["expected"]} observed</p>'
         f"{extra_note_html}{question_html}</div>"

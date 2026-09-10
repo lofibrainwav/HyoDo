@@ -33,13 +33,20 @@ KEY_TO_SLUG: tuple[tuple[str, str], ...] = (
 PILLAR_SPEC_ENTRY_RE = re.compile(
     r'\(\s*"(?P<key>\w+)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"(?P<color>\w+)"\s*\)'
 )
-DASHBOARD_ACCENT_RE = re.compile(
-    r"\.(?P<name>\w+)\s*\{\{\s*--accent:(?P<hex>#[0-9a-fA-F]{6})\s*\}\}"
-)
-TOKEN_RE = re.compile(r"--color-virtue-(?P<slug>[a-z]+):\s*(?P<hex>#[0-9a-fA-F]{6})\s*;")
+# Each virtue accent is a light-dark() pair: one hex cannot clear WCAG AA
+# against both the light and the dark surface. See _VIRTUE_ACCENT_HEX.
+_PAIR = r"light-dark\(\s*(?P<light>#[0-9a-fA-F]{6})\s*,\s*(?P<dark>#[0-9a-fA-F]{6})\s*\)"
+DASHBOARD_ACCENT_RE = re.compile(r"\.(?P<name>\w+)\s*\{\{\s*--accent:" + _PAIR + r"\s*\}\}")
+TOKEN_RE = re.compile(r"--color-virtue-(?P<slug>[a-z]+):\s*" + _PAIR + r"\s*;")
+SURFACE_RE = re.compile(r"--surface:\s*(?P<hex>#[0-9a-fA-F]{3,6})\s*;")
+DARK_BLOCK_RE = re.compile(r"prefers-color-scheme:\s*dark")
+
+# WCAG 2.2 SC 1.4.3, normal text. The accent is used as text (the hanja label
+# and the reference line), so the 3:1 large-text allowance does not apply.
+AA_NORMAL_TEXT = 4.5
 
 
-def _dashboard_key_to_hex() -> dict[str, str]:
+def _dashboard_key_to_hex() -> dict[str, tuple[str, str]]:
     text = DASHBOARD_PATH.read_text(encoding="utf-8")
 
     specs_match = re.search(r"PILLAR_SPECS.*?=\s*\((.*?)\n\)", text, re.DOTALL)
@@ -50,15 +57,52 @@ def _dashboard_key_to_hex() -> dict[str, str]:
     }
     assert key_to_color, "no PILLAR_SPECS entries parsed"
 
-    color_to_hex = {m.group("name"): m.group("hex") for m in DASHBOARD_ACCENT_RE.finditer(text)}
-    assert color_to_hex, "no .accent-class { --accent:#hex } rules parsed from dashboard.py"
+    color_to_hex = {
+        m.group("name"): (m.group("light"), m.group("dark"))
+        for m in DASHBOARD_ACCENT_RE.finditer(text)
+    }
+    assert color_to_hex, "no .accent-class { --accent:light-dark(...) } rules parsed"
 
     return {key: color_to_hex[color] for key, color in key_to_color.items()}
 
 
-def _tokens_slug_to_hex() -> dict[str, str]:
+def _tokens_slug_to_hex() -> dict[str, tuple[str, str]]:
     text = TOKENS_PATH.read_text(encoding="utf-8")
-    return {m.group("slug"): m.group("hex") for m in TOKEN_RE.finditer(text)}
+    return {m.group("slug"): (m.group("light"), m.group("dark")) for m in TOKEN_RE.finditer(text)}
+
+
+def _relative_luminance(hex_value: str) -> float:
+    """WCAG relative luminance for a #rgb or #rrggbb value."""
+    digits = hex_value.lstrip("#")
+    if len(digits) == 3:
+        digits = "".join(ch * 2 for ch in digits)
+    channels = []
+    for offset in (0, 2, 4):
+        channel = int(digits[offset : offset + 2], 16) / 255
+        channels.append(
+            channel / 12.92 if channel <= 0.04045 else ((channel + 0.055) / 1.055) ** 2.4
+        )
+    red, green, blue = channels
+    return 0.2126 * red + 0.7152 * green + 0.0722 * blue
+
+
+def _contrast_ratio(foreground: str, background: str) -> float:
+    first, second = _relative_luminance(foreground), _relative_luminance(background)
+    lighter, darker = max(first, second), min(first, second)
+    return (lighter + 0.05) / (darker + 0.05)
+
+
+def _dashboard_surfaces() -> tuple[str, str]:
+    """The light and dark `--surface` values the accents are read against."""
+    text = DASHBOARD_PATH.read_text(encoding="utf-8")
+    dark_at = DARK_BLOCK_RE.search(text)
+    assert dark_at, "no prefers-color-scheme: dark block found in hyodo/dashboard.py"
+
+    light = SURFACE_RE.search(text, 0, dark_at.start())
+    assert light, "could not read the light --surface value from hyodo/dashboard.py"
+    dark = SURFACE_RE.search(text, dark_at.end())
+    assert dark, "could not read the dark --surface value from hyodo/dashboard.py"
+    return light.group("hex"), dark.group("hex")
 
 
 def test_virtue_hex_values_match_dashboard_ssot():
@@ -90,9 +134,53 @@ def test_virtue_accent_hex_dict_matches_the_dashboard_css_block():
     from hyodo.dashboard import _VIRTUE_ACCENT_HEX
 
     text = DASHBOARD_PATH.read_text(encoding="utf-8")
-    css_hex = {m.group("name"): m.group("hex") for m in DASHBOARD_ACCENT_RE.finditer(text)}
-    assert css_hex, "no .accent-class { --accent:#hex } rules parsed from dashboard.py"
+    css_hex = {
+        m.group("name"): (m.group("light"), m.group("dark"))
+        for m in DASHBOARD_ACCENT_RE.finditer(text)
+    }
+    assert css_hex, "no .accent-class { --accent:light-dark(...) } rules parsed"
     assert css_hex == _VIRTUE_ACCENT_HEX
+
+
+def test_every_virtue_accent_clears_wcag_aa_on_its_own_surface():
+    """A muted or re-derived palette must not buy looks with legibility.
+
+    This is the guard the colours themselves cannot provide: it reads the two
+    `--surface` values straight out of the stylesheet, so changing a surface
+    re-runs the check on every accent instead of silently invalidating it.
+    """
+    from hyodo.dashboard import _VIRTUE_ACCENT_HEX
+
+    light_surface, dark_surface = _dashboard_surfaces()
+    failures = []
+    for name, (light, dark) in _VIRTUE_ACCENT_HEX.items():
+        for label, accent, surface in (
+            ("light", light, light_surface),
+            ("dark", dark, dark_surface),
+        ):
+            ratio = _contrast_ratio(accent, surface)
+            if ratio < AA_NORMAL_TEXT:
+                failures.append(f"{name} {label}: {accent} on {surface} is {ratio:.2f}:1")
+
+    assert not failures, "accents below WCAG AA (4.5:1): " + "; ".join(failures)
+
+
+def test_no_single_hex_could_serve_both_surfaces():
+    """Documents why the accents are pairs rather than one value each.
+
+    Clearing 4.5:1 against the light surface caps an accent's relative
+    luminance; clearing it against the dark surface floors it. If those two
+    windows ever overlap again -- because a surface moved -- the pair split is
+    no longer forced and this test says so.
+    """
+    light_surface, dark_surface = _dashboard_surfaces()
+    ceiling = (_relative_luminance(light_surface) + 0.05) / AA_NORMAL_TEXT - 0.05
+    floor = AA_NORMAL_TEXT * (_relative_luminance(dark_surface) + 0.05) - 0.05
+
+    assert ceiling < floor, (
+        f"a single accent hex with relative luminance in [{floor:.4f}, {ceiling:.4f}] "
+        "would now clear AA on both surfaces; the light-dark() pairs can be collapsed"
+    )
 
 
 def test_virtue_tokens_appear_in_fixed_column_order():
