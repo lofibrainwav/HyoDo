@@ -5,6 +5,33 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.1] - 2026-09-10
+
+Cursor/Codex native hook normalization and release-surface provenance.
+
+### Added
+
+- Cursor and Codex host adapters for canonical `hyodo.agent-event/v1`
+  tool-call and tool-result observation.
+- Real Cursor specialized-hook payload coverage for shell, MCP, and file edit
+  events.
+
+### Changed
+
+- Native host mapping now preserves privacy-minimized argument, output, and
+  path digests while keeping lifecycle events explicitly unobserved.
+
+### Fixed
+
+- Cursor specialized hooks no longer lose top-level `command`, `file_path`,
+  `edits`, `output`, or `result_json` fields.
+
+### Evidence
+
+- Adapter fixtures and clean wheel install smoke pass on the release candidate.
+- Native Cursor/Codex response serialization is fixture-verified; live
+  Cursor/Codex callback observation remains `UNOBSERVED` in this release.
+
 ## [Unreleased]
 
 ### Added

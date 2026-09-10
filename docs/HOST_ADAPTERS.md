@@ -22,13 +22,19 @@ Codex `PermissionRequest`, therefore return an explicit unsupported reason;
 callers must surface that as `UNOBSERVED`. They are not silently converted to
 tool calls or model responses.
 
-The adapters are pure mappers. They do not append to the ledger, evaluate
-policy, or enforce a host decision. The caller remains responsible for
-validation, policy, recording, and the host-specific response contract. The
-CLI can therefore calculate and print a HyoDo decision for a native
-pre-action payload, but this release does not yet emit Cursor's or Codex's
-native allow/deny/rewrite response envelope. Native enforcement parity is
-still `UNOBSERVED`/`NOT_BUILT` and must not be inferred from a mapper fixture.
+The observation adapters are pure mappers. They do not append to the ledger
+or evaluate policy. The CLI remains responsible for validation, policy, and
+recording; the native response adapters serialize a policy decision into the
+host's stdout contract:
+
+- Cursor: `--native-response` emits `permission` and optional `updated_input`.
+- Codex: `--native-response` emits `hookSpecificOutput` with
+  `permissionDecision`/`updatedInput` or `PermissionRequest.decision`.
+
+This proves response serialization only. It does not prove that an installed
+host invoked the command or honored the response. Native response adapter
+fixtures are `BUILT`; live enforcement remains `UNOBSERVED` until a real host
+receipt is captured.
 
 ## Live-canary rule
 
