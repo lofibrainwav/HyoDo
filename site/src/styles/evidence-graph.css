@@ -136,6 +136,69 @@
 	margin: 0.5rem 0 1rem;
 }
 
+.eg-page .eg-consolebar {
+	display: grid;
+	grid-template-columns: minmax(180px, 1fr) auto auto;
+	align-items: center;
+	gap: 1rem;
+	max-width: 62rem;
+	min-height: 3.8rem;
+	margin: 1rem 0 0.7rem;
+	padding: 0.7rem 0.9rem;
+	background: #0c0e11;
+	border: 1px solid #343941;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+	font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+	font-size: 0.7rem;
+	letter-spacing: 0.08em;
+	text-transform: uppercase;
+}
+
+.eg-page .eg-console-brand {
+	display: grid;
+	gap: 0.2rem;
+}
+
+.eg-page .eg-console-kicker {
+	color: #8c949e;
+	font-size: 0.62rem;
+}
+
+.eg-page .eg-console-brand strong {
+	color: #f1f3f5;
+	font-size: 0.82rem;
+}
+
+.eg-page .eg-transport {
+	display: flex;
+	align-items: center;
+	gap: 0.55rem;
+	color: #a8afb7;
+	white-space: nowrap;
+}
+
+.eg-page .eg-transport strong {
+	color: #f1c644;
+	font-weight: 700;
+}
+
+.eg-page .eg-transport-mark {
+	color: var(--color-deny);
+	font-size: 0.62rem;
+}
+
+.eg-page .eg-transport-divider {
+	width: 1px;
+	height: 1.1rem;
+	background: #343941;
+}
+
+.eg-page .eg-console-boundary {
+	color: #f1c644;
+	font-size: 0.62rem;
+	text-align: right;
+}
+
 .eg-page .legend {
 	display: flex;
 	flex-wrap: wrap;
@@ -183,8 +246,9 @@
 	overflow-x: auto;
 	background: var(--eg-card);
 	border: 1px solid var(--eg-border);
-	border-radius: 10px;
+	border-radius: 2px;
 	padding: 0.9rem;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
 }
 
 .eg-page .grid {
@@ -210,6 +274,8 @@
 	align-self: end;
 	padding-bottom: 4px;
 	font-variant-numeric: tabular-nums;
+	font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
+	letter-spacing: 0.04em;
 }
 
 .eg-page .rowhead {
@@ -436,9 +502,10 @@
 	min-width: 260px;
 	background: var(--eg-card);
 	border: 1px solid var(--eg-border);
-	border-radius: 10px;
+	border-radius: 2px;
 	padding: 0.9rem 1rem;
 	font-size: 0.8rem;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
 }
 
 .eg-page aside.panel h2 {
@@ -501,6 +568,17 @@
 	.eg-page aside.panel {
 		flex: 1 1 auto;
 		width: 100%;
+	}
+}
+
+@media (max-width: 760px) {
+	.eg-page .eg-consolebar {
+		grid-template-columns: 1fr;
+		gap: 0.55rem;
+	}
+
+	.eg-page .eg-console-boundary {
+		text-align: left;
 	}
 }
 
