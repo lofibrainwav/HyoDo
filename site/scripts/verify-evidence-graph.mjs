@@ -139,7 +139,7 @@ report.motionByCell = await evalJs(`(async()=>{
  }
  return results;
 })()`);
-check(report.motionByCell.every(c=>c.count===0),'focus does not add animated evidence tokens');
+check(report.motionByCell.every(c=>['evt-e2','evt-r2'].includes(c.id)?c.count>0:c.count===0),'only decisions with evidence refs animate');
 // Reduced motion
 await call('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
 await load();
@@ -153,7 +153,7 @@ await shot(prefix + 'verify-mobile-375.png');
 
 report.mobileScroll = await evalJs(`(async()=>{scrollTo(1000,0);await new Promise(r=>requestAnimationFrame(r));return {x:scrollX,width:document.body.getBoundingClientRect().width};})()`);
 check(report.desktop.cellCount===14,'expected 14 cells');
-check(report.desktop.animAtRest===0 && report.desktop.animWhileActive===0 && report.desktop.animAfterEscape===0,'evidence graph has no transient animated token overlay');
+check(report.desktop.animAtRest===0 && report.desktop.animWhileActive>0 && report.desktop.animAfterEscape===0,'motion must be active only for selected evidence decision');
 check(report.desktop.panelChanged && report.desktop.focusKeptAfterEscape && report.desktop.panelAfterEscape===report.desktop.placeholder,'focus and Escape panel contract');
 const tab=JSON.parse(report.realTab), escape=JSON.parse(report.realEscape);
 check(!!tab.active && tab.panel.includes(tab.active),'real Tab reaches cell and fills panel');
