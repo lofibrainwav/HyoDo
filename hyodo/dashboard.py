@@ -760,8 +760,8 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _event_button(node: dict[str, Any]) -> str:
-    label = _event_label(node)
+def _event_button(node: dict[str, Any], *, label: str | None = None) -> str:
+    label = label or _event_label(node)
     title = escape(_event_title(node), quote=True)
     detail = escape(json.dumps(_event_detail_payload(node)), quote=True)
     node_id = escape(str(node.get("id") or ""))
@@ -1218,25 +1218,36 @@ def _daw_track(node: dict[str, Any]) -> tuple[str, str]:
     ``actor`` field; the event id/tool name are already recorded evidence and
     are sufficient for a stable local presentation lane.
     """
-    node_id = str(node.get("id") or "").lower()
-    tool = node.get("tool") if isinstance(node.get("tool"), dict) else {}
-    tool_name = str(tool.get("name") or "").lower() if isinstance(tool, dict) else ""
     actor = str(node.get("actor") or "").lower()
     if actor == "human":
-        return "operator", "OPERATOR"
-    if "parallel" in node_id:
-        return "parallel", "PARALLEL"
-    if "join" in node_id:
-        return "join", "DAG JOIN"
-    if "retry" in node_id or "false" in tool_name or "true" in tool_name:
-        return "retry", "RETRY / REWORK"
-    if "wait" in node_id or "wait" in tool_name:
-        return "wait", "WAIT"
-    if "unresolved" in node_id or "unresolved" in tool_name:
-        return "unresolved", "UNRESOLVED"
+        return "human", "Human"
+    if actor == "hyodo":
+        return "reviewer", "Reviewer"
     if actor == "agent":
-        return "execution", "EXECUTION"
-    return "observation", "OBSERVATION"
+        return "executor", "Executor"
+    return "planner", "Planner"
+
+
+def _daw_event_label(node: dict[str, Any]) -> str:
+    """Compact prototype-style label with measured signal still visible."""
+    node_id = str(node.get("id") or "").lower()
+    kind = str(node.get("kind") or "event").lower()
+    suffix = "call" if kind == "tool_call" else "result"
+    if "parallel" in node_id:
+        return f"parallel / {suffix}"
+    if "join" in node_id:
+        return f"dag join / {suffix}"
+    if "retry-call-1" in node_id or "retry-result-1" in node_id:
+        return f"retry 1 / {suffix}"
+    if "retry-call-2" in node_id or "retry-result-2" in node_id:
+        return f"rework / {suffix}"
+    if "wait" in node_id:
+        return f"wait / {suffix}"
+    if "unresolved" in node_id:
+        return "unresolved"
+    if "human" in node_id:
+        return "approval"
+    return _event_label(node)
 
 
 def _render_daw_timeline(
@@ -1249,25 +1260,15 @@ def _render_daw_timeline(
         default=0,
     )
     columns = max_step + 1
-    track_order = [
-        "operator",
-        "execution",
-        "parallel",
-        "join",
-        "retry",
-        "wait",
-        "unresolved",
-        "observation",
-    ]
+    run_id = next(
+        (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
+    )
+    track_order = ["human", "planner", "executor", "reviewer"]
     track_labels = {
-        "operator": "OPERATOR",
-        "execution": "EXECUTION",
-        "parallel": "PARALLEL",
-        "join": "DAG JOIN",
-        "retry": "RETRY / REWORK",
-        "wait": "WAIT",
-        "unresolved": "UNRESOLVED",
-        "observation": "OBSERVATION",
+        "human": "Human",
+        "planner": "Planner",
+        "executor": "Executor",
+        "reviewer": "Reviewer",
     }
     buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
     track_seen: set[str] = set()
@@ -1283,6 +1284,9 @@ def _render_daw_timeline(
     visible_tracks = [track for track in track_order if track in track_seen]
     parts = [
         '<section class="daw-console" aria-label="Evidence session timeline">',
+        f'<div class="daw-sessionbar"><div><span>EVIDENCE CONSOLE</span><strong>SESSION / {escape(run_id)}</strong></div>'
+        f'<div><span class="session-state">■ STATIC VIEW</span><span>STEP INDEX <b>t0 — t{max_step}</b></span>'
+        '<span class="session-boundary">LOCAL DATA / NOT SEALED</span></div></div>',
         '<div class="daw-console-head"><div><span class="daw-kicker">EVIDENCE SESSION / LIVE READBACK</span>'
         '<h2>Run timeline</h2></div><div class="daw-legend"><span><i class="legend-call"></i>CALL</span>'
         '<span><i class="legend-result"></i>RESULT</span><span><i class="legend-human"></i>HUMAN</span></div></div>',
@@ -1309,7 +1313,7 @@ def _render_daw_timeline(
             for tile_index, node in enumerate(events):
                 node_id = str(node["id"])
                 anchors[node_id] = (row_index, step, tile_index)
-                parts.append(_event_button(node))
+                parts.append(_event_button(node, label=_daw_event_label(node)))
             parts.append("</div>")
         parts.append("</div>")
     parts.extend([edge_overlay, "</div>", "</section>"])
@@ -1527,6 +1531,9 @@ h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .meta, .meta a {{ color:#8d9792 }}
 .unobserved-notice {{ border-radius:0; background:#321d1d; color:#ffb5a9; border:1px solid #9d4d43 }}
 .daw-console {{ position:relative; overflow:auto; border:1px solid #3b4440; background:#111514; box-shadow:0 18px 50px #0008; padding:18px; margin:4px 0 16px }}
+.daw-sessionbar {{ display:flex; justify-content:space-between; gap:20px; border:1px solid #343c38; padding:11px 12px; margin-bottom:16px; min-width:980px; color:#aab4ae; font-size:.68rem; letter-spacing:.08em }}
+.daw-sessionbar div {{ display:flex; gap:18px; align-items:center }} .daw-sessionbar span {{ color:#738078 }} .daw-sessionbar strong {{ color:#e4ebe5; letter-spacing:.1em }}
+.daw-sessionbar b, .session-boundary {{ color:#e4ba58 !important }} .session-state {{ color:#de7868 !important }}
 .daw-console-head {{ display:flex; justify-content:space-between; align-items:end; gap:20px; border-bottom:1px solid #303734; padding:2px 0 14px; min-width:980px }}
 .daw-kicker {{ color:#8fbd73; font-size:.68rem; letter-spacing:.16em }}
 .daw-console h2 {{ margin:5px 0 0; font-size:1.25rem; letter-spacing:.05em; text-transform:uppercase }}
@@ -1551,11 +1558,10 @@ h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-cell button[data-event-kind="prompt"] {{ border-left:3px solid #de7868 }}
 .daw-cell button[data-event-kind="decision"] {{ border-left:3px solid #b8a5eb }}
 .track-led {{ width:7px; height:7px; flex:0 0 auto; background:#82bd69; box-shadow:0 0 8px #82bd69 }}
-.track-parallel, .track-join {{ background:#72a9d5; box-shadow:0 0 8px #72a9d5 }}
-.track-retry {{ background:#d5a04c; box-shadow:0 0 8px #d5a04c }}
-.track-wait {{ background:#b8a5eb; box-shadow:0 0 8px #b8a5eb }}
-.track-unresolved {{ background:#de7868; box-shadow:0 0 8px #de7868 }}
-.track-operator {{ background:#f0b36c; box-shadow:0 0 8px #f0b36c }}
+.track-human {{ background:#f0b36c; box-shadow:0 0 8px #f0b36c }}
+.track-planner {{ background:#72a9d5; box-shadow:0 0 8px #72a9d5 }}
+.track-executor {{ background:#82bd69; box-shadow:0 0 8px #82bd69 }}
+.track-reviewer {{ background:#b8a5eb; box-shadow:0 0 8px #b8a5eb }}
 .daw-rows .edge-overlay {{ z-index:3 }}
 .daw-rows .edge {{ stroke:#82bd69; opacity:.68 }}
 .daw-rows .edge-evidence {{ stroke:#d5a04c; stroke-dasharray:4 3 }}
