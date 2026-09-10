@@ -66,6 +66,7 @@ from hyodo.connect import (
     UNOBSERVED_MESSAGE,
     UNOBSERVED_TARGETS,
     WRITABLE_TARGETS,
+    MappedHookEvent,
     check_status,
     load_connect_state,
     map_claude_code_hook_payload,
@@ -126,6 +127,8 @@ from hyodo.gates import (
 )
 from hyodo.graph_export import build_graph_export
 from hyodo.graph_view import build_actor_rings
+from hyodo.host_adapters.codex import map_codex_hook_payload
+from hyodo.host_adapters.cursor import map_cursor_hook_payload
 from hyodo.mcp_config import (
     ALL_HOSTS,
     CHATGPT_UNOBSERVED_MESSAGE,
@@ -3602,6 +3605,22 @@ def _load_event_payload(
     return load_event_from_path(file)
 
 
+_NATIVE_HOOKS = frozenset({"claude-code", "cursor", "codex"})
+
+
+def _map_hook_payload(
+    payload: object, root: Path, hook: str
+) -> tuple[MappedHookEvent | None, str | None]:
+    """Select the host adapter without duplicating event-recording logic."""
+    if hook == "claude-code":
+        return map_claude_code_hook_payload(payload, root)
+    if hook == "cursor":
+        return map_cursor_hook_payload(payload, root)
+    if hook == "codex":
+        return map_codex_hook_payload(payload, root)
+    return None, "unsupported_hook"
+
+
 def _unobserved_policy_decision(
     event: dict[str, Any],
     policy_err: str | None,
@@ -3622,7 +3641,7 @@ def _unobserved_policy_decision(
     thing as an explicit permissive policy, so it must still be recorded as
     unobserved rather than crash before anything is recorded.
     """
-    if hook == "claude-code" and policy_err == "policy_missing":
+    if hook in _NATIVE_HOOKS and policy_err == "policy_missing":
         default_cfg = PolicyConfig(
             schema=POLICY_SCHEMA_ID,
             max_steps=None,
@@ -3736,7 +3755,7 @@ def event_record(
         None,
         "--hook",
         help="Adapt stdin from a harness-native hook JSON shape instead of "
-        "hyodo.agent-event/v1 (currently: claude-code)",
+        "hyodo.agent-event/v1 (claude-code, cursor, or codex)",
     ),
     shadow: bool = typer.Option(
         False,
@@ -3806,14 +3825,14 @@ def event_record(
         raise typer.Exit(code)
 
     if hook is not None:
-        if hook != "claude-code":
+        if hook not in _NATIVE_HOOKS:
             message = f"unsupported --hook value: {hook}"
             if json_output:
                 console.print_json(json.dumps({"ok": False, "reasons": [message], "exit_code": 2}))
             else:
                 console.print(f"[red]{message}[/red]")
             raise typer.Exit(2)
-        mapped, map_err = map_claude_code_hook_payload(data, root_path)
+        mapped, map_err = _map_hook_payload(data, root_path, hook)
         if mapped is None:
             mapping_exit = 0 if shadow else 2
             if json_output:
@@ -3828,7 +3847,7 @@ def event_record(
                     )
                 )
             else:
-                console.print(f"[red]Cannot map Claude Code hook payload: {map_err}[/red]")
+                console.print(f"[red]Cannot map {hook} hook payload: {map_err}[/red]")
             stderr_prefix = "[SHADOW, not blocking] " if shadow else ""
             typer.echo(
                 f"{stderr_prefix}HYODO UNOBSERVED: malformed hook payload; treating as "
@@ -3857,14 +3876,14 @@ def event_record(
             )
         # A PostToolUse hook is fire-and-forget: it can never block, so an
         # unrecordable event exits 0 there and is reported as UNOBSERVED.
-        code = 0 if hook == "claude-code" else 1
+        code = 0 if hook in _NATIVE_HOOKS else 1
         if json_output:
             console.print_json(json.dumps({"ok": False, "reasons": reasons, "exit_code": code}))
         else:
             console.print("[red]INVALID[/red] event — not recorded")
             for reason in reasons:
                 console.print(f"  - {reason}")
-            if hook == "claude-code":
+            if hook in _NATIVE_HOOKS:
                 console.print("HYODO UNOBSERVED: event not recorded (fire-and-forget hook)")
         raise typer.Exit(code)
 
@@ -4065,7 +4084,7 @@ def event_record(
     # PostToolUse, which cannot block — fire-and-forget always exits 0 once the
     # ledger write itself succeeded. --shadow carries the same "recorded, not
     # enforced" honesty rule regardless of --hook.
-    final_exit_code = 0 if (hook == "claude-code" or shadow) else exit_code
+    final_exit_code = 0 if (hook in _NATIVE_HOOKS or shadow) else exit_code
     ledger = str(root_path / AGENT_EVENTS_RELATIVE_PATH)
     if ledger_obligation:
         ledger_obligation["ledger_written"] = True
@@ -4095,7 +4114,7 @@ def event_record(
             console.print(f"policy: [{color}]{decision_label}[/{color}]")
             if shadow:
                 console.print("[dim]shadow: true (recorded, not enforced)[/dim]")
-            if decision_label == "DENY" and not (hook == "claude-code" or shadow):
+            if decision_label == "DENY" and not (hook in _NATIVE_HOOKS or shadow):
                 console.print(
                     "[yellow]DENY is recorded for audit; the caller must stop "
                     "the agent. HyoDo is not a runtime interceptor.[/yellow]"
@@ -4234,7 +4253,7 @@ def policy_check(
         None,
         "--hook",
         help="Adapt stdin from a harness-native hook JSON shape instead of "
-        "hyodo.agent-event/v1 (currently: claude-code)",
+        "hyodo.agent-event/v1 (claude-code, cursor, or codex)",
     ),
     shadow: bool = typer.Option(
         False,
@@ -4281,7 +4300,7 @@ def policy_check(
             raise typer.Exit(2)
 
         if hook is not None:
-            if hook != "claude-code":
+            if hook not in _NATIVE_HOOKS:
                 message = f"unsupported --hook value: {hook}"
                 if json_output:
                     console.print_json(
@@ -4298,7 +4317,7 @@ def policy_check(
                     console.print(f"[red]{message}[/red]")
                 typer.echo(f"HYODO UNOBSERVED: {message}.", err=True)
                 raise typer.Exit(2)
-            mapped, map_err = map_claude_code_hook_payload(data, root_path)
+            mapped, map_err = _map_hook_payload(data, root_path, hook)
             if mapped is None:
                 mapping_exit = 0 if shadow else 2
                 if json_output:
@@ -4314,7 +4333,7 @@ def policy_check(
                         )
                     )
                 else:
-                    console.print(f"[red]Cannot map Claude Code hook payload: {map_err}[/red]")
+                    console.print(f"[red]Cannot map {hook} hook payload: {map_err}[/red]")
                 stderr_prefix = "[SHADOW, not blocking] " if shadow else ""
                 typer.echo(
                     f"{stderr_prefix}HYODO UNOBSERVED: malformed hook payload; treating as "

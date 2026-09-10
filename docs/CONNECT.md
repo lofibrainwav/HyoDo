@@ -22,13 +22,22 @@ hyodo connect [<target>] [--write] [--yes] [--shadow] [--status] [--root PATH] [
 | `claude-code` | `.claude/settings.json`, `.hyodo/policy.toml` | Adds a `PreToolUse` hook (`hyodo policy check --stdin --hook claude-code`) and a `PostToolUse` hook (`hyodo event record --stdin --hook claude-code`); also bootstraps a permissive starter `.hyodo/policy.toml` when none exists yet, so the hooks have something to evaluate from the first tool call |
 | `pre-commit` | `.pre-commit-config.yaml` | Adds the `hyodo-check` repo entry from this project's own `.pre-commit-hooks.yaml` |
 | `github-actions` | `.github/workflows/hyodo.yml` | A workflow calling the `.github/actions/hyodo` composite action |
-| `cursor` | — | **UNOBSERVED** — no verified hook contract; `connect` never fabricates a config format |
-| `codex` | — | **UNOBSERVED** — same reason |
+| `cursor` | — | Platform hook contract AVAILABLE; HyoDo adapter BUILT for native tool hooks. `connect` does not fabricate `.cursor/hooks.json`; live canary remains **UNOBSERVED** until an installed Cursor run emits a receipt. |
+| `codex` | — | Platform hook contract AVAILABLE; HyoDo adapter BUILT for native `PreToolUse`/`PostToolUse`. `connect` does not fabricate `.codex/hooks.json`; live canary remains **UNOBSERVED** until an installed Codex run emits a receipt. |
 
 A dual-host `allowed_tools` copy file (Claude Code names plus Cursor/demo
 names) lives at [`examples/host-policies/`](../examples/host-policies/). It
-is an allowlist, not a hook adapter — copying it does not make `connect
-cursor` observed.
+is an allowlist, not a hook adapter — copying it does not make a live
+Cursor/Codex canary observed. For a native hook command, pipe the host payload
+to `hyodo event record --stdin --hook cursor` or `--hook codex` (and use
+`hyodo policy check --stdin --hook ...` to calculate the HyoDo decision for a
+pre-action payload). The current release does not translate that decision into
+Cursor/Codex-native allow/deny/rewrite response JSON; native enforcement
+parity remains `UNOBSERVED`/`NOT_BUILT`.
+
+The adapter boundary is documented in [`HOST_ADAPTERS.md`](./HOST_ADAPTERS.md).
+Fixture tests prove `hyodo_adapter = BUILT`; they do not promote
+`live_canary = UNOBSERVED` to `OBSERVED`.
 
 Every file HyoDo did not create itself gets a `.bak` alongside it on its first
 write; everything HyoDo does not own in that file (other hooks, other
