@@ -79,7 +79,7 @@ POLL_SCRIPT_SHA256 = base64.b64encode(hashlib.sha256(POLL_SCRIPT.encode("utf-8")
 # collapse toggle (row visibility changes what is measurable).
 GRAPH_SCRIPT = """\
 const panel = document.getElementById("event-detail");
-const DEFAULT_DETAIL = "Select an event to see its 5W1H detail.";
+const DEFAULT_DETAIL = panel ? Array.from(panel.childNodes, (node) => node.cloneNode(true)) : [];
 const FIELDS = [
   ["Who", "who"],
   ["What", "what"],
@@ -96,6 +96,9 @@ function highlightEdges(eventId) {
     const target = edge.dataset.dawTarget || edge.dataset.target;
     const active = eventId && (source === eventId || target === eventId);
     edge.classList.toggle("edge-active", Boolean(active));
+  });
+  document.querySelectorAll(".daw-cell button[data-event-id]").forEach((tile) => {
+    tile.classList.toggle("event-active", Boolean(eventId && tile.dataset.eventId === eventId));
   });
 }
 function layoutEdges() {
@@ -243,7 +246,7 @@ ringButtons.forEach((button) => {
 });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  if (panel) panel.textContent = DEFAULT_DETAIL;
+  if (panel) panel.replaceChildren(...DEFAULT_DETAIL.map((node) => node.cloneNode(true)));
   highlightEdges(null);
   const target = lastFocusedCell || cells[0];
   if (target) target.focus();
@@ -1265,10 +1268,11 @@ def _render_daw_timeline(
 ) -> tuple[str, dict[str, tuple[int, int, int]]]:
     """Render the user-facing DAW timeline and return edge anchor membership."""
     valid_nodes = [node for node in nodes if isinstance(node.get("id"), str)]
-    max_step = max(
-        (node.get("step_index") for node in valid_nodes if isinstance(node.get("step_index"), int)),
-        default=0,
-    )
+
+    step_indices = [
+        value for node in valid_nodes if isinstance(value := node.get("step_index"), int)
+    ]
+    max_step = max(step_indices, default=0)
     columns = max_step + 1
     run_id = next(
         (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
@@ -1283,10 +1287,15 @@ def _render_daw_timeline(
     buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
     anchors: dict[str, tuple[int, int, int]] = {}
     for node in sorted(
-        valid_nodes, key=lambda item: (item.get("step_index", 0), str(item.get("ts", "")))
+        valid_nodes,
+        key=lambda item: (
+            item.get("step_index") if isinstance(item.get("step_index"), int) else 0,
+            str(item.get("ts", "")),
+        ),
     ):
         track, _label = _daw_track(node)
-        step = node.get("step_index") if isinstance(node.get("step_index"), int) else 0
+        raw_step = node.get("step_index")
+        step: int = raw_step if isinstance(raw_step, int) else 0
         buckets.setdefault((track, step), []).append(node)
 
     # Keep the prototype's four-lane structure even when a role is absent from
@@ -1311,17 +1320,31 @@ def _render_daw_timeline(
     ]
     for row_index, track in enumerate(visible_tracks):
         label = track_labels[track]
+        is_empty_track = not any(buckets.get((track, step)) for step in range(columns))
+        row_class = "daw-row daw-row-empty" if is_empty_track else "daw-row"
+        empty_state = '<span class="track-empty-state">UNOBSERVED</span>' if is_empty_track else ""
         parts.append(
-            f'<div class="daw-row" data-daw-track="{escape(track)}"><div class="daw-track-label">'
-            f'<span class="track-led track-{escape(track)}"></span>{escape(label)}<small>{row_index:02d}</small></div>'
+            f'<div class="{row_class}" data-daw-track="{escape(track)}"><div class="daw-track-label">'
+            f'<span class="track-led track-{escape(track)}"></span>{escape(label)}{empty_state}'
+            f"<small>{row_index:02d}</small></div>"
         )
         for step in range(columns):
             events = buckets.get((track, step), [])
             if not events:
                 parts.append('<div class="daw-cell daw-empty"></div>')
                 continue
+            is_parallel_cluster = len(events) > 1 and all(
+                "parallel-" in str(node["id"]).lower() for node in events
+            )
             cluster_class = " daw-cluster" if len(events) > 1 else ""
-            parts.append(f'<div class="daw-cell{cluster_class}" data-event-count="{len(events)}">')
+            parallel_attr = ' data-parallel-cluster="true"' if is_parallel_cluster else ""
+            parts.append(
+                f'<div class="daw-cell{cluster_class}" data-event-count="{len(events)}"{parallel_attr}>'
+            )
+            if is_parallel_cluster:
+                parts.append(
+                    '<span class="daw-cluster-label" aria-hidden="true">PARALLEL / A + B</span>'
+                )
             for tile_index, node in enumerate(events):
                 node_id = str(node["id"])
                 anchors[node_id] = (row_index, step, tile_index)
@@ -1517,7 +1540,7 @@ button {{ font:inherit; border:1px solid var(--line); background:var(--surface);
 .time-ruler {{ display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:.72rem; margin:6px 0 18px }}
 .time-ruler-line {{ flex:1; height:1px; background:var(--line) }}
 .edge-overlay {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible }}
-.edge.edge-active {{ stroke-width:3; filter:drop-shadow(0 0 2px currentColor) }}
+.edge.edge-active {{ stroke-width:3 }}
 .cells {{ display:flex; flex-wrap:wrap; gap:6px }}
 .gutter {{ margin-bottom:18px }} .gutter h2 {{ font-size:.95rem }}
 button[hidden], .grid-row[hidden] {{ display:none }}
@@ -1536,55 +1559,65 @@ button[hidden], .grid-row[hidden] {{ display:none }}
    the DOM for contract compatibility, but the operator-facing graph is the
    measured event timeline below. */
 .legacy-orb, .legacy-proof-grid, .legacy-proof-gutter {{ display:none }}
-body {{ background:#0b0d0e; color:#e8ece9; font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace }}
+/* TE hardware deck: flat anodised surfaces, sharp displays, and only the
+   status colours that distinguish evidence. No bloom or decorative shadow. */
+body {{ background:#0f0e12; color:#f5f5f5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; font-weight:300 }}
 main {{ max-width:1480px; padding:28px 28px 56px }}
-header {{ border-bottom:1px solid #343a38; padding-bottom:18px; margin-bottom:20px }}
-h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3vw,2.5rem) }}
-.meta, .meta a {{ color:#8d9792 }}
-.unobserved-notice {{ border-radius:0; background:#321d1d; color:#ffb5a9; border:1px solid #9d4d43 }}
-.daw-console {{ position:relative; overflow:auto; border:1px solid #3b4440; background:#111514; box-shadow:0 18px 50px #0008; padding:18px; margin:4px 0 16px }}
-.daw-sessionbar {{ display:flex; justify-content:space-between; gap:20px; border:1px solid #343c38; padding:11px 12px; margin-bottom:16px; min-width:980px; color:#aab4ae; font-size:.68rem; letter-spacing:.08em }}
-.daw-sessionbar div {{ display:flex; gap:18px; align-items:center }} .daw-sessionbar span {{ color:#738078 }} .daw-sessionbar strong {{ color:#e4ebe5; letter-spacing:.1em }}
-.daw-sessionbar b, .session-boundary {{ color:#e4ba58 !important }} .session-state {{ color:#de7868 !important }}
-.daw-console-head {{ display:flex; justify-content:space-between; align-items:end; gap:20px; border-bottom:1px solid #303734; padding:2px 0 14px; min-width:980px }}
-.daw-kicker {{ color:#8fbd73; font-size:.68rem; letter-spacing:.16em }}
-.daw-console h2 {{ margin:5px 0 0; font-size:1.25rem; letter-spacing:.05em; text-transform:uppercase }}
-.daw-legend {{ display:flex; gap:14px; color:#929c96; font-size:.68rem; letter-spacing:.08em }}
-.daw-legend i {{ display:inline-block; width:8px; height:8px; margin-right:5px; background:#82bd69 }}
-.daw-legend .legend-result {{ background:#d5a04c }}
-.daw-legend .legend-human {{ background:#de7868 }}
+header {{ border-bottom:1px solid #3a393d; padding-bottom:18px; margin-bottom:20px }}
+h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3vw,2.5rem); font-weight:300 }}
+.meta, .meta a {{ color:#aaa9ab }}
+.unobserved-notice {{ border-radius:0; background:#251716; color:#f5b5ad; border:1px solid #f05a24 }}
+.daw-console {{ position:relative; overflow:auto; border:1px solid #57565a; background:#17161a; padding:14px; margin:4px 0 16px }}
+.daw-sessionbar {{ display:flex; justify-content:space-between; gap:20px; border:1px solid #3a393d; border-left:3px solid #f05a24; padding:11px 12px; margin-bottom:14px; min-width:980px; color:#d1d0d2; font-size:.68rem; letter-spacing:.1em }}
+.daw-sessionbar div {{ display:flex; gap:18px; align-items:center }} .daw-sessionbar span {{ color:#969598 }} .daw-sessionbar strong {{ color:#f5f5f5; letter-spacing:.12em; font-weight:300 }}
+.daw-sessionbar b, .session-boundary {{ color:#fab413 !important }} .session-state {{ color:#f05a24 !important }}
+.daw-console-head {{ display:flex; justify-content:space-between; align-items:end; gap:20px; border-bottom:1px solid #3a393d; padding:2px 0 14px; min-width:980px }}
+.daw-kicker {{ color:#7fc86a; font-size:.68rem; letter-spacing:.18em }}
+.daw-console h2 {{ margin:5px 0 0; font-size:1.25rem; letter-spacing:.08em; text-transform:uppercase; font-weight:300 }}
+.daw-legend {{ display:flex; gap:14px; color:#aaa9ab; font-size:.68rem; letter-spacing:.1em }}
+.daw-legend i {{ display:inline-block; width:7px; height:7px; margin-right:5px; background:#7fc86a }}
+.daw-legend .legend-result {{ background:#fab413 }}
+.daw-legend .legend-human {{ background:#f05a24 }}
 .daw-rows {{ position:relative; min-width:1060px; padding-top:14px }}
 .daw-ruler, .daw-row {{ display:grid; grid-template-columns:190px repeat(var(--daw-columns), minmax(104px,1fr)); min-width:1060px }}
-.daw-ruler {{ color:#7c8881; font-size:.68rem; letter-spacing:.09em; border-bottom:1px solid #3b4440 }}
-.daw-step {{ padding:0 8px 8px; border-left:1px solid #2c3431; font-variant-numeric:tabular-nums }}
-.daw-step small {{ display:block; color:#4f5b55; margin-top:3px }}
-.daw-track-label {{ display:flex; align-items:center; gap:7px; padding:0 10px; color:#aab4ae; font-size:.69rem; letter-spacing:.08em; border-right:1px solid #343c38 }}
-.daw-track-label small {{ margin-left:auto; color:#4d5852 }}
-.daw-row {{ min-height:78px; margin:8px 0; border:1px solid #2a312e; border-radius:4px; background:#101513; overflow:visible }}
-.daw-cell {{ min-height:78px; padding:7px 5px; border-left:1px solid #252d29; display:flex; flex-direction:column; gap:4px; justify-content:center }}
-.daw-cell.daw-cluster {{ display:grid; grid-template-columns:minmax(0,1fr); align-content:center; gap:7px; padding:9px 7px; background:#0d1210; box-shadow:inset 0 0 0 1px #344139 }}
+.daw-ruler {{ color:#aaa9ab; font-size:.68rem; letter-spacing:.1em; border-bottom:1px solid #57565a }}
+.daw-step {{ padding:0 8px 8px; border-left:1px solid #302f33; font-variant-numeric:tabular-nums }}
+.daw-step small {{ display:block; color:#747378; margin-top:3px }}
+.daw-track-label {{ display:flex; align-items:center; gap:7px; padding:0 10px; color:#f5f5f5; font-size:.69rem; letter-spacing:.1em; border-right:1px solid #57565a }}
+.daw-track-label small {{ margin-left:auto; color:#747378 }}
+.track-empty-state {{ color:#747378; font-size:.54rem; letter-spacing:.12em }}
+.daw-row {{ min-height:78px; margin:8px 0; border:1px solid #3a393d; border-radius:0; background:#121116; overflow:visible }}
+.daw-row.daw-row-empty {{ min-height:36px; margin:4px 0; border-color:#302f33; background:#101015 }}
+.daw-row.daw-row-empty .daw-cell {{ min-height:34px; padding:0; background:#101015 }}
+.daw-row.daw-row-empty .daw-track-label {{ color:#aaa9ab }}
+.daw-cell {{ min-height:78px; padding:7px 5px; border-left:1px solid #302f33; display:flex; flex-direction:column; gap:4px; justify-content:center }}
+.daw-cell.daw-cluster {{ display:grid; grid-template-columns:minmax(0,1fr); align-content:center; gap:7px; padding:9px 7px; background:#0f0e12; box-shadow:inset 0 0 0 1px #3a393d }}
 .daw-cell.daw-cluster[data-event-count="4"] {{ grid-template-columns:repeat(2,minmax(0,1fr)) }}
-.daw-empty {{ background:repeating-linear-gradient(135deg,transparent 0 8px,#ffffff03 8px 9px) }}
-.daw-cell button {{ width:100%; min-width:0; border-radius:0; border:1px solid #4b5750; background:#1a211e; color:#dce5df; padding:8px 7px; font-size:.66rem; letter-spacing:.02em; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer }}
-.daw-cell.daw-cluster button {{ padding:6px 5px; min-height:24px; border-radius:2px; font-size:.59rem; box-shadow:0 0 0 1px #101512 }}
-.daw-cell.daw-cluster button[data-event-id*="parallel-a"] {{ border-color:#739bb2 }}
-.daw-cell.daw-cluster button[data-event-id*="parallel-b"] {{ border-color:#b59663 }}
-.daw-cell button:hover, .daw-cell button:focus-visible {{ border-color:#d9ead7; background:#26332c }}
-.daw-cell button[data-event-kind="tool_call"] {{ border-left:3px solid #82bd69 }}
-.daw-cell button[data-event-kind="tool_result"] {{ border-left:3px solid #d5a04c }}
-.daw-cell button[data-event-kind="prompt"] {{ border-left:3px solid #de7868 }}
-.daw-cell button[data-event-kind="decision"] {{ border-left:3px solid #b8a5eb }}
-.track-led {{ width:7px; height:7px; flex:0 0 auto; background:#82bd69; box-shadow:0 0 8px #82bd69 }}
-.track-human {{ background:#f0b36c; box-shadow:0 0 8px #f0b36c }}
-.track-planner {{ background:#72a9d5; box-shadow:0 0 8px #72a9d5 }}
-.track-agent {{ background:#82bd69; box-shadow:0 0 8px #82bd69 }}
-.track-reviewer {{ background:#b8a5eb; box-shadow:0 0 8px #b8a5eb }}
+.daw-cell.daw-cluster[data-parallel-cluster="true"] {{ position:relative; padding-top:23px; border:1px solid #0071bb; background:#15151a }}
+.daw-cluster-label {{ position:absolute; top:5px; left:7px; color:#72bfe9; font-size:.52rem; letter-spacing:.14em; line-height:1 }}
+.daw-empty {{ background:#121116 }}
+.daw-cell button {{ width:100%; min-width:0; border-radius:0; border:1px solid #68676a; border-top-color:#929195; background:#202025; color:#f5f5f5; padding:8px 7px; font-family:inherit; font-weight:300; font-size:.66rem; letter-spacing:.035em; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer }}
+.daw-cell.daw-cluster button {{ padding:6px 5px; min-height:24px; border-radius:0; font-size:.59rem; box-shadow:inset 0 -1px 0 #0f0e12 }}
+.daw-cell.daw-cluster button[data-event-id*="parallel-a"] {{ border-color:#0071bb }}
+.daw-cell.daw-cluster button[data-event-id*="parallel-b"] {{ border-color:#fab413 }}
+.daw-cell button:hover {{ border-color:#f5f5f5; background:#2c2b30 }}
+.daw-cell button:focus-visible {{ outline:2px solid #f05a24; outline-offset:2px; border-color:#f05a24; background:#2c2b30 }}
+.daw-cell button.event-active {{ border-color:#f05a24; background:#f5f5f5; color:#0f0e12; font-weight:500 }}
+.daw-cell button[data-event-kind="tool_call"] {{ border-left:3px solid #7fc86a }}
+.daw-cell button[data-event-kind="tool_result"] {{ border-left:3px solid #fab413 }}
+.daw-cell button[data-event-kind="prompt"] {{ border-left:3px solid #f05a24 }}
+.daw-cell button[data-event-kind="decision"] {{ border-left:3px solid #0071bb }}
+.track-led {{ width:7px; height:7px; flex:0 0 auto; background:#7fc86a }}
+.track-human {{ background:#f05a24 }}
+.track-planner {{ background:#0071bb }}
+.track-agent {{ background:#7fc86a }}
+.track-reviewer {{ background:#fab413 }}
 .daw-rows .edge-overlay {{ z-index:3 }}
-.daw-rows .edge {{ stroke:#82bd69; opacity:.68 }}
-.daw-rows .edge-evidence {{ stroke:#d5a04c; stroke-dasharray:4 3 }}
-.daw-rows .edge-broken {{ stroke:#de7868 }}
-.daw-rows .edge.edge-active {{ stroke-width:3; opacity:1; filter:drop-shadow(0 0 4px currentColor) }}
-.detail {{ border-radius:0; background:#111514; border-color:#3b4440; color:#cdd8d1; font-size:.75rem; min-height:86px }}
+.daw-rows .edge {{ stroke:#7fc86a; opacity:.82 }}
+.daw-rows .edge-evidence {{ stroke:#fab413; stroke-dasharray:4 3 }}
+.daw-rows .edge-broken {{ stroke:#f05a24 }}
+.daw-rows .edge.edge-active {{ stroke-width:3; opacity:1 }}
+.detail {{ border-radius:0; background:#17161a; border-color:#57565a; color:#f5f5f5; font-size:.75rem; min-height:86px }}
 @media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} }}
 @media (prefers-reduced-motion:reduce) {{ .daw-cell button {{ transition:none }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
@@ -1599,5 +1632,5 @@ h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 {time_ruler_html}
 </div>
 <div class="legacy-proof-gutter">{gutter_html}</div>
-<section id="event-detail" class="detail" aria-live="polite"><p>Select an event to see its 5W1H detail.</p></section>
+<section id="event-detail" class="detail" aria-live="polite"><p class="detail-kicker">RUN #3 / READING GUIDE</p><p>Select a timeline pad to inspect its recorded 5W1H evidence.</p><p><strong>SOLID</strong> execution route · <strong>DASHED</strong> evidence relation · <strong>ORANGE</strong> human or unresolved signal.</p></section>
 </main><script>{GRAPH_SCRIPT}</script></body></html>"""
