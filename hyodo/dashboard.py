@@ -594,6 +594,10 @@ def render_dashboard_html(
     high = sum(1 for finding in findings if finding.get("severity") == "high")
     measured_at = str(evidence.get("measured_at", "Not recorded"))
     target = str(evidence.get("target", "Not recorded"))
+    gate_values = (typecheck, tests, lint)
+    measured_gate_count = sum(
+        1 for gate in gate_values if gate["status"].upper() not in {"NOT MEASURED", "UNOBSERVED"}
+    )
 
     pillars = evidence.get("pillars")
     pillars = pillars if isinstance(pillars, dict) else {}
@@ -652,17 +656,29 @@ def render_dashboard_html(
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HyoDo Instrument Panel</title><style>
-:root {{ color-scheme: light dark; --ink:#182033; --muted:#5b6475; --surface:#fff; --bg:#f5f7fb; --line:#dbe1ed; --line-soft:#edf0f5; --focus:#111827; }}
-@media (prefers-color-scheme: dark) {{ :root {{ --ink:#e6eaf3; --muted:#9aa3b5; --surface:#161b28; --bg:#0d1119; --line:#2a3245; --line-soft:#232a3b; --focus:#e6eaf3; }} }}
-* {{ box-sizing:border-box }} body {{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 ui-sans-serif,system-ui,sans-serif }}
-main {{ max-width:1180px; margin:auto; padding:28px 20px 48px }} header {{ display:flex; justify-content:space-between; gap:24px; align-items:start; margin-bottom:24px }}
-h1 {{ margin:0; font-size:clamp(1.7rem,4vw,2.5rem) }} .meta {{ color:var(--muted); margin:.35rem 0 0 }} .legend {{ font-size:.9rem; color:var(--muted); text-align:right }} .legend a {{ color:inherit }} .controls {{ display:grid; gap:6px; margin:0 0 24px }} button {{ width:max-content; border:1px solid var(--accent,#2563eb); border-radius:8px; background:#2563eb; color:white; cursor:pointer; font:inherit; padding:9px 12px }} button:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }}
-.grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px }} .card {{ background:var(--surface); border:1px solid var(--line); border-top:7px solid var(--accent); border-radius:14px; padding:18px; min-height:210px; box-shadow:0 2px 9px #15244a0a }}
+:root {{ color-scheme: light dark; --ink:#121212; --muted:#68645d; --surface:#fffdf7; --bg:#ebe9e1; --line:#121212; --line-soft:#d8d5cc; --focus:#ff5a36; --signal:#ff5a36; --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace; }}
+@media (prefers-color-scheme: dark) {{ :root {{ --ink:#f5f1e7; --muted:#aaa59a; --surface:#1d1d1a; --bg:#11110f; --line:#f5f1e7; --line-soft:#46443e; --focus:#ff7153; --signal:#ff7153; }} }}
+* {{ box-sizing:border-box }} body {{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 "Helvetica Neue",Helvetica,Arial,sans-serif }}
+main {{ max-width:1220px; margin:auto; padding:24px 22px 56px }}
+header {{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:28px; align-items:end; padding:0 0 20px; border-bottom:2px solid var(--line) }}
+.eyebrow,.kicker,.readout-label,.status-label {{ font:700 .7rem/1.2 var(--mono); letter-spacing:.12em; text-transform:uppercase }}
+.eyebrow {{ color:var(--signal); margin:0 0 8px }} h1 {{ margin:0; font-size:clamp(2.1rem,6vw,4.8rem); line-height:.92; letter-spacing:-.075em; font-weight:800 }}
+.meta {{ color:var(--muted); margin:.6rem 0 0; font-family:var(--mono); font-size:.78rem; overflow-wrap:anywhere }}
+.legend {{ max-width:260px; margin:0; color:var(--muted); font:700 .72rem/1.5 var(--mono); text-align:right; text-transform:uppercase }} .legend a {{ color:var(--ink); text-decoration-thickness:2px; text-underline-offset:3px }}
+.instrument-strip {{ display:grid; grid-template-columns:1.5fr repeat(3,1fr); border-bottom:1px solid var(--line); margin:0 0 18px }}
+.readout {{ min-height:96px; padding:14px 15px 12px; border-left:1px solid var(--line) }} .readout:first-child {{ border-left:0 }}
+.readout-label {{ color:var(--muted); display:block; margin-bottom:11px }} .readout-value {{ display:block; font:800 clamp(1.05rem,2vw,1.5rem)/1 var(--mono); letter-spacing:-.06em; overflow-wrap:anywhere }} .readout-value.signal {{ color:var(--signal) }}
+.controls {{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:12px 0 18px; border-bottom:1px solid var(--line) }}
+button {{ border:2px solid var(--line); border-radius:0; background:var(--signal); color:#121212; cursor:pointer; font:800 .78rem var(--mono); padding:10px 14px; text-transform:uppercase }} button:disabled {{ cursor:wait; opacity:.55 }} .controls small {{ color:var(--muted); font: .72rem var(--mono) }}
+.measurement-status {{ display:inline-block; color:var(--ink); font:700 .72rem var(--mono); text-transform:uppercase }}
+.grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:18px }} .card {{ position:relative; background:var(--surface); border:2px solid var(--line); border-radius:0; padding:18px; min-height:218px; box-shadow:4px 4px 0 var(--line) }}
+.card::before {{ content:""; position:absolute; top:0; left:0; width:28px; height:6px; background:var(--accent) }}
 .blue {{ --accent:#2563eb }} .green {{ --accent:#059669 }} .purple {{ --accent:#7c3aed }} .orange {{ --accent:#ea580c }} .gold {{ --accent:#ca8a04 }} .indigo {{ --accent:#4f46e5 }}
-h2 {{ margin:0 0 14px; font-size:1.1rem }} h2 span {{ color:var(--accent); font-size:1rem; letter-spacing:.02em }} ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} small,.reference {{ grid-column:1/-1; color:var(--muted); font-size:.82rem }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:700; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0 }}
+h2 {{ display:flex; justify-content:space-between; gap:12px; align-items:baseline; margin:0 0 18px; font-size:1rem; letter-spacing:-.02em }} h2 span {{ color:var(--accent); font:800 .82rem var(--mono); letter-spacing:.08em }}
+ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} li strong {{ font:800 .86rem var(--mono); text-align:right; overflow-wrap:anywhere }} .metric-label {{ font-size:.84rem }} small,.reference {{ grid-column:1/-1; color:var(--muted); font: .68rem/1.35 var(--mono) }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:800; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0; font-size:.8rem }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }} @media (prefers-reduced-motion:reduce) {{ * {{ scroll-behavior:auto }} }}
-@media (max-width:820px) {{ header {{ display:block }} .legend {{ text-align:left; margin-top:10px }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
-</style></head><body><main><header><div><h1>HyoDo Instrument Panel</h1><p class="meta">Target: {escape(target)} · Measured: {escape(measured_at)}</p></div><p class="legend">Raw evidence only · No composite score<br><a href="/graph">Open evidence graph</a> · <a href="/api/evidence">Open current evidence JSON</a></p></header><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="meta" aria-live="polite">{escape(refresh_status)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
+@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} header {{ display:block }} .legend {{ text-align:left; margin-top:18px; max-width:none }} .instrument-strip {{ grid-template-columns:1fr 1fr }} .readout {{ border-top:1px solid var(--line); border-left:1px solid var(--line) }} .readout:nth-child(odd) {{ border-left:0 }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
+</style></head><body><main><header><div><p class="eyebrow">HyoDo / Measurement Console</p><h1>Instrument Panel</h1><p class="meta">TARGET // {escape(target)}<br>MEASURED // {escape(measured_at)}</p></div><p class="legend">Raw evidence only<br>No composite score<br><a href="/graph">Open evidence graph</a> · <a href="/api/evidence">Open evidence JSON</a></p></header><section class="instrument-strip" aria-label="measurement summary"><div class="readout"><span class="readout-label">Signal state</span><strong class="readout-value signal">{escape("MEASURED" if measured_gate_count else "UNOBSERVED")}</strong></div><div class="readout"><span class="readout-label">Gates read</span><strong class="readout-value">{measured_gate_count}/3</strong></div><div class="readout"><span class="readout-label">Refresh mode</span><strong class="readout-value">{escape("AUTO " + str(interval) + "S" if interval else "FIXED")}</strong></div><div class="readout"><span class="readout-label">Receipt scope</span><strong class="readout-value">LOCAL ONLY</strong></div></section><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="measurement-status" aria-live="polite">{escape(refresh_status)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
 
 
 def _parse_iso_ts(value: Any) -> datetime | None:
