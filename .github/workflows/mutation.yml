@@ -1,16 +1,6 @@
 name: HyoDo Mutation Evidence
 
 "on":
-  pull_request:
-    branches: [main]
-    paths:
-      - "hyodo/__init__.py"
-      - "tests/test_scoring_math.py"
-      - "tests/test_scoring_properties.py"
-      - "tests/conftest.py"
-      - "cosmic-ray.scoring.toml"
-      - "pyproject.toml"
-      - ".github/workflows/mutation.yml"
   schedule:
     - cron: "17 9 * * 1"
   workflow_dispatch:
@@ -36,9 +26,8 @@ jobs:
   scoring-mutation:
     name: "Mutation Evidence - Scoring (advisory)"
     if: >-
-      github.event_name == 'pull_request' ||
-      (github.event_name == 'workflow_dispatch' &&
-       (inputs.scope == 'scoring' || inputs.scope == 'both'))
+      github.event_name == 'workflow_dispatch' &&
+      (inputs.scope == 'scoring' || inputs.scope == 'both')
     runs-on: ubuntu-latest
     timeout-minutes: 90
 

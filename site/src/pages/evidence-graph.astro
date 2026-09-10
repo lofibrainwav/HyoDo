@@ -84,6 +84,21 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 
 			<p class="eg-key">Rows are participants, columns are step index, cells are events. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
 
+			<section class="eg-consolebar" aria-label="evidence session console">
+				<div class="eg-console-brand">
+					<span class="eg-console-kicker">Evidence Console</span>
+					<strong id="eg-console-session">SESSION / FIXTURE</strong>
+				</div>
+				<div class="eg-transport" aria-label="session status">
+					<span class="eg-transport-mark" aria-hidden="true">■</span>
+					<span id="eg-console-view">STATIC VIEW</span>
+					<span class="eg-transport-divider" aria-hidden="true"></span>
+					<span>STEP INDEX</span>
+					<strong id="eg-console-steps">t0 — t7</strong>
+				</div>
+				<div class="eg-console-boundary" id="eg-console-boundary">DEMO DATA / NOT LIVE</div>
+			</section>
+
 			<div class="legend" aria-hidden="false">
 				<span class="lg-item"
 					><span class="lg-dot" style="background:var(--color-tile-observed)"
@@ -140,6 +155,10 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 			const banner = document.getElementById('eg-banner');
 			const fileInput = document.getElementById('eg-file');
 			const resetBtn = document.getElementById('eg-reset');
+			const consoleSession = document.getElementById('eg-console-session');
+			const consoleView = document.getElementById('eg-console-view');
+			const consoleSteps = document.getElementById('eg-console-steps');
+			const consoleBoundary = document.getElementById('eg-console-boundary');
 			const fixtureBannerHtml = banner?.innerHTML ?? '';
 
 			let dispose = () => {};
@@ -160,6 +179,10 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 
 			function showFixture(): void {
 				remount(EVENTS);
+				if (consoleSession) consoleSession.textContent = 'SESSION / FIXTURE';
+				if (consoleView) consoleView.textContent = 'STATIC VIEW';
+				if (consoleSteps) consoleSteps.textContent = 't0 — t7';
+				if (consoleBoundary) consoleBoundary.textContent = 'DEMO DATA / NOT LIVE';
 				if (banner) {
 					banner.innerHTML = fixtureBannerHtml;
 					banner.dataset.source = 'fixture';
@@ -194,6 +217,17 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 				}
 
 				remount(fromEvidenceGraphV1(parsed));
+				const graphNodes = Array.isArray((parsed as { nodes?: unknown }).nodes)
+					? (parsed as { nodes: Array<{ step_index?: unknown }> }).nodes
+					: [];
+				const steps = graphNodes
+					.map((node) => (typeof node.step_index === 'number' ? node.step_index : null))
+					.filter((step): step is number => step !== null);
+				const maxStep = steps.length > 0 ? Math.max(...steps) : 0;
+				if (consoleSession) consoleSession.textContent = 'SESSION / LOCAL JSON';
+				if (consoleView) consoleView.textContent = 'STATIC VIEW';
+				if (consoleSteps) consoleSteps.textContent = `t0 — t${maxStep}`;
+				if (consoleBoundary) consoleBoundary.textContent = 'LOCAL DATA / NOT SEALED';
 				const status = escapeHtml(info.status ?? 'unknown');
 				const reason = info.reason ? ` (${escapeHtml(info.reason)})` : '';
 				const unobserved =

@@ -376,6 +376,31 @@ def test_edge_overlay_draws_parent_and_evidence_ref_edges(tmp_path: Path) -> Non
     assert 'data-evidence-edges="1"' in svg_tag.group(0)  # d1 cites t1
     assert 'class="edge edge-parent"' in html
     assert 'class="edge edge-evidence"' in html
+    assert 'id="daw-arrow-parent"' in html
+    assert 'id="daw-arrow-evidence"' in html
+    assert 'marker-end="url(#daw-arrow-parent)"' in html
+    assert 'marker-end="url(#daw-arrow-evidence)"' in html
+
+
+def test_daw_parallel_events_use_a_labeled_two_by_two_cluster(tmp_path: Path) -> None:
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="parallel-a-call", kind="tool_call", actor="agent", step_index=1),
+            _event(event_id="parallel-b-call", kind="tool_call", actor="agent", step_index=1),
+            _event(event_id="parallel-a-result", kind="tool_result", actor="agent", step_index=1),
+            _event(event_id="parallel-b-result", kind="tool_result", actor="agent", step_index=1),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode("utf-8")
+
+    assert 'class="daw-cell daw-cluster" data-event-count="4"' in html
+    assert ">A call</button>" in html
+    assert ">B call</button>" in html
+    assert ">A res</button>" in html
+    assert ">B res</button>" in html
 
 
 def test_edge_overlay_draws_a_broken_stub_for_an_unresolved_ref(tmp_path: Path) -> None:

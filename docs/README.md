@@ -31,6 +31,8 @@ language-agnostic.
 | [SKILLS.md](./SKILLS.md) | `hyodo skills ingest` / `lens` / `propose` — skill lens over the six pillars |
 | [INSPECT.md](./INSPECT.md) | `hyodo inspect` — field-deployment folder absorption, digests and chunks |
 | [GRAPH_EXPORT.md](./GRAPH_EXPORT.md) | `hyodo graph export` — evidence-graph export bridge and actor rings |
+| [FRICTION_EVENT_V0.md](./FRICTION_EVENT_V0.md) | Read-only DAG observation and FrictionEvent v0 contract |
+| [DASHBOARD_REDESIGN.md](./DASHBOARD_REDESIGN.md) | Run-first dashboard baseline for Evidence Pack v1 |
 | [EYE.md](./EYE.md) | `hyodo eye capture` / `verify` — ephemeral visual evidence, no pixels stored |
 | [AUDIENCE.md](./AUDIENCE.md) | `--audience` profiles (vibe / engineer / professional) — wording only, same decision |
 | [TEST_INTEGRITY.md](./TEST_INTEGRITY.md) | `hyodo check --strict-tests` — AST-based test-integrity scan |

@@ -540,8 +540,16 @@ export function mountEvidenceGraph(
 	const maxStep = events.reduce((m, e) => Math.max(m, e.stepIndex), 0);
 	const cols = maxStep + 1;
 
-	const atCell = new Map<string, EvidenceEvent>();
-	for (const ev of events) atCell.set(`${ev.row}:${ev.stepIndex}`, ev);
+	// A single (row, step) can contain several schema events — most commonly
+	// a tool_call and its tool_result. Keep the full bucket instead of letting
+	// the later event overwrite the earlier one.
+	const atCell = new Map<string, EvidenceEvent[]>();
+	for (const ev of events) {
+		const key = `${ev.row}:${ev.stepIndex}`;
+		const bucket = atCell.get(key);
+		if (bucket) bucket.push(ev);
+		else atCell.set(key, [ev]);
+	}
 
 	// ---- build grid DOM -----------------------------------------------
 	gridRoot.innerHTML = '';
@@ -574,58 +582,55 @@ export function mountEvidenceGraph(
 		gridRoot.appendChild(rh);
 
 		for (let c = 0; c < cols; c++) {
-			const ev = atCell.get(`${row}:${c}`);
-			if (!ev) {
+			const eventsAtCell = atCell.get(`${row}:${c}`) ?? [];
+			if (!eventsAtCell.length) {
 				const unlit = el('div', 'cell unlit');
 				gridRoot.appendChild(unlit);
 				gridCells[r][c] = unlit;
 				continue;
 			}
 
-			const btn = doc.createElement('button');
-			btn.type = 'button';
-			btn.className = 'cell node';
-			btn.dataset.eventId = ev.eventId;
-			btn.dataset.decision = ev.policy?.decision ?? 'event';
-			btn.setAttribute('aria-label', accessibleCellName(ev));
+			const cell = el('div', 'cell occupied');
+			gridRoot.appendChild(cell);
+			gridCells[r][c] = cell;
+			for (const ev of eventsAtCell) {
+				const btn = doc.createElement('button');
+				btn.type = 'button';
+				btn.className = 'cell node';
+				btn.dataset.eventId = ev.eventId;
+				btn.dataset.decision = ev.policy?.decision ?? 'event';
+				btn.setAttribute('aria-label', accessibleCellName(ev));
 
-			const chip = el('span', `chip ${ev.schemaKind}`);
-			if (ev.schemaKind === 'decision' && ev.policy) {
-				chip.classList.add('decision', ev.policy.decision);
+				const chip = el('span', `chip ${ev.schemaKind}`);
+				if (ev.schemaKind === 'decision' && ev.policy) {
+					chip.classList.add('decision', ev.policy.decision);
+				}
+				// Rendered as CSS-generated content (see evidence-graph.css),
+				// so the visible glyph does not create a second accessible label.
+				chip.dataset.glyph = chipGlyph(ev);
+				chip.setAttribute('aria-hidden', 'true');
+				btn.appendChild(chip);
+
+				const label = el('span', 'node-label');
+				label.textContent = shortLabel(ev);
+				btn.appendChild(label);
+
+				const onEnter = () => activate(ev.eventId);
+				const onLeave = () => deactivate();
+				btn.addEventListener('mouseenter', onEnter);
+				btn.addEventListener('focus', onEnter);
+				btn.addEventListener('mouseleave', onLeave);
+				btn.addEventListener('blur', onLeave);
+				cleanupFns.push(() => {
+					btn.removeEventListener('mouseenter', onEnter);
+					btn.removeEventListener('focus', onEnter);
+					btn.removeEventListener('mouseleave', onLeave);
+					btn.removeEventListener('blur', onLeave);
+				});
+
+				cell.appendChild(btn);
+				cellEls.set(ev.eventId, btn);
 			}
-			// Rendered as a `::before { content: attr(data-glyph) }` (see
-			// evidence-graph.css), not `chip.textContent` — a real text node
-			// here is a second "visible text label" alongside .node-label,
-			// and axe's label-content-name-mismatch rule reads visible-on-
-			// screen text (aria-hidden does not exempt it: the rule ignores
-			// the accessibility tree by design). CSS-generated content isn't
-			// part of the DOM/accessibility tree at all, so it renders the
-			// same glyph without becoming a second label the aria-label text
-			// (which already covers the same information) would need to repeat.
-			chip.dataset.glyph = chipGlyph(ev);
-			chip.setAttribute('aria-hidden', 'true');
-			btn.appendChild(chip);
-
-			const label = el('span', 'node-label');
-			label.textContent = shortLabel(ev);
-			btn.appendChild(label);
-
-			const onEnter = () => activate(ev.eventId);
-			const onLeave = () => deactivate();
-			btn.addEventListener('mouseenter', onEnter);
-			btn.addEventListener('focus', onEnter);
-			btn.addEventListener('mouseleave', onLeave);
-			btn.addEventListener('blur', onLeave);
-			cleanupFns.push(() => {
-				btn.removeEventListener('mouseenter', onEnter);
-				btn.removeEventListener('focus', onEnter);
-				btn.removeEventListener('mouseleave', onLeave);
-				btn.removeEventListener('blur', onLeave);
-			});
-
-			gridRoot.appendChild(btn);
-			cellEls.set(ev.eventId, btn);
-			gridCells[r][c] = btn;
 		}
 	}
 
@@ -665,7 +670,7 @@ export function mountEvidenceGraph(
 	function occupiedAt(rowIdx: number, col: number): EvidenceEvent | null {
 		const row = ROW_ORDER[rowIdx];
 		if (!row) return null;
-		return atCell.get(`${row}:${col}`) ?? null;
+		return atCell.get(`${row}:${col}`)?.[0] ?? null;
 	}
 
 	interface Box {

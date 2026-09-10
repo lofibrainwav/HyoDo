@@ -79,7 +79,7 @@ POLL_SCRIPT_SHA256 = base64.b64encode(hashlib.sha256(POLL_SCRIPT.encode("utf-8")
 # collapse toggle (row visibility changes what is measurable).
 GRAPH_SCRIPT = """\
 const panel = document.getElementById("event-detail");
-const DEFAULT_DETAIL = "Select an event to see its 5W1H detail.";
+const DEFAULT_DETAIL = panel ? Array.from(panel.childNodes, (node) => node.cloneNode(true)) : [];
 const FIELDS = [
   ["Who", "who"],
   ["What", "what"],
@@ -88,17 +88,22 @@ const FIELDS = [
   ["Why", "why"],
   ["How", "how"],
 ];
-const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event]");
+const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event], .daw-cell button[data-event]");
 let lastFocusedCell = null;
 function highlightEdges(eventId) {
-  document.querySelectorAll("#edge-overlay .edge").forEach((edge) => {
-    const active = eventId && (edge.dataset.source === eventId || edge.dataset.target === eventId);
+  document.querySelectorAll("#daw-edge-overlay .edge, #edge-overlay .edge").forEach((edge) => {
+    const source = edge.dataset.dawSource || edge.dataset.source;
+    const target = edge.dataset.dawTarget || edge.dataset.target;
+    const active = eventId && (source === eventId || target === eventId);
     edge.classList.toggle("edge-active", Boolean(active));
+  });
+  document.querySelectorAll(".daw-cell button[data-event-id]").forEach((tile) => {
+    tile.classList.toggle("event-active", Boolean(eventId && tile.dataset.eventId === eventId));
   });
 }
 function layoutEdges() {
-  const svg = document.getElementById("edge-overlay");
-  const container = document.querySelector(".grid-rows");
+  const svg = document.getElementById("daw-edge-overlay") || document.getElementById("edge-overlay");
+  const container = document.querySelector(".daw-rows, .grid-rows");
   if (!svg || !container) return;
   const containerRect = container.getBoundingClientRect();
   const tiles = new Map();
@@ -114,9 +119,11 @@ function layoutEdges() {
       midY: (r.top + r.bottom) / 2 - containerRect.top,
     });
   });
-  svg.querySelectorAll("path[data-source]").forEach((path) => {
+  svg.querySelectorAll("path[data-source], path[data-daw-source]").forEach((path) => {
     const kind = path.dataset.kind;
-    const source = tiles.get(path.dataset.source);
+    const sourceId = path.dataset.dawSource || path.dataset.source;
+    const targetId = path.dataset.dawTarget || path.dataset.target;
+    const source = tiles.get(sourceId);
     if (!source) {
       path.setAttribute("d", "");
       return;
@@ -127,7 +134,7 @@ function layoutEdges() {
       path.setAttribute("d", "M" + x1 + "," + y1 + " L" + (x1 + 24) + "," + y1);
       return;
     }
-    const target = tiles.get(path.dataset.target);
+    const target = tiles.get(targetId);
     if (!target) {
       path.setAttribute("d", "");
       return;
@@ -239,7 +246,7 @@ ringButtons.forEach((button) => {
 });
 document.addEventListener("keydown", (event) => {
   if (event.key !== "Escape") return;
-  if (panel) panel.textContent = DEFAULT_DETAIL;
+  if (panel) panel.replaceChildren(...DEFAULT_DETAIL.map((node) => node.cloneNode(true)));
   highlightEdges(null);
   const target = lastFocusedCell || cells[0];
   if (target) target.focus();
@@ -594,6 +601,10 @@ def render_dashboard_html(
     high = sum(1 for finding in findings if finding.get("severity") == "high")
     measured_at = str(evidence.get("measured_at", "Not recorded"))
     target = str(evidence.get("target", "Not recorded"))
+    gate_values = (typecheck, tests, lint)
+    measured_gate_count = sum(
+        1 for gate in gate_values if gate["status"].upper() not in {"NOT MEASURED", "UNOBSERVED"}
+    )
 
     pillars = evidence.get("pillars")
     pillars = pillars if isinstance(pillars, dict) else {}
@@ -652,17 +663,29 @@ def render_dashboard_html(
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HyoDo Instrument Panel</title><style>
-:root {{ color-scheme: light dark; --ink:#182033; --muted:#5b6475; --surface:#fff; --bg:#f5f7fb; --line:#dbe1ed; --line-soft:#edf0f5; --focus:#111827; }}
-@media (prefers-color-scheme: dark) {{ :root {{ --ink:#e6eaf3; --muted:#9aa3b5; --surface:#161b28; --bg:#0d1119; --line:#2a3245; --line-soft:#232a3b; --focus:#e6eaf3; }} }}
-* {{ box-sizing:border-box }} body {{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 ui-sans-serif,system-ui,sans-serif }}
-main {{ max-width:1180px; margin:auto; padding:28px 20px 48px }} header {{ display:flex; justify-content:space-between; gap:24px; align-items:start; margin-bottom:24px }}
-h1 {{ margin:0; font-size:clamp(1.7rem,4vw,2.5rem) }} .meta {{ color:var(--muted); margin:.35rem 0 0 }} .legend {{ font-size:.9rem; color:var(--muted); text-align:right }} .legend a {{ color:inherit }} .controls {{ display:grid; gap:6px; margin:0 0 24px }} button {{ width:max-content; border:1px solid var(--accent,#2563eb); border-radius:8px; background:#2563eb; color:white; cursor:pointer; font:inherit; padding:9px 12px }} button:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }}
-.grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px }} .card {{ background:var(--surface); border:1px solid var(--line); border-top:7px solid var(--accent); border-radius:14px; padding:18px; min-height:210px; box-shadow:0 2px 9px #15244a0a }}
+:root {{ color-scheme: light dark; --ink:#121212; --muted:#68645d; --surface:#fffdf7; --bg:#ebe9e1; --line:#121212; --line-soft:#d8d5cc; --focus:#ff5a36; --signal:#ff5a36; --mono:"SFMono-Regular",Consolas,"Liberation Mono",monospace; }}
+@media (prefers-color-scheme: dark) {{ :root {{ --ink:#f5f1e7; --muted:#aaa59a; --surface:#1d1d1a; --bg:#11110f; --line:#f5f1e7; --line-soft:#46443e; --focus:#ff7153; --signal:#ff7153; }} }}
+* {{ box-sizing:border-box }} body {{ margin:0; background:var(--bg); color:var(--ink); font:15px/1.45 "Helvetica Neue",Helvetica,Arial,sans-serif }}
+main {{ max-width:1220px; margin:auto; padding:24px 22px 56px }}
+header {{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:28px; align-items:end; padding:0 0 20px; border-bottom:2px solid var(--line) }}
+.eyebrow,.kicker,.readout-label,.status-label {{ font:700 .7rem/1.2 var(--mono); letter-spacing:.12em; text-transform:uppercase }}
+.eyebrow {{ color:var(--signal); margin:0 0 8px }} h1 {{ margin:0; font-size:clamp(2.1rem,6vw,4.8rem); line-height:.92; letter-spacing:-.075em; font-weight:800 }}
+.meta {{ color:var(--muted); margin:.6rem 0 0; font-family:var(--mono); font-size:.78rem; overflow-wrap:anywhere }}
+.legend {{ max-width:260px; margin:0; color:var(--muted); font:700 .72rem/1.5 var(--mono); text-align:right; text-transform:uppercase }} .legend a {{ color:var(--ink); text-decoration-thickness:2px; text-underline-offset:3px }}
+.instrument-strip {{ display:grid; grid-template-columns:1.5fr repeat(3,1fr); border-bottom:1px solid var(--line); margin:0 0 18px }}
+.readout {{ min-height:96px; padding:14px 15px 12px; border-left:1px solid var(--line) }} .readout:first-child {{ border-left:0 }}
+.readout-label {{ color:var(--muted); display:block; margin-bottom:11px }} .readout-value {{ display:block; font:800 clamp(1.05rem,2vw,1.5rem)/1 var(--mono); letter-spacing:-.06em; overflow-wrap:anywhere }} .readout-value.signal {{ color:var(--signal) }}
+.controls {{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:12px 0 18px; border-bottom:1px solid var(--line) }}
+button {{ border:2px solid var(--line); border-radius:0; background:var(--signal); color:#121212; cursor:pointer; font:800 .78rem var(--mono); padding:10px 14px; text-transform:uppercase }} button:disabled {{ cursor:wait; opacity:.55 }} .controls small {{ color:var(--muted); font: .72rem var(--mono) }}
+.measurement-status {{ display:inline-block; color:var(--ink); font:700 .72rem var(--mono); text-transform:uppercase }}
+.grid {{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; padding-top:18px }} .card {{ position:relative; background:var(--surface); border:2px solid var(--line); border-radius:0; padding:18px; min-height:218px; box-shadow:4px 4px 0 var(--line) }}
+.card::before {{ content:""; position:absolute; top:0; left:0; width:28px; height:6px; background:var(--accent) }}
 .blue {{ --accent:#2563eb }} .green {{ --accent:#059669 }} .purple {{ --accent:#7c3aed }} .orange {{ --accent:#ea580c }} .gold {{ --accent:#ca8a04 }} .indigo {{ --accent:#4f46e5 }}
-h2 {{ margin:0 0 14px; font-size:1.1rem }} h2 span {{ color:var(--accent); font-size:1rem; letter-spacing:.02em }} ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} small,.reference {{ grid-column:1/-1; color:var(--muted); font-size:.82rem }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:700; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0 }}
+h2 {{ display:flex; justify-content:space-between; gap:12px; align-items:baseline; margin:0 0 18px; font-size:1rem; letter-spacing:-.02em }} h2 span {{ color:var(--accent); font:800 .82rem var(--mono); letter-spacing:.08em }}
+ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} li strong {{ font:800 .86rem var(--mono); text-align:right; overflow-wrap:anywhere }} .metric-label {{ font-size:.84rem }} small,.reference {{ grid-column:1/-1; color:var(--muted); font: .68rem/1.35 var(--mono) }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:800; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0; font-size:.8rem }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }} @media (prefers-reduced-motion:reduce) {{ * {{ scroll-behavior:auto }} }}
-@media (max-width:820px) {{ header {{ display:block }} .legend {{ text-align:left; margin-top:10px }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
-</style></head><body><main><header><div><h1>HyoDo Instrument Panel</h1><p class="meta">Target: {escape(target)} · Measured: {escape(measured_at)}</p></div><p class="legend">Raw evidence only · No composite score<br><a href="/graph">Open evidence graph</a> · <a href="/api/evidence">Open current evidence JSON</a></p></header><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="meta" aria-live="polite">{escape(refresh_status)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
+@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} header {{ display:block }} .legend {{ text-align:left; margin-top:18px; max-width:none }} .instrument-strip {{ grid-template-columns:1fr 1fr }} .readout {{ border-top:1px solid var(--line); border-left:1px solid var(--line) }} .readout:nth-child(odd) {{ border-left:0 }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
+</style></head><body><main><header><div><p class="eyebrow">HyoDo / Measurement Console</p><h1>Instrument Panel</h1><p class="meta">TARGET // {escape(target)}<br>MEASURED // {escape(measured_at)}</p></div><p class="legend">Raw evidence only<br>No composite score<br><a href="/graph">Open evidence graph</a> · <a href="/api/evidence">Open evidence JSON</a></p></header><section class="instrument-strip" aria-label="measurement summary"><div class="readout"><span class="readout-label">Signal state</span><strong class="readout-value signal">{escape("MEASURED" if measured_gate_count else "UNOBSERVED")}</strong></div><div class="readout"><span class="readout-label">Gates read</span><strong class="readout-value">{measured_gate_count}/3</strong></div><div class="readout"><span class="readout-label">Refresh mode</span><strong class="readout-value">{escape("AUTO " + str(interval) + "S" if interval else "FIXED")}</strong></div><div class="readout"><span class="readout-label">Receipt scope</span><strong class="readout-value">LOCAL ONLY</strong></div></section><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="measurement-status" aria-live="polite">{escape(refresh_status)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
 
 
 def _parse_iso_ts(value: Any) -> datetime | None:
@@ -740,8 +763,8 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
     }
 
 
-def _event_button(node: dict[str, Any]) -> str:
-    label = _event_label(node)
+def _event_button(node: dict[str, Any], *, label: str | None = None) -> str:
+    label = label or _event_label(node)
     title = escape(_event_title(node), quote=True)
     detail = escape(json.dumps(_event_detail_payload(node)), quote=True)
     node_id = escape(str(node.get("id") or ""))
@@ -750,7 +773,7 @@ def _event_button(node: dict[str, Any]) -> str:
         f"cell-{str(decision).lower()}" if isinstance(decision, str) and decision else "cell-plain"
     )
     return (
-        f'<button type="button" class="{cell_class}" data-event-id="{node_id}" '
+        f'<button type="button" class="{cell_class}" data-event-id="{node_id}" data-event-kind="{escape(str(node.get("kind") or "event"))}" '
         f'data-event="{detail}" title="{title}">{escape(label)}</button>'
     )
 
@@ -966,7 +989,9 @@ def _build_grid_cells(
     return flat_keys, cells, anchors
 
 
-def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) -> str:
+def _render_edge_overlay(
+    graph: dict[str, Any], anchored_ids: dict[str, Any], *, overlay_id: str = "edge-overlay"
+) -> str:
     """SVG overlay skeleton (brief finding 2; fix round 2, coordinator
     live-screenshot review): the server only classifies and counts edges;
     real tile-to-tile geometry is measured client-side.
@@ -1009,21 +1034,34 @@ def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) ->
         target_ok = isinstance(target, str) and target in anchored_ids
         if edge.get("type") == "parent_event_id":
             if source_ok and target_ok:
+                source_attr = (
+                    "data-daw-source" if overlay_id == "daw-edge-overlay" else "data-source"
+                )
+                target_attr = (
+                    "data-daw-target" if overlay_id == "daw-edge-overlay" else "data-target"
+                )
                 parts.append(
-                    f'<path class="edge edge-parent" data-source="{escape(str(source))}" '
-                    f'data-target="{escape(str(target))}" data-kind="parent" d="" '
-                    f'fill="none" stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5"/>'
+                    f'<path class="edge edge-parent" {source_attr}="{escape(str(source))}" '
+                    f'{target_attr}="{escape(str(target))}" data-kind="parent" d="" '
+                    f'fill="none" stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5" '
+                    'marker-end="url(#daw-arrow-parent)"/>'
                 )
                 parent_count += 1
             else:
                 offgrid_count += 1
         elif edge.get("type") == "evidence_ref":
             if source_ok and target_ok:
+                source_attr = (
+                    "data-daw-source" if overlay_id == "daw-edge-overlay" else "data-source"
+                )
+                target_attr = (
+                    "data-daw-target" if overlay_id == "daw-edge-overlay" else "data-target"
+                )
                 parts.append(
-                    f'<path class="edge edge-evidence" data-source="{escape(str(source))}" '
-                    f'data-target="{escape(str(target))}" data-kind="evidence" d="" '
+                    f'<path class="edge edge-evidence" {source_attr}="{escape(str(source))}" '
+                    f'{target_attr}="{escape(str(target))}" data-kind="evidence" d="" '
                     f'fill="none" stroke="{EDGE_COLORS["evidence"]}" stroke-width="1.5" '
-                    'stroke-dasharray="4 3"/>'
+                    'stroke-dasharray="4 3" marker-end="url(#daw-arrow-evidence)"/>'
                 )
                 evidence_count += 1
             else:
@@ -1032,19 +1070,26 @@ def _render_edge_overlay(graph: dict[str, Any], anchored_ids: dict[str, Any]) ->
     for issue in graph.get("unresolved_refs") or []:
         event_id = issue.get("event_id") if isinstance(issue, dict) else None
         if isinstance(event_id, str) and event_id in anchored_ids:
+            source_attr = "data-daw-source" if overlay_id == "daw-edge-overlay" else "data-source"
             parts.append(
-                f'<path class="edge edge-broken" data-source="{escape(event_id)}" '
+                f'<path class="edge edge-broken" {source_attr}="{escape(event_id)}" '
                 f'data-kind="broken" d="" fill="none" stroke="{EDGE_COLORS["broken"]}" '
-                'stroke-width="2"/>'
+                'stroke-width="2" marker-end="url(#daw-arrow-broken)"/>'
             )
             broken_count += 1
 
     return (
-        '<svg id="edge-overlay" class="edge-overlay" role="img" aria-hidden="true" '
+        f'<svg id="{escape(overlay_id)}" class="edge-overlay" role="img" aria-hidden="true" '
         f'data-parent-edges="{parent_count}" data-evidence-edges="{evidence_count}" '
         f'data-broken-edges="{broken_count}" data-offgrid-edges="{offgrid_count}">'
-        + "".join(parts)
-        + "</svg>"
+        '<defs><marker id="daw-arrow-parent" viewBox="0 0 10 10" refX="9" refY="5" '
+        'markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" '
+        f'fill="{EDGE_COLORS["parent"]}"/></marker><marker id="daw-arrow-evidence" viewBox="0 0 10 10" '
+        'refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path '
+        f'd="M 0 0 L 10 5 L 0 10 z" fill="{EDGE_COLORS["evidence"]}"/></marker><marker '
+        'id="daw-arrow-broken" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" '
+        'orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" '
+        f'fill="{EDGE_COLORS["broken"]}"/></marker></defs>' + "".join(parts) + "</svg>"
     )
 
 
@@ -1175,6 +1220,141 @@ def _render_grid_rows(
     )
 
 
+def _daw_track(node: dict[str, Any]) -> tuple[str, str]:
+    """Choose a display-only DAW lane from observed event identity.
+
+    This is intentionally not added to the event schema. A graph viewer needs
+    a readable arrangement even when the producer only supplies the coarse
+    ``actor`` field; the event id/tool name are already recorded evidence and
+    are sufficient for a stable local presentation lane.
+    """
+    actor = str(node.get("actor") or "").lower()
+    if actor == "human":
+        return "human", "Human"
+    if actor == "hyodo":
+        return "reviewer", "Reviewer"
+    if actor == "agent":
+        return "agent", "Agent / role unobserved"
+    return "planner", "Planner"
+
+
+def _daw_event_label(node: dict[str, Any]) -> str:
+    """Compact prototype-style label with measured signal still visible."""
+    node_id = str(node.get("id") or "").lower()
+    kind = str(node.get("kind") or "event").lower()
+    suffix = "call" if kind == "tool_call" else "result"
+    if "parallel" in node_id:
+        branch = next((branch for branch in ("a", "b") if f"parallel-{branch}" in node_id), "?")
+        return f"{branch.upper()} {'call' if suffix == 'call' else 'res'}"
+    if "join" in node_id:
+        return f"dag join / {suffix}"
+    if "serial" in node_id:
+        return f"serial / {suffix}"
+    if "retry-1" in node_id or "retry-call-1" in node_id or "retry-result-1" in node_id:
+        return f"retry 1 / {suffix}"
+    if "rework" in node_id or "retry-call-2" in node_id or "retry-result-2" in node_id:
+        return f"rework / {suffix}"
+    if "wait" in node_id:
+        return f"wait / {suffix}"
+    if "unresolved" in node_id:
+        return "unresolved"
+    if "human" in node_id:
+        return "approval"
+    return _event_label(node)
+
+
+def _render_daw_timeline(
+    nodes: list[dict[str, Any]], edges: list[dict[str, Any]], edge_overlay: str = ""
+) -> tuple[str, dict[str, tuple[int, int, int]]]:
+    """Render the user-facing DAW timeline and return edge anchor membership."""
+    valid_nodes = [node for node in nodes if isinstance(node.get("id"), str)]
+
+    step_indices = [
+        value for node in valid_nodes if isinstance(value := node.get("step_index"), int)
+    ]
+    max_step = max(step_indices, default=0)
+    columns = max_step + 1
+    run_id = next(
+        (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
+    )
+    track_order = ["human", "planner", "agent", "reviewer"]
+    track_labels = {
+        "human": "Human",
+        "planner": "Planner",
+        "agent": "Agent / role unobserved",
+        "reviewer": "Reviewer",
+    }
+    buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
+    anchors: dict[str, tuple[int, int, int]] = {}
+    for node in sorted(
+        valid_nodes,
+        key=lambda item: (
+            item.get("step_index") if isinstance(item.get("step_index"), int) else 0,
+            str(item.get("ts", "")),
+        ),
+    ):
+        track, _label = _daw_track(node)
+        raw_step = node.get("step_index")
+        step: int = raw_step if isinstance(raw_step, int) else 0
+        buckets.setdefault((track, step), []).append(node)
+
+    # Keep the prototype's four-lane structure even when a role is absent from
+    # the measured source. Empty lanes make absence observable without
+    # fabricating events or role assignments.
+    visible_tracks = track_order
+    parts = [
+        '<section class="daw-console" aria-label="Evidence session timeline">',
+        f'<div class="daw-sessionbar"><div><span>EVIDENCE CONSOLE</span><strong>SESSION / {escape(run_id)}</strong></div>'
+        f'<div><span class="session-state">■ STATIC VIEW</span><span>STEP INDEX <b>t0 — t{max_step}</b></span>'
+        '<span class="session-boundary">LOCAL DATA / NOT SEALED</span></div></div>',
+        '<div class="daw-console-head"><div><span class="daw-kicker">EVIDENCE SESSION / LIVE READBACK</span>'
+        '<h2>Run timeline</h2></div><div class="daw-legend"><span><i class="legend-call"></i>CALL</span>'
+        '<span><i class="legend-result"></i>RESULT</span><span><i class="legend-human"></i>HUMAN</span></div></div>',
+        f'<div class="daw-rows" style="--daw-columns:{columns}">',
+        '<div class="daw-ruler"><div class="daw-track-label">TRACK / SIGNAL</div>'
+        + "".join(
+            f'<div class="daw-step">t{index}<small>{index:02d}</small></div>'
+            for index in range(columns)
+        )
+        + "</div>",
+    ]
+    for row_index, track in enumerate(visible_tracks):
+        label = track_labels[track]
+        is_empty_track = not any(buckets.get((track, step)) for step in range(columns))
+        row_class = "daw-row daw-row-empty" if is_empty_track else "daw-row"
+        empty_state = '<span class="track-empty-state">UNOBSERVED</span>' if is_empty_track else ""
+        parts.append(
+            f'<div class="{row_class}" data-daw-track="{escape(track)}"><div class="daw-track-label">'
+            f'<span class="track-led track-{escape(track)}"></span>{escape(label)}{empty_state}'
+            f"<small>{row_index:02d}</small></div>"
+        )
+        for step in range(columns):
+            events = buckets.get((track, step), [])
+            if not events:
+                parts.append('<div class="daw-cell daw-empty"></div>')
+                continue
+            is_parallel_cluster = len(events) > 1 and all(
+                "parallel-" in str(node["id"]).lower() for node in events
+            )
+            cluster_class = " daw-cluster" if len(events) > 1 else ""
+            parallel_attr = ' data-parallel-cluster="true"' if is_parallel_cluster else ""
+            parts.append(
+                f'<div class="daw-cell{cluster_class}" data-event-count="{len(events)}"{parallel_attr}>'
+            )
+            if is_parallel_cluster:
+                parts.append(
+                    '<span class="daw-cluster-label" aria-hidden="true">PARALLEL / A + B</span>'
+                )
+            for tile_index, node in enumerate(events):
+                node_id = str(node["id"])
+                anchors[node_id] = (row_index, step, tile_index)
+                parts.append(_event_button(node, label=_daw_event_label(node)))
+            parts.append("</div>")
+        parts.append("</div>")
+    parts.extend([edge_overlay, "</div>", "</section>"])
+    return "".join(parts), anchors
+
+
 def render_graph_html(
     graph: dict[str, Any], *, now: datetime | None = None, root: Path | None = None
 ) -> str:
@@ -1243,6 +1423,10 @@ def render_graph_html(
         if nodes and not has_mission
         else ""
     )
+
+    _daw_preview, daw_anchors = _render_daw_timeline(nodes, edges)
+    daw_edge_overlay = _render_edge_overlay(graph, daw_anchors, overlay_id="daw-edge-overlay")
+    daw_html, _ = _render_daw_timeline(nodes, edges, daw_edge_overlay)
 
     # Brief finding 1: one grid, columns x actor rows, each event a tile at
     # (its column, its row) — replaces the old two-separate-lists layout
@@ -1356,7 +1540,7 @@ button {{ font:inherit; border:1px solid var(--line); background:var(--surface);
 .time-ruler {{ display:flex; justify-content:space-between; align-items:center; gap:8px; color:var(--muted); font-size:.72rem; margin:6px 0 18px }}
 .time-ruler-line {{ flex:1; height:1px; background:var(--line) }}
 .edge-overlay {{ position:absolute; inset:0; width:100%; height:100%; pointer-events:none; overflow:visible }}
-.edge.edge-active {{ stroke-width:3; filter:drop-shadow(0 0 2px currentColor) }}
+.edge.edge-active {{ stroke-width:3 }}
 .cells {{ display:flex; flex-wrap:wrap; gap:6px }}
 .gutter {{ margin-bottom:18px }} .gutter h2 {{ font-size:.95rem }}
 button[hidden], .grid-row[hidden] {{ display:none }}
@@ -1370,16 +1554,83 @@ button[hidden], .grid-row[hidden] {{ display:none }}
 .ring-layer li {{ border-left:3px solid var(--tint,var(--ring-color)); padding:1px 0 1px 6px; margin:2px 0 }}
 .ring-layer li.ring-more {{ color:var(--muted); border-left-color:var(--line) }}
 .ring-note {{ font-size:.75rem; color:var(--muted); margin:0 0 4px }}
+
+/* DAW / instrument-console presentation. The legacy virtue grid stays in
+   the DOM for contract compatibility, but the operator-facing graph is the
+   measured event timeline below. */
+.legacy-orb, .legacy-proof-grid, .legacy-proof-gutter {{ display:none }}
+/* TE hardware deck: flat anodised surfaces, sharp displays, and only the
+   status colours that distinguish evidence. No bloom or decorative shadow. */
+body {{ background:#0f0e12; color:#f5f5f5; font-family:"Helvetica Neue",Helvetica,Arial,sans-serif; font-weight:300 }}
+main {{ max-width:1480px; padding:28px 28px 56px }}
+header {{ border-bottom:1px solid #3a393d; padding-bottom:18px; margin-bottom:20px }}
+h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3vw,2.5rem); font-weight:300 }}
+.meta, .meta a {{ color:#aaa9ab }}
+.unobserved-notice {{ border-radius:0; background:#251716; color:#f5b5ad; border:1px solid #f05a24 }}
+.daw-console {{ position:relative; overflow:auto; border:1px solid #57565a; background:#17161a; padding:14px; margin:4px 0 16px }}
+.daw-sessionbar {{ display:flex; justify-content:space-between; gap:20px; border:1px solid #3a393d; border-left:3px solid #f05a24; padding:11px 12px; margin-bottom:14px; min-width:980px; color:#d1d0d2; font-size:.68rem; letter-spacing:.1em }}
+.daw-sessionbar div {{ display:flex; gap:18px; align-items:center }} .daw-sessionbar span {{ color:#969598 }} .daw-sessionbar strong {{ color:#f5f5f5; letter-spacing:.12em; font-weight:300 }}
+.daw-sessionbar b, .session-boundary {{ color:#fab413 !important }} .session-state {{ color:#f05a24 !important }}
+.daw-console-head {{ display:flex; justify-content:space-between; align-items:end; gap:20px; border-bottom:1px solid #3a393d; padding:2px 0 14px; min-width:980px }}
+.daw-kicker {{ color:#7fc86a; font-size:.68rem; letter-spacing:.18em }}
+.daw-console h2 {{ margin:5px 0 0; font-size:1.25rem; letter-spacing:.08em; text-transform:uppercase; font-weight:300 }}
+.daw-legend {{ display:flex; gap:14px; color:#aaa9ab; font-size:.68rem; letter-spacing:.1em }}
+.daw-legend i {{ display:inline-block; width:7px; height:7px; margin-right:5px; background:#7fc86a }}
+.daw-legend .legend-result {{ background:#fab413 }}
+.daw-legend .legend-human {{ background:#f05a24 }}
+.daw-rows {{ position:relative; min-width:1060px; padding-top:14px }}
+.daw-ruler, .daw-row {{ display:grid; grid-template-columns:190px repeat(var(--daw-columns), minmax(104px,1fr)); min-width:1060px }}
+.daw-ruler {{ color:#aaa9ab; font-size:.68rem; letter-spacing:.1em; border-bottom:1px solid #57565a }}
+.daw-step {{ padding:0 8px 8px; border-left:1px solid #302f33; font-variant-numeric:tabular-nums }}
+.daw-step small {{ display:block; color:#747378; margin-top:3px }}
+.daw-track-label {{ display:flex; align-items:center; gap:7px; padding:0 10px; color:#f5f5f5; font-size:.69rem; letter-spacing:.1em; border-right:1px solid #57565a }}
+.daw-track-label small {{ margin-left:auto; color:#747378 }}
+.track-empty-state {{ color:#747378; font-size:.54rem; letter-spacing:.12em }}
+.daw-row {{ min-height:78px; margin:8px 0; border:1px solid #3a393d; border-radius:0; background:#121116; overflow:visible }}
+.daw-row.daw-row-empty {{ min-height:36px; margin:4px 0; border-color:#302f33; background:#101015 }}
+.daw-row.daw-row-empty .daw-cell {{ min-height:34px; padding:0; background:#101015 }}
+.daw-row.daw-row-empty .daw-track-label {{ color:#aaa9ab }}
+.daw-cell {{ min-height:78px; padding:7px 5px; border-left:1px solid #302f33; display:flex; flex-direction:column; gap:4px; justify-content:center }}
+.daw-cell.daw-cluster {{ display:grid; grid-template-columns:minmax(0,1fr); align-content:center; gap:7px; padding:9px 7px; background:#0f0e12; box-shadow:inset 0 0 0 1px #3a393d }}
+.daw-cell.daw-cluster[data-event-count="4"] {{ grid-template-columns:repeat(2,minmax(0,1fr)) }}
+.daw-cell.daw-cluster[data-parallel-cluster="true"] {{ position:relative; padding-top:23px; border:1px solid #0071bb; background:#15151a }}
+.daw-cluster-label {{ position:absolute; top:5px; left:7px; color:#72bfe9; font-size:.52rem; letter-spacing:.14em; line-height:1 }}
+.daw-empty {{ background:#121116 }}
+.daw-cell button {{ width:100%; min-width:0; border-radius:0; border:1px solid #68676a; border-top-color:#929195; background:#202025; color:#f5f5f5; padding:8px 7px; font-family:inherit; font-weight:300; font-size:.66rem; letter-spacing:.035em; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer }}
+.daw-cell.daw-cluster button {{ padding:6px 5px; min-height:24px; border-radius:0; font-size:.59rem; box-shadow:inset 0 -1px 0 #0f0e12 }}
+.daw-cell.daw-cluster button[data-event-id*="parallel-a"] {{ border-color:#0071bb }}
+.daw-cell.daw-cluster button[data-event-id*="parallel-b"] {{ border-color:#fab413 }}
+.daw-cell button:hover {{ border-color:#f5f5f5; background:#2c2b30 }}
+.daw-cell button:focus-visible {{ outline:2px solid #f05a24; outline-offset:2px; border-color:#f05a24; background:#2c2b30 }}
+.daw-cell button.event-active {{ border-color:#f05a24; background:#f5f5f5; color:#0f0e12; font-weight:500 }}
+.daw-cell button[data-event-kind="tool_call"] {{ border-left:3px solid #7fc86a }}
+.daw-cell button[data-event-kind="tool_result"] {{ border-left:3px solid #fab413 }}
+.daw-cell button[data-event-kind="prompt"] {{ border-left:3px solid #f05a24 }}
+.daw-cell button[data-event-kind="decision"] {{ border-left:3px solid #0071bb }}
+.track-led {{ width:7px; height:7px; flex:0 0 auto; background:#7fc86a }}
+.track-human {{ background:#f05a24 }}
+.track-planner {{ background:#0071bb }}
+.track-agent {{ background:#7fc86a }}
+.track-reviewer {{ background:#fab413 }}
+.daw-rows .edge-overlay {{ z-index:3 }}
+.daw-rows .edge {{ stroke:#7fc86a; opacity:.82 }}
+.daw-rows .edge-evidence {{ stroke:#fab413; stroke-dasharray:4 3 }}
+.daw-rows .edge-broken {{ stroke:#f05a24 }}
+.daw-rows .edge.edge-active {{ stroke-width:3; opacity:1 }}
+.detail {{ border-radius:0; background:#17161a; border-color:#57565a; color:#f5f5f5; font-size:.75rem; min-height:86px }}
+@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} }}
+@media (prefers-reduced-motion:reduce) {{ .daw-cell button {{ transition:none }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
 {notice_html}
-<section class="orb-wrap">{orb_html}</section>
-<div class="grid-wrap">
+<section class="orb-wrap legacy-orb">{orb_html}</section>
+{daw_html}
+<div class="grid-wrap legacy-proof-grid">
 <div class="grid-graph">
 <div class="grid-headrow"><div class="grid-corner"></div>{column_headers}</div>
 <div class="grid-rows">{grid_rows_html}{edge_overlay_html}</div>
 </div>
 {time_ruler_html}
 </div>
-{gutter_html}
-<section id="event-detail" class="detail" aria-live="polite"><p>Select an event to see its 5W1H detail.</p></section>
+<div class="legacy-proof-gutter">{gutter_html}</div>
+<section id="event-detail" class="detail" aria-live="polite"><p class="detail-kicker">RUN #3 / READING GUIDE</p><p>Select a timeline pad to inspect its recorded 5W1H evidence.</p><p><strong>SOLID</strong> execution route · <strong>DASHED</strong> evidence relation · <strong>ORANGE</strong> human or unresolved signal.</p></section>
 </main><script>{GRAPH_SCRIPT}</script></body></html>"""

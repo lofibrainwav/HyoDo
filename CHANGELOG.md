@@ -13,6 +13,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [4.18.0] - 2026-09-09
+
+Release readiness and measured execution preparation: sampled checks now
+preserve their scope in compact output, and public verification validates
+artifacts from an isolated wheel installation. The release also adds the
+read-only DAG observation adapter and generic FrictionEvent v0 contract for
+measuring external orchestration without moving execution authority into HyoDo.
+
+### Added
+
+- Regression coverage for sampled fallback output and BYOG boundaries.
+- `hyodo.orchestration-observation/v1` and `hyodo.friction-event/v0` contracts
+  for serial/parallel topology, joins, retries, waits, rework, intervention,
+  and unresolved observations.
+
+### Changed
+
+- `hyodo check --json` and `--quiet` disclose bounded sampled syntax checks.
+- Public verification builds into an isolated directory and tests a clean wheel environment.
+- DAG observation remains a sidecar measurement surface; it does not schedule,
+  authorize, or score execution.
+
 ## [4.17.0] - 2026-09-08
 
 Instrumentation release: the CLI gains a local-only friction preview so a
