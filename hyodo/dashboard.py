@@ -1040,7 +1040,8 @@ def _render_edge_overlay(
                 parts.append(
                     f'<path class="edge edge-parent" {source_attr}="{escape(str(source))}" '
                     f'{target_attr}="{escape(str(target))}" data-kind="parent" d="" '
-                    f'fill="none" stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5"/>'
+                    f'fill="none" stroke="{EDGE_COLORS["parent"]}" stroke-width="1.5" '
+                    'marker-end="url(#daw-arrow-parent)"/>'
                 )
                 parent_count += 1
             else:
@@ -1057,7 +1058,7 @@ def _render_edge_overlay(
                     f'<path class="edge edge-evidence" {source_attr}="{escape(str(source))}" '
                     f'{target_attr}="{escape(str(target))}" data-kind="evidence" d="" '
                     f'fill="none" stroke="{EDGE_COLORS["evidence"]}" stroke-width="1.5" '
-                    'stroke-dasharray="4 3"/>'
+                    'stroke-dasharray="4 3" marker-end="url(#daw-arrow-evidence)"/>'
                 )
                 evidence_count += 1
             else:
@@ -1070,7 +1071,7 @@ def _render_edge_overlay(
             parts.append(
                 f'<path class="edge edge-broken" {source_attr}="{escape(event_id)}" '
                 f'data-kind="broken" d="" fill="none" stroke="{EDGE_COLORS["broken"]}" '
-                'stroke-width="2"/>'
+                'stroke-width="2" marker-end="url(#daw-arrow-broken)"/>'
             )
             broken_count += 1
 
@@ -1078,8 +1079,14 @@ def _render_edge_overlay(
         f'<svg id="{escape(overlay_id)}" class="edge-overlay" role="img" aria-hidden="true" '
         f'data-parent-edges="{parent_count}" data-evidence-edges="{evidence_count}" '
         f'data-broken-edges="{broken_count}" data-offgrid-edges="{offgrid_count}">'
-        + "".join(parts)
-        + "</svg>"
+        '<defs><marker id="daw-arrow-parent" viewBox="0 0 10 10" refX="9" refY="5" '
+        'markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" '
+        f'fill="{EDGE_COLORS["parent"]}"/></marker><marker id="daw-arrow-evidence" viewBox="0 0 10 10" '
+        'refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path '
+        f'd="M 0 0 L 10 5 L 0 10 z" fill="{EDGE_COLORS["evidence"]}"/></marker><marker '
+        'id="daw-arrow-broken" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" '
+        'orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" '
+        f'fill="{EDGE_COLORS["broken"]}"/></marker></defs>' + "".join(parts) + "</svg>"
     )
 
 

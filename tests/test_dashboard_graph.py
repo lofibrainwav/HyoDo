@@ -376,6 +376,10 @@ def test_edge_overlay_draws_parent_and_evidence_ref_edges(tmp_path: Path) -> Non
     assert 'data-evidence-edges="1"' in svg_tag.group(0)  # d1 cites t1
     assert 'class="edge edge-parent"' in html
     assert 'class="edge edge-evidence"' in html
+    assert 'id="daw-arrow-parent"' in html
+    assert 'id="daw-arrow-evidence"' in html
+    assert 'marker-end="url(#daw-arrow-parent)"' in html
+    assert 'marker-end="url(#daw-arrow-evidence)"' in html
 
 
 def test_edge_overlay_draws_a_broken_stub_for_an_unresolved_ref(tmp_path: Path) -> None:
