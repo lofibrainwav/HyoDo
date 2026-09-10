@@ -581,6 +581,40 @@ def _yeong_body(pillar: Any) -> str:
     )
 
 
+def _provenance_readout(evidence: dict[str, Any]) -> tuple[str, str]:
+    """`(readout value, banner html)` for the measurement's own origin.
+
+    A panel that reports gate results without saying which build produced them
+    is asking to be believed. The readout answers that in every state; the
+    banner appears only when the answer invalidates the numbers beside it.
+    """
+    record = evidence.get("provenance")
+    if not isinstance(record, dict):
+        return "UNOBSERVED", (
+            '<p class="provenance-alert">Measurement origin UNOBSERVED — this panel '
+            "cannot say which HyoDo produced the readings below.</p>"
+        )
+    relation = str(record.get("relation", "SOURCE_UNOBSERVED"))
+    validity = str(record.get("validity", "UNOBSERVED"))
+    commit = str(record.get("target_commit") or "")[:8] or "no commit"
+    if validity == "OBSERVED":
+        value = "EXTERNAL" if relation == "EXTERNAL_TARGET" else f"SELF {commit}"
+        return value, ""
+    if validity == "MISMATCH":
+        tool = str(record.get("tool_commit") or "")[:8] or "unknown"
+        return "MISMATCH", (
+            '<p class="provenance-alert">MEASUREMENT MISMATCH — the gate results below '
+            f"were produced by HyoDo at commit {escape(tool)}, but the target is at "
+            f"{escape(commit)}. Same version string, different code. Run "
+            "<code>hyodo check</code> for the measuring checkout&rsquo;s path.</p>"
+        )
+    return "UNOBSERVED", (
+        '<p class="provenance-alert">Measurement origin UNOBSERVED — the measuring '
+        "code could not be compared with this checkout, so the readings below are "
+        "unproven rather than green.</p>"
+    )
+
+
 def render_dashboard_html(
     evidence: dict[str, Any],
     *,
@@ -591,6 +625,7 @@ def render_dashboard_html(
     refresh_started_at: str = "",
 ) -> str:
     """Render raw evidence without creating a composite score or fake values."""
+    provenance_value, provenance_banner = _provenance_readout(evidence)
     typecheck = _gate(evidence, "typecheck")
     tests = _gate(evidence, "tests")
     lint = _gate(evidence, "lint_format")
@@ -673,7 +708,9 @@ header {{ display:grid; grid-template-columns:minmax(0,1fr) auto; gap:28px; alig
 .eyebrow {{ color:var(--signal); margin:0 0 8px }} h1 {{ margin:0; font-size:clamp(2.1rem,6vw,4.8rem); line-height:.92; letter-spacing:-.075em; font-weight:800 }}
 .meta {{ color:var(--muted); margin:.6rem 0 0; font-family:var(--mono); font-size:.78rem; overflow-wrap:anywhere }}
 .legend {{ max-width:260px; margin:0; color:var(--muted); font:700 .72rem/1.5 var(--mono); text-align:right; text-transform:uppercase }} .legend a {{ color:var(--ink); text-decoration-thickness:2px; text-underline-offset:3px }}
-.instrument-strip {{ display:grid; grid-template-columns:1.5fr repeat(3,1fr); border-bottom:1px solid var(--line); margin:0 0 18px }}
+.instrument-strip {{ display:grid; grid-template-columns:1.5fr repeat(4,1fr); border-bottom:1px solid var(--line); margin:0 0 18px }}
+.provenance-alert {{ margin:0 0 18px; padding:12px 14px; border:2px solid var(--line); background:var(--surface); font:700 .82rem/1.45 var(--mono) }}
+.provenance-alert code {{ font:inherit }}
 .readout {{ min-height:96px; padding:14px 15px 12px; border-left:1px solid var(--line) }} .readout:first-child {{ border-left:0 }}
 .readout-label {{ color:var(--muted); display:block; margin-bottom:11px }} .readout-value {{ display:block; font:800 clamp(1.05rem,2vw,1.5rem)/1 var(--mono); letter-spacing:-.06em; overflow-wrap:anywhere }} .readout-value.signal {{ color:var(--signal) }}
 .controls {{ display:flex; flex-wrap:wrap; gap:10px 16px; align-items:center; padding:12px 0 18px; border-bottom:1px solid var(--line) }}
@@ -687,7 +724,7 @@ h2 {{ display:flex; justify-content:space-between; gap:12px; align-items:baselin
 ul {{ list-style:none; padding:0; margin:0 }} li {{ display:grid; grid-template-columns:1fr auto; gap:5px 10px; padding:10px 0; border-top:1px solid var(--line-soft) }} li:first-child {{ border-top:0; padding-top:0 }} li strong {{ font:800 .86rem var(--mono); text-align:right; overflow-wrap:anywhere }} .metric-label {{ font-size:.84rem }} small,.reference {{ grid-column:1/-1; color:var(--muted); font: .68rem/1.35 var(--mono) }} .reference {{ color:var(--accent) }} .not-measured {{ font-size:1.2rem; font-weight:800; margin:20px 0 4px }} .reason {{ color:var(--muted); margin:0; font-size:.8rem }}
 *:focus-visible {{ outline:3px solid var(--focus); outline-offset:3px }} @media (prefers-reduced-motion:reduce) {{ * {{ scroll-behavior:auto }} }}
 @media (max-width:820px) {{ main {{ padding:18px 14px 40px }} header {{ display:block }} .legend {{ text-align:left; margin-top:18px; max-width:none }} .instrument-strip {{ grid-template-columns:1fr 1fr }} .readout {{ border-top:1px solid var(--line); border-left:1px solid var(--line) }} .readout:nth-child(odd) {{ border-left:0 }} .grid {{ grid-template-columns:1fr }} .card {{ min-height:0 }} }}
-</style></head><body><main><header><div><p class="eyebrow">HyoDo / Measurement Console</p><h1>Instrument Panel</h1><p class="meta">TARGET // {escape(target)}<br>MEASURED // {escape(measured_at)}</p></div><p class="legend">Raw evidence only<br>No composite score<br><a href="/graph">Open evidence graph</a> · <a href="/api/evidence">Open evidence JSON</a></p></header><section class="instrument-strip" aria-label="measurement summary"><div class="readout"><span class="readout-label">Signal state</span><strong class="readout-value signal">{escape("MEASURED" if measured_gate_count else "UNOBSERVED")}</strong></div><div class="readout"><span class="readout-label">Gates read</span><strong class="readout-value">{measured_gate_count}/3</strong></div><div class="readout"><span class="readout-label">Refresh mode</span><strong class="readout-value">{escape("AUTO " + str(interval) + "S" if interval else "FIXED")}</strong></div><div class="readout"><span class="readout-label">Receipt scope</span><strong class="readout-value">LOCAL ONLY</strong></div></section><p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="measurement-status" aria-live="polite">{escape(refresh_status)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
+</style></head><body><main><header><div><p class="eyebrow">HyoDo / Measurement Console</p><h1>Instrument Panel</h1><p class="meta">TARGET // {escape(target)}<br>MEASURED // {escape(measured_at)}</p></div><p class="legend">Raw evidence only<br>No composite score<br><a href="/graph">Open evidence graph</a> · <a href="/api/evidence">Open evidence JSON</a></p></header><section class="instrument-strip" aria-label="measurement summary"><div class="readout"><span class="readout-label">Signal state</span><strong class="readout-value signal">{escape("MEASURED" if measured_gate_count else "UNOBSERVED")}</strong></div><div class="readout"><span class="readout-label">Gates read</span><strong class="readout-value">{measured_gate_count}/3</strong></div><div class="readout"><span class="readout-label">Refresh mode</span><strong class="readout-value">{escape("AUTO " + str(interval) + "S" if interval else "FIXED")}</strong></div><div class="readout"><span class="readout-label">Receipt scope</span><strong class="readout-value">LOCAL ONLY</strong></div><div class="readout"><span class="readout-label">Measured by</span><strong class="readout-value">{escape(provenance_value)}</strong></div></section>{provenance_banner}<p class="meta">{escape(refresh_mode)}</p><p id="measurement-status" class="measurement-status" aria-live="polite">{escape(refresh_status)}</p>{refresh_control}<div class="grid">{cards}</div></main><script data-measured="{escape(measured_at)}">{POLL_SCRIPT}</script></body></html>"""
 
 
 def _parse_iso_ts(value: Any) -> datetime | None:

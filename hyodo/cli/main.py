@@ -171,6 +171,7 @@ from hyodo.policy_trust import (
     load_policy_trust,
     resolve_policy_trust_grant,
 )
+from hyodo.provenance import resolve_provenance
 from hyodo.report import build_report_graph, write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
@@ -704,6 +705,9 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "target": str(root),
         "measured_at": datetime.now(timezone.utc).isoformat(),
+        # The portable form: this dict is served over HTTP by `hyodo dashboard`,
+        # so it carries commit ids and path digests, never a home directory.
+        "provenance": resolve_provenance(root).to_portable_dict(),
         "gates": {name: asdict(result) for name, result in gates.items()},
         "safety": {
             "risk_score": safety_risk,
@@ -751,6 +755,7 @@ def collect_evidence_root_snapshot(root: Path) -> dict[str, object]:
         "schema_version": EVIDENCE_SCHEMA_VERSION,
         "target": str(root),
         "measured_at": datetime.now(timezone.utc).isoformat(),
+        "provenance": resolve_provenance(root).to_portable_dict(),
         "gates": gates,
         "safety": {
             "risk_score": None,
@@ -1622,6 +1627,15 @@ def _verdict_output(
         detail = ", ".join(state.get("failed", [])) or (
             "all executed gates passed" if exit_code == 0 else "required gates UNOBSERVED"
         )
+    # Measurement provenance is a separate axis from policy: it does not ask
+    # whether an actor was permitted to act, it asks whether this measurement
+    # is valid at all. A MISMATCH means the gates that just ran came from a
+    # different HyoDo than the one being measured, so their verdict describes
+    # code nobody asked about — it cannot be reported as green.
+    provenance = state.get("provenance")
+    if provenance is not None and provenance.validity == "MISMATCH" and decision == "PASS":
+        decision = "UNOBSERVED"
+        detail = provenance.summary()
     verdict_args = (
         decision,
         state.get("observed", 0),
@@ -1656,6 +1670,10 @@ def _verdict_output(
                 payload["test_integrity"] = state["test_integrity"]
             if "dx_signals" in state:
                 payload["dx_signals"] = state["dx_signals"]
+            if provenance is not None:
+                # the portable form: commit ids and digests, never a home
+                # directory, because --json output travels into issues
+                payload["provenance"] = provenance.to_portable_dict()
         else:
             assert captured is not None
             payload = json.loads(captured.get())
@@ -1666,6 +1684,13 @@ def _verdict_output(
         verdict = render_verdict_line(*verdict_args, audience=profile.profile)
         if sampled_limitation:
             verdict += f"; {sampled_limitation}"
+        # Local terminal output may carry absolute paths: the person reading it
+        # needs to know which directory to go fix. Never silent, even when the
+        # provenance is fine, so "measured by what?" always has an answer.
+        # Printed before the verdict, because the verdict line is the one
+        # callers parse and it has to stay last.
+        if provenance is not None and not quiet:
+            typer.echo(f"Measurement: {provenance.summary()}")
         typer.echo(verdict)
         if explain:
             typer.echo(
@@ -1732,6 +1757,10 @@ def check(
 
     profile = _resolve_audience_or_exit(Path.cwd(), audience, "check", json_output)
     verdict_state: dict[str, Any] = {"unit": "gates"}
+    # Resolved before any gate runs, so the answer to "which HyoDo measured
+    # this?" exists even when the gates themselves blow up. Never raises: an
+    # unreadable origin is reported as UNOBSERVED, not as a crash.
+    verdict_state["provenance"] = resolve_provenance(Path.cwd())
     with _verdict_output("check", verdict_state, quiet, explain, json_output, profile):
         console.print(Panel.fit("HyoDo Code Quality Check", style="bold blue"))
 
