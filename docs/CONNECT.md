@@ -31,9 +31,10 @@ is an allowlist, not a hook adapter — copying it does not make a live
 Cursor/Codex canary observed. For a native hook command, pipe the host payload
 to `hyodo event record --stdin --hook cursor` or `--hook codex` (and use
 `hyodo policy check --stdin --hook ...` to calculate the HyoDo decision for a
-pre-action payload). The current release does not translate that decision into
-Cursor/Codex-native allow/deny/rewrite response JSON; native enforcement
-parity remains `UNOBSERVED`/`NOT_BUILT`.
+pre-action payload). Add `--native-response --json` when the caller is a
+Cursor or Codex command hook and needs the host-native response envelope.
+Serialization is verified by fixtures; live host enforcement remains
+`UNOBSERVED` until a real callback receipt is captured.
 
 The adapter boundary is documented in [`HOST_ADAPTERS.md`](./HOST_ADAPTERS.md).
 Fixture tests prove `hyodo_adapter = BUILT`; they do not promote

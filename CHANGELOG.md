@@ -29,8 +29,8 @@ Cursor/Codex native hook normalization and release-surface provenance.
 ### Evidence
 
 - Adapter fixtures and clean wheel install smoke pass on the release candidate.
-- Live Cursor/Codex callback observation and native allow/deny/rewrite
-  response parity remain unobserved/not built in this release.
+- Native Cursor/Codex response serialization is fixture-verified; live
+  Cursor/Codex callback observation remains `UNOBSERVED` in this release.
 
 ## [Unreleased]
 

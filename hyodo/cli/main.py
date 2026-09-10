@@ -128,7 +128,9 @@ from hyodo.gates import (
 from hyodo.graph_export import build_graph_export
 from hyodo.graph_view import build_actor_rings
 from hyodo.host_adapters.codex import map_codex_hook_payload
+from hyodo.host_adapters.codex_response import map_codex_permission_response
 from hyodo.host_adapters.cursor import map_cursor_hook_payload
+from hyodo.host_adapters.cursor_response import map_cursor_permission_response
 from hyodo.mcp_config import (
     ALL_HOSTS,
     CHATGPT_UNOBSERVED_MESSAGE,
@@ -1614,6 +1616,7 @@ def _verdict_output(
     explain: bool,
     json_output: bool,
     audience: AudienceProfile | None = None,
+    native_response: bool = False,
 ) -> Iterator[None]:
     """Stream default details; propagate the original command exit unchanged."""
     profile = audience or AudienceProfile(profile="engineer")
@@ -1653,6 +1656,10 @@ def _verdict_output(
         else ""
     )
     if json_output:
+        if native_response:
+            assert captured is not None
+            console.print_json(captured.get())
+            return
         # --json content stays byte-identical across profiles: the profile
         # is surfaced only as the added "audience" key, never by reflavoring
         # an existing field (including "verdict").
@@ -3757,6 +3764,11 @@ def event_record(
         help="Adapt stdin from a harness-native hook JSON shape instead of "
         "hyodo.agent-event/v1 (claude-code, cursor, or codex)",
     ),
+    native_response: bool = typer.Option(
+        False,
+        "--native-response",
+        help="Emit the host-native response envelope for Cursor or Codex.",
+    ),
     shadow: bool = typer.Option(
         False,
         "--shadow",
@@ -4255,6 +4267,11 @@ def policy_check(
         help="Adapt stdin from a harness-native hook JSON shape instead of "
         "hyodo.agent-event/v1 (claude-code, cursor, or codex)",
     ),
+    native_response: bool = typer.Option(
+        False,
+        "--native-response",
+        help="Emit the host-native response envelope (currently Cursor only).",
+    ),
     shadow: bool = typer.Option(
         False,
         "--shadow",
@@ -4273,12 +4290,24 @@ def policy_check(
     for that).
     """
 
+    if native_response and hook not in {"cursor", "codex"}:
+        raise typer.BadParameter("--native-response requires --hook cursor or codex")
+    if native_response and not json_output:
+        raise typer.BadParameter("--native-response requires --json")
     profile = _resolve_audience_or_exit(Path(root).resolve(), audience, "policy check", json_output)
     verdict_state: dict[str, Any] = {"unit": "surfaces"}
     verdict_state.update(
         decision="UNOBSERVED", detail="trust=UNOBSERVED, required evidence UNOBSERVED"
     )
-    with _verdict_output("policy check", verdict_state, quiet, explain, json_output, profile):
+    with _verdict_output(
+        "policy check",
+        verdict_state,
+        quiet,
+        explain,
+        json_output,
+        profile,
+        native_response,
+    ):
         root_path = Path(root).resolve()
         file_path = Path(file) if file else None
         data, err = _load_event_payload(file_path, stdin_flag)
@@ -4299,6 +4328,7 @@ def policy_check(
                 console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2)
 
+        native_event_name: str | None = None
         if hook is not None:
             if hook not in _NATIVE_HOOKS:
                 message = f"unsupported --hook value: {hook}"
@@ -4317,6 +4347,8 @@ def policy_check(
                     console.print(f"[red]{message}[/red]")
                 typer.echo(f"HYODO UNOBSERVED: {message}.", err=True)
                 raise typer.Exit(2)
+            if native_response and isinstance(data, dict):
+                native_event_name = data.get("hook_event_name")
             mapped, map_err = _map_hook_payload(data, root_path, hook)
             if mapped is None:
                 mapping_exit = 0 if shadow else 2
@@ -4421,12 +4453,26 @@ def policy_check(
             typer.echo(stderr_message, err=True)
         final_exit_code = 0 if shadow else hook_exit_code
         if json_output:
-            payload = decision.as_dict()
-            payload["exit_code"] = final_exit_code
-            payload["shadow"] = shadow
-            if decision.trust_level >= 2:
-                payload["ledger_write_required"] = True
-                payload["ledger_written"] = False
+            if native_response:
+                if not isinstance(native_event_name, str):
+                    raise typer.BadParameter("Cursor payload is missing hook_event_name")
+                if hook == "cursor":
+                    payload = map_cursor_permission_response(
+                        decision,
+                        event_name=native_event_name,
+                    )
+                else:
+                    payload = map_codex_permission_response(
+                        decision,
+                        event_name=native_event_name,
+                    )
+            else:
+                payload = decision.as_dict()
+                payload["exit_code"] = final_exit_code
+                payload["shadow"] = shadow
+                if decision.trust_level >= 2:
+                    payload["ledger_write_required"] = True
+                    payload["ledger_written"] = False
             console.print_json(json.dumps(payload))
         else:
             color = "green" if decision.decision == "ALLOW" else "red"
