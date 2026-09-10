@@ -1271,17 +1271,18 @@ def _render_daw_timeline(
         "reviewer": "Reviewer",
     }
     buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
-    track_seen: set[str] = set()
     anchors: dict[str, tuple[int, int, int]] = {}
     for node in sorted(
         valid_nodes, key=lambda item: (item.get("step_index", 0), str(item.get("ts", "")))
     ):
         track, _label = _daw_track(node)
-        track_seen.add(track)
         step = node.get("step_index") if isinstance(node.get("step_index"), int) else 0
         buckets.setdefault((track, step), []).append(node)
 
-    visible_tracks = [track for track in track_order if track in track_seen]
+    # Keep the prototype's four-lane structure even when a role is absent from
+    # the measured source. Empty lanes make absence observable without
+    # fabricating events or role assignments.
+    visible_tracks = track_order
     parts = [
         '<section class="daw-console" aria-label="Evidence session timeline">',
         f'<div class="daw-sessionbar"><div><span>EVIDENCE CONSOLE</span><strong>SESSION / {escape(run_id)}</strong></div>'
