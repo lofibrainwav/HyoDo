@@ -1560,10 +1560,12 @@ h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-track-label small {{ margin-left:auto; color:#4d5852 }}
 .daw-row {{ min-height:78px; border-bottom:1px solid #2a312e }}
 .daw-cell {{ min-height:78px; padding:7px 5px; border-left:1px solid #252d29; display:flex; flex-direction:column; gap:4px; justify-content:center }}
-.daw-cell.daw-cluster {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; gap:4px }}
+.daw-cell.daw-cluster {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; gap:7px; padding:9px 7px; background:#0d1210; box-shadow:inset 0 0 0 1px #344139 }}
 .daw-empty {{ background:repeating-linear-gradient(135deg,transparent 0 8px,#ffffff03 8px 9px) }}
 .daw-cell button {{ width:100%; min-width:0; border-radius:0; border:1px solid #4b5750; background:#1a211e; color:#dce5df; padding:8px 7px; font-size:.66rem; letter-spacing:.02em; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer }}
-.daw-cell.daw-cluster button {{ padding:6px 5px; font-size:.59rem }}
+.daw-cell.daw-cluster button {{ padding:6px 5px; min-height:24px; border-radius:2px; font-size:.59rem; box-shadow:0 0 0 1px #101512 }}
+.daw-cell.daw-cluster button[data-event-id*="parallel-a"] {{ border-color:#739bb2 }}
+.daw-cell.daw-cluster button[data-event-id*="parallel-b"] {{ border-color:#b59663 }}
 .daw-cell button:hover, .daw-cell button:focus-visible {{ border-color:#d9ead7; background:#26332c }}
 .daw-cell button[data-event-kind="tool_call"] {{ border-left:3px solid #82bd69 }}
 .daw-cell button[data-event-kind="tool_result"] {{ border-left:3px solid #d5a04c }}
