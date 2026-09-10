@@ -1,4 +1,4 @@
-"""Contract tests for targeted mutation workflow triggering."""
+"""Contract tests for advisory mutation workflow boundaries."""
 
 from __future__ import annotations
 
@@ -16,24 +16,9 @@ def _load_workflow() -> dict:
     return data
 
 
-def test_scoring_mutation_pull_request_trigger_is_targeted() -> None:
+def test_advisory_mutation_does_not_enter_pull_request_merge_rollup() -> None:
     data = _load_workflow()
-    paths = set(data["on"]["pull_request"]["paths"])
-
-    assert paths == {
-        "hyodo/__init__.py",
-        "tests/test_scoring_math.py",
-        "tests/test_scoring_properties.py",
-        "tests/conftest.py",
-        "cosmic-ray.scoring.toml",
-        "pyproject.toml",
-        ".github/workflows/mutation.yml",
-    }
-
-    assert "hyodo/**" not in paths
-    assert "tests/**" not in paths
-    assert "cosmic-ray*.toml" not in paths
-    assert "docs/research/mutation-testing-receipt.md" not in paths
+    assert "pull_request" not in data["on"]
 
 
 def test_full_core_schedule_and_manual_scopes_remain_available() -> None:
