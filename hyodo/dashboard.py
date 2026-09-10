@@ -1241,7 +1241,8 @@ def _daw_event_label(node: dict[str, Any]) -> str:
     kind = str(node.get("kind") or "event").lower()
     suffix = "call" if kind == "tool_call" else "result"
     if "parallel" in node_id:
-        return f"parallel / {suffix}"
+        branch = next((branch for branch in ("a", "b") if f"parallel-{branch}" in node_id), "?")
+        return f"{branch.upper()} {'call' if suffix == 'call' else 'res'}"
     if "join" in node_id:
         return f"dag join / {suffix}"
     if "retry-call-1" in node_id or "retry-result-1" in node_id:
@@ -1317,7 +1318,8 @@ def _render_daw_timeline(
             if not events:
                 parts.append('<div class="daw-cell daw-empty"></div>')
                 continue
-            parts.append('<div class="daw-cell">')
+            cluster_class = " daw-cluster" if len(events) > 1 else ""
+            parts.append(f'<div class="daw-cell{cluster_class}" data-event-count="{len(events)}">')
             for tile_index, node in enumerate(events):
                 node_id = str(node["id"])
                 anchors[node_id] = (row_index, step, tile_index)
@@ -1558,8 +1560,10 @@ h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-track-label small {{ margin-left:auto; color:#4d5852 }}
 .daw-row {{ min-height:78px; border-bottom:1px solid #2a312e }}
 .daw-cell {{ min-height:78px; padding:7px 5px; border-left:1px solid #252d29; display:flex; flex-direction:column; gap:4px; justify-content:center }}
+.daw-cell.daw-cluster {{ display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); align-content:center; gap:4px }}
 .daw-empty {{ background:repeating-linear-gradient(135deg,transparent 0 8px,#ffffff03 8px 9px) }}
 .daw-cell button {{ width:100%; min-width:0; border-radius:0; border:1px solid #4b5750; background:#1a211e; color:#dce5df; padding:8px 7px; font-size:.66rem; letter-spacing:.02em; text-align:left; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; cursor:pointer }}
+.daw-cell.daw-cluster button {{ padding:6px 5px; font-size:.59rem }}
 .daw-cell button:hover, .daw-cell button:focus-visible {{ border-color:#d9ead7; background:#26332c }}
 .daw-cell button[data-event-kind="tool_call"] {{ border-left:3px solid #82bd69 }}
 .daw-cell button[data-event-kind="tool_result"] {{ border-left:3px solid #d5a04c }}
