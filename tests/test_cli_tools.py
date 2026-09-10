@@ -14,6 +14,7 @@ from hyodo.cli.main import (
     _tool_cmd,
     app,
     collect_dashboard_evidence,
+    collect_evidence_root_snapshot,
     find_repo_root,
     resolve_check_target,
     run_pyright_check,
@@ -82,6 +83,17 @@ def test_dashboard_evidence_uses_user_gates_when_gates_toml_present(tmp_path):
     ruff_mock.assert_not_called()
     pytest_mock.assert_not_called()
     sbom_mock.assert_not_called()
+
+
+def test_evidence_root_snapshot_does_not_execute_project_gates_or_history(tmp_path):
+    ledger = tmp_path / ".hyodo" / "agent-events.jsonl"
+    ledger.parent.mkdir()
+    ledger.write_text("{not-json}\n", encoding="utf-8")
+    evidence = collect_evidence_root_snapshot(tmp_path)
+    assert evidence["gates"]["typecheck"]["status"] == "UNOBSERVED"
+    assert evidence["gates"]["evidence_graph"]["status"] == "UNOBSERVED"
+    assert evidence["safety"]["risk_score_state"] == "not_executed"
+    assert not (tmp_path / ".hyodo" / "history.jsonl").exists()
 
 
 def test_dashboard_marks_safety_risk_not_measured_for_an_empty_change_set(tmp_path):

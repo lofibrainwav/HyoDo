@@ -14,7 +14,7 @@ from pathlib import Path
 
 from typer.testing import CliRunner
 
-from hyodo.cli.main import app, find_repo_root, resolve_dashboard_root
+from hyodo.cli.main import app, find_repo_root, resolve_dashboard_root, resolve_evidence_root
 
 runner = CliRunner()
 
@@ -50,6 +50,14 @@ def test_plain_directory_is_still_rejected(tmp_path):
     """No gates.toml and no hyodo/ package -> still unobservable, not green."""
     (tmp_path / "README.md").write_text("nothing here\n", encoding="utf-8")
     assert resolve_dashboard_root(tmp_path) is None
+
+
+def test_explicit_evidence_root_requires_the_agent_event_ledger(tmp_path):
+    assert resolve_evidence_root(tmp_path) is None
+    ledger = tmp_path / ".hyodo" / "agent-events.jsonl"
+    ledger.parent.mkdir()
+    ledger.write_text("{}\n", encoding="utf-8")
+    assert resolve_evidence_root(tmp_path) == tmp_path.resolve()
 
 
 def test_find_repo_root_meaning_is_unchanged(tmp_path):

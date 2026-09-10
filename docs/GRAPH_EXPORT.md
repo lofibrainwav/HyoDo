@@ -33,6 +33,25 @@ The output is one JSON object, schema `hyodo.graph-export/v1`:
 }
 ```
 
+## Timed events
+
+An event may include `io.duration_ms`, a non-negative integer supplied by the
+observing harness. HyoDo validates and preserves this value in the report
+graph; it does not infer duration from timestamps or claim that an absent
+value was zero. `duration_ms` is therefore a measurement annotation, not a
+scheduler or performance verdict.
+
+The local dashboard can inspect a sealed ledger without running project gates:
+
+```
+hyodo dashboard --evidence-root /path/to/evidence-pack
+```
+
+The path must contain `.hyodo/agent-events.jsonl`. This mode is graph-only:
+gate, safety, and history surfaces are explicitly `UNOBSERVED`, and no receipt
+is written. It is suitable for Evidence Pack review, not for certifying a
+checkout or replacing the KINGDOM execution authority.
+
 - `nodes` / `edges` mirror `hyodo report --format graph`'s own
   `hyodo.evidence-graph/v1` shape (`hyodo/event_graph.py`) verbatim,
   including each node's `actor_id` (`null` when the event did not carry

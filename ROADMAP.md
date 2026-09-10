@@ -5,8 +5,9 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.17.0 is the latest published release. Main is maintaining the
-4.17.0 baseline.
+HyoDo 4.18.0 is the latest published release. The signed tag, public wheel and
+sdist, SBOM receipt, PyPI provenance, and clean-install readback are complete.
+Main is maintaining the 4.18.0 baseline.
 
 Landed and released:
 
@@ -98,6 +99,18 @@ evidence is not converted into a pass.
 - `hyodo mcp continuity` counts hook-recorded actors as their own hosts, so
   a hook-only onboarding (no MCP client ever connected) can reach
   `OBSERVED`/`READY` instead of being stuck at `hosts observed: 0/2`.
+
+### 4.18.0 (released 2026-09-10)
+
+- Sampled syntax checks disclose their bounded scope in normal, quiet, and JSON
+  output.
+- Public release evidence is complete: signed tag, GitHub Release, SBOM and
+  checksum assets, PyPI OIDC provenance, and clean-install smoke.
+- The local evidence graph preserves call/result lanes, parent/evidence edges,
+  parallel clusters, and the explicit `UNOBSERVED` boundary.
+- KINGDOM native Measured Run #3 was recorded through the public package and
+  sealed as Evidence Pack v1. The pack is observation evidence, not execution
+  authority.
 
 ## Next candidates
 

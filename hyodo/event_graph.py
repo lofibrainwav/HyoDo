@@ -230,6 +230,9 @@ def build_event_graph(
         io = _io(event)
         urls = tool.get("urls")
         urls = urls if isinstance(urls, list) else []
+        node_io: dict[str, Any] = {"output_digest": io.get("output_digest")}
+        if isinstance(io.get("duration_ms"), int) and not isinstance(io.get("duration_ms"), bool):
+            node_io["duration_ms"] = io["duration_ms"]
         node = {
             "id": event_id,
             "type": "event",
@@ -246,7 +249,7 @@ def build_event_graph(
             # `hyodo.graph_view.assign_columns` can tell a measured
             # `model_response` (Beauty) from an unmeasured one (no
             # column) without a second ledger read.
-            "io": {"output_digest": io.get("output_digest")},
+            "io": node_io,
             "policy": {
                 "rule_id": policy.get("rule_id"),
                 "reason": policy.get("reason"),
