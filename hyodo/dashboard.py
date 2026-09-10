@@ -99,7 +99,7 @@ function highlightEdges(eventId) {
   });
 }
 function layoutEdges() {
-  const svg = document.getElementById("edge-overlay");
+  const svg = document.getElementById("daw-edge-overlay") || document.getElementById("edge-overlay");
   const container = document.querySelector(".daw-rows, .grid-rows");
   if (!svg || !container) return;
   const containerRect = container.getBoundingClientRect();
