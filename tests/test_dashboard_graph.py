@@ -717,3 +717,79 @@ def test_graph_script_layout_edges_function_and_csp_hash_match() -> None:
     digest = base64.b64encode(hashlib.sha256(GRAPH_SCRIPT.encode("utf-8")).digest()).decode("ascii")
     assert digest == GRAPH_SCRIPT_SHA256
     assert f"'sha256-{GRAPH_SCRIPT_SHA256}'" in DASHBOARD_CSP
+
+
+def _bare_event(event_id: str, tool_name: str, *, output_digest: str | None = None) -> dict:
+    """One graph node shaped like the real ledger's shell calls."""
+    return {
+        "id": event_id,
+        "type": "event",
+        "run_id": "r1",
+        "ts": "2026-09-06T00:00:00+00:00",
+        "kind": "tool_call",
+        "actor": "agent",
+        "actor_id": "zaryong",
+        "step_index": 0,
+        "decision": None,
+        "policy": {"rule_id": None, "reason": None, "evaluated_by": None},
+        "tool": {"name": tool_name, "method": None, "paths": [], "urls": []},
+        "io": {"output_digest": output_digest},
+    }
+
+
+def test_an_event_with_nothing_recorded_still_gets_a_gutter_of_its_own() -> None:
+    # The viewer must never let an event disappear just because there was
+    # nothing on it to classify -- "we could not measure this" is itself a
+    # finding the operator needs to see.
+    from hyodo.dashboard import render_graph_html
+
+    html = render_graph_html(
+        {"status": "READY", "nodes": [_bare_event("e1", "ssh-keygen")], "edges": [], "root": "/tmp"}
+    )
+    assert 'class="gutter"' in html
+    assert "Unmeasured" in html
+
+
+def test_the_two_gutters_render_as_separate_labelled_sections() -> None:
+    # A mapping gap and a recording gap are different problems with
+    # different fixes, so they must not share one bucket in the UI either.
+    from hyodo.dashboard import render_graph_html
+
+    html = render_graph_html(
+        {
+            "status": "READY",
+            "nodes": [
+                _bare_event("e1", "ssh-keygen"),
+                _bare_event("e2", "git.status", output_digest="dcb01359d6b9"),
+            ],
+            "edges": [],
+            "root": "/tmp",
+        }
+    )
+    assert "Unmeasured" in html
+    assert "Unclassified" in html
+    assert html.count('class="gutter"') == 2
+    assert "ssh-keygen" in html
+    assert "git.status" in html
+
+
+def test_each_gutter_states_how_many_events_it_holds() -> None:
+    # The split only pays off if the two counts are readable side by side:
+    # "53 unmeasured, 10 unclassified" says fix the recording, while the
+    # reverse would say fix the table.
+    from hyodo.dashboard import render_graph_html
+
+    html = render_graph_html(
+        {
+            "status": "READY",
+            "nodes": [
+                _bare_event("e1", "ssh-keygen"),
+                _bare_event("e2", "gh"),
+                _bare_event("e3", "git.status", output_digest="dcb01359d6b9"),
+            ],
+            "edges": [],
+            "root": "/tmp",
+        }
+    )
+    assert 'data-gutter-count="2"' in html
+    assert 'data-gutter-count="1"' in html

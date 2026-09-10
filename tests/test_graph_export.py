@@ -274,3 +274,47 @@ def test_export_succeeds_with_no_ledger_file_at_all(tmp_path: Path) -> None:
     assert payload["nodes"] == []
     assert payload["edges"] == []
     assert payload["backlinks"] == {}
+
+
+def _decision(node_id: str, decision: str) -> dict:
+    return {
+        "id": node_id,
+        "type": "event",
+        "run_id": "r1",
+        "ts": "2026-09-06T00:00:00+00:00",
+        "kind": "decision",
+        "actor": "agent",
+        "step_index": 0,
+        "decision": decision,
+        "policy": {"rule_id": None, "reason": None, "evaluated_by": None},
+        "tool": {"name": "anything", "method": None, "paths": [], "urls": []},
+        "io": {"output_digest": None},
+    }
+
+
+def test_compute_clusters_never_drops_a_decision_event() -> None:
+    # `compute_clusters` maps each column through `_COLUMN_TO_PILLAR` and
+    # silently skips anything that is not a pillar. That is safe only while
+    # every decision event classifies onto a real column. This pins the
+    # invariant: if the decision row ever stops classifying -- and
+    # `assign_columns` starts returning a gutter sentinel here -- these
+    # events would vanish from the export entirely rather than fail loudly.
+    nodes = [
+        _decision("d1", "ALLOW"),
+        _decision("d2", "DENY"),
+        _decision("d3", "ASK"),
+        _decision("d4", "UNOBSERVED"),
+    ]
+    clusters = compute_clusters(nodes)
+    placed = {node_id for ids in clusters.values() for node_id in ids}
+    assert placed == {"d1", "d2", "d3", "d4"}
+
+
+def test_the_export_contract_stays_at_seven_keys() -> None:
+    # The unclassified/unmeasured split added a second gutter to the local
+    # viewer but must not add an eighth key here: `hyodo.graph-export/v1`
+    # is a published contract, and an always-empty key is noise in it.
+    # Reachability is what keeps that true -- see the test above.
+    clusters = compute_clusters([_decision("d1", "ALLOW")])
+    assert set(clusters) == set(CLUSTER_PILLAR_KEYS) | {"unclassified"}
+    assert "unmeasured" not in clusters

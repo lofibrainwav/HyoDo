@@ -14,6 +14,7 @@ from typing import Any
 
 from hyodo.graph_view import (
     UNCLASSIFIED,
+    UNMEASURED,
     VIRTUE_COLUMNS,
     assign_columns,
     build_actor_rings,
@@ -230,13 +231,23 @@ def test_readme_tool_name_is_doc_only_not_also_a_file_tool() -> None:
 def test_bash_and_web_search_tool_names_are_not_file_tools() -> None:
     # Guards against over-broad substring matching (e.g. a naive "read"/
     # "write" substring would also fire on unrelated names) swallowing
-    # non-file tool calls into the Hyo/Goodness file-tool rows.
-    assert assign_columns(_node("e1", tool_name="Bash")) == [UNCLASSIFIED]
-    assert assign_columns(_node("e1", tool_name="WebSearch")) == [UNCLASSIFIED]
+    # non-file tool calls into the Hyo/Goodness file-tool rows. Neither
+    # carries a path, a url or a digest, so the gutter they land in is the
+    # unmeasured one -- the guard is that they land in *neither* virtue
+    # column, which holds unchanged.
+    assert assign_columns(_node("e1", tool_name="Bash")) == [UNMEASURED]
+    assert assign_columns(_node("e1", tool_name="WebSearch")) == [UNMEASURED]
 
 
-def test_unmatched_event_lands_in_the_unclassified_gutter() -> None:
+def test_unmatched_event_with_nothing_recorded_lands_in_the_unmeasured_gutter() -> None:
     node = _node("e1", tool_name="mystery_internal_tool")
+    assert assign_columns(node) == [UNMEASURED]
+
+
+def test_unmatched_event_that_did_record_evidence_lands_in_the_unclassified_gutter() -> None:
+    # Same unmatched name, but this one measured its output. The table
+    # really did fail to place recorded evidence, and must keep saying so.
+    node = _node("e1", tool_name="mystery_internal_tool", output_digest="dcb01359d6b9")
     assert assign_columns(node) == [UNCLASSIFIED]
 
 
@@ -735,3 +746,76 @@ def test_backward_compatibility_without_actor_id_matches_existing_fixture() -> N
     assert tree["rows"]["agent:s1"]["depth"] == 1
     assert tree["rows"]["agent:s1"]["events"] == ["s1", "s2"]
     assert tree["rows"]["agent:s1"]["label"] == "agent:planner"
+
+
+# --- unclassified vs unmeasured: two different gaps -----------------------
+#
+# `unclassified` was doing two jobs at once. Measured across every local
+# ledger (108 events), 63 landed in the gutter -- but 53 of those carried
+# no `paths`, no `urls`, no `method`, no `rule_id` and no observed
+# `output_digest`. There was nothing on them to classify. Reporting that as
+# a mapping failure blames the table for a recording gap, and invites the
+# exact fix that must not happen: a tool-name row.
+
+
+def test_event_carrying_no_measurable_evidence_is_unmeasured_not_unclassified() -> None:
+    # A shell call whose arguments were digested away for privacy carries a
+    # name and nothing else. The table did not fail to place it; there was
+    # nothing to place.
+    node = _node("e1", tool_name="ssh-keygen")
+    assert assign_columns(node) == [UNMEASURED]
+
+
+def test_tool_name_alone_is_never_treated_as_evidence() -> None:
+    # The load-bearing guard. A host picks the tool name; it is a label, not
+    # a measurement. Two events differing only in name must classify the
+    # same, or some name-based row has crept back in.
+    bare = _node("e1", tool_name="kingdom.task")
+    other = _node("e2", tool_name="safe-pr-merge.mjs")
+    assert assign_columns(bare) == [UNMEASURED]
+    assert assign_columns(other) == [UNMEASURED]
+
+
+def test_observed_output_with_no_matching_row_stays_unclassified() -> None:
+    # A status readback whose output really was measured. Nothing on the
+    # table matches it, so this one is a genuine mapping gap and must keep
+    # saying so.
+    node = _node("e1", kind="tool_result", tool_name="git.status", output_digest="dcb01359d6b9")
+    assert assign_columns(node) == [UNCLASSIFIED]
+
+
+def test_located_paths_with_unknown_root_stay_unclassified() -> None:
+    # Evidence was recorded (a path), but the root needed to resolve it was
+    # not available. That is the table failing to place real evidence -- a
+    # mapping gap, not a recording one.
+    node = _node("e1", tool_name="Read", paths=["/etc/passwd"])
+    assert assign_columns(node) == [UNCLASSIFIED]
+
+
+def test_recorded_urls_count_as_evidence() -> None:
+    # `urls` is not read by any row today, but it is still a measurement the
+    # event carries, so its absence is what makes an event unmeasured -- not
+    # whether the current table happens to consume it.
+    node = _node("e1", tool_name="internal_fetcher")
+    node["tool"]["urls"] = ["https://example.invalid/x"]
+    assert assign_columns(node) == [UNCLASSIFIED]
+
+
+def test_the_two_gutters_are_distinct_and_borrow_no_policy_vocabulary() -> None:
+    # Policy already owns ALLOW/DENY/ASK/UNOBSERVED and measurement
+    # provenance owns OBSERVED/MISMATCH/UNOBSERVED. A third axis reusing
+    # those tokens would collapse three questions into one unreadable word.
+    assert UNCLASSIFIED != UNMEASURED
+    assert {UNCLASSIFIED, UNMEASURED}.isdisjoint(
+        {"ALLOW", "DENY", "ASK", "UNOBSERVED", "OBSERVED", "MISMATCH"}
+    )
+    assert UNMEASURED not in VIRTUE_COLUMNS
+
+
+def test_classified_events_are_untouched_by_the_split() -> None:
+    # The split may only ever divide the fallthrough. Anything the table
+    # already placed must place identically.
+    assert assign_columns(_node("e1", tool_name="pytest")) == ["jin"]
+    assert assign_columns(_node("e2", kind="decision", decision="ALLOW")) == ["seon"]
+    assert assign_columns(_node("e3", kind="prompt", actor="human")) == ["hyo"]
+    assert assign_columns(_node("e4", kind="error")) == ["jin"]
