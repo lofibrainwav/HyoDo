@@ -1,6 +1,7 @@
 # Dashboard redesign baseline
 
-Status: **design baseline, implementation not started**.
+Status: **local graph and explicit evidence-root mode shipped; KINGDOM run-first
+consumer remains a separate surface**.
 
 This document separates the HyoDo local dashboard from the KINGDOM consumer.
 They have different owners and different evidence authority:
@@ -8,6 +9,7 @@ They have different owners and different evidence authority:
 | Surface | Owner | Current state | Boundary |
 | --- | --- | --- | --- |
 | `hyodo dashboard` / `:8768` | HyoDo | Six-pillar instrument cards plus local `/graph` | Reads local HyoDo evidence; no composite score |
+| `hyodo dashboard --evidence-root PATH` | HyoDo | Read-only sealed-ledger graph view | Graph evidence only; gates, safety, and history are `UNOBSERVED` |
 | Public `/evidence-graph/` | HyoDo site | Fixed 14-event demo fixture with optional local JSON load | Not a live KINGDOM run |
 | KINGDOM HyoDo board | KINGDOM | Six-axis merge of KINGDOM pulse and HyoDo live evidence | Consumer only; must preserve `UNOBSERVED` |
 
@@ -16,7 +18,7 @@ They have different owners and different evidence authority:
 The six cards answer “what is the current checkout gate state?” They do not
 make a real measured run the primary object. The graph answers “what events are
 connected?” but does not yet present a run receipt, exact HyoDo/KINGDOM SHAs,
-or a signal-by-signal coverage matrix. The KINGDOM board adds useful context,
+or a signal-by-signal coverage matrix by itself. The KINGDOM board adds useful context,
 but mixes two sources in one card and is not organized around Measured Run #3.
 
 ## Proposed information architecture
@@ -47,6 +49,15 @@ but mixes two sources in one card and is not organized around Measured Run #3.
 - The first implementation must render the same eight-signal matrix used by
   the Evidence Pack v1 receipt. A field is not considered measured merely
   because the UI has a placeholder for it.
+
+## Shipped local contract
+
+`hyodo dashboard --evidence-root PATH` requires `PATH/.hyodo/agent-events.jsonl`.
+It renders the graph from that ledger only; it does not run `check`, `safe`,
+lint, tests, SBOM generation, or write a history receipt. Those unrelated
+surfaces are deliberately shown as `UNOBSERVED`, not as passing or zero-valued
+measurements. Use the sealed Evidence Pack manifest and README for the run
+identity, package version, and KINGDOM-side receipt.
 
 ## Open product decision
 

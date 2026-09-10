@@ -13,6 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+## [4.19.0] - 2026-09-10
+
+Evidence review and ledger-readiness follow-up after the public 4.18.0
+release and KINGDOM Measured Run #3 Evidence Pack v1.
+
+### Added
+
+- Evidence-root dashboard review mode for sealed ledgers, preserving explicit
+  `UNOBSERVED` states for gates and safety instead of executing local checks.
+- Optional non-negative `io.duration_ms` event measurements are preserved in
+  report graphs without inferring missing timing.
+
+### Changed
+
+- Agent-event ledger reads now stream JSONL lines instead of materializing the
+  entire file as an intermediate string list.
+
 ## [4.18.0] - 2026-09-09
 
 Release readiness and measured execution preparation: sampled checks now

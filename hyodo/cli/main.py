@@ -354,6 +354,21 @@ def resolve_dashboard_root(start: Path | None = None) -> Path | None:
     return find_repo_root(current)
 
 
+def resolve_evidence_root(start: Path | None = None) -> Path | None:
+    """Resolve an explicit evidence-only root without running project gates.
+
+    This is intentionally separate from :func:`resolve_dashboard_root`: an
+    evidence pack is a read-only graph source, not a HyoDo checkout and not a
+    BYOG project. The caller must opt into this boundary with
+    ``dashboard --evidence-root``.
+    """
+    current = (start or Path.cwd()).resolve()
+    if current.is_file():
+        current = current.parent
+    ledger = current / AGENT_EVENTS_RELATIVE_PATH
+    return current if ledger.is_file() else None
+
+
 def resolve_check_target(path: str | None) -> Path:
     """Resolve check target path. Raises FileNotFoundError if missing."""
     raw = path or "."
@@ -711,6 +726,46 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
     return evidence
 
 
+def collect_evidence_root_snapshot(root: Path) -> dict[str, object]:
+    """Render a graph-only snapshot for an explicit evidence root.
+
+    No gate, safety scan, history receipt, or project inspection runs here.
+    Those operations would turn an evidence pack into a new measurement target.
+    The graph status is the only observed signal in this mode; the six cards
+    remain visibly UNOBSERVED rather than implying checkout health.
+    """
+    graph = build_report_graph(root)
+    graph_status = str(graph.get("status", "UNOBSERVED"))
+    graph_message = (
+        "Evidence graph is READY; project gates were not executed."
+        if graph_status == "READY"
+        else f"Evidence graph is {graph_status}; project gates were not executed."
+    )
+    gates = {
+        name: {"status": "UNOBSERVED", "message": "evidence-only root; gate not executed"}
+        for name in ("typecheck", "tests", "lint_format", "sbom")
+    }
+    gates["evidence_graph"] = {"status": graph_status, "message": graph_message}
+    empty_pillar = {"metrics": {}, "sources": ["evidence-only root"]}
+    return {
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+        "target": str(root),
+        "measured_at": datetime.now(timezone.utc).isoformat(),
+        "gates": gates,
+        "safety": {
+            "risk_score": None,
+            "risk_score_state": "not_executed",
+            "source": "evidence-only root; safety not executed",
+            "findings": [],
+        },
+        "pillars": {
+            "in": empty_pillar,
+            "hyo": empty_pillar,
+            "yeong": empty_pillar,
+        },
+    }
+
+
 DASHBOARD_CSP = (
     "default-src 'none'; style-src 'unsafe-inline'; "
     f"script-src 'sha256-{POLL_SCRIPT_SHA256}' 'sha256-{GRAPH_SCRIPT_SHA256}'; connect-src 'self'"
@@ -988,14 +1043,31 @@ def dashboard(
             "none allowed by default (existing behaviour unchanged)."
         ),
     ),
+    evidence_root: str | None = typer.Option(
+        None,
+        "--evidence-root",
+        help=(
+            "Serve a read-only evidence pack root. Requires .hyodo/agent-events.jsonl; "
+            "project gates and safety scans are not executed."
+        ),
+    ),
 ):
     """Serve a local, evidence-only Jin-Seon-Mi-In-Hyo-Yeong dashboard."""
     try:
-        target = resolve_check_target(path)
+        if evidence_root is not None and path is not None:
+            raise FileNotFoundError("use either PATH or --evidence-root, not both")
+        target = resolve_check_target(evidence_root if evidence_root is not None else path)
     except FileNotFoundError as exc:
         console.print(f"[red]Path not found: {exc}[/red]")
         raise typer.Exit(2) from exc
-    root = resolve_dashboard_root(target)
+    evidence_only = evidence_root is not None
+    root = resolve_evidence_root(target) if evidence_only else resolve_dashboard_root(target)
+    if root is None and evidence_only:
+        console.print(
+            "[red]--evidence-root requires .hyodo/agent-events.jsonl; "
+            "the evidence source is not observable.[/red]"
+        )
+        raise typer.Exit(2)
     if root is None:
         console.print(
             "[red]dashboard requires a HyoDo checkout (pyproject.toml + hyodo/) "
@@ -1011,7 +1083,11 @@ def dashboard(
     def _refresh_evidence() -> dict[str, object]:
         """Collect one serialized local measurement without concurrent gate runs."""
         with refresh_lock:
-            return collect_dashboard_evidence(root)
+            return (
+                collect_evidence_root_snapshot(root)
+                if evidence_only
+                else collect_dashboard_evidence(root)
+            )
 
     state = DashboardState(_refresh_evidence(), refresh_token=refresh_token, interval=interval)
     stop_refresh = threading.Event()

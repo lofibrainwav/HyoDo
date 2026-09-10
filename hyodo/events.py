@@ -280,6 +280,16 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                     reasons.append(f"invalid_field:io.{byte_key}")
                 else:
                     io_out[byte_key] = val
+            duration_ms = io_raw.get("duration_ms")
+            if duration_ms is not None:
+                if (
+                    not isinstance(duration_ms, int)
+                    or isinstance(duration_ms, bool)
+                    or duration_ms < 0
+                ):
+                    reasons.append("invalid_field:io.duration_ms")
+                else:
+                    io_out["duration_ms"] = duration_ms
             # Full bodies are opt-in: only kept when present and strings.
             for body_key in ("input_text", "output_text"):
                 body = io_raw.get(body_key)
@@ -554,20 +564,24 @@ def count_run_events(root: Path, run_id: str) -> int | None:
     if not path.exists():
         return 0
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        handle = path.open(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return None
     count = 0
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            parsed = json.loads(line)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict) and parsed.get("run_id") == run_id:
-            count += 1
+    try:
+        with handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict) and parsed.get("run_id") == run_id:
+                    count += 1
+    except (OSError, UnicodeDecodeError):
+        return None
     return count
 
 
@@ -585,24 +599,28 @@ def read_agent_events(root: Path) -> tuple[list[dict[str, Any]] | None, int]:
     if not path.exists():
         return [], 0
     try:
-        lines = path.read_text(encoding="utf-8").splitlines()
+        handle = path.open(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         return None, 0
     events: list[dict[str, Any]] = []
     corrupt = 0
-    for line in lines:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            parsed = json.loads(line)
-        except json.JSONDecodeError:
-            corrupt += 1
-            continue
-        if isinstance(parsed, dict):
-            events.append(parsed)
-        else:
-            corrupt += 1
+    try:
+        with handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    corrupt += 1
+                    continue
+                if isinstance(parsed, dict):
+                    events.append(parsed)
+                else:
+                    corrupt += 1
+    except (OSError, UnicodeDecodeError):
+        return None, 0
     return events, corrupt
 
 

@@ -800,6 +800,21 @@ def test_event_record_allows_resolved_parent_and_evidence_edges(tmp_path: Path):
     assert events[1]["evidence_refs"] == ["parent"]
 
 
+@pytest.mark.parametrize("duration", [0, 1, 2500])
+def test_event_duration_ms_is_optional_and_preserved(duration):
+    ok, reasons, normalized = validate_event(_valid_event(io={"duration_ms": duration}))
+    assert ok, reasons
+    assert normalized is not None
+    assert normalized["io"]["duration_ms"] == duration
+
+
+def test_event_duration_ms_rejects_negative_and_boolean_values():
+    for duration in (-1, True):
+        ok, reasons, _ = validate_event(_valid_event(io={"duration_ms": duration}))
+        assert not ok
+        assert "invalid_field:io.duration_ms" in reasons
+
+
 @pytest.mark.parametrize("digest", ["abcdef123456", "BAD", "a" * 13, 12])
 def test_url_explicit_digest(digest):
     ok, reasons, normalized = validate_event(

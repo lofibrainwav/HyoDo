@@ -1,8 +1,12 @@
-# Measured Run #3 receipt
+# Measured Run #3 candidate receipt — historical
+
+> This document records the pre-public candidate measurement. It is retained
+> for lineage and is superseded by the native public-package Evidence Pack v1
+> for `kingdom-measured-run-3-public-4.18.0-2026-09-10`.
 
 This receipt records an actual KINGDOM run against a locally installed HyoDo
-4.18.0 candidate. It is a measurement receipt, not a claim that the public
-PyPI release or a signed tag already exists.
+4.18.0 candidate. It is not the public-release proof; the signed tag, PyPI
+provenance, and native public-package run are recorded separately.
 
 ## Scope
 

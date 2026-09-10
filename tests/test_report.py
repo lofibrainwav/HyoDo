@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 
 from hyodo.cli.main import app
 from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, AGENT_EVENTS_RELATIVE_PATH, content_digest
+from hyodo.report import build_report_graph
 
 runner = CliRunner()
 
@@ -135,6 +136,18 @@ def test_report_graph_exports_edges_and_tool_urls(tmp_path: Path) -> None:
     assert graph["nodes"][0]["tool"]["urls"] == [
         {"domain": "example.com", "digest": content_digest("/docs"), "credential_shaped": False}
     ]
+
+
+def test_report_graph_preserves_optional_duration_ms(tmp_path: Path) -> None:
+    ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    ledger.parent.mkdir(parents=True, exist_ok=True)
+    event = _graph_event("timed", step_index=0)
+    event["io"]["duration_ms"] = 250
+    ledger.write_text(json.dumps(event) + "\n", encoding="utf-8")
+
+    graph = build_report_graph(tmp_path)
+
+    assert graph["nodes"][0]["io"]["duration_ms"] == 250
 
 
 def test_report_graph_nodes_carry_actor_id_field(tmp_path: Path) -> None:
