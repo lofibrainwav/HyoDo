@@ -307,6 +307,19 @@
 	border: 1px solid var(--eg-border);
 }
 
+/* A DAW lane can have multiple clips at the same time index. The wrapper is
+   the stable grid/edge geometry box; each event remains its own button so
+   focus, 5W1H inspection, and event cardinality are preserved. */
+.eg-page .cell.occupied {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 2px;
+	background: var(--color-tile-unlit);
+	border: 1px solid var(--eg-border);
+	overflow: hidden;
+}
+
 .eg-page .cell.node {
 	background: var(--eg-card);
 	border: 1px solid var(--eg-border);
@@ -324,6 +337,12 @@
 		opacity 120ms ease,
 		border-color 120ms ease,
 		transform 120ms ease;
+}
+
+.eg-page .cell.occupied > .cell.node {
+	min-height: 0;
+	height: auto;
+	flex: 1 1 0;
 }
 
 .eg-page .cell.node:hover {
