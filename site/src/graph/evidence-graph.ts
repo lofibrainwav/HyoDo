@@ -638,7 +638,6 @@ export function mountEvidenceGraph(
 	let parentEdges: ParentEdgeRecord[] = [];
 	let evidenceEdges: EvidenceEdgeRecord[] = [];
 	let activeId: string | null = null;
-	const activeTokens: SVGGElement[] = [];
 
 	function cellRect(id: string): DOMRect | null {
 		const btn = cellEls.get(id);
@@ -1020,12 +1019,6 @@ export function mountEvidenceGraph(
 		svgRoot.classList.remove('is-focused');
 		for (const rec of parentEdges) rec.el.classList.remove('active');
 		for (const rec of evidenceEdges) rec.el.classList.remove('active');
-		for (const token of activeTokens) token.remove();
-		activeTokens.length = 0;
-	}
-
-	function reducedMotion(): boolean {
-		return win?.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 	}
 
 	function activate(eventId: string): void {
@@ -1043,32 +1036,6 @@ export function mountEvidenceGraph(
 		}
 		for (const rec of evidenceEdges) {
 			if (rec.sourceId === eventId || rec.targetId === eventId) rec.el.classList.add('active');
-		}
-
-		if (!reducedMotion()) {
-			const feeding = evidenceEdges.filter((rec) => rec.targetId === eventId);
-			for (const rec of feeding) {
-				const g = svgEl(doc, 'g');
-				const dot = svgEl(doc, 'circle', { r: 4, class: 'token-dot' });
-				const motion = doc.createElementNS(SVG_NS, 'animateMotion');
-				motion.setAttribute('dur', '1.3s');
-				motion.setAttribute('repeatCount', 'indefinite');
-				motion.setAttribute('path', rec.d);
-				dot.appendChild(motion);
-				g.appendChild(dot);
-
-				const label = svgEl(doc, 'text', { class: 'token', x: 0, y: -8, 'text-anchor': 'middle' });
-				label.textContent = rec.sourceId.replace('evt-', '');
-				const motion2 = doc.createElementNS(SVG_NS, 'animateMotion');
-				motion2.setAttribute('dur', '1.3s');
-				motion2.setAttribute('repeatCount', 'indefinite');
-				motion2.setAttribute('path', rec.d);
-				label.appendChild(motion2);
-				g.appendChild(label);
-
-				svgRoot.querySelector('.layer-evidence')?.appendChild(g);
-				activeTokens.push(g);
-			}
 		}
 
 		if (panel) panel.innerHTML = renderPanelHtml(events, ev);
@@ -1100,6 +1067,5 @@ export function mountEvidenceGraph(
 		root.removeEventListener('keydown', onKeydown);
 		resizeObserver.disconnect();
 		for (const fn of cleanupFns) fn();
-		activeTokens.length = 0;
 	};
 }
