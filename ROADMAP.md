@@ -5,12 +5,13 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.19.0 is the latest release candidate after the public 4.18.0 measured
+HyoDo 4.19.0 is the latest published release after the public 4.18.0 measured
 run. The 4.18.0 signed tag, public wheel and sdist, SBOM receipt, PyPI
 provenance, clean-install readback, and Evidence Pack v1 remain sealed. The
 4.19.0 follow-up adds read-only evidence-root review, optional timing
-annotations, and streamed ledger reads; its public release proof is tracked by
-the release workflow for this branch.
+annotations, and streamed ledger reads. Its signed tag, GitHub Release, exact
+tag SBOM evidence, PyPI OIDC provenance, and post-publish install readback are
+complete.
 
 Landed and released:
 
@@ -115,7 +116,7 @@ evidence is not converted into a pass.
   sealed as Evidence Pack v1. The pack is observation evidence, not execution
   authority.
 
-### 4.19.0 (release candidate, 2026-09-10)
+### 4.19.0 (released 2026-09-10)
 
 - Evidence-root dashboard review is explicit and graph-only: gates, safety, and
   history remain `UNOBSERVED`.
