@@ -6,7 +6,6 @@ name: HyoDo Site Build
     paths: ["site/**", ".github/workflows/site.yml"]
   pull_request:
     branches: [main]
-    paths: ["site/**", ".github/workflows/site.yml"]
   workflow_dispatch:
 
 permissions:
