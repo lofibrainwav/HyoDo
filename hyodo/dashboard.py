@@ -1224,7 +1224,7 @@ def _daw_track(node: dict[str, Any]) -> tuple[str, str]:
     if actor == "hyodo":
         return "reviewer", "Reviewer"
     if actor == "agent":
-        return "executor", "Executor"
+        return "agent", "Agent / role unobserved"
     return "planner", "Planner"
 
 
@@ -1263,11 +1263,11 @@ def _render_daw_timeline(
     run_id = next(
         (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
     )
-    track_order = ["human", "planner", "executor", "reviewer"]
+    track_order = ["human", "planner", "agent", "reviewer"]
     track_labels = {
         "human": "Human",
         "planner": "Planner",
-        "executor": "Executor",
+        "agent": "Agent / role unobserved",
         "reviewer": "Reviewer",
     }
     buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
@@ -1560,7 +1560,7 @@ h1 {{ letter-spacing:-.04em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .track-led {{ width:7px; height:7px; flex:0 0 auto; background:#82bd69; box-shadow:0 0 8px #82bd69 }}
 .track-human {{ background:#f0b36c; box-shadow:0 0 8px #f0b36c }}
 .track-planner {{ background:#72a9d5; box-shadow:0 0 8px #72a9d5 }}
-.track-executor {{ background:#82bd69; box-shadow:0 0 8px #82bd69 }}
+.track-agent {{ background:#82bd69; box-shadow:0 0 8px #82bd69 }}
 .track-reviewer {{ background:#b8a5eb; box-shadow:0 0 8px #b8a5eb }}
 .daw-rows .edge-overlay {{ z-index:3 }}
 .daw-rows .edge {{ stroke:#82bd69; opacity:.68 }}
