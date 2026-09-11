@@ -40,6 +40,17 @@ Cursor/Codex native hook normalization and release-surface provenance.
 
 ### Fixed
 
+- Codex and Cursor host adapters no longer collapse one tool call into a single
+  ledger entry. The `tool_call` and `tool_result` derived from the same host
+  `tool_use_id` now carry distinct `event_id`s, qualified as
+  `{host}:{event_name}:{tool_use_id}` — the shape the specialized-hook digest
+  path already used. A bare tool id made the second half an `event_id` conflict,
+  so the ledger refused it and half of the observation spine was dropped in
+  silence. Only the mapper was under test, and it never recorded both halves of
+  one call, so every fixture passed. Note for existing ledgers: host-adapter
+  `event_id`s written by 4.19.1 used the bare tool id, so replaying such a
+  payload now yields a new id instead of deduplicating.
+
 ## [4.19.0] - 2026-09-10
 
 Evidence review and ledger-readiness follow-up after the public 4.18.0

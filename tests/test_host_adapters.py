@@ -3,7 +3,12 @@ from pathlib import Path
 
 import pytest
 
-from hyodo.events import validate_event
+from hyodo.events import (
+    EVENT_ID_NEW,
+    append_agent_event,
+    check_event_id,
+    validate_event,
+)
 from hyodo.host_adapters.codex import map_codex_hook_payload
 from hyodo.host_adapters.codex_response import map_codex_permission_response
 from hyodo.host_adapters.cursor import map_cursor_hook_payload
@@ -229,3 +234,63 @@ def test_policy_check_can_emit_cursor_native_response(tmp_path: Path) -> None:
     )
     assert result.exit_code == 0
     assert json.loads(result.stdout) == {"permission": "allow"}
+
+
+def _codex_ids(event: str) -> str:
+    mapped, error = map_codex_hook_payload(_codex(event), Path("/tmp"))
+    assert error is None
+    assert mapped is not None
+    return str(mapped.raw["event_id"])
+
+
+def _cursor_with_tool_id(event: str) -> dict[str, object]:
+    """Cursor payload where the host *does* supply a tool id.
+
+    The bare ``_cursor`` fixture omits ``tool_use_id`` and therefore exercises the
+    digest fallback, which already carries the event name. Only the host-supplied
+    id path can collide.
+    """
+    payload = _cursor(event)
+    payload["tool_use_id"] = "cursor-tool-1"
+    return payload
+
+
+def test_codex_tool_call_and_tool_result_get_distinct_event_ids() -> None:
+    """One Codex tool call emits two canonical events; they must not share an id."""
+    assert _codex_ids("PreToolUse") != _codex_ids("PostToolUse")
+
+
+def test_cursor_host_supplied_tool_id_still_separates_call_from_result() -> None:
+    pre, error = map_cursor_hook_payload(_cursor_with_tool_id("preToolUse"), Path("/tmp"))
+    assert error is None
+    assert pre is not None
+    post, error = map_cursor_hook_payload(_cursor_with_tool_id("postToolUse"), Path("/tmp"))
+    assert error is None
+    assert post is not None
+    assert pre.raw["kind"] == "tool_call"
+    assert post.raw["kind"] == "tool_result"
+    assert pre.raw["event_id"] != post.raw["event_id"]
+
+
+def test_both_tool_call_and_tool_result_reach_the_ledger(tmp_path: Path) -> None:
+    """The end-to-end guard: a single tool call must leave two ledger lines.
+
+    Mapping alone never surfaced the collision because no test recorded both
+    halves of one tool call. The idempotency check refuses the second write when
+    the ids match, so half the observation spine was dropped in silence.
+    """
+    for event_name in ("PreToolUse", "PostToolUse"):
+        mapped, error = map_codex_hook_payload(_codex(event_name), tmp_path)
+        assert error is None
+        assert mapped is not None
+        assert check_event_id(tmp_path, mapped.raw) == EVENT_ID_NEW
+        assert append_agent_event(tmp_path, mapped.raw) is True
+
+    recorded = [
+        json.loads(line)
+        for line in (tmp_path / ".hyodo" / "agent-events.jsonl")
+        .read_text(encoding="utf-8")
+        .splitlines()
+        if line.strip()
+    ]
+    assert [event["kind"] for event in recorded] == ["tool_call", "tool_result"]

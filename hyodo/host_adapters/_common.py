@@ -18,7 +18,12 @@ def _nonempty(value: Any) -> str | None:
 def _event_id(payload: dict[str, Any], host: str, event_name: str) -> str | None:
     native = _nonempty(payload.get("tool_use_id"))
     if native:
-        return native
+        # One tool call emits two canonical events (tool_call, tool_result) that
+        # share the host's tool id. The ledger keys idempotency on event_id, so a
+        # bare tool id makes the second half a conflict and drops it in silence.
+        # Qualifying by host and event name keeps the tool id as the correlation
+        # anchor while giving each canonical event its own identity.
+        return f"{host}:{event_name}:{native}"
     # Specialized hooks do not always provide a tool id. A digest is a
     # correlation id, not a claim that the host supplied an id.
     stable = json.dumps(payload, sort_keys=True, separators=(",", ":"), default=str)
