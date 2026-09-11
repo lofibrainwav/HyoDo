@@ -4,6 +4,11 @@ Status: working research documentation
 
 This directory is the durable roadmap and protocol surface for the HyoDo / ACL / KINGDOM research program. The public `/docs/acl/` page remains a high-level field note; these repository documents define the stricter execution and research contracts.
 
+For the cross-cutting readback of the latest public package versus current
+`main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is
+closed; the active work is Phase 1 observation/passive-shadow expansion plus
+Graph v2 and matched KINGDOM/ACL experiments.
+
 Read them in this order.
 
 ## 0. Top-level technical roadmap — what belongs where and when
@@ -38,11 +43,13 @@ Current top-level doctrine:
 
 > **Measure reality first; compare alternatives in shadow; promote only verified improvements; keep execution, authority, evidence, and observation as separate planes.**
 
-## Current claim lock
+## Current public claim lock
 
-This matrix is the shared product boundary for the root README, public site,
-and research page. The [Measured Run #1 receipt](./MEASURED_RUN_1_2026-09-08.md)
-is the execution evidence; this table does not turn it into an ACL result.
+This matrix is the shared **published-package** boundary for the root README,
+public site, and research page. It is not the status of unreleased `main`.
+See [`../CURRENT_STATE.md`](../CURRENT_STATE.md) for the newer source and
+measured-state readback. The [Measured Run #1 receipt](./MEASURED_RUN_1_2026-09-08.md)
+is execution evidence; this table does not turn it into an ACL result.
 
 | Capability | Status | Evidence boundary |
 | --- | --- | --- |
@@ -152,23 +159,38 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 
 ## Immediate roadmap gate
 
-1. Freeze the exact research-source snapshot.
-2. Start the 86/86 source audit, interpretation Zettelkasten, hostile baseline research, and measurement-readiness lane in parallel.
-3. In the measurement lane, close the exact-head documentation PR, verify installed HyoDo 4.17.0, merge the observation contract under clean governance, freeze the exact runtime, and produce Measured Run #1.
-4. Converge source/interpretation conflicts through one registrar/adjudicator.
-5. Freeze the benchmark object and evaluation policy.
-6. Only then run the falsifiable Wisdom benchmark.
-7. Treat safe evolution, IFC enforcement expansion, and cryptographic attestation as later phases that require measured need and separate promotion evidence.
+Phase 0 is already closed. Do not reopen it by copying historical prose into new
+receipts or by treating older planning text as current state.
+
+The current gate is:
+
+1. keep `docs/CURRENT_STATE.md`, the public claim lock, and the technical roadmap
+   reconciled with measured `main` reality;
+2. govern and publish the landed post-4.19.2 observation fixes through the full
+   release chain;
+3. make that public package the canonical KINGDOM dogfood dependency;
+4. freeze and implement Graph v2 multi-parent semantics without changing HyoDo
+   execution authority;
+5. run matched serial / parallel / heuristic / current-KINGDOM shadow
+   experiments with HyoDo measuring actual versus shadow;
+6. allow ACL/Wisdom Reflex to lose against simpler baselines;
+7. promote only after independent readback, privacy/authority audit, and SSOT
+   update.
+
+Research-source audit, interpretation collection, hostile baselines, Graph v2
+fixtures, and experiment design may proceed in parallel. Truth registration,
+release promotion, and execution authority remain serial convergence gates.
 
 ## Document hierarchy
 
 When two documents appear to disagree, resolve them in this order:
 
 1. shipped/runtime authority contracts and exact code behavior;
-2. the top-level technical roadmap;
-3. the canon audit protocol;
-4. the Wisdom decision experiment protocol;
-5. the serial/parallel execution plan;
-6. public field notes and external-review summaries.
+2. [`docs/CURRENT_STATE.md`](../CURRENT_STATE.md) for the dated measured-state snapshot;
+3. the top-level technical roadmap;
+4. the canon audit protocol;
+5. the Wisdom decision experiment protocol;
+6. the serial/parallel execution plan;
+7. public field notes and external-review summaries.
 
 A lower-level research note may refine implementation detail, but it must not silently override a higher-level authority or roadmap boundary.
