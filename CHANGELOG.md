@@ -69,6 +69,18 @@ Cursor/Codex native hook normalization and release-surface provenance.
 
 ### Fixed
 
+- The Codex host adapter reads the result the host actually sends. An
+  installed `codex-cli 0.154.0` names it `tool_response`; the adapter looked
+  for `output` and `result_json`, so every live tool result was dropped and
+  `io.output_digest` read null. Fixtures never caught it because the Codex
+  fixture sends no result field at all and no test asserted the digest.
+  The field name is host vocabulary, so hosts now declare their own result
+  keys rather than the shared mapper assuming one name fits all. A result
+  digest is also only derived for result events: a `tool_call` carrying one
+  would be a claim about something that has not happened yet.
+  `exit_code` and outcome remain unmapped -- Codex sends no structured
+  outcome, and inferring one from result text would not be an observation.
+
 
 ## [4.19.0] - 2026-09-10
 

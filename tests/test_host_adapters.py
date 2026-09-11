@@ -294,3 +294,72 @@ def test_both_tool_call_and_tool_result_reach_the_ledger(tmp_path: Path) -> None
         if line.strip()
     ]
     assert [event["kind"] for event in recorded] == ["tool_call", "tool_result"]
+
+
+# --- Codex `tool_response` is the host's name for the tool result -----------
+#
+# Measured against codex-cli 0.154.0: a real PostToolUse payload carries the
+# result as `tool_response`, a string. The adapter looked for `output` and
+# `result_json`, so every live result was dropped and `io.output_digest` read
+# null. The fixture never caught it because it sends no result field at all.
+
+
+def _codex_post_with_response(response: object) -> dict[str, object]:
+    payload = _codex("PostToolUse")
+    payload["tool_response"] = response
+    return payload
+
+
+def test_codex_tool_response_becomes_the_output_digest() -> None:
+    mapped, error = map_codex_hook_payload(_codex_post_with_response("ok"), Path("/tmp"))
+
+    assert error is None
+    assert mapped is not None
+    assert mapped.raw["io"]["output_digest"]
+
+
+def test_the_raw_response_never_reaches_the_canonical_event() -> None:
+    """A digest, not the text. The privacy contract does not change here."""
+    secret = "s3cr3t-value-the-host-returned"
+    mapped, _ = map_codex_hook_payload(_codex_post_with_response(secret), Path("/tmp"))
+
+    assert mapped is not None
+    assert secret not in json.dumps(mapped.raw)
+    assert mapped.raw["io"]["output_digest"] != secret
+
+
+def test_a_tool_call_never_carries_a_result_digest() -> None:
+    """`PreToolUse` is the call. A result on it would be a claim about the future."""
+    payload = _codex("PreToolUse")
+    payload["tool_response"] = "somehow present"
+
+    mapped, _ = map_codex_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert mapped.raw["kind"] == "tool_call"
+    assert "output_digest" not in mapped.raw.get("io", {})
+
+
+def test_output_and_result_json_hosts_do_not_regress() -> None:
+    """Cursor's existing result fields keep working."""
+    mcp = _cursor("afterMCPExecution")
+    mcp["result_json"] = {"ok": True}
+    mapped, _ = map_cursor_hook_payload(mcp, Path("/tmp"))
+
+    assert mapped is not None
+    assert mapped.raw["io"]["output_digest"]
+
+
+def test_tool_response_is_a_codex_reading_not_a_universal_one() -> None:
+    """`_common` must not assume every host means a result by `tool_response`.
+
+    Cursor has its own vocabulary. Teaching the shared mapper that this field
+    is a result everywhere would be a guess about hosts nobody measured.
+    """
+    payload = _cursor("postToolUse")
+    payload["tool_response"] = "cursor did not promise this means a result"
+
+    mapped, _ = map_cursor_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert "output_digest" not in mapped.raw.get("io", {})
