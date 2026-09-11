@@ -101,6 +101,24 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 
 7. Demo recording uses `docs/DEMO_READY_CHECKLIST.md` **after** this checklist is green.
 
+## Write the receipt down
+
+The chain above is not finished until the release note says what was measured.
+
+```bash
+python -m scripts.release.verify_release_chain <version>          # write it
+python -m scripts.release.verify_release_chain <version> --check  # drift only
+```
+
+This reads each step back off git, GitHub and PyPI and rewrites
+`docs/releases/<version>.md`'s receipt with the identifier behind every
+`OBSERVED` line. A step it cannot tie to this version stays `UNOBSERVED`
+rather than borrowing another release's run id.
+
+This step is the one that was missing. Six releases were reconciled by hand
+and two were not, which is how 4.19.1 shipped a receipt claiming that none of
+a chain it had fully completed had happened.
+
 ## Decision log
 
 | Date | Version | Decision |
