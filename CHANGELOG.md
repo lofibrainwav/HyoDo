@@ -67,6 +67,19 @@ Cursor/Codex native hook normalization and release-surface provenance.
 
 ### Changed
 
+### Added
+
+- A Codex `tool_result` now names the `tool_call` it answers. Both halves
+  share the host's `tool_use_id`, but nothing in the event said one caused the
+  other, so a graph reader could not join them from the event alone. The
+  canonical parent is derived from that same tool id under the host's call
+  event name, which keeps the mapper pure -- no ledger lookup. Without a host
+  tool id the event_id is a payload digest and no parent can be derived, so
+  none is invented. When the call is missing, the existing v1 validator
+  reports `unresolved_ref`; dropping the link instead would make a gap in the
+  host's own output look like a complete record. Correlation identity, causal
+  parent and evidence reference stay three separate things.
+
 ### Fixed
 
 - The Codex host adapter reads the result the host actually sends. An
