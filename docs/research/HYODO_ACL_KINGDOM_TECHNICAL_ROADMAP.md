@@ -2,7 +2,7 @@
 
 Status: working roadmap
 Date: 2026-09-08
-Last measured update: 2026-09-08 PT / 2026-09-09 UTC
+Last measured update: 2026-09-10 PT (Phase-0 readback against the public 4.19.2 line)
 
 Purpose: preserve the agreed system boundaries, sequencing, and promotion gates so new research ideas do not silently turn HyoDo into a monolithic orchestrator or move unmeasured hypotheses into production.
 
@@ -66,12 +66,40 @@ Measured Run #2b — same execution behavior, unknown -> fail   OBSERVED
         ↓
 target-run attribution isolation                              NEXT
         ↓
-Measured Run #3 — successful real execution                   REQUIRED
+Measured Run #3 — successful real execution                   OBSERVED
         ↓
-sensor coverage matrix + Run #1/#2/#2b/#3 receipts           REQUIRED
+Run #1 and Run #3 receipts in this repository                 OBSERVED
         ↓
-Evidence Pack v1                                              PHASE-0 GATE
+Run #2 / #2b standalone receipts                              UNOBSERVED
+        ↓
+sensor coverage matrix                                        REQUIRED
+        ↓
+Evidence Pack v1                                              SEALED
 ```
+
+Read back 2026-09-10 against the published 4.19.2 line. What changed since
+this table was first written, and what did not:
+
+- **Run #3 is measured and sealed.** `EVIDENCE_PACK_V1_2026-09-10.md` seals it
+  by content hash, and its five release-chain rows — signed tag, public
+  wheel/sdist, SBOM, PyPI provenance, clean install — were `HOLD` at the time
+  and have since been measured against the published 4.18.0 artifacts and
+  appended to that pack.
+- **`target-run attribution isolation` stays `NEXT` here.** Run #3 was taken
+  from an isolated evidence root, which is storage isolation, not the producer
+  run-id filtering this row asks for. That filtering is a KINGDOM-side fact and
+  is not observable from this repository, so it is not marked closed here.
+- **The sensor coverage matrix does not exist as an artifact.** The pack's
+  acceptance readback table answers *contract* questions; this row asks for a
+  per-signal `OBSERVED` / `PARTIAL` / `UNOBSERVED` matrix that separates a
+  missing producer vocabulary from a deliberately excluded channel. Nothing in
+  `docs/` provides it.
+- **Run #2 and #2b exist only as prose in section 3 of this document.** There
+  is no standalone receipt for either, so the Phase-0 bundle requirement is
+  partially met at best.
+
+Declaring Phase 0 complete is an authority decision, not a measurement, and
+these two open rows belong to whoever makes it.
 
 There are **two different freezes**:
 
@@ -461,19 +489,23 @@ observer fidelity correction
 Measured Run #2
 Coder terminal truth correction
 Measured Run #2b unknown -> fail validation
-
-SERIAL P0 — NOW
-target-run attribution isolation
-        ↓
-freeze exact Run #3 execution snapshot
-        ↓
 Measured Run #3 successful sample
-        ↓
-sensor coverage matrix
-        ↓
 Evidence Pack v1 seal
+public release chain 4.18.0 .. 4.19.2 (tag, SBOM, provenance, install)
+Cursor/Codex host adapters, fixture-verified
+
+SERIAL P0 — REMAINING
+sensor coverage matrix                      not produced
         ↓
-Phase 0 COMPLETE
+Run #2 / #2b standalone receipts            prose only
+        ↓
+target-run attribution isolation            KINGDOM-side, unobserved here
+        ↓
+Phase 0 COMPLETE                            authority decision
+
+PARALLEL P1 — NOW
+live host canary: an installed Cursor/Codex process reaching the ledger
+(the 4.19.2 canary fed a synthetic payload to the CLI; no host was observed)
 
 PARALLEL RESEARCH LANES
 A 86/86 provenance audit

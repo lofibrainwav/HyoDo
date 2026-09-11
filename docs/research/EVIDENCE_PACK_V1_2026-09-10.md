@@ -2,12 +2,13 @@
 
 ## Status
 
-`MEASURED / RELATION-CORRECTED / LOCAL-CANDIDATE / RELEASE-CHAIN-HOLD`
+`MEASURED / RELATION-CORRECTED / RELEASE-CHAIN-CLOSED`
 
-This pack seals the Run #3 measurement artifacts by content hash. It does not
-claim that HyoDo 4.18.0 has been published. The release-chain status stays
-explicitly separate until a signed verified tag, published wheel/sdist, SBOM,
-and PyPI provenance are read back.
+This pack seals the Run #3 measurement artifacts by content hash. The
+release-chain rows were `HOLD` when it was written, because 4.18.0 had not
+been published yet. It has since been published, and the closeout below is
+appended rather than written over the local measurements -- the sealing rule
+at the end of this document requires exactly that.
 
 The original Run #3 receipt is preserved for historical comparison. The
 corrected-v2 receipt is the canonical relationship readback for this pack.
@@ -41,6 +42,27 @@ corrected-v2 receipt is the canonical relationship readback for this pack.
 | SBOM | HOLD | not attached to a public release |
 | PyPI provenance | HOLD | no public artifact provenance readback |
 | clean install from PyPI | HOLD | only local candidate wheel was installed |
+
+## Public release closeout — 4.18.0
+
+Appended 2026-09-10. The five `HOLD` rows above were measured against the
+published artifacts; the local candidate measurements are untouched.
+
+| Contract | Status | Readback |
+| --- | --- | --- |
+| signed tag | MEASURED | `v4.18.0` verifies: good signature for `lofibrainwav`, ED25519 key `SHA256:nae7KdoWdukaCa/+ZIGphTwapOI3bAJzJOOEvFFdAwE` |
+| public wheel/sdist | MEASURED | PyPI `4.18.0` — wheel `9b7fc1a1a5546760290f9b9bde1872b0e6706d259ac22b2835ac927d1fea64a3`, sdist `274c715e47c61eec0d9017b76494c436d6fed4a5a8567197fcc842fd2ad4a40f` |
+| SBOM | MEASURED | Release `v4.18.0` carries `sbom.cyclonedx.json` (21860 bytes) and `sbom.cyclonedx.json.sha256` recording `d3dbbfb1f8f99c1c0718962f98dfbc103ddf95b8662051edef659e780e468c2a` |
+| PyPI provenance | MEASURED | attestation bundle, publisher GitHub `lofibrainwav/HyoDo` workflow `publish.yml` |
+| clean install from PyPI | MEASURED | `pip install --no-cache-dir hyodo==4.18.0` in an empty venv reads back `HyoDo v4.18.0` from a neutral working directory |
+
+The install readback was taken from outside any checkout on purpose. Running
+it inside the repository puts the source tree on `sys.path` ahead of the
+installed package, which measures the checkout rather than the artifact.
+
+The candidate wheel hash recorded under "Sealed inputs" is the locally built
+wheel and is not expected to equal the published wheel hash; the two were
+produced by different builds.
 
 ## Sealing rule
 
