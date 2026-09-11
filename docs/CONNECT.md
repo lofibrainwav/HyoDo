@@ -23,7 +23,7 @@ hyodo connect [<target>] [--write] [--yes] [--shadow] [--status] [--root PATH] [
 | `pre-commit` | `.pre-commit-config.yaml` | Adds the `hyodo-check` repo entry from this project's own `.pre-commit-hooks.yaml` |
 | `github-actions` | `.github/workflows/hyodo.yml` | A workflow calling the `.github/actions/hyodo` composite action |
 | `cursor` | — | Platform hook contract AVAILABLE; HyoDo adapter BUILT for native tool hooks. `connect` does not fabricate `.cursor/hooks.json`; live canary remains **UNOBSERVED** until an installed Cursor run emits a receipt. |
-| `codex` | — | Platform hook contract AVAILABLE; HyoDo adapter BUILT for native `PreToolUse`/`PostToolUse`. `connect` does not fabricate `.codex/hooks.json`; live canary remains **UNOBSERVED** until an installed Codex run emits a receipt. |
+| `codex` | — | Platform hook contract AVAILABLE; HyoDo adapter BUILT for native `PreToolUse`/`PostToolUse`. `connect` writes nothing and reports `UNOBSERVED`. Live canary is **OBSERVED** for `codex-cli 0.154.0` by hand-written wiring (`docs/research/CODEX_LIVE_CANARY_2026-09-10.md`); that receipt describes a manual setup, not a `connect` target. |
 
 A dual-host `allowed_tools` copy file (Claude Code names plus Cursor/demo
 names) lives at [`examples/host-policies/`](../examples/host-policies/). It
@@ -34,7 +34,14 @@ to `hyodo event record --stdin --hook cursor` or `--hook codex` (and use
 pre-action payload). Add `--native-response --json` when the caller is a
 Cursor or Codex command hook and needs the host-native response envelope.
 Serialization is verified by fixtures; live host enforcement remains
-`UNOBSERVED` until a real callback receipt is captured.
+`UNOBSERVED` until a real callback receipt is captured. The Codex canary
+observed *recording*, not enforcement: it ran `event record`, and no host was
+observed honoring a returned decision.
+
+A host may also refuse to run a hook until a person approves it. Codex does,
+and it keeps that approval in `config.toml` keyed by a hash of the hook, so
+writing the file is not the same as being connected. See
+[`HOST_ADAPTERS.md`](./HOST_ADAPTERS.md).
 
 The adapter boundary is documented in [`HOST_ADAPTERS.md`](./HOST_ADAPTERS.md).
 Fixture tests prove `hyodo_adapter = BUILT`; they do not promote

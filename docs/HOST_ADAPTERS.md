@@ -43,3 +43,35 @@ Passing adapter fixtures proves only `hyodo_adapter = BUILT`. It does not prove
 version, host event name, HyoDo commit, package install mode, and the resulting
 canonical event. Hosted tools or specialized host paths not covered by a canary
 remain `UNOBSERVED`.
+
+## Current live-canary state
+
+| Host | `live_canary` | Receipt |
+|---|---|---|
+| Codex | `OBSERVED` (manual wiring) | `docs/research/CODEX_LIVE_CANARY_2026-09-10.md` |
+| Cursor | `UNOBSERVED` | adapter fixtures only; no live host observed |
+
+An installed `codex-cli 0.154.0` emitted `PreToolUse` and `PostToolUse` through
+`hyodo event record --hook codex` and left two canonical events carrying
+`host:codex`. The wiring was written by hand: `hyodo connect` has no installer
+for either host.
+
+## Installing a hook is not observing one
+
+A host can require a person to approve a hook before it runs, and Codex does.
+Writing the file leaves three distinguishable states:
+
+```text
+CONFIGURED      the hook file names HyoDo
+TRUST_PENDING   the host has not yet been told to run it
+OBSERVED        a payload from that host reached the ledger
+```
+
+These subdivide `live_canary`; they are not a fourth provenance axis. Codex
+records approval in `config.toml` under `hooks.state`, keyed by hook file path
+and snake_case event name, with a hash over the hook's own serialization. The
+hash cannot be reproduced from the command text, so the record cannot be
+written from outside the host — approval is a human action by design.
+
+An installer must therefore report `CONFIGURED` and `TRUST_PENDING` rather than
+"connected", and must say that editing the command invalidates the approval.

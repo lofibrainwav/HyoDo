@@ -86,7 +86,9 @@ hyodo start
 audience question, then offers to connect one host. Claude Code gets hook
 wiring (`hyodo connect`) plus MCP. Cursor, VS Code, Claude Desktop, and
 Codex get MCP config only. `hyodo connect cursor` and `hyodo connect
-codex` stay UNOBSERVED — no verified hook contract. To write MCP config
+codex` stay UNOBSERVED — those targets have no installer, so nothing is
+written. The Codex adapter itself is verified against a live host; the wiring
+for that canary was written by hand. To write MCP config
 directly:
 
 ```bash

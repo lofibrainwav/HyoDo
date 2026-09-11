@@ -17,8 +17,10 @@ hyodo connect claude-code --write
 ```
 
 Supported targets: `claude-code` (Claude Code hooks), `pre-commit`,
-`github-actions`. `cursor` and `codex` report `UNOBSERVED` — no verified
-hook contract, so `connect` never fabricates a config format.
+`github-actions`. `cursor` and `codex` report `UNOBSERVED` — there is no
+installer for either, so `connect` never fabricates a config format. The Codex
+adapter itself has been observed against a live host; that wiring was written
+by hand.
 
 ## What is stored
 
