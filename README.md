@@ -2,13 +2,10 @@
 
 **Honest local guardrails for AI-assisted development.**
 
-HyoDo is a model-agnostic Python CLI that helps teams prove which checks ran,
-record agent actions, enforce local tool and path policy, and reuse existing
-tests and linters without turning missing evidence into a green result.
+HyoDo is a model-agnostic Python CLI that helps teams prove which checks ran, record agent actions, enforce local tool and path policy, and reuse existing tests and linters without turning missing evidence into a green result.
 Review signals never grant automatic approval. Unobserved is never green.
 
-For the latest measured project state, including work already landed on `main`
-after the current public package, see [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
+For the latest measured project state, including work already landed on `main` after the current public package, see [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
@@ -37,14 +34,10 @@ hyodo init
 hyodo check
 ```
 
-`safe` works immediately in any repository. `init` is optional: it detects
-tools you already use and writes `.hyodo/gates.toml`; `check` then runs those
-gates. No detected tooling means no invented green check. See
-[`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for every `gates.toml` field.
+`safe` works immediately in any repository. `init` is optional: it detects tools you already use and writes `.hyodo/gates.toml`; `check` then runs those gates.
+No detected tooling means no invented green check. See [`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for every `gates.toml` field.
 
-Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep
-the rest of `.hyodo/` out of version control — see
-[what to commit](docs/CONNECT.md#what-to-commit) for the `.gitignore` split.
+Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep the rest of `.hyodo/` out of version control — see [what to commit](docs/CONNECT.md#what-to-commit) for the `.gitignore` split.
 
 ## What it does
 
@@ -64,10 +57,8 @@ the rest of `.hyodo/` out of version control — see
 
 ## Current public claim lock
 
-This table is the latest **published-package** boundary. It is intentionally not
-used to describe unreleased `main` work. See
-[`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md) for the current source and
-measured-state readback.
+This table is the latest **published-package** boundary. It is intentionally not used to describe unreleased `main` work.
+See [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md) for the current source and measured-state readback.
 
 Measured Run #1: [receipt](./docs/research/MEASURED_RUN_1_2026-09-08.md).
 
