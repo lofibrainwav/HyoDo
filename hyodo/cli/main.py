@@ -144,6 +144,10 @@ from hyodo.mcp_config import (
 from hyodo.mcp_config import (
     detect_hosts as detect_mcp_hosts,
 )
+from hyodo.orchestration_observation import (
+    append_orchestration_observation,
+    validate_orchestration_observation,
+)
 from hyodo.pairing import (
     PAIRING_RELATIVE_PATH,
     PairingState,
@@ -222,6 +226,11 @@ event_app = typer.Typer(
     help="Agent event ledger (FDE evidence spine; opt-in, not a runtime interceptor)",
     add_completion=False,
 )
+observation_app = typer.Typer(
+    name="observation",
+    help="Sidecar orchestration observations (DAG shape; never an agent event)",
+    add_completion=False,
+)
 policy_app = typer.Typer(
     name="policy",
     help="Local policy gate for agent events (ALLOW|DENY; unobserved ≠ ALLOW)",
@@ -272,6 +281,7 @@ eye_app = typer.Typer(
 mcp_app.add_typer(rules_app, name="rules")
 mcp_app.add_typer(pairing_app, name="pairing")
 app.add_typer(event_app, name="event")
+app.add_typer(observation_app, name="observation")
 app.add_typer(policy_app, name="policy")
 policy_app.add_typer(trust_app, name="trust")
 app.add_typer(schema_app, name="schema")
@@ -3723,6 +3733,71 @@ def event_validate(
         for reason in reasons:
             console.print(f"  - {reason}")
     raise typer.Exit(0 if ok else 1)
+
+
+@observation_app.command("record")
+def observation_record(
+    file: str | None = typer.Option(
+        None, "--file", "-f", help="Path to a JSON orchestration observation"
+    ),
+    stdin_flag: bool = typer.Option(
+        False, "--stdin", help="Read observation JSON from stdin instead of --file"
+    ),
+    root: str = typer.Option(".", "--root", help="Project root holding .hyodo/"),
+    json_out: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+) -> None:
+    """Record one sidecar orchestration observation.
+
+    An observation describes how execution was shaped -- serial or parallel,
+    what a node waited for -- without becoming an event. It lands in its own
+    file beside the agent ledger and never inside it, so a dependency can
+    never be mistaken for something that happened.
+
+    Refused rather than stored when it does not validate: a sidecar that
+    accepts anything would make the dependency graph unfalsifiable.
+    """
+    if file and stdin_flag:
+        typer.echo("ERROR: use either --file or --stdin, not both", err=True)
+        raise typer.Exit(2)
+    try:
+        if stdin_flag:
+            payload_text = sys.stdin.read()
+        elif file:
+            payload_text = Path(file).read_text(encoding="utf-8")
+        else:
+            typer.echo("ERROR: one of --file or --stdin is required", err=True)
+            raise typer.Exit(2)
+    except OSError:
+        typer.echo("ERROR: observation input could not be read", err=True)
+        raise typer.Exit(2) from None
+
+    try:
+        raw = json.loads(payload_text)
+    except json.JSONDecodeError:
+        typer.echo("ERROR: observation is not valid JSON", err=True)
+        raise typer.Exit(2) from None
+
+    ok, reasons, normalized = validate_orchestration_observation(raw)
+    if not ok or normalized is None:
+        if json_out:
+            typer.echo(json.dumps({"recorded": False, "reasons": reasons}, sort_keys=True))
+        else:
+            typer.echo(f"ERROR: observation rejected: {', '.join(reasons)}", err=True)
+        raise typer.Exit(2)
+
+    if not append_orchestration_observation(Path(root), normalized):
+        typer.echo("ERROR: observation could not be written", err=True)
+        raise typer.Exit(2)
+
+    if json_out:
+        typer.echo(
+            json.dumps(
+                {"recorded": True, "observation_id": normalized["observation_id"]},
+                sort_keys=True,
+            )
+        )
+    else:
+        typer.echo(f"RECORDED {normalized['observation_id']}")
 
 
 @event_app.command("record")
