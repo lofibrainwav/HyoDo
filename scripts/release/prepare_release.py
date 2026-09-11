@@ -6,12 +6,14 @@ from datetime import date
 from pathlib import Path
 
 try:
+    from scripts.release.verify_release_chain import CHAIN_STEPS, ChainStep, render_receipt
     from scripts.release.version_sources import (
         VersionSourceUpdateError,
         synchronized_version,
         update_version_sources,
     )
 except ModuleNotFoundError:  # pragma: no cover - direct script execution path
+    from verify_release_chain import CHAIN_STEPS, ChainStep, render_receipt
     from version_sources import (
         VersionSourceUpdateError,
         synchronized_version,
@@ -52,6 +54,17 @@ Release preparation.
 """
 
 
+def _unmeasured_receipt() -> str:
+    """A receipt written before the chain runs says UNOBSERVED, never "not done".
+
+    An unchecked box asserts the step did not happen, so it is false from the
+    moment the release succeeds and nothing brings a writer back to it --
+    which is exactly how 4.19.1 shipped claiming a chain it had completed.
+    """
+    steps = [ChainStep(name=name, state="UNOBSERVED", evidence=None) for name in CHAIN_STEPS]
+    return render_receipt(steps, measured_at=None)
+
+
 def _release_notes(version: str) -> str:
     return f"""# HyoDo {version} Release Notes
 
@@ -59,18 +72,7 @@ def _release_notes(version: str) -> str:
 
 TODO: describe release intent.
 
-## Release chain receipt
-
-- [ ] Signed verified tag created.
-- [ ] Draft GitHub Release created.
-- [ ] Release evidence workflow completed.
-- [ ] SBOM asset attached.
-- [ ] SHA-256 receipt attached.
-- [ ] Human published Release.
-- [ ] PyPI OIDC publish completed.
-- [ ] PyPI provenance verified.
-- [ ] Install smoke passed.
-"""
+{_unmeasured_receipt()}"""
 
 
 def prepare_release(root: Path, version: str, *, today: str | None = None) -> None:

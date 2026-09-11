@@ -53,6 +53,7 @@ language-agnostic.
 | [DEMO_READY_CHECKLIST.md](./DEMO_READY_CHECKLIST.md) | Pre-record gates |
 | [SCAN_EXCEPTIONS.md](./SCAN_EXCEPTIONS.md) | Auditable local scan exceptions |
 | [../scripts/demo-dry-run.sh](../scripts/demo-dry-run.sh) | Local demo receipt script |
+| [../scripts/release/verify_release_chain.py](../scripts/release/verify_release_chain.py) | Measure the release chain and write the receipt |
 
 ## Optional
 

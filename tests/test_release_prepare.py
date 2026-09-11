@@ -123,8 +123,14 @@ def test_prepare_release_creates_release_notes_file(tmp_path: Path) -> None:
     assert release_note.exists()
     text = release_note.read_text()
     assert text.startswith("# HyoDo 4.12.0 Release Notes\n")
-    assert "Signed verified tag created" in text
+    assert "Signed verified tag" in text
     assert "PyPI provenance verified" in text
+    # A receipt written before the chain runs states UNOBSERVED, never a
+    # checkbox: an unticked box asserts "did not happen" and is false the
+    # moment the release succeeds, which is how 4.19.1 shipped claiming a
+    # chain it had already completed.
+    assert "UNOBSERVED" in text
+    assert "- [ ]" not in text
 
 
 def test_prepare_release_refuses_duplicate_release_note(tmp_path: Path) -> None:
