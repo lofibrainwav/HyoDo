@@ -48,6 +48,7 @@ def map_tool_payload(
     pre_events: frozenset[str],
     post_events: frozenset[str],
     output_keys: tuple[str, ...] = ("output", "result_json"),
+    parent_events: dict[str, str] | None = None,
 ) -> tuple[MappedHookEvent | None, str | None]:
     """Map a host tool hook into HyoDo's validated event shape.
 
@@ -56,6 +57,10 @@ def map_tool_payload(
     name is a host fact: Codex says ``tool_response`` where Cursor says
     ``output``. Assuming one host's word holds for the others would be a guess
     about hosts nobody measured.
+
+    ``parent_events`` maps a result event name to the call event name it
+    answers, for hosts where that pairing is 1:1 and measured. Cursor's
+    specialized hooks are not such a pairing, so it passes nothing.
     """
     if not isinstance(payload, dict):
         return None, "not_an_object"
@@ -117,4 +122,18 @@ def map_tool_payload(
         io["output_digest"] = content_digest(output_text)
     if io:
         raw["io"] = io
+
+    # The result points back at the call it answers. The parent is derived from
+    # the host's own tool id, so no ledger lookup is needed and the mapper stays
+    # pure. Without that id the event_id is a payload digest, and a digest of
+    # the result cannot produce the digest of the call -- so there is no parent
+    # to derive and none is invented. When the call is missing from the ledger,
+    # the v1 validator reports `unresolved_ref`; dropping the link instead would
+    # make a gap in the host's output look like a complete record.
+    if parent_events:
+        parent_event_name = parent_events.get(event_name)
+        native_tool_id = _nonempty(payload.get("tool_use_id"))
+        if parent_event_name and native_tool_id:
+            raw["parent_event_id"] = f"{host}:{parent_event_name}:{native_tool_id}"
+
     return MappedHookEvent(raw=raw, root=root), None

@@ -17,6 +17,11 @@ CODEX_POST_EVENTS = frozenset({"PostToolUse"})
 #: list so a payload shaped by some other producer still maps.
 CODEX_OUTPUT_KEYS = ("tool_response", "output", "result_json")
 
+#: Codex pairs its tool hooks 1:1, so a `PostToolUse` answers the `PreToolUse`
+#: carrying the same `tool_use_id`. Cursor's specialized hooks are not such a
+#: pairing, which is why this is declared per host rather than assumed.
+CODEX_PARENT_EVENTS = {"PostToolUse": "PreToolUse"}
+
 
 def map_codex_hook_payload(
     payload: Any, default_root: Path
@@ -34,6 +39,7 @@ def map_codex_hook_payload(
         pre_events=CODEX_PRE_EVENTS,
         post_events=CODEX_POST_EVENTS,
         output_keys=CODEX_OUTPUT_KEYS,
+        parent_events=CODEX_PARENT_EVENTS,
     )
 
 

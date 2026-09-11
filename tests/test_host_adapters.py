@@ -3,6 +3,7 @@ from pathlib import Path
 
 import pytest
 
+from hyodo.event_graph import validate_event_edges
 from hyodo.events import (
     EVENT_ID_NEW,
     append_agent_event,
@@ -363,3 +364,124 @@ def test_tool_response_is_a_codex_reading_not_a_universal_one() -> None:
 
     assert mapped is not None
     assert "output_digest" not in mapped.raw.get("io", {})
+
+
+# --- the result points back at the call it came from ------------------------
+#
+# A `tool_result` and its `tool_call` share the host's tool id, but nothing in
+# the event said one caused the other, so a graph reader could not join them
+# from the event alone. The canonical parent is derivable without consulting
+# the ledger: the same tool id under the host's pre event name.
+#
+# Three axes stay apart. The host tool id is *correlation identity*. The
+# `PreToolUse` event_id is the *causal parent*. `evidence_refs` is a citation
+# relation and is untouched here.
+
+
+def _codex_pair(tool_id: str = "tool-1") -> tuple[dict, dict]:
+    pre = _codex("PreToolUse")
+    post = _codex("PostToolUse")
+    for payload in (pre, post):
+        payload["tool_use_id"] = tool_id
+    post["tool_response"] = "done"
+    return pre, post
+
+
+def test_a_result_names_the_call_it_came_from() -> None:
+    pre, post = _codex_pair()
+    mapped_pre, _ = map_codex_hook_payload(pre, Path("/tmp"))
+    mapped_post, _ = map_codex_hook_payload(post, Path("/tmp"))
+
+    assert mapped_pre is not None
+    assert mapped_post is not None
+    assert mapped_post.raw["parent_event_id"] == mapped_pre.raw["event_id"]
+
+
+def test_a_call_has_no_parent() -> None:
+    pre, _ = _codex_pair()
+    mapped, _ = map_codex_hook_payload(pre, Path("/tmp"))
+
+    assert mapped is not None
+    assert mapped.raw.get("parent_event_id") is None
+
+
+def test_a_result_never_parents_itself() -> None:
+    _, post = _codex_pair()
+    mapped, _ = map_codex_hook_payload(post, Path("/tmp"))
+
+    assert mapped is not None
+    assert mapped.raw["parent_event_id"] != mapped.raw["event_id"]
+
+
+def test_results_do_not_cross_link_between_tool_calls() -> None:
+    _, post_a = _codex_pair("tool-a")
+    _, post_b = _codex_pair("tool-b")
+    mapped_a, _ = map_codex_hook_payload(post_a, Path("/tmp"))
+    mapped_b, _ = map_codex_hook_payload(post_b, Path("/tmp"))
+
+    assert mapped_a is not None
+    assert mapped_b is not None
+    assert "tool-a" in mapped_a.raw["parent_event_id"]
+    assert "tool-b" in mapped_b.raw["parent_event_id"]
+    assert mapped_a.raw["parent_event_id"] != mapped_b.raw["parent_event_id"]
+
+
+def test_no_tool_id_means_no_parent_rather_than_a_guessed_one() -> None:
+    """Without the host's tool id the event_id is a payload digest.
+
+    A digest of the result payload cannot produce the digest of the call's,
+    so there is no parent to derive. Inventing one would be a guess.
+    """
+    _, post = _codex_pair()
+    del post["tool_use_id"]
+
+    mapped, _ = map_codex_hook_payload(post, Path("/tmp"))
+
+    assert mapped is not None
+    assert mapped.raw.get("parent_event_id") is None
+
+
+def test_the_pair_resolves_as_a_graph_edge() -> None:
+    pre, post = _codex_pair()
+    mapped_pre, _ = map_codex_hook_payload(pre, Path("/tmp"))
+    mapped_post, _ = map_codex_hook_payload(post, Path("/tmp"))
+    assert mapped_pre is not None
+    assert mapped_post is not None
+
+    issues = validate_event_edges([mapped_pre.raw, mapped_post.raw])
+
+    assert issues == []
+
+
+def test_a_result_without_its_call_is_reported_not_hidden() -> None:
+    """The missing producer surfaces as `unresolved_ref` rather than silence.
+
+    Dropping the parent when the call is absent would make a gap in the host's
+    own output look like a complete record.
+    """
+    _, post = _codex_pair()
+    mapped, _ = map_codex_hook_payload(post, Path("/tmp"))
+    assert mapped is not None
+
+    issues = validate_event_edges([mapped.raw])
+
+    assert [i["reason"] for i in issues] == ["unresolved_ref"]
+    assert issues[0]["field"] == "parent_event_id"
+    assert mapped.raw["parent_event_id"]
+
+
+def test_causal_parenting_is_a_codex_reading_not_a_universal_one() -> None:
+    """Cursor's pre/post events are not a 1:1 pair; that mapping is unmeasured.
+
+    The tool id is supplied deliberately. Without it no parent could be derived
+    for any host, so the test would pass for the wrong reason and would not
+    notice the pairing being promoted to a shared default.
+    """
+    payload = _cursor("postToolUse")
+    payload["tool_use_id"] = "cursor-tool-1"
+
+    mapped, _ = map_cursor_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert mapped.raw["event_id"].endswith("cursor-tool-1")
+    assert mapped.raw.get("parent_event_id") is None
