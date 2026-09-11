@@ -20,6 +20,7 @@ import pytest
 from scripts.release.verify_release_chain import (
     CHAIN_STEPS,
     ChainStep,
+    install_smoke_step,
     matching_run,
     receipt_drift,
     render_receipt,
@@ -215,5 +216,32 @@ def test_a_missing_tag_is_unobserved_without_claiming_anything_about_signing() -
     # The step's own name carries the word "Signed", so the claim to check is
     # the evidence: with no tag there is nothing to say about a signature.
     step = tag_step(tag="v9.9.9", commit=None, signed=False, verified=False)
+    assert step.state == "UNOBSERVED"
+    assert step.evidence is None
+
+
+# --- a past release stays observed after a newer one ships ---------------
+
+
+def test_install_smoke_asks_whether_this_version_is_on_pypi_not_whether_it_is_latest() -> None:
+    # The first draft compared against `info.version`, the newest release
+    # PyPI serves. Every receipt then rotted the moment the next version
+    # shipped: 4.19.1's step flipped to UNOBSERVED an hour after it was
+    # measured OBSERVED, purely because 4.19.2 landed. That is the exact
+    # decay this file exists to prevent, reintroduced one field over.
+    step = install_smoke_step("4.19.1", wheel_sha256="c4a3cb7c68246ddf" + "0" * 48)
+    assert step.state == "OBSERVED"
+    assert "4.19.1" in step.render()
+
+
+def test_install_smoke_names_the_artifact_rather_than_the_moment() -> None:
+    # A digest is true forever. "PyPI serves 4.19.2" is true only until it
+    # does not.
+    step = install_smoke_step("4.19.2", wheel_sha256="d80d1c792178c1b1" + "0" * 48)
+    assert "d80d1c792178c1b1" in step.render()
+
+
+def test_install_smoke_is_unobserved_when_the_version_is_absent() -> None:
+    step = install_smoke_step("9.9.9", wheel_sha256=None)
     assert step.state == "UNOBSERVED"
     assert step.evidence is None

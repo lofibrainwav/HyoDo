@@ -171,6 +171,27 @@ def _gh_json(*args: str) -> Any | None:
 _MIN_SHA_OVERLAP = 8
 
 
+def install_smoke_step(version: str, *, wheel_sha256: str | None) -> ChainStep:
+    """Whether *this* version is on PyPI -- not whether it is the newest.
+
+    The first draft compared the version against `info.version`, the latest
+    release PyPI serves. That made every receipt decay on the next release:
+    4.19.1's step read OBSERVED when measured and UNOBSERVED an hour later,
+    purely because 4.19.2 shipped. Nothing about 4.19.1 had changed.
+
+    The digest is what makes the line durable. "PyPI serves 4.19.2" is true
+    only until it is not; a wheel's sha256 is true forever and can be
+    rechecked against the file long after the version stops being current.
+    """
+    if not wheel_sha256:
+        return ChainStep(name="Install smoke", state="UNOBSERVED", evidence=None)
+    return ChainStep(
+        name="Install smoke",
+        state="OBSERVED",
+        evidence=f"`{version}` on PyPI, wheel sha256 `{wheel_sha256[:16]}`",
+    )
+
+
 def tag_step(*, tag: str, commit: str | None, signed: bool, verified: bool) -> ChainStep:
     """The tag step, keeping "not verifiable here" apart from "not signed".
 
@@ -294,24 +315,39 @@ def measure_chain(version: str, *, repo: str, root: Path) -> list[ChainStep]:
     # more than that one run id supports.
     add("PyPI provenance verified", f"run `{publish_run}`" if publish_run else None)
 
-    served = _pypi_version()
-    add(
-        "Install smoke",
-        f"PyPI serves `{served}`" if served == version else None,
-    )
+    steps.append(install_smoke_step(version, wheel_sha256=_pypi_wheel_digest(version)))
 
     order = {name: i for i, name in enumerate(CHAIN_STEPS)}
     return sorted(steps, key=lambda s: order.get(s.name, len(order)))
 
 
-def _pypi_version(package: str = "hyodo") -> str | None:
-    raw = _run("curl", "-s", "-m", "15", f"https://pypi.org/pypi/{package}/json")
+def _pypi_wheel_digest(version: str, package: str = "hyodo") -> str | None:
+    """sha256 of *version*'s wheel on PyPI, or None if that version is absent.
+
+    Asks the per-version endpoint rather than the project one: the project
+    endpoint answers "what is newest", which is a different question and the
+    wrong one for a receipt about a specific release.
+    """
+    raw = _run(
+        "curl",
+        "-s",
+        "-m",
+        "15",
+        "-H",
+        "Cache-Control: no-cache",
+        f"https://pypi.org/pypi/{package}/{version}/json",
+    )
     if not raw:
         return None
     try:
-        return str(json.loads(raw)["info"]["version"])
+        urls = json.loads(raw)["urls"]
     except (json.JSONDecodeError, KeyError, TypeError):
         return None
+    for entry in urls:
+        if str(entry.get("filename", "")).endswith(".whl"):
+            digest = (entry.get("digests") or {}).get("sha256")
+            return str(digest) if digest else None
+    return None
 
 
 def replace_receipt(document: str, receipt: str) -> str:
