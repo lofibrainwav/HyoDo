@@ -146,3 +146,40 @@ def test_sidecar_for_missing_event_is_visible() -> None:
             "reasons": ["unresolved_event_id:J"],
         }
     ]
+
+
+# --- attempt is a measurement, not a default ------------------------------
+#
+# attempt answers "how many attempts did this node take", which is only knowable
+# once the node has finished. A producer that never said anything about attempts
+# has not said "one" -- filling in 1 turns UNKNOWN into a number and lets a
+# reader believe someone counted.
+
+
+def test_an_unstated_attempt_is_not_recorded_as_one() -> None:
+    raw = _observation()
+    raw.pop("attempt", None)
+
+    ok, reasons, normalized = validate_orchestration_observation(raw)
+
+    assert ok, reasons
+    assert normalized is not None
+    assert "attempt" not in normalized
+
+
+def test_a_stated_attempt_is_kept_exactly() -> None:
+    for stated in (1, 2, 3):
+        ok, reasons, normalized = validate_orchestration_observation(_observation(attempt=stated))
+
+        assert ok, reasons
+        assert normalized is not None
+        assert normalized["attempt"] == stated
+
+
+def test_a_stated_attempt_is_still_validated() -> None:
+    for bad in (0, -1, "3", True):
+        ok, reasons, normalized = validate_orchestration_observation(_observation(attempt=bad))
+
+        assert not ok
+        assert "invalid_field:attempt" in reasons
+        assert normalized is None

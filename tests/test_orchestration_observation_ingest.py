@@ -285,3 +285,28 @@ def test_the_agent_ledger_is_untouched_by_sidecar_writes(tmp_path: Path) -> None
     append_orchestration_observation(tmp_path, _observation(state="completed"))
 
     assert _sha256(ledger) == before
+
+
+def test_a_pre_existing_defaulted_attempt_is_a_conflict_not_a_rewrite(tmp_path: Path) -> None:
+    """Rows written before attempt stopped being defaulted carry ``attempt: 1``.
+
+    Nothing can tell whether that 1 was declared by a producer or filled in, so
+    it is left exactly as it is. Re-collecting the same stream now normalizes to
+    a row with no attempt, which is a different payload under the same id -- a
+    conflict, refused, and the older record stands unchanged.
+    """
+    path = tmp_path / ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    from hyodo.orchestration_observation import validate_orchestration_observation
+
+    _ok, _reasons, legacy = validate_orchestration_observation(_observation())
+    assert legacy is not None
+    legacy["attempt"] = 1  # what the old default wrote, indistinguishable from a claim
+    path.write_text(json.dumps(legacy, sort_keys=True) + "\n", encoding="utf-8")
+    before = _sha256(path)
+
+    fresh = _observation()
+    fresh.pop("attempt", None)
+
+    assert append_orchestration_observation(tmp_path, fresh) is False
+    assert _sha256(path) == before
