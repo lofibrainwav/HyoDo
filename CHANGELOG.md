@@ -5,6 +5,35 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.2] - 2026-09-10
+
+Host adapter ledger fix: one tool call now leaves both of its canonical events.
+
+### Fixed
+
+- Codex and Cursor host adapters no longer collapse one tool call into a single
+  ledger entry. The `tool_call` and `tool_result` derived from the same host
+  `tool_use_id` now carry distinct `event_id`s, qualified as
+  `{host}:{event_name}:{tool_use_id}` — the shape the specialized-hook digest
+  path already used. A bare tool id made the second half an `event_id` conflict,
+  so the ledger refused it and half of the observation spine was dropped in
+  silence. Only the mapper was under test, and it never recorded both halves of
+  one call, so every fixture passed. Note for existing ledgers: host-adapter
+  `event_id`s written by 4.19.1 used the bare tool id, so replaying such a
+  payload now yields a new id instead of deduplicating.
+
+### Evidence
+
+- `scripts/verify-public.sh` passes end to end — version sync, ruff, pyright,
+  pytest (1362 passed, 1 skipped), shell syntax, wheel and sdist build, sdist
+  package boundary, wheel install smoke, CLI smoke, claim regression.
+- Recording both hooks of one Codex tool call against a real ledger now leaves
+  two lines (`codex:PreToolUse:<id>` as `tool_call` and
+  `codex:PostToolUse:<id>` as `tool_result`) where 4.19.1 left one.
+- Live Cursor and Codex callback observation stays `UNOBSERVED`. This release
+  makes the two-event path recordable; it does not claim an installed host
+  emitted it.
+
 ## [4.19.1] - 2026-09-10
 
 Cursor/Codex native hook normalization and release-surface provenance.
@@ -40,16 +69,6 @@ Cursor/Codex native hook normalization and release-surface provenance.
 
 ### Fixed
 
-- Codex and Cursor host adapters no longer collapse one tool call into a single
-  ledger entry. The `tool_call` and `tool_result` derived from the same host
-  `tool_use_id` now carry distinct `event_id`s, qualified as
-  `{host}:{event_name}:{tool_use_id}` — the shape the specialized-hook digest
-  path already used. A bare tool id made the second half an `event_id` conflict,
-  so the ledger refused it and half of the observation spine was dropped in
-  silence. Only the mapper was under test, and it never recorded both halves of
-  one call, so every fixture passed. Note for existing ledgers: host-adapter
-  `event_id`s written by 4.19.1 used the bare tool id, so replaying such a
-  payload now yields a new id instead of deduplicating.
 
 ## [4.19.0] - 2026-09-10
 
