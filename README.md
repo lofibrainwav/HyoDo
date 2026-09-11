@@ -68,7 +68,7 @@ Measured Run #1: [receipt](./docs/research/MEASURED_RUN_1_2026-09-08.md).
 | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
 | Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
 | Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
-| Codex hooks | OBSERVED (manual wiring) | Live canary on codex-cli 0.154.0; `connect` has no installer. |
+| Codex hooks | OBSERVED (manual) | Live canary; no `connect` installer. |
 | Cursor hooks | UNOBSERVED | Adapter built; no live host observed. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
 | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
