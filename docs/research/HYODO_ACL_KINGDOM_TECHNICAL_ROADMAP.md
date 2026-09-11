@@ -64,8 +64,7 @@ Coder coarse terminal truth (ok + closed status enum)         OBSERVED
         ↓
 Measured Run #2b — same execution behavior, unknown -> fail   OBSERVED
         ↓
-target-run isolation capability (KINGDOM #779)
-sensor coverage matrix, read from producer code                OBSERVED
+target-run isolation capability (KINGDOM #779)                OBSERVED
         ↓
 Run #3 actual use of that filter                              UNOBSERVED
         ↓
@@ -117,8 +116,10 @@ this table was first written, and what did not:
   would change the format of a claim without adding a measurement, so the
   Phase-0 bundle requirement stays partially met.
 
-Declaring Phase 0 complete is an authority decision, not a measurement, and
-these two open rows belong to whoever makes it.
+Declaring Phase 0 complete is an authority decision, not a measurement. That
+decision was taken with the residual named rather than carried silently:
+`PHASE_0_CLOSEOUT_2026-09-10.md` records what closed, the one residual accepted
+as open, and the producer capability gaps that stay open on purpose.
 
 There are **two different freezes**:
 
@@ -514,6 +515,7 @@ public release chain 4.18.0 .. 4.19.2 (tag, SBOM, provenance, install)
 Cursor/Codex host adapters, fixture-verified
 Codex live host callback reaching the ledger
 target-run isolation capability (KINGDOM #779)
+sensor coverage matrix, read from producer code
 
 SERIAL P0 — REMAINING
 Run #2 / #2b standalone receipts            MISSING
