@@ -7,10 +7,19 @@ changing ``hyodo.agent-event/v1`` or granting execution authority.
 
 from __future__ import annotations
 
+import json
+import os
+import stat
 from collections.abc import Iterable, Mapping
+from pathlib import Path
 from typing import Any
 
 ORCHESTRATION_OBSERVATION_SCHEMA_VERSION = "hyodo.orchestration-observation/v1"
+
+#: Sidecar observations live beside the agent ledger, never inside it. Keeping
+#: the files apart is what makes "the source ledger is never mutated" checkable
+#: rather than a promise: an observation cannot be mistaken for an event.
+ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH = Path(".hyodo") / "orchestration-observations.jsonl"
 
 EXECUTION_MODES = frozenset({"serial", "parallel"})
 JOIN_POLICIES = frozenset({"all", "any"})
@@ -203,3 +212,56 @@ __all__ = [
     "join_adapter_events",
     "validate_orchestration_observation",
 ]
+
+
+def append_orchestration_observation(root: Path, raw: Any) -> bool:
+    """Validate and append one sidecar observation. Never raises.
+
+    The normalized form is stored, not the caller's dict, so a field nobody
+    validated cannot ride along into the record. An observation that does not
+    validate is refused rather than written -- a sidecar that accepts anything
+    would make the dependency graph unfalsifiable.
+
+    File mode is pinned to ``0o600`` like the event ledger: an observation
+    names run, event and node identifiers, which are salted digests but still
+    describe someone's execution.
+    """
+    ok, _reasons, normalized = validate_orchestration_observation(raw)
+    if not ok or normalized is None:
+        return False
+
+    path = root / ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(normalized, sort_keys=True, ensure_ascii=False) + "\n")
+        if stat.S_IMODE(path.stat().st_mode) != 0o600:
+            os.chmod(path, 0o600)
+        return True
+    except OSError:
+        return False
+
+
+def read_orchestration_observations(root: Path) -> list[dict[str, Any]]:
+    """Read back stored observations, skipping lines that do not parse.
+
+    A corrupt line is skipped rather than allowed to empty the whole file:
+    an unreadable record must not read as an absent dependency.
+    """
+    path = root / ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH
+    rows: list[dict[str, Any]] = []
+    try:
+        with path.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    parsed = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if isinstance(parsed, dict):
+                    rows.append(parsed)
+    except OSError:
+        return rows
+    return rows
