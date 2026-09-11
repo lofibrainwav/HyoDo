@@ -214,6 +214,67 @@ __all__ = [
 ]
 
 
+#: Outcome of an idempotency check against a stored ``observation_id``.
+#: Mirrors the agent ledger's ``EVENT_ID_*`` vocabulary so the two records
+#: answer the same question the same way.
+OBSERVATION_ID_NEW = "new"
+OBSERVATION_ID_DUPLICATE = "duplicate"  # same id, same payload -> already recorded
+OBSERVATION_ID_CONFLICT = "conflict"  # same id, different payload -> refuse
+OBSERVATION_ID_UNOBSERVED = "unobserved"  # cannot be read -> cannot tell
+
+
+def check_observation_id(root: Path, normalized: Mapping[str, Any]) -> str:
+    """Classify *normalized* against stored rows sharing its ``observation_id``.
+
+    Reading and writing take deliberately different attitudes to a damaged file.
+    :func:`read_orchestration_observations` skips a line it cannot parse, because
+    losing every good observation over one bad line would be worse. Writing
+    cannot borrow that habit: a line nobody can read may itself be this
+    observation, so uniqueness is unproven and the answer is
+    ``OBSERVATION_ID_UNOBSERVED`` -- never ``OBSERVATION_ID_NEW``.
+
+    The whole file is read before any verdict, so an unreadable row anywhere
+    blocks the write rather than only one that happens to come first.
+    """
+    path = root / ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH
+    if not path.exists():
+        return OBSERVATION_ID_NEW
+    try:
+        lines = path.read_text(encoding="utf-8").splitlines()
+    except (OSError, UnicodeDecodeError):
+        return OBSERVATION_ID_UNOBSERVED
+
+    observation_id = normalized.get("observation_id")
+    if not isinstance(observation_id, str) or not observation_id.strip():
+        return OBSERVATION_ID_UNOBSERVED
+    observation_id = observation_id.strip()
+
+    match: dict[str, Any] | None = None
+    for line in lines:
+        line = line.strip()
+        if not line:
+            # Whitespace is absence, not damage.
+            continue
+        try:
+            parsed = json.loads(line)
+        except json.JSONDecodeError:
+            return OBSERVATION_ID_UNOBSERVED
+        if not isinstance(parsed, dict):
+            return OBSERVATION_ID_UNOBSERVED
+        stored_id = parsed.get("observation_id")
+        if not isinstance(stored_id, str) or not stored_id.strip():
+            # A row that names no observation cannot be ruled out as this one.
+            return OBSERVATION_ID_UNOBSERVED
+        if match is None and stored_id.strip() == observation_id:
+            match = parsed
+
+    if match is None:
+        return OBSERVATION_ID_NEW
+    incoming = json.dumps(normalized, sort_keys=True, ensure_ascii=False)
+    existing = json.dumps(match, sort_keys=True, ensure_ascii=False)
+    return OBSERVATION_ID_DUPLICATE if existing == incoming else OBSERVATION_ID_CONFLICT
+
+
 def append_orchestration_observation(root: Path, raw: Any) -> bool:
     """Validate and append one sidecar observation. Never raises.
 
@@ -221,6 +282,13 @@ def append_orchestration_observation(root: Path, raw: Any) -> bool:
     validated cannot ride along into the record. An observation that does not
     validate is refused rather than written -- a sidecar that accepts anything
     would make the dependency graph unfalsifiable.
+
+    Replaying an observation is a no-op that reports success: the observation is
+    recorded, which is what the caller asked for, and the file does not grow.
+    Re-collecting a stream therefore counts once, so anything later reading how
+    often something repeated is not secretly counting re-collections.
+    Reusing an id with different content is refused instead -- otherwise a
+    producer could rewrite what it already said.
 
     File mode is pinned to ``0o600`` like the event ledger: an observation
     names run, event and node identifiers, which are salted digests but still
@@ -231,6 +299,19 @@ def append_orchestration_observation(root: Path, raw: Any) -> bool:
         return False
 
     path = root / ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH
+    verdict = check_observation_id(root, normalized)
+    if verdict == OBSERVATION_ID_DUPLICATE:
+        # Nothing to write. The mode guard still runs, because a replay against
+        # a file that predates it is the only visit this file may ever get.
+        try:
+            if stat.S_IMODE(path.stat().st_mode) != 0o600:
+                os.chmod(path, 0o600)
+        except OSError:
+            return False
+        return True
+    if verdict != OBSERVATION_ID_NEW:
+        return False
+
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         with path.open("a", encoding="utf-8") as handle:
