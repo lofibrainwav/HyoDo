@@ -116,8 +116,10 @@ this table was first written, and what did not:
   would change the format of a claim without adding a measurement, so the
   Phase-0 bundle requirement stays partially met.
 
-Declaring Phase 0 complete is an authority decision, not a measurement, and
-these two open rows belong to whoever makes it.
+Declaring Phase 0 complete is an authority decision, not a measurement. That
+decision was taken with the residual named rather than carried silently:
+`PHASE_0_CLOSEOUT_2026-09-10.md` records what closed, the one residual accepted
+as open, and the producer capability gaps that stay open on purpose.
 
 There are **two different freezes**:
 
