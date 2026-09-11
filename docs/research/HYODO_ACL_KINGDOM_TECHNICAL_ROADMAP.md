@@ -64,7 +64,8 @@ Coder coarse terminal truth (ok + closed status enum)         OBSERVED
         ↓
 Measured Run #2b — same execution behavior, unknown -> fail   OBSERVED
         ↓
-target-run isolation capability (KINGDOM #779)                OBSERVED
+target-run isolation capability (KINGDOM #779)
+sensor coverage matrix, read from producer code                OBSERVED
         ↓
 Run #3 actual use of that filter                              UNOBSERVED
         ↓
@@ -74,7 +75,7 @@ Run #1 and Run #3 receipts in this repository                 OBSERVED
         ↓
 Run #2 / #2b standalone receipts                              MISSING
         ↓
-sensor coverage matrix                                        MISSING
+sensor coverage matrix                                        OBSERVED
         ↓
 Evidence Pack v1                                              SEALED
 ```
@@ -99,11 +100,18 @@ this table was first written, and what did not:
   storage isolation — a different thing. #779 merged a day before the corrected
   run, so it could have been used; being able to use a filter is not evidence
   of having used it, and the capability is not read backwards into the run.
-- **The sensor coverage matrix is `MISSING`.** The pack's acceptance readback
-  table answers *contract* questions; this row asks for a per-signal
-  `OBSERVED` / `PARTIAL` / `UNOBSERVED` matrix that separates a missing
-  producer vocabulary from a deliberately excluded channel. Nothing in `docs/`
-  provides it. `MISSING`, not `UNOBSERVED`: there is no artifact to measure.
+- **The sensor coverage matrix exists**, read from the KINGDOM contract, its
+  trace producer and the bridge rather than from what this document wished for:
+  `SENSOR_COVERAGE_MATRIX.md`. Separating a missing producer vocabulary from a
+  deliberately excluded channel turned out to need three causes rather than
+  two -- a channel emitted and dropped by the allowlist, a signal that exists
+  in the producer but never reaches its trace payload, and a concept the
+  producer does not have. Each needs different work to close.
+
+  It also records that receipts come from two different layers: Run #1/#2/#2b
+  measured the producer path, while Run #3 was constructed by a harness. Both
+  are true about different things, and a single coverage number over the two
+  would claim an observation capability this system does not have.
 - **Run #2 and #2b standalone receipts are `MISSING`.** Both runs exist as
   prose in section 3 of this document. Copying that prose into receipt files
   would change the format of a claim without adding a measurement, so the
@@ -508,8 +516,6 @@ Codex live host callback reaching the ledger
 target-run isolation capability (KINGDOM #779)
 
 SERIAL P0 — REMAINING
-sensor coverage matrix                      MISSING
-        ↓
 Run #2 / #2b standalone receipts            MISSING
         ↓
 Run #3 use of the #779 target-run filter    UNOBSERVED
