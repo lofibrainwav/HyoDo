@@ -113,3 +113,88 @@ this change.
 - **The operator's real Codex environment.** Deliberately untouched.
 - **Specialized Codex paths.** Only a shell tool call was exercised. MCP calls,
   file edits, and `PermissionRequest` remain unobserved.
+
+---
+
+# P1-B — what the host actually sends
+
+A second observation, with a one-off probe that captured the host payload
+before HyoDo's privacy boundary. The probe is over; the raw captures were
+deleted and the canary hook is back to its privacy-minimized form. Only field
+names, types, presence and digests are recorded here -- never a captured
+value.
+
+Two tool calls were observed, one succeeding and one failing.
+
+## Field shape of a real Codex payload
+
+```text
+PreToolUse   cwd, hook_event_name, model, permission_mode, session_id,
+             tool_input{command}, tool_name, tool_use_id, transcript_path,
+             turn_id
+PostToolUse  the same, plus tool_response
+```
+
+`tool_response` is a string in both the succeeding and the failing call. It is
+the only field that differs between a call and its result.
+
+## Layer judgement
+
+| Axis | Host payload | Adapter | Canonical | Ledger |
+| --- | --- | --- | --- | --- |
+| output / result | OBSERVED (`tool_response`, str) | was UNOBSERVED, now OBSERVED | OBSERVED | `output_digest` |
+| `exit_code` | UNSUPPORTED | no mapping | no field | — |
+| success / failure / outcome | UNSUPPORTED | no mapping | no field | — |
+| bytes in / out | UNSUPPORTED | not written | `0` | `0` |
+| tool identity / correlation | OBSERVED (`tool_use_id`, `turn_id`) | PARTIAL (`tool_use_id` only) | OBSERVED | OBSERVED |
+
+Two different gaps, kept apart:
+
+- **adapter loss** — the host sent it and HyoDo dropped it: `tool_response`,
+  and also `model`, `turn_id`, `permission_mode`, `transcript_path`.
+- **host unsupported** — not in the payload at all, in either the succeeding
+  or the failing call: `exit_code`, `status`, `success`, `outcome`, structured
+  `error`, `bytes_in`, `bytes_out`.
+
+Only the first kind is repaired here. Success and failure differ solely in the
+text of `tool_response`, so distinguishing `shell.true` from `shell.false`
+would mean parsing that text. That is inference, not observation, and it is
+left `UNSUPPORTED_BY_HOST` rather than manufactured.
+
+## Trust-scope semantics — `codex-cli 0.154.0`
+
+Observed three times over, in both directions:
+
+```text
+CONFIGURED         the hook file names HyoDo
+TRUST_PENDING      the host has not been told to run it
+TRUSTED_ENTRYPOINT a person approved this exact command string
+CONTENT_ATTESTED   UNOBSERVED
+```
+
+Changing the command stopped the hook from firing; re-approving recorded a new
+`trusted_hash`; restoring the earlier command stopped it again. The approval
+is therefore bound to the command string.
+
+Whether the approval extends to content that the approved command later reads
+or executes was not observed, and is recorded as `UNOBSERVED` rather than
+assumed either way. This is the trust scope measured in this version, not a
+vulnerability finding.
+
+The practical consequence for HyoDo: an approved entrypoint and the mutable
+content that entrypoint may later run are not the same fact, and an installer
+must not report them as one.
+
+## Live readback of the repair
+
+```text
+tool_call    codex:PreToolUse:call_7h22ksvt    output_digest  none
+tool_result  codex:PostToolUse:call_7h22ksvt   output_digest  3baf75ce8847
+```
+
+The digest was recomputed independently with `content_digest` from what the
+tool actually printed, and matched. A present digest alone would not have
+shown that the right bytes were digested.
+
+No raw response text appears anywhere in the ledger, and no captured payload
+file remains.

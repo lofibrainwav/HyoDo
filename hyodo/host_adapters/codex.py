@@ -11,6 +11,12 @@ from hyodo.host_adapters._common import map_tool_payload
 CODEX_PRE_EVENTS = frozenset({"PreToolUse"})
 CODEX_POST_EVENTS = frozenset({"PostToolUse"})
 
+#: Codex names the tool result `tool_response`. Measured against codex-cli
+#: 0.154.0: a real `PostToolUse` payload carries it as a string, and carries no
+#: `output` or `result_json` at all. `output` and `result_json` stay in the
+#: list so a payload shaped by some other producer still maps.
+CODEX_OUTPUT_KEYS = ("tool_response", "output", "result_json")
+
 
 def map_codex_hook_payload(
     payload: Any, default_root: Path
@@ -27,6 +33,7 @@ def map_codex_hook_payload(
         event_name=str(payload.get("hook_event_name")) if isinstance(payload, dict) else "",
         pre_events=CODEX_PRE_EVENTS,
         post_events=CODEX_POST_EVENTS,
+        output_keys=CODEX_OUTPUT_KEYS,
     )
 
 

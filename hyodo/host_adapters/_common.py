@@ -47,8 +47,16 @@ def map_tool_payload(
     event_name: str,
     pre_events: frozenset[str],
     post_events: frozenset[str],
+    output_keys: tuple[str, ...] = ("output", "result_json"),
 ) -> tuple[MappedHookEvent | None, str | None]:
-    """Map a host tool hook into HyoDo's validated event shape."""
+    """Map a host tool hook into HyoDo's validated event shape.
+
+    ``output_keys`` is the host's own vocabulary for a tool result, in
+    precedence order. It is a parameter rather than a fixed list because the
+    name is a host fact: Codex says ``tool_response`` where Cursor says
+    ``output``. Assuming one host's word holds for the others would be a guess
+    about hosts nobody measured.
+    """
     if not isinstance(payload, dict):
         return None, "not_an_object"
     session_id = _nonempty(payload.get("session_id")) or _nonempty(payload.get("conversation_id"))
@@ -95,9 +103,15 @@ def map_tool_payload(
     io: dict[str, Any] = {}
     if isinstance(duration, int) and not isinstance(duration, bool) and duration >= 0:
         io["duration_ms"] = duration
-    output = payload.get("output")
-    if output is None:
-        output = payload.get("result_json")
+    # Only the result half can carry a result. A digest on a `tool_call` would
+    # be a claim about something that has not happened yet.
+    output = None
+    if event_name in post_events:
+        for key in output_keys:
+            candidate = payload.get(key)
+            if candidate is not None:
+                output = candidate
+                break
     output_text = _digestable(output)
     if output_text:
         io["output_digest"] = content_digest(output_text)
