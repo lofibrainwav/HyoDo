@@ -7,6 +7,9 @@ record agent actions, enforce local tool and path policy, and reuse existing
 tests and linters without turning missing evidence into a green result.
 Review signals never grant automatic approval. Unobserved is never green.
 
+For the latest measured project state, including work already landed on `main`
+after the current public package, see [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
+
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
 [![Python](https://img.shields.io/pypi/pyversions/hyodo)](https://pypi.org/project/hyodo/)
@@ -59,7 +62,12 @@ the rest of `.hyodo/` out of version control — see
 | Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
 | Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
-## Current claim lock
+## Current public claim lock
+
+This table is the latest **published-package** boundary. It is intentionally not
+used to describe unreleased `main` work. See
+[`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md) for the current source and
+measured-state readback.
 
 Measured Run #1: [receipt](./docs/research/MEASURED_RUN_1_2026-09-08.md).
 
