@@ -119,6 +119,19 @@ This step is the one that was missing. Six releases were reconciled by hand
 and two were not, which is how 4.19.1 shipped a receipt claiming that none of
 a chain it had fully completed had happened.
 
+## Point the roadmap at this release
+
+`ROADMAP.md` carries the shipped version as prose, so `check_version_sync`
+never covered it and it drifted three releases behind before anyone noticed.
+
+```bash
+python -m scripts.release.check_roadmap_sync    # baseline + release entry
+```
+
+Update the `Current public baseline` sentence and add a `### <version>` entry.
+The check fails closed: if the baseline sentence is rewritten past recognition
+it reports an error instead of quietly passing.
+
 ## Decision log
 
 | Date | Version | Decision |

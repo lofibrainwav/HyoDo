@@ -5,13 +5,17 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.19.0 is the latest published release after the public 4.18.0 measured
+HyoDo 4.19.2 is the latest published release after the public 4.18.0 measured
 run. The 4.18.0 signed tag, public wheel and sdist, SBOM receipt, PyPI
-provenance, clean-install readback, and Evidence Pack v1 remain sealed. The
-4.19.0 follow-up adds read-only evidence-root review, optional timing
-annotations, and streamed ledger reads. Its signed tag, GitHub Release, exact
-tag SBOM evidence, PyPI OIDC provenance, and post-publish install readback are
-complete.
+provenance, clean-install readback, and Evidence Pack v1 remain sealed. Every
+release in the 4.19.x line carries its own measured chain receipt under
+`docs/releases/`: signed tag, GitHub Release, exact tag SBOM evidence, PyPI
+OIDC provenance, and post-publish install readback.
+
+Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
+adapters are fixture-verified and the two-event recording path is measured on
+the published artifact, but no installed host has been observed emitting into
+a ledger.
 
 Landed and released:
 
@@ -123,6 +127,24 @@ evidence is not converted into a pass.
 - Optional event timing is preserved without inventing missing duration.
 - JSONL ledger readers stream input while preserving corrupt-line and unreadable
   ledger semantics.
+
+### 4.19.1 (released 2026-09-10)
+
+- Cursor and Codex host adapters normalize native tool-hook payloads into
+  canonical `hyodo.agent-event/v1` observation, preserving privacy-minimized
+  argument, output, and path digests.
+- Platform contract, adapter verification, and live-canary status are recorded
+  as separate provenance axes, so a passing fixture is never read as a live
+  host callback.
+
+### 4.19.2 (released 2026-09-10)
+
+- One host tool call now leaves both of its canonical events. `tool_call` and
+  `tool_result` derived from the same `tool_use_id` carry distinct `event_id`s
+  qualified as `{host}:{event_name}:{tool_use_id}`; a bare tool id had made the
+  second half an `event_id` conflict, and the ledger dropped it in silence.
+- Release chain receipts ask whether a version is on PyPI rather than whether
+  it is the newest, so a receipt stops decaying when the next release ships.
 
 ## Next candidates
 
