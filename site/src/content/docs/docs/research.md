@@ -71,7 +71,7 @@ The public product boundary is fixed below. The [Measured Run #1 receipt](https:
 | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
 | Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
 | Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
-| Codex hooks | OBSERVED (manual) | Live canary; no `connect` installer. |
+| Codex hooks | UNOBSERVED | Adapter built; no receipt; no installer. |
 | Cursor hooks | UNOBSERVED | Adapter built; no live host observed. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
 | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
