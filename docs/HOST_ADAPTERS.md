@@ -3,7 +3,7 @@
 HyoDo separates three facts for every host:
 
 | Fact | Meaning |
-|---|---|
+| --- | --- |
 | `platform_contract` | The host documents a hook surface. |
 | `hyodo_adapter` | This package can normalize the host payload. |
 | `live_canary` | This exact installed host emitted a payload through HyoDo. |
@@ -47,14 +47,15 @@ remain `UNOBSERVED`.
 ## Current live-canary state
 
 | Host | `live_canary` | Receipt |
-|---|---|---|
-| Codex | `OBSERVED` (manual wiring) | `docs/research/CODEX_LIVE_CANARY_2026-09-10.md` |
-| Cursor | `UNOBSERVED` | adapter fixtures only; no live host observed |
+| --- | --- | --- |
+| Codex | `UNOBSERVED` | No current receipt; adapter fixtures only |
+| Cursor | `UNOBSERVED` | Adapter fixtures only; no live host observed |
 
-An installed `codex-cli 0.154.0` emitted `PreToolUse` and `PostToolUse` through
-`hyodo event record --hook codex` and left two canonical events carrying
-`host:codex`. The wiring was written by hand: `hyodo connect` has no installer
-for either host.
+The current checkout has no receipt proving that an installed Codex emitted
+through HyoDo. The native adapter remains built and can be exercised with
+`hyodo event record --hook codex`, but synthetic or manually fed payloads do
+not promote `live_canary` to `OBSERVED`. The wiring was written by hand in
+the past; `hyodo connect` has no installer for either host.
 
 ## Installing a hook is not observing one
 
