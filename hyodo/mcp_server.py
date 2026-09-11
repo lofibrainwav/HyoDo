@@ -8,6 +8,7 @@ exit contract.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -57,10 +58,15 @@ def _run_cli(
 ) -> dict[str, Any]:
     """Run the HyoDo CLI SSOT and serialize its observable result."""
     command = [sys.executable, "-m", "hyodo.cli.main", *args]
+    child_env = os.environ.copy()
+    source_root = str(Path(__file__).resolve().parent.parent)
+    python_path = child_env.get("PYTHONPATH")
+    child_env["PYTHONPATH"] = os.pathsep.join(part for part in (source_root, python_path) if part)
     try:
         process = subprocess.run(
             command,
             cwd=root,
+            env=child_env,
             input=stdin,
             capture_output=True,
             text=True,
