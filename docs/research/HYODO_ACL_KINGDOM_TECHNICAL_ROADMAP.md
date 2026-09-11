@@ -64,8 +64,7 @@ Coder coarse terminal truth (ok + closed status enum)         OBSERVED
         ↓
 Measured Run #2b — same execution behavior, unknown -> fail   OBSERVED
         ↓
-target-run isolation capability (KINGDOM #779)
-sensor coverage matrix, read from producer code                OBSERVED
+target-run isolation capability (KINGDOM #779)                OBSERVED
         ↓
 Run #3 actual use of that filter                              UNOBSERVED
         ↓
@@ -514,6 +513,7 @@ public release chain 4.18.0 .. 4.19.2 (tag, SBOM, provenance, install)
 Cursor/Codex host adapters, fixture-verified
 Codex live host callback reaching the ledger
 target-run isolation capability (KINGDOM #779)
+sensor coverage matrix, read from producer code
 
 SERIAL P0 — REMAINING
 Run #2 / #2b standalone receipts            MISSING
