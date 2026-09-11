@@ -69,6 +69,11 @@ Cursor/Codex native hook normalization and release-surface provenance.
 
 ### Added
 
+- Codex events record the model the host names. `meta.model` is a v1 slot that
+  read null on every live event because the adapter never looked, while the
+  host sent it on both tool hooks. A non-string value is left out rather than
+  coerced into a claim, and a host never observed sending the field declares
+  nothing rather than having it guessed at.
 - A Codex `tool_result` now names the `tool_call` it answers. Both halves
   share the host's `tool_use_id`, but nothing in the event said one caused the
   other, so a graph reader could not join them from the event alone. The

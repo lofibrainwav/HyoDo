@@ -22,6 +22,10 @@ CODEX_OUTPUT_KEYS = ("tool_response", "output", "result_json")
 #: pairing, which is why this is declared per host rather than assumed.
 CODEX_PARENT_EVENTS = {"PostToolUse": "PreToolUse"}
 
+#: Measured against codex-cli 0.154.0: both tool hooks carry `model` as a
+#: string. Cursor was not observed sending one, so it declares nothing.
+CODEX_MODEL_KEY = "model"
+
 
 def map_codex_hook_payload(
     payload: Any, default_root: Path
@@ -40,6 +44,7 @@ def map_codex_hook_payload(
         post_events=CODEX_POST_EVENTS,
         output_keys=CODEX_OUTPUT_KEYS,
         parent_events=CODEX_PARENT_EVENTS,
+        model_key=CODEX_MODEL_KEY,
     )
 
 

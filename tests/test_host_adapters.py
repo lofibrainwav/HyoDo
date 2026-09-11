@@ -485,3 +485,62 @@ def test_causal_parenting_is_a_codex_reading_not_a_universal_one() -> None:
     assert mapped is not None
     assert mapped.raw["event_id"].endswith("cursor-tool-1")
     assert mapped.raw.get("parent_event_id") is None
+
+
+# --- the host says which model ran; the canonical event has a slot for it ---
+#
+# `meta.model` exists in the v1 schema and read null on every live Codex event,
+# because the adapter never looked. Measured against codex-cli 0.154.0: both
+# `PreToolUse` and `PostToolUse` carry `model` as a string.
+
+
+def test_the_model_the_host_names_reaches_the_event() -> None:
+    payload = _codex("PreToolUse")
+    payload["model"] = "gpt-6-astra"
+
+    mapped, _ = map_codex_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert mapped.raw["meta"]["model"] == "gpt-6-astra"
+
+
+def test_no_model_means_no_claim_about_one() -> None:
+    payload = _codex("PreToolUse")
+    payload.pop("model", None)
+
+    mapped, _ = map_codex_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert "model" not in mapped.raw["meta"]
+
+
+def test_a_model_that_is_not_a_string_is_not_recorded() -> None:
+    payload = _codex("PreToolUse")
+    payload["model"] = {"name": "something structured"}
+
+    mapped, _ = map_codex_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert "model" not in mapped.raw["meta"]
+
+
+def test_recording_the_model_does_not_disturb_the_tags() -> None:
+    payload = _codex("PostToolUse")
+    payload["model"] = "gpt-6-astra"
+
+    mapped, _ = map_codex_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert "host:codex" in mapped.raw["meta"]["tags"]
+    assert "host_event:PostToolUse" in mapped.raw["meta"]["tags"]
+
+
+def test_reading_model_is_a_codex_reading_not_a_universal_one() -> None:
+    """Cursor was not measured sending a model field, so nothing is assumed."""
+    payload = _cursor("preToolUse")
+    payload["model"] = "some-cursor-model"
+
+    mapped, _ = map_cursor_hook_payload(payload, Path("/tmp"))
+
+    assert mapped is not None
+    assert "model" not in mapped.raw["meta"]

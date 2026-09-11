@@ -49,6 +49,7 @@ def map_tool_payload(
     post_events: frozenset[str],
     output_keys: tuple[str, ...] = ("output", "result_json"),
     parent_events: dict[str, str] | None = None,
+    model_key: str | None = None,
 ) -> tuple[MappedHookEvent | None, str | None]:
     """Map a host tool hook into HyoDo's validated event shape.
 
@@ -61,6 +62,10 @@ def map_tool_payload(
     ``parent_events`` maps a result event name to the call event name it
     answers, for hosts where that pairing is 1:1 and measured. Cursor's
     specialized hooks are not such a pairing, so it passes nothing.
+
+    ``model_key`` names the payload field carrying the model identifier, for
+    hosts measured to send one. A host that was never observed sending it
+    passes nothing rather than having the field guessed at.
     """
     if not isinstance(payload, dict):
         return None, "not_an_object"
@@ -92,6 +97,15 @@ def map_tool_payload(
         tool["args_digest"] = content_digest(args_text)
     if isinstance(file_path, str) and file_path:
         tool["paths"] = [file_path]
+    # `meta.model` is a v1 slot that read null on every event because nobody
+    # filled it. The host names the model that ran; a non-string value is left
+    # out rather than coerced into a claim.
+    meta: dict[str, Any] = {"tags": tags}
+    if model_key:
+        model = _nonempty(payload.get(model_key))
+        if model:
+            meta["model"] = model
+
     raw: dict[str, Any] = {
         "schema_version": AGENT_EVENT_SCHEMA_VERSION,
         "event_id": event_id,
@@ -102,7 +116,7 @@ def map_tool_payload(
         "actor": "agent",
         "actor_id": _nonempty(payload.get("agent_id")) or session_id,
         "tool": tool,
-        "meta": {"tags": tags},
+        "meta": meta,
     }
     duration = payload.get("duration")
     io: dict[str, Any] = {}
