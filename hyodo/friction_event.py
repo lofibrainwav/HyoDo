@@ -98,16 +98,20 @@ def derive_friction_events(raw: Any) -> tuple[list[dict[str, Any]], list[str]]:
 
     events: list[dict[str, Any]] = []
 
-    retry_count = observation["attempt"] - 1
-    if retry_count > 0:
-        events.append(
-            _friction_event(
-                observation,
-                friction_type="agent_retry",
-                rule_id="attempt_gt_one",
-                count=retry_count,
+    # An observation that never stated an attempt count says nothing about
+    # retries. That is not the same as saying there were none, so nothing is
+    # derived from it -- the absence is left as an absence.
+    if "attempt" in observation:
+        retry_count = observation["attempt"] - 1
+        if retry_count > 0:
+            events.append(
+                _friction_event(
+                    observation,
+                    friction_type="agent_retry",
+                    rule_id="attempt_gt_one",
+                    count=retry_count,
+                )
             )
-        )
 
     approval_wait_ms = observation["approval_wait_ms"]
     if approval_wait_ms > 0:

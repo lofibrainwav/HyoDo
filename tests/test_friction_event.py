@@ -102,3 +102,33 @@ def test_invalid_observation_fails_closed_without_events() -> None:
 
     assert events == []
     assert "invalid_field:attempt" in reasons
+
+
+def test_an_unstated_attempt_claims_nothing_about_retries() -> None:
+    """No attempt was observed, so no retry count can be derived from it.
+
+    This looks the same from the outside as ``attempt == 1`` -- both emit no
+    event -- but the reason differs, and only one of them is a measurement.
+    """
+    raw = _observation()
+    raw.pop("attempt", None)
+
+    events, reasons = derive_friction_events(raw)
+
+    assert reasons == []
+    assert [event["friction"]["type"] for event in events] == []
+
+
+def test_a_stated_single_attempt_claims_no_retries() -> None:
+    events, reasons = derive_friction_events(_observation(attempt=1))
+
+    assert reasons == []
+    assert "agent_retry" not in {event["friction"]["type"] for event in events}
+
+
+def test_a_stated_third_attempt_is_two_retries() -> None:
+    events, reasons = derive_friction_events(_observation(attempt=3))
+
+    assert reasons == []
+    retry = next(e for e in events if e["friction"]["type"] == "agent_retry")
+    assert retry["magnitude"]["count"] == 2

@@ -87,8 +87,15 @@ def validate_orchestration_observation(
     if join_policy is not None and len(depends_on) < 2:
         reasons.append("invalid_field:join_policy:requires_multiple_dependencies")
 
-    attempt = raw.get("attempt", 1)
-    if not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1:
+    # attempt answers "how many attempts did this node take", which is only
+    # knowable once the node has finished. Defaulting it to 1 turned UNKNOWN into
+    # a number: a reader could not tell a producer that counted one attempt from
+    # a producer that never said. An unstated attempt therefore stays unstated.
+    attempt_stated = "attempt" in raw
+    attempt = raw.get("attempt")
+    if attempt_stated and (
+        not isinstance(attempt, int) or isinstance(attempt, bool) or attempt < 1
+    ):
         reasons.append("invalid_field:attempt")
 
     approval_wait_ms = raw.get("approval_wait_ms", 0)
@@ -126,11 +133,12 @@ def validate_orchestration_observation(
         "depends_on": depends_on,
         "join_policy": join_policy,
         "state": state,
-        "attempt": attempt,
         "approval_wait_ms": approval_wait_ms,
         "evidence_refs": evidence_refs,
         **counts,
     }
+    if attempt_stated:
+        normalized["attempt"] = attempt
     return True, [], normalized
 
 

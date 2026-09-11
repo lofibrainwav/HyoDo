@@ -21,7 +21,14 @@ measurement:
 - event/node identity and run identity
 - serial or parallel execution
 - dependency event ids and optional `all` / `any` join policy
-- node state and attempt number
+- node state, and an attempt count when the producer stated one
+
+`attempt` is optional on purpose. It answers "how many attempts did this node
+take", which is only knowable once the node has finished, so a producer that has
+not said anything about attempts leaves the field out rather than sending 1. A
+missing `attempt` and `attempt: 1` are different facts: one is silence, the other
+is a count. Both derive no `agent_retry` event, because neither is friction --
+the difference is carried by the observation, not by the event stream.
 - approval wait duration
 - explicit human-intervention, clarification, context-loss, duplicate-work,
   unobserved-claim, policy-conflict, rework, and verification-failure counts
