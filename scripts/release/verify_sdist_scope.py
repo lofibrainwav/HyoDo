@@ -1,9 +1,10 @@
 """Verify an sdist by contents, not by a brittle compressed-byte ceiling.
 
 The source of truth for allowed public sdist roots is
-``tool.hatch.build.targets.sdist.only-include`` in ``pyproject.toml``.  Hatch
-also emits ``PKG-INFO`` at the archive root.  Anything else is package-scope
-drift and fails closed.
+``tool.hatch.build.targets.sdist.only-include`` in ``pyproject.toml``. Hatch
+also emits a small fixed set of build metadata (currently ``PKG-INFO`` and the
+repository ``.gitignore``). Anything else is package-scope drift and fails
+closed.
 """
 
 from __future__ import annotations
@@ -18,7 +19,7 @@ try:
 except ModuleNotFoundError:  # pragma: no cover - Python 3.10 public support
     import tomli as tomllib
 
-_AUTO_ALLOWED = {"PKG-INFO"}
+_AUTO_ALLOWED = {".gitignore", "PKG-INFO"}
 
 
 def allowed_roots(pyproject: Path) -> set[str]:
