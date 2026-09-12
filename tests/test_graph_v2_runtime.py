@@ -50,6 +50,24 @@ def test_v1_parent_export_is_unchanged() -> None:
     assert graph["nodes"][1]["parent_event_ids"] == ["mission"]
 
 
+def test_v1_cross_run_parent_keeps_legacy_ready_edge() -> None:
+    rows = [
+        event("parent", run_id="legacy-a", step=0),
+        event("child", run_id="legacy-b", step=1, parent="parent"),
+    ]
+    graph = build_event_graph(rows)
+    assert graph["status"] == "READY"
+    assert graph["unresolved_refs"] == []
+    assert graph["edges"] == [
+        {
+            "type": "parent_event_id",
+            "source": "parent",
+            "target": "child",
+            "label": "result_of",
+        }
+    ]
+
+
 def test_v2_diamond_join_exports_every_parent_deterministically() -> None:
     rows = [
         event("mission", step=0, kind="prompt", actor="human"),
