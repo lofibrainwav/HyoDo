@@ -41,7 +41,9 @@ def registry_table() -> list[str]:
     assert payload["schema"] == "hyodo.capabilities/v1"
     rows = payload["public_claim_table"]
     rendered = [HEADER, "| --- | --- | --- |"]
-    rendered.extend(f"| {capability} | {status} | {evidence} |" for capability, status, evidence in rows)
+    rendered.extend(
+        f"| {capability} | {status} | {evidence} |" for capability, status, evidence in rows
+    )
     return rendered
 
 
@@ -61,7 +63,9 @@ def test_every_copy_of_the_claim_table_matches_the_registry() -> None:
             mismatched.append(f"{rel}: +{sorted(extra)} -{sorted(missing)}")
 
     assert copies >= 2, "expected the public claim table in multiple tracked documents"
-    assert not mismatched, "claim table copies disagree with docs/capabilities.json:\n" + "\n".join(mismatched)
+    assert not mismatched, "claim table copies disagree with docs/capabilities.json:\n" + "\n".join(
+        mismatched
+    )
 
 
 def test_registry_contains_current_state_axes() -> None:
