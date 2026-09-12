@@ -117,12 +117,7 @@ def validate_graph_v2(events: list[dict[str, Any]]) -> GraphV2Result:
     cross_run.sort(key=lambda row: (row["event_id"], row["parent_event_id"]))
     scc = tarjan_scc(sorted(ids), sorted(set(edges)))
     references_resolved = not unresolved and not cross_run
-    structurally_valid = (
-        not malformed
-        and not duplicate_ids
-        and references_resolved
-        and scc.acyclic
-    )
+    structurally_valid = not malformed and not duplicate_ids and references_resolved and scc.acyclic
     return GraphV2Result(
         acyclic=scc.acyclic,
         references_resolved=references_resolved,
