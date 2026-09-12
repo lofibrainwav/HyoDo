@@ -73,7 +73,7 @@ def test_undeclared_top_level_path_fails(tmp_path: Path) -> None:
 def test_afo_core_fails_even_if_build_config_were_relaxed(tmp_path: Path) -> None:
     pyproject = tmp_path / "pyproject.toml"
     pyproject.write_text(
-        "[tool.hatch.build.targets.sdist]\nonly-include = [\"afo_core\"]\n",
+        '[tool.hatch.build.targets.sdist]\nonly-include = ["afo_core"]\n',
         encoding="utf-8",
     )
     sdist = tmp_path / "hyodo.tar.gz"
