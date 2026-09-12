@@ -44,7 +44,9 @@ def test_audit_write_failure_does_not_change_operation_result(tmp_path: Path, mo
     assert result["audit"] == {"state": "UNOBSERVED", "reason": "write_failed"}
 
 
-def test_unexpected_audit_exception_is_fail_visible_and_non_fatal(tmp_path: Path, monkeypatch) -> None:
+def test_unexpected_audit_exception_is_fail_visible_and_non_fatal(
+    tmp_path: Path, monkeypatch
+) -> None:
     from hyodo import mcp_server
 
     def explode(*args, **kwargs):
