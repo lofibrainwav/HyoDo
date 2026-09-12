@@ -1,0 +1,28 @@
+{
+  "schema": "hyodo.capabilities/v1",
+  "public_release": "4.19.2",
+  "public_claim_table": [
+    ["gates / ledger / friction preview", "SHIPPED", "Local preview/export; ledger."],
+    ["Graph v1", "SHIPPED (site DEMO FIXTURE)", "Local dashboard; fixed demo site."],
+    ["Graph v2 join", "NOT BUILT", "No join runtime/viewer; SCC oracle only."],
+    ["Codex hooks", "UNOBSERVED", "Adapter built; no receipt; no installer."],
+    ["Cursor hooks", "UNOBSERVED", "Adapter built; no live host observed."],
+    ["remote MCP / ChatGPT", "CONTRACT ONLY", "Hosted contract; runtime unobserved."],
+    ["ACL runtime / Wisdom Reflex", "RESEARCH", "Hypothesis; no automatic router."],
+    ["friction collector", "NOT BUILT", "No collector/uploader; transport disabled."]
+  ],
+  "capabilities": {
+    "core_gates_policy_ledger": {"public": "SHIPPED", "current": "SHIPPED"},
+    "friction_local_export": {"public": "SHIPPED", "current": "SHIPPED"},
+    "runtime_identity_v1": {"public": "NOT_IN_RELEASE", "current": "SHIPPED"},
+    "graph_v1": {"public": "SHIPPED", "current": "SHIPPED"},
+    "graph_v2_multi_parent": {"public": "NOT_BUILT", "current": "NOT_BUILT"},
+    "codex_host_adapter": {"public": "SHIPPED", "current": "SHIPPED"},
+    "codex_canonical_canary": {"public": "UNOBSERVED", "current": "UNOBSERVED"},
+    "cursor_live_callback": {"public": "UNOBSERVED", "current": "UNOBSERVED"},
+    "public_remote_mcp": {"public": "CONTRACT_ONLY", "current": "CONTRACT_ONLY"},
+    "acl_wisdom_routing": {"public": "RESEARCH", "current": "RESEARCH"},
+    "ifa_v0": {"public": "RESEARCH", "current": "RESEARCH"},
+    "friction_collector_uploader": {"public": "NOT_BUILT", "current": "NOT_BUILT"}
+  }
+}
