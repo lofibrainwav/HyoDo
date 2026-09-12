@@ -3,11 +3,14 @@
 Snapshot: 2026-09-11 PT
 
 This file separates the latest public package from newer work already landed on `main`.
+It intentionally does **not** hard-code its own commit SHA: a self-referential SHA becomes
+stale the moment this file is updated. Use the repository `main` ref, a release receipt,
+or a measured runtime-identity receipt when an exact revision is required.
 
-- Current reconciliation SHA: `8f6bf23a9bfa5fb6eb6eb804335d9d864aa50a82`
+- Canonical source branch: `main`
 - Latest public package: HyoDo `4.19.2`
 - Phase 0: CLOSED; Evidence Pack v1 is sealed with named residuals.
-- Active phase: Phase 1 observation and passive-shadow seams.
+- Active closure program: #263 HyoDo Final Closure.
 
 ## Current truth
 
@@ -16,6 +19,7 @@ This file separates the latest public package from newer work already landed on 
 | gates, policy, event ledger | SHIPPED | SHIPPED |
 | local Friction Contribution | SHIPPED | SHIPPED; no collector/uploader |
 | MCP stdio, loopback, private Tailscale | SHIPPED | SHIPPED |
+| canonical runtime identity v1 | not in 4.19.2 | SHIPPED; `/api/identity` + receipt contract, KINGDOM consumer merged |
 | Codex host adapter | SHIPPED | SHIPPED plus newer landed fixes |
 | installed Codex callback | release-era claim UNOBSERVED | historically OBSERVED in an isolated real-host run |
 | current canonical Codex canary receipt | UNOBSERVED | UNOBSERVED until a fresh receipt is sealed |
@@ -28,6 +32,7 @@ This file separates the latest public package from newer work already landed on 
 | sidecar replay idempotency | not in 4.19.2 | LANDED and verified |
 | unstated attempt stays unknown | not in 4.19.2 | LANDED and verified |
 | Graph v2 multi-parent runtime | NOT BUILT | NOT BUILT; SCC oracle/fixtures only |
+| Information Flow Attestation v0 | RESEARCH | contract/fixture lane OPEN (#229) |
 | ACL / Wisdom Reflex automatic routing | RESEARCH | RESEARCH / shadow only |
 | public remote MCP | CONTRACT ONLY | CONTRACT ONLY / UNOBSERVED |
 | friction collector/uploader | NOT BUILT | NOT BUILT |
@@ -42,12 +47,13 @@ This file separates the latest public package from newer work already landed on 
 
 Capability existence is not run usage. Missing evidence is not green. Research is not shipped capability evidence.
 
-## Immediate priority
+## Final-closure priority
 
-1. Keep public-release claims separate from current-main claims.
-2. Reconcile roadmap, issues, README and site whenever measured state changes.
-3. Govern and publish the landed post-4.19.2 fixes as the next release.
-4. Use the public package as KINGDOM's canonical dogfood dependency.
-5. Finish Graph v2 multi-parent semantics/runtime for honest fork/join measurement.
-6. Run ACL/KINGDOM matched shadow A/B after the evidence contracts freeze.
-7. Promote only independently verified improvements.
+1. Eliminate SSOT/release drift and audit-loss ambiguity.
+2. Govern and publish the landed post-4.19.2 work as the next public release.
+3. Dogfood the public package from KINGDOM rather than a source checkout.
+4. Finish Graph v2 multi-parent semantics/runtime for honest fork/join measurement.
+5. Finish IFA v0 contract/fixtures/local readback without acquiring execution authority.
+6. Run the final regression/convergence suite.
+7. Complete matched KINGDOM/ACL shadow A/B and record the result.
+8. Resolve remaining host/transport scope explicitly and enter maintenance mode.
