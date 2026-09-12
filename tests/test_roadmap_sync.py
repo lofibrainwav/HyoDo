@@ -34,13 +34,9 @@ HyoDo {target} is the current release target.
 """
 
 
-def write_repo(
-    root: Path, *, version: str, baseline: str, target: str, entry: str
-) -> None:
+def write_repo(root: Path, *, version: str, baseline: str, target: str, entry: str) -> None:
     (root / "VERSION").write_text(f"{version}\n")
-    (root / "ROADMAP.md").write_text(
-        ROADMAP.format(baseline=baseline, target=target, entry=entry)
-    )
+    (root / "ROADMAP.md").write_text(ROADMAP.format(baseline=baseline, target=target, entry=entry))
 
 
 def test_the_real_roadmap_names_the_version_this_repo_targets() -> None:
@@ -64,9 +60,7 @@ def test_published_baseline_may_lag_release_target(tmp_path: Path, capsys) -> No
     assert "4.20.0" in out
 
 
-def test_stale_release_target_exits_one_and_names_both_versions(
-    tmp_path: Path, capsys
-) -> None:
+def test_stale_release_target_exits_one_and_names_both_versions(tmp_path: Path, capsys) -> None:
     write_repo(
         tmp_path,
         version="4.20.0",
@@ -83,9 +77,7 @@ def test_stale_release_target_exits_one_and_names_both_versions(
     assert "4.20.0" in err
 
 
-def test_public_baseline_cannot_be_newer_than_release_target(
-    tmp_path: Path, capsys
-) -> None:
+def test_public_baseline_cannot_be_newer_than_release_target(tmp_path: Path, capsys) -> None:
     write_repo(
         tmp_path,
         version="4.20.0",
