@@ -53,6 +53,13 @@ function asStepIndex(value: unknown): number | null {
 	return typeof value === 'number' && Number.isInteger(value) && value >= 0 ? value : null;
 }
 
+function uniqueStrings(value: unknown): string[] {
+	if (!Array.isArray(value)) return [];
+	return Array.from(
+		new Set(value.filter((item): item is string => typeof item === 'string' && item.trim() !== '')),
+	).sort();
+}
+
 /**
  * Read schema/status/reason without mapping nodes. Never throws.
  * `ok` means "this is a v1 graph we can attempt to render", not READY.
@@ -115,7 +122,7 @@ function deriveDisplayKind(
 	toolName: string | null,
 	decision: Decision | null,
 	row: Row,
-	parentEventId: string | null,
+	hasParent: boolean,
 ): DisplayKind {
 	if (schemaKind === 'decision') {
 		return decision === 'UNOBSERVED' ? 'unobserved' : 'decision';
@@ -126,17 +133,17 @@ function deriveDisplayKind(
 	if (name.includes('write') || name.includes('edit')) return 'write_file';
 	if (name.includes('read')) return 'read_file';
 	if (schemaKind === 'prompt') {
-		return row === 'human' && parentEventId ? 'approve' : 'mission';
+		return row === 'human' && hasParent ? 'approve' : 'mission';
 	}
 	if (schemaKind === 'error') return 'unobserved';
 	return 'decision';
 }
 
 function linkMaps(graph: Record<string, unknown>): {
-	parentOf: Map<string, string>;
+	parentsOf: Map<string, string[]>;
 	evidenceOf: Map<string, string[]>;
 } {
-	const parentOf = new Map<string, string>();
+	const parentSets = new Map<string, Set<string>>();
 	const evidenceOf = new Map<string, string[]>();
 	const edges = Array.isArray(graph.edges) ? graph.edges : [];
 	for (const edge of edges) {
@@ -145,7 +152,9 @@ function linkMaps(graph: Record<string, unknown>): {
 		const target = asNonEmptyString(edge.target);
 		if (!source || !target) continue;
 		if (edge.type === 'parent_event_id') {
-			if (!parentOf.has(target)) parentOf.set(target, source);
+			const set = parentSets.get(target) ?? new Set<string>();
+			set.add(source);
+			parentSets.set(target, set);
 		} else if (edge.type === 'evidence_ref') {
 			const list = evidenceOf.get(target) ?? [];
 			list.push(source);
@@ -155,18 +164,31 @@ function linkMaps(graph: Record<string, unknown>): {
 	const unresolved = Array.isArray(graph.unresolved_refs) ? graph.unresolved_refs : [];
 	for (const issue of unresolved) {
 		if (!isRecord(issue)) continue;
-		if (issue.field !== 'parent_event_id') continue;
+		if (issue.field !== 'parent_event_id' && issue.field !== 'parent_event_ids') continue;
 		const eventId = asNonEmptyString(issue.event_id);
 		const ref = asNonEmptyString(issue.ref);
-		if (eventId && ref && !parentOf.has(eventId)) parentOf.set(eventId, ref);
+		if (!eventId || !ref) continue;
+		const set = parentSets.get(eventId) ?? new Set<string>();
+		set.add(ref);
+		parentSets.set(eventId, set);
 	}
-	return { parentOf, evidenceOf };
+	const parentsOf = new Map<string, string[]>();
+	for (const [target, parents] of parentSets) {
+		parentsOf.set(target, Array.from(parents).sort());
+	}
+	for (const [target, refs] of evidenceOf) {
+		evidenceOf.set(target, Array.from(new Set(refs)).sort());
+	}
+	return { parentsOf, evidenceOf };
 }
 
-function nodeParentId(node: Record<string, unknown>, parentOf: Map<string, string>): string | null {
-	const fromEdge = parentOf.get(String(node.id ?? ''));
-	if (fromEdge) return fromEdge;
-	return asNonEmptyString(node.parent_event_id);
+function nodeParentIds(node: Record<string, unknown>, parentsOf: Map<string, string[]>): string[] {
+	const fromEdges = parentsOf.get(String(node.id ?? ''));
+	if (fromEdges && fromEdges.length) return fromEdges;
+	const plural = uniqueStrings(node.parent_event_ids);
+	if (plural.length) return plural;
+	const singular = asNonEmptyString(node.parent_event_id);
+	return singular ? [singular] : [];
 }
 
 function nodeEvidenceRefs(
@@ -175,10 +197,7 @@ function nodeEvidenceRefs(
 ): string[] {
 	const fromEdges = evidenceOf.get(String(node.id ?? ''));
 	if (fromEdges && fromEdges.length) return fromEdges;
-	if (!Array.isArray(node.evidence_refs)) return [];
-	return node.evidence_refs.filter(
-		(item): item is string => typeof item === 'string' && item.trim() !== '',
-	);
+	return uniqueStrings(node.evidence_refs);
 }
 
 /**
@@ -189,7 +208,7 @@ export function fromEvidenceGraphV1(graph: unknown): EvidenceEvent[] {
 	const info = inspectEvidenceGraphV1(graph);
 	if (!info.ok || !isRecord(graph) || !Array.isArray(graph.nodes)) return [];
 
-	const { parentOf, evidenceOf } = linkMaps(graph);
+	const { parentsOf, evidenceOf } = linkMaps(graph);
 	const seen = new Set<string>();
 	const events: EvidenceEvent[] = [];
 
@@ -215,10 +234,10 @@ export function fromEvidenceGraphV1(graph: unknown): EvidenceEvent[] {
 		);
 		const ruleId = policyBlock ? asNonEmptyString(policyBlock.rule_id) : null;
 		const reason = policyBlock ? asNonEmptyString(policyBlock.reason) : null;
-		const parentEventId = nodeParentId(raw, parentOf);
+		const parentEventIds = nodeParentIds(raw, parentsOf);
+		const parentEventId = parentEventIds.length === 1 ? parentEventIds[0] : null;
 		const evidenceRefs = nodeEvidenceRefs(raw, evidenceOf);
-		const policy =
-			decision === null ? null : { decision, ruleId, reason };
+		const policy = decision === null ? null : { decision, ruleId, reason };
 
 		events.push({
 			eventId,
@@ -230,7 +249,7 @@ export function fromEvidenceGraphV1(graph: unknown): EvidenceEvent[] {
 				tool?.name ?? null,
 				decision,
 				row,
-				parentEventId,
+				parentEventIds.length > 0,
 			),
 			actor: actorId ? `${actor}:${actorId}` : actor,
 			row,
@@ -238,6 +257,7 @@ export function fromEvidenceGraphV1(graph: unknown): EvidenceEvent[] {
 			tool,
 			policy,
 			parentEventId,
+			parentEventIds,
 			evidenceRefs,
 			note: reason ?? '',
 		});
