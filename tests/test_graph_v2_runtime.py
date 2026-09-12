@@ -93,9 +93,7 @@ def test_v2_cross_run_parent_never_becomes_a_graph_edge() -> None:
         "ref": "a",
         "reason": "cross_run_ref",
     } in graph["unresolved_refs"]
-    assert graph["topology"]["cross_run_refs"] == [
-        {"event_id": "b", "parent_event_id": "a"}
-    ]
+    assert graph["topology"]["cross_run_refs"] == [{"event_id": "b", "parent_event_id": "a"}]
 
 
 def test_v2_join_cycle_is_fail_closed_by_tarjan_runtime() -> None:
