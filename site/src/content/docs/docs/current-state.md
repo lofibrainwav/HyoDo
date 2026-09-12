@@ -23,6 +23,8 @@ not in a self-referential current-state page.
 | local Friction Contribution | SHIPPED | SHIPPED; local only |
 | MCP stdio / loopback / private Tailscale | SHIPPED | SHIPPED |
 | canonical runtime identity v1 | not in 4.19.2 | SHIPPED; `/api/identity` + receipt contract, KINGDOM consumer merged |
+| MCP access-audit readback | not in 4.19.2 | SHIPPED; operation and audit state are separate, audit loss is fail-visible |
+| release-note drift verifier | not in 4.19.2 | SHIPPED; repo notes are canonical, unavailable remote evidence is UNOBSERVED, mutation requires explicit apply + readback |
 | Codex host adapter | SHIPPED | SHIPPED plus newer landed fixes |
 | installed Codex callback | release-era UNOBSERVED | historically OBSERVED in an isolated real-host run |
 | current canonical Codex canary | UNOBSERVED | UNOBSERVED until a fresh receipt is sealed |
@@ -34,8 +36,8 @@ not in a self-referential current-state page.
 | KINGDOM declared serial/parallel stage shape | not in 4.19.2 | OBSERVED |
 | sidecar replay idempotency | not in 4.19.2 | LANDED + verified |
 | unstated attempt remains unknown | not in 4.19.2 | LANDED + verified |
-| Graph v2 true multi-parent runtime | NOT BUILT | NOT BUILT; oracle/fixtures only |
-| Information Flow Attestation v0 | RESEARCH | contract/fixture lane OPEN (#229) |
+| Graph v2 true multi-parent runtime | NOT BUILT | SHIPPED on `main`; multi-parent read/normalize/export/viewer + Tarjan SCC with v1 compatibility; #222 closed |
+| Information Flow Attestation v0 | RESEARCH | SHIPPED observer-only on `main`; privacy lineage stays separate and non-authoritative; #229 closed |
 | ACL / Wisdom Reflex automatic routing | RESEARCH | RESEARCH / shadow only |
 | public remote MCP | CONTRACT ONLY | CONTRACT ONLY / UNOBSERVED |
 | friction collector/uploader | NOT BUILT | NOT BUILT |
@@ -50,9 +52,10 @@ ACL                makes shadow recommendations
 HyoDo              observes / records / validates / attests / measures
 ```
 
-The final-closure path is SSOT/audit convergence, a governed post-4.19.2
-release, KINGDOM dogfood on the public artifact, Graph v2, IFA v0, the final
-regression suite, and matched ACL/KINGDOM shadow experiments.
+The remaining final-closure path is the #224 convergence review, a governed
+post-4.19.2 release, KINGDOM clean-install dogfood on that public artifact,
+matched #225 ACL/KINGDOM shadow experiments, explicit host/transport scope
+closure, and maintenance mode.
 
 Capability existence is not run usage. Missing evidence is not green. Research
 is not shipped capability evidence.
