@@ -117,6 +117,10 @@ def validate_event_edges(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
     directed-cycle truth remain separate facts. Multi-parent topology is
     checked by the canonical Graph-v2 Tarjan oracle; no parent is selected as
     a legacy representative for a join.
+
+    The Graph-v2 same-run parent boundary is additive. Historical v1 events
+    keep their shipped cross-run-parent semantics so reading or recording v1
+    ledgers does not change merely because a v2 consumer is installed.
     """
     event_ids = [_event_id(event) for event in events]
     counts = Counter(event_id for event_id in event_ids if event_id is not None)
@@ -152,7 +156,9 @@ def validate_event_edges(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
         parents, parent_issues = _parent_refs(event)
         issues.extend(parent_issues)
-        field = "parent_event_ids" if event.get("schema_version") == V2_SCHEMA else "parent_event_id"
+        field = (
+            "parent_event_ids" if event.get("schema_version") == V2_SCHEMA else "parent_event_id"
+        )
         for parent in parents:
             if parent == event_id:
                 issues.append(
@@ -177,7 +183,12 @@ def validate_event_edges(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
                 continue
             child_run = event.get("run_id")
             parent_run = parent_event.get("run_id")
-            if isinstance(child_run, str) and isinstance(parent_run, str) and child_run != parent_run:
+            if (
+                event.get("schema_version") == V2_SCHEMA
+                and isinstance(child_run, str)
+                and isinstance(parent_run, str)
+                and child_run != parent_run
+            ):
                 issues.append(
                     _edge_issue(
                         event_id=event_id,
@@ -256,15 +267,11 @@ def validate_event_edges(events: list[dict[str, Any]]) -> list[dict[str, Any]]:
             )
         )
 
-    return sorted(
-        issues,
-        key=lambda item: (
-            str(item.get("event_id") or ""),
-            str(item.get("field") or ""),
-            str(item.get("ref") or ""),
-            str(item.get("reason") or ""),
-        ),
-    )
+    # Preserve the shipped v1 field ordering: parent issues precede evidence
+    # issues for the same event. V2 parent lists are already normalized and
+    # deterministic by causal_parents(), so no global alphabetical reorder is
+    # necessary (and doing one would silently change v1 CLI reason ordering).
+    return issues
 
 
 def build_event_graph(
@@ -284,6 +291,7 @@ def build_event_graph(
     """
     edge_issues = validate_event_edges(events) if not ledger_unreadable else []
     topology = validate_graph_v2(events) if not ledger_unreadable else None
+    contains_v2 = any(event.get("schema_version") == V2_SCHEMA for event in events)
     nodes: list[dict[str, Any]] = []
     edges: list[dict[str, Any]] = []
     event_ids = {_event_id(event) for event in events}
@@ -364,7 +372,10 @@ def build_event_graph(
             if (
                 parent_event is not None
                 and parent != event_id
-                and parent_event.get("run_id") == event.get("run_id")
+                and (
+                    event.get("schema_version") != V2_SCHEMA
+                    or parent_event.get("run_id") == event.get("run_id")
+                )
             ):
                 edges.append(
                     {
@@ -387,7 +398,16 @@ def build_event_graph(
                     }
                 )
 
-    edges.sort(key=lambda edge: (str(edge.get("target")), str(edge.get("type")), str(edge.get("source"))))
+    # V1 graph order is a shipped readback contract. Only graphs containing
+    # Graph-v2 rows need canonicalized multi-parent edge ordering.
+    if contains_v2:
+        edges.sort(
+            key=lambda edge: (
+                str(edge.get("target")),
+                str(edge.get("type")),
+                str(edge.get("source")),
+            )
+        )
 
     status = "READY"
     reason = None
