@@ -17,9 +17,10 @@ The public product boundary is fixed below. The [Measured Run #1 receipt](https:
 | --- | --- | --- |
 | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
 | Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
-| Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
-| Codex hooks | UNOBSERVED | Adapter built; no receipt; no installer. |
-| Cursor hooks | UNOBSERVED | Adapter built; no live host observed. |
+| Graph v2 join | SHIPPED | Multi-parent runtime/viewer with v1 compatibility; public site remains fixture-only. |
+| Codex host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; a fresh canonical live canary is separate evidence. |
+| Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
+| IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
 | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
 | friction collector | NOT BUILT | No collector/uploader; transport disabled. |
@@ -227,7 +228,7 @@ This page separates HyoDo from its experimental companion runtime, KINGDOM.
 - Friction Contribution v1 is implemented on the 4.17.0 line as a local-only, explicit-opt-in derived record. It does not ship a collector, uploader, or population backend.
 - The contribution contract is intentionally privacy-minimized: it derives coarse task / orchestration / retry / intervention / verification / evidence buckets rather than exporting raw prompts, responses, code, paths, or local identifiers.
 - HyoDo does **not** contain the KINGDOM strategy runtime and does not gain execution authority from wisdom or population evidence.
-- The current event model has one optional `parent_event_id` per event plus separate `evidence_refs`. It can represent fan-out through sibling events, but it does **not** explicitly model an arbitrary multi-parent execution join as multiple parent edges. That limitation should be measured before the schema is expanded.
+- HyoDo 4.19.3 ships Graph v2 multi-parent causal joins while keeping `evidence_refs` separate from causality and preserving v1 compatibility. The public site graph remains a fixture/demo surface rather than a claim of live KINGDOM execution.
 
 ### KINGDOM experimental runtime
 

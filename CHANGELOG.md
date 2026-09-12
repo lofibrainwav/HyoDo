@@ -7,15 +7,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.19.3] - 2026-09-11
 
+Final closure release for the post-4.19.2 source line.
+
+### Added
+
+- Graph v2 multi-parent DAG normalization/export/viewer support with deterministic
+  parent handling, Tarjan SCC validation, and preserved v1 compatibility.
+- Information Flow Attestation v0 as an observer-only privacy-lineage surface;
+  attestation never grants execution authority.
+- Canonical runtime identity v1 schema/pin bytes in public wheel, sdist, and the
+  Astro site's `/schemas/` route.
+
 ### Fixed
 
-- Test wheel and sdist manifests for the runtime identity v1 schema and pin.
-- Publish the exact runtime identity contract bytes through the Astro site's
-  `/schemas/` route when the separate site deployment is run.
+- MCP access-audit write/read loss is fail-visible as `UNOBSERVED` rather than
+  silently looking healthy while the tool operation succeeds.
+- Release-note drift has a read-only verifier; remote-unavailable evidence stays
+  UNOBSERVED and mutation requires explicit apply plus post-write readback.
+- The sdist guard validates declared package scope instead of enforcing a brittle
+  compressed-byte ceiling.
 
-### Release status
+### Evidence
 
-- Candidate only; no tag, publication, or deployment was performed.
+- Signed `v4.19.3` tag targets the canonical `main` release commit.
+- GitHub Release is published with CycloneDX SBOM and checksum assets.
+- PyPI wheel and sdist are published through OIDC provenance and pass a neutral-cwd
+  clean-install smoke.
+- Wheel, sdist, source, and live `hyodo.app` runtime-identity contract bytes were
+  read back as matching.
 
 ## [4.19.2] - 2026-09-10
 

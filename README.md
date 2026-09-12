@@ -55,10 +55,6 @@ the rest of `.hyodo/` out of version control — see
 | Schema / eval / evidence report | `hyodo schema`, `eval`, `report` |
 | Local evidence panel | `hyodo dashboard --open` |
 | Optional MCP adapter | `hyodo mcp stdio` / `serve` |
-| MCP diagnostics and audit | `hyodo mcp doctor`, `access-log`, `rules` |
-| Onboarding, harness and host wiring | `hyodo start`, `connect`, `mcp config` |
-| Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
-| Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
 ## Current public claim lock
 
@@ -66,16 +62,21 @@ This table is the latest **published-package** boundary. It does not describe
 unreleased `main` work. For current source and measured-state readback, see
 [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
 
+<!-- markdownlint-disable MD013 -->
+
 | Capability | Status | Evidence boundary |
 | --- | --- | --- |
 | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
 | Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
-| Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
-| Codex hooks | UNOBSERVED | Adapter built; no receipt; no installer. |
-| Cursor hooks | UNOBSERVED | Adapter built; no live host observed. |
+| Graph v2 join | SHIPPED | Multi-parent runtime/viewer with v1 compatibility; public site remains fixture-only. |
+| Codex host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; a fresh canonical live canary is separate evidence. |
+| Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
+| IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
 | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
 | friction collector | NOT BUILT | No collector/uploader; transport disabled. |
+
+<!-- markdownlint-enable MD013 -->
 
 ## Honest boundaries
 
