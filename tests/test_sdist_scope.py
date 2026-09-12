@@ -29,10 +29,17 @@ def write_sdist(path: Path, names: list[str]) -> None:
             archive.addfile(info, io.BytesIO(payload))
 
 
-def test_allowed_roots_come_from_pyproject_plus_pkg_info(tmp_path: Path) -> None:
+def test_allowed_roots_come_from_pyproject_plus_hatch_metadata(tmp_path: Path) -> None:
     pyproject = tmp_path / "pyproject.toml"
     write_pyproject(pyproject)
-    assert allowed_roots(pyproject) == {"hyodo", "tests", "README.md", "schemas", "PKG-INFO"}
+    assert allowed_roots(pyproject) == {
+        ".gitignore",
+        "hyodo",
+        "tests",
+        "README.md",
+        "schemas",
+        "PKG-INFO",
+    }
 
 
 def test_declared_public_sdist_scope_passes_regardless_of_compressed_size(tmp_path: Path) -> None:
@@ -46,11 +53,12 @@ def test_declared_public_sdist_scope_passes_regardless_of_compressed_size(tmp_pa
             "hyodo-4.20.0/tests/test_public.py",
             "hyodo-4.20.0/README.md",
             "hyodo-4.20.0/PKG-INFO",
+            "hyodo-4.20.0/.gitignore",
         ],
     )
     root, members = verify_sdist_scope(sdist, pyproject)
     assert root == "hyodo-4.20.0"
-    assert members == 4
+    assert members == 5
 
 
 def test_undeclared_top_level_path_fails(tmp_path: Path) -> None:
