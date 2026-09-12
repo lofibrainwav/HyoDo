@@ -23,6 +23,7 @@ from collections import Counter
 from pathlib import Path
 from typing import Any
 
+from hyodo.graph_parenting import hyo_chain_all_parents, parent_sets, single_parent_map
 from hyodo.policy import path_outside_root
 
 #: Fixed column order (spec section 2): Truth, Goodness, Beauty, Benevolence,
@@ -280,65 +281,15 @@ def assign_columns(node: dict[str, Any], root: Path | None = None) -> list[str]:
 
 
 def hyo_chain(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -> dict[str, bool]:
-    """Structural Hyo check (spec section 3, "not a table lookup").
+    """Structural Hyo check across every causal parent.
 
-    An event is filial (`True`) if walking its `parent_event_id` chain,
-    hop by hop, reaches its run's mission event (the run's lowest
-    `step_index` `prompt` event from `actor == "human"`, spec section 2).
-    The mission event itself counts as filial. An event with no parent, a
-    parent chain that terminates before the mission, a chain that cycles,
-    or a run with no observed mission is an orphan (`False`).
+    A mission is filial by definition. Every other event is filial only when
+    it has observed same-run causal parent(s) and *all* of those parent
+    lineages reach the mission. Missing parents, cross-run parents, cycles,
+    and disconnected roots fail closed instead of selecting one parent from
+    a join.
     """
-    node_by_id = {node["id"]: node for node in nodes if node.get("id")}
-    parent_of: dict[str, str] = {}
-    for edge in edges:
-        if edge.get("type") == "parent_event_id":
-            target, source = edge.get("target"), edge.get("source")
-            if isinstance(target, str) and isinstance(source, str):
-                parent_of[target] = source
-
-    mission_by_run: dict[str, str] = {}
-    mission_step: dict[str, int] = {}
-    for node in nodes:
-        run_id = node.get("run_id")
-        step = node.get("step_index")
-        if (
-            isinstance(run_id, str)
-            and node.get("kind") == "prompt"
-            and node.get("actor") == "human"
-            and isinstance(step, int)
-            and not isinstance(step, bool)
-            and (run_id not in mission_step or step < mission_step[run_id])
-        ):
-            mission_by_run[run_id] = node["id"]
-            mission_step[run_id] = step
-
-    result: dict[str, bool] = {}
-    for node in nodes:
-        node_id = node.get("id")
-        if not isinstance(node_id, str):
-            continue
-        run_id = node.get("run_id")
-        mission_id = mission_by_run.get(run_id) if isinstance(run_id, str) else None
-        if mission_id is None:
-            result[node_id] = False
-            continue
-        if node_id == mission_id:
-            result[node_id] = True
-            continue
-        seen = {node_id}
-        current = parent_of.get(node_id)
-        chained = False
-        while current is not None:
-            if current == mission_id:
-                chained = True
-                break
-            if current not in node_by_id or current in seen:
-                break
-            seen.add(current)
-            current = parent_of.get(current)
-        result[node_id] = chained
-    return result
+    return hyo_chain_all_parents(nodes, edges)
 
 
 def column_coverage(
@@ -449,22 +400,13 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     A row is one actor lineage, never one event. `human` and `hyodo` are
     each a single row (the schema's actor field stays coarse,
     `hyodo/events.py:37 ACTORS`). An `agent` lineage is a connected run of
-    `parent_event_id` links between `agent`-actor events (`_lane_root`
-    below) — so one real sub-agent calling several differently named tools
-    in sequence stays *one* row, not one row per tool call — and is
-    labelled, display-only, from the lineage's earliest event's
-    `tool.name`; never a new schema field and never the row's identity
-    (row identity is the lineage, `tool.name` only picks its label). When
-    an event carries the optional `actor_id` field, row identity is
-    instead `(actor, actor_id)` directly — key `agent:<actor_id>`, label
-    `agent <actor_id>` — so two differently labelled agents in one run are
-    always two rows even when one's `parent_event_id` chains into the
-    other's; `_lane_root`'s walk also stops at the first `actor_id`
-    boundary it meets, for the same reason. Absent `actor_id`, this is
-    unchanged from before that field existed. A row nests under another
-    row when its lineage's earliest event's `parent_event_id` resolves to
-    a `tool_call` belonging to a different lineage — entirely derived from
-    the `parent_event_id` edge Phase 1-B already ships.
+    causal links between `agent`-actor events (`_lane_root` below) — so one
+    real sub-agent calling several differently named tools in sequence stays
+    *one* row, not one row per tool call — and is labelled, display-only,
+    from the lineage's earliest event's `tool.name`; never a new schema field
+    and never the row's identity. A multi-parent join is never assigned an
+    arbitrary singular row parent; nesting only follows an unambiguous single
+    parent.
 
     Returns `{"order": [row_key, ...], "rows": {row_key: {...}}}` where
     each row dict has `actor`, `label` (display text), `events` (node ids,
@@ -478,12 +420,10 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     `human > orchestrator > reviewer > worker`:
 
     - `"human"`: the row's `actor` is `"human"`.
-    - `"orchestrator"`: some *other* `agent`-actor row's first event's
-      `parent_event_id` points at one of this row's events (this row
-      spawned a child *agent* lane). A `human` or `hyodo` row landing as
-      another row's child does not qualify — that is not spawned work,
-      it is the mission or a policy evaluation citing back (fix round 1,
-      coordinator live-screenshot review).
+    - `"orchestrator"`: some *other* `agent`-actor row's first event cites
+      one of this row's events as a causal parent. Multi-parent joins may
+      therefore mark more than one spawning row as an orchestrator without
+      inventing a singular nesting parent.
     - `"reviewer"`: this row has at least one event whose `evidence_refs`
       cite another actor's events (an `evidence_ref` edge whose source
       belongs to a different `actor`) *and* the row has no write-shaped
@@ -504,12 +444,8 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     inherits its children's orphaned counts this way, without re-walking
     the chain itself.
     """
-    parent_of: dict[str, str] = {}
-    for edge in edges:
-        if edge.get("type") == "parent_event_id":
-            target, source = edge.get("target"), edge.get("source")
-            if isinstance(target, str) and isinstance(source, str):
-                parent_of[target] = source
+    parent_of = single_parent_map(edges)
+    parents_by_child = parent_sets(edges)
     node_by_id = {node["id"]: node for node in nodes if isinstance(node.get("id"), str)}
 
     def _sort_key(node: dict[str, Any]) -> int:
@@ -522,14 +458,10 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
         return value if isinstance(value, str) and value else None
 
     def _lane_root(node_id: str) -> str:
-        """Walk `parent_event_id` up while the parent is also `agent`-actor.
+        """Walk causal parents while the parent is an unambiguous agent event.
 
-        Two `agent`-actor events belong to the same lineage (row) exactly
-        when this returns the same id for both — the actor lineage, never
-        a `tool.name`, is the row identity. The walk also stops the moment
-        the parent event carries a different `actor_id` than the current
-        event — two labelled agents are always two rows, even when one's
-        `parent_event_id` chains into the other's.
+        Multi-parent joins stop the lineage walk instead of selecting a parent.
+        Actor-id boundaries and malformed cycles also stop the walk.
         """
         current = node_id
         seen = {node_id}
@@ -557,11 +489,9 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
 
         When the event carries an `actor_id`, row identity is
         `(actor, actor_id)` directly — key `agent:<actor_id>`, label
-        `agent <actor_id>` — regardless of `parent_event_id` topology, so
-        two labelled agents (e.g. two orchestrated sub-agents in one run)
-        never collapse into one row and the same labelled agent's events
-        always land in one row. Absent `actor_id`, behaviour is unchanged
-        (lineage derived from `_lane_root`'s `parent_event_id` walk).
+        `agent <actor_id>` — regardless of causal topology, so two labelled
+        agents never collapse into one row. Absent `actor_id`, behaviour is
+        lineage-derived through only unambiguous singular parents.
         """
         actor = node.get("actor")
         if actor != "agent":
@@ -676,18 +606,16 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
     orchestrator_keys: set[str] = set()
     for key in order:
         row = rows[key]
-        # Fix round 1 (coordinator, live screenshot): only an `agent` child
-        # lane makes its spawning row an orchestrator. A `human` or `hyodo`
-        # row landing as another row's child (e.g. `hyodo` citing back to
-        # the row it evaluated) is not itself "spawned work" — it stays
-        # whatever `_cites_another_actor`/write-tool-call already ruled.
         agent_first_events = {
             rows[other]["events"][0]
             for other in order
             if other != key and rows[other]["events"] and rows[other]["actor"] == "agent"
         }
         owned_events = set(row["events"])
-        if any(parent_of.get(first_event) in owned_events for first_event in agent_first_events):
+        if any(
+            any(parent_id in owned_events for parent_id in parents_by_child.get(first_event, ()))
+            for first_event in agent_first_events
+        ):
             orchestrator_keys.add(key)
 
     for key in order:
@@ -865,20 +793,12 @@ def _build_tools_ring(
     """Tools ring (spec section 5, ring 4): one node per distinct `tool.name`.
 
     Colour key is the *latest* `policy.decision` for that tool, per the
-    brief. A `decision`-kind event's own `parent_event_id` is the
-    `tool_call` it evaluates (the same convention `hyodo/dashboard.py`'s
-    fixtures and the local viewer already assume); this walks that link
-    across the *whole* graph (`all_nodes`/`edges`), not just this row,
-    because the decision event's actor is `hyodo`, never this row's own
-    actor. `"UNOBSERVED"` when no decision was ever recorded for any call
-    of that tool.
+    brief. A decision is attributed to a tool call only when its causal
+    parent is unambiguous. A multi-parent decision remains unattributed and
+    therefore cannot borrow one parent's decision state. `"UNOBSERVED"`
+    remains the default when no attributable decision was recorded.
     """
-    parent_of: dict[str, str] = {}
-    for edge in edges:
-        if edge.get("type") == "parent_event_id":
-            target, source = edge.get("target"), edge.get("source")
-            if isinstance(target, str) and isinstance(source, str):
-                parent_of[target] = source
+    parent_of = single_parent_map(edges)
 
     latest_decision_by_call: dict[str, tuple[str, str]] = {}
     for node in all_nodes:
