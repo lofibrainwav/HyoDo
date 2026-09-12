@@ -17,6 +17,10 @@ adapters are fixture-verified and the two-event recording path is measured on
 the published artifact, but no installed host has been observed emitting into
 a ledger.
 
+## Current release target
+
+HyoDo 4.19.2 is the current release target.
+
 Landed and released:
 
 - `hyodo safe` for early-warning scans with strict and JSON modes.
