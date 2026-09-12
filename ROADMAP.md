@@ -12,10 +12,14 @@ release in the 4.19.x line carries its own measured chain receipt under
 `docs/releases/`: signed tag, GitHub Release, exact tag SBOM evidence, PyPI
 OIDC provenance, and post-publish install readback.
 
-Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
-adapters are fixture-verified and the two-event recording path is measured on
-the published artifact, but no installed host has been observed emitting into
-a ledger.
+An installed Codex host has historically been observed emitting through HyoDo,
+including a real output digest, causal call/result parent, and host-reported
+model metadata. A fresh canonical Codex host-canary receipt remains
+`UNOBSERVED`, and Cursor live callback observation remains `UNOBSERVED`.
+
+## Current release target
+
+HyoDo 4.19.2 is the current release target.
 
 Landed and released:
 
