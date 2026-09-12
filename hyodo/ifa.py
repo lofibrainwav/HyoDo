@@ -112,10 +112,10 @@ def attest_information_flow(
             effective_label = normalized["declassification"]["output_label"]
         normalized["effective_sensitivity"] = effective_label
 
-        if (
-            normalized["sink_class"] == "external_network"
-            and effective_label not in {"public", "unknown"}
-        ):
+        if normalized["sink_class"] == "external_network" and effective_label not in {
+            "public",
+            "unknown",
+        }:
             risks.append(
                 {
                     "flow_id": normalized["flow_id"],
