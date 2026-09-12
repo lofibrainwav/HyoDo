@@ -74,12 +74,21 @@ echo "-- sdist must not ship afo_core --"
 $PYTHON - "$VERIFY_DIR/dist" <<'PY'
 import sys
 import tarfile
+import zipfile
 from pathlib import Path
 
-sdists = list(Path(sys.argv[1]).glob("*.tar.gz"))
+dist = Path(sys.argv[1])
+sdists = list(dist.glob("*.tar.gz"))
 assert sdists, "no sdist found"
 with tarfile.open(sdists[0]) as t:
     names = t.getnames()
+required = {
+    "/schemas/runtime-identity-v1.schema.json",
+    "/schemas/runtime-identity-v1.pin.json",
+}
+missing = [suffix for suffix in required if not any(name.endswith(suffix) for name in names)]
+if missing:
+    raise SystemExit(f"ERROR: sdist missing runtime identity contract files: {missing}")
 bad = [n for n in names if "/afo_core/" in n or n.endswith("/afo_core")]
 if bad:
     raise SystemExit(f"ERROR: sdist contains afo_core paths ({len(bad)}), e.g. {bad[:3]}")
@@ -88,6 +97,19 @@ size = sdists[0].stat().st_size
 if size > 500_000:
     raise SystemExit(f"ERROR: sdist too large ({size} bytes); expected < 500KB without afo_core")
 print(f"sdist ok: {sdists[0].name} ({size} bytes), {len(names)} entries")
+
+wheels = list(dist.glob("*.whl"))
+assert wheels, "no wheel found"
+with zipfile.ZipFile(wheels[0]) as archive:
+    wheel_names = set(archive.namelist())
+required_wheel = {
+    "schemas/runtime-identity-v1.schema.json",
+    "schemas/runtime-identity-v1.pin.json",
+}
+missing_wheel = sorted(required_wheel - wheel_names)
+if missing_wheel:
+    raise SystemExit(f"ERROR: wheel missing runtime identity contract files: {missing_wheel}")
+print(f"wheel ok: {wheels[0].name}, runtime identity files present")
 PY
 
 echo "-- wheel install smoke --"

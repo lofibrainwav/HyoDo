@@ -1,0 +1,7 @@
+{
+  "algorithm": "sha256",
+  "digest": "41c5b35fc8a163c51cdbb3fa5a8f4e4099f59b6d5887eb799660e976d94e9961",
+  "schema": "runtime-identity-v1.schema.json",
+  "schema_id": "https://hyodo.app/schemas/runtime-identity-v1.schema.json",
+  "schema_version": "hyodo.runtime-identity/v1"
+}

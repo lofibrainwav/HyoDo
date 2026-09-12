@@ -104,6 +104,10 @@ Security = "https://github.com/lofibrainwav/HyoDo/blob/main/SECURITY.md"
 [tool.hatch.build.targets.wheel]
 packages = ["hyodo"]
 
+[tool.hatch.build.targets.wheel.force-include]
+"schemas/runtime-identity-v1.schema.json" = "schemas/runtime-identity-v1.schema.json"
+"schemas/runtime-identity-v1.pin.json" = "schemas/runtime-identity-v1.pin.json"
+
 # Public sdist must NOT ship afo_core (advisory tree) or repo tooling noise.
 [tool.hatch.build.targets.sdist]
 only-include = [
@@ -113,6 +117,7 @@ only-include = [
   "LICENSE",
   "CHANGELOG.md",
   "VERSION",
+  "schemas",
   "pyproject.toml",
   "SECURITY.md",
   "CONTRIBUTING.md",

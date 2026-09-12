@@ -34,6 +34,7 @@ language-agnostic.
 | [GRAPH_EXPORT.md](./GRAPH_EXPORT.md) | `hyodo graph export` — evidence-graph export bridge and actor rings |
 | [FRICTION_EVENT_V0.md](./FRICTION_EVENT_V0.md) | Read-only DAG observation and FrictionEvent v0 contract |
 | [MEASUREMENT_PROVENANCE.md](./MEASUREMENT_PROVENANCE.md) | Which HyoDo measured which target — the `hyodo.measurement-provenance/v1` contract |
+| [RUNTIME_IDENTITY.md](./RUNTIME_IDENTITY.md) | Runtime identity v1 schema and checkout-independent digest pin |
 | [DASHBOARD_REDESIGN.md](./DASHBOARD_REDESIGN.md) | Run-first dashboard baseline for Evidence Pack v1 |
 | [EYE.md](./EYE.md) | `hyodo eye capture` / `verify` — ephemeral visual evidence, no pixels stored |
 | [AUDIENCE.md](./AUDIENCE.md) | `--audience` profiles (vibe / engineer / professional) — wording only, same decision |
