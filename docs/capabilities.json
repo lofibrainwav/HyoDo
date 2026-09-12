@@ -16,13 +16,13 @@
     "friction_local_export": {"public": "SHIPPED", "current": "SHIPPED"},
     "runtime_identity_v1": {"public": "NOT_IN_RELEASE", "current": "SHIPPED"},
     "graph_v1": {"public": "SHIPPED", "current": "SHIPPED"},
-    "graph_v2_multi_parent": {"public": "NOT_BUILT", "current": "NOT_BUILT"},
+    "graph_v2_multi_parent": {"public": "NOT_BUILT", "current": "SHIPPED"},
     "codex_host_adapter": {"public": "SHIPPED", "current": "SHIPPED"},
     "codex_canonical_canary": {"public": "UNOBSERVED", "current": "UNOBSERVED"},
     "cursor_live_callback": {"public": "UNOBSERVED", "current": "UNOBSERVED"},
     "public_remote_mcp": {"public": "CONTRACT_ONLY", "current": "CONTRACT_ONLY"},
     "acl_wisdom_routing": {"public": "RESEARCH", "current": "RESEARCH"},
-    "ifa_v0": {"public": "RESEARCH", "current": "RESEARCH"},
+    "ifa_v0": {"public": "RESEARCH", "current": "SHIPPED"},
     "friction_collector_uploader": {"public": "NOT_BUILT", "current": "NOT_BUILT"}
   }
 }
