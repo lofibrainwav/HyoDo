@@ -139,19 +139,8 @@ jobs:
       - name: Twine check
         run: python -m twine check dist/*.whl dist/*.tar.gz
 
-      - name: Guard sdist (no afo_core)
-        run: |
-          python - <<'PY'
-          import tarfile
-          from pathlib import Path
-          sdist = next(Path("dist").glob("*.tar.gz"))
-          with tarfile.open(sdist) as t:
-              names = t.getnames()
-          bad = [n for n in names if "/afo_core/" in n or n.endswith("/afo_core")]
-          assert not bad, f"sdist includes afo_core: {bad[:5]}"
-          assert sdist.stat().st_size < 500_000, sdist.stat().st_size
-          print(f"sdist clean: {sdist.name} {sdist.stat().st_size} bytes")
-          PY
+      - name: Guard sdist public scope
+        run: python scripts/release/verify_sdist_scope.py dist/*.tar.gz
 
       - name: Upload dist artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
