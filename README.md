@@ -15,7 +15,8 @@ Review signals never grant automatic approval. Unobserved is never green.
 
 ## Why HyoDo exists
 
-AI coding tools can move quickly, but a normal green check does not always answer:
+AI coding tools can move quickly, but a normal green check does not always
+answer:
 
 - Did the check actually run?
 - Did the agent touch only approved tools and paths?
@@ -59,9 +60,11 @@ the rest of `.hyodo/` out of version control — see
 | Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
 | Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
-## Current claim lock
+## Current public claim lock
 
-Measured Run #1: [receipt](./docs/research/MEASURED_RUN_1_2026-09-08.md).
+This table is the latest **published-package** boundary. It does not describe
+unreleased `main` work. For current source and measured-state readback, see
+[`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
 
 | Capability | Status | Evidence boundary |
 | --- | --- | --- |
@@ -97,8 +100,6 @@ HyoDo is deliberately narrow:
 - run: pip install hyodo
 - run: hyodo safe --strict --json
 ```
-
-Composite action: pin a signed ref; SARIF needs `security-events: write`.
 
 ```yaml
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
@@ -161,10 +162,6 @@ SDK v1/v2 are in CI. `mcp.hyodo.app` is contract-only, not this path.
 | `event`, `policy` | 0 valid/ALLOW; 1 invalid/DENY; 2 unobserved; 3 ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
 
-## Engineering model
-
-See [`PHILOSOPHY.md`](./PHILOSOPHY.md) for evidence pillars and score lineage.
-
 ## Install and support
 
 Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
@@ -172,8 +169,10 @@ Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 - Docs index: [`docs/README.md`](./docs/README.md)
 - Quick start: [`QUICK_START.md`](./QUICK_START.md)
 - Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
-- Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
-- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md); Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+- Security: [`SECURITY.md`](./SECURITY.md);
+  Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
+- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md);
+  Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
 ## License
 
