@@ -80,7 +80,7 @@ def hyo_chain_all_parents(
     changed = True
     while changed and pending:
         changed = False
-        for node_id in sorted(tuple(pending)):
+        for node_id in sorted(pending):
             node = node_by_id[node_id]
             run_id = node.get("run_id")
             mission_id = mission_by_run.get(run_id) if isinstance(run_id, str) else None
