@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
+from contextlib import suppress
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -20,6 +22,12 @@ from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, AGENT_EVENTS_RELATIVE_PATH,
 from hyodo.provenance import path_digest, resolve_provenance
 
 RUNTIME_IDENTITY_SCHEMA_VERSION = "hyodo.runtime-identity/v1"
+_RUNTIME_STARTED_AT = datetime.now(timezone.utc).isoformat()
+
+
+def default_runtime_identity_path() -> Path:
+    """Return the per-user receipt location for the canonical dashboard."""
+    return Path.home() / ".hyodo" / "runtime" / "current.json"
 
 
 def _connect_identity(root: Path) -> dict[str, Any]:
@@ -118,5 +126,43 @@ def build_runtime_identity(
         "connect_state_path": str(CONNECT_RELATIVE_PATH),
         "ledger_path": str(AGENT_EVENTS_RELATIVE_PATH),
         "ledger": _ledger_identity(target),
-        "runtime": {"pid": os.getpid()},
+        "runtime": {"pid": os.getpid(), "started_at": _RUNTIME_STARTED_AT},
     }
+
+
+def write_runtime_identity(
+    root: Path,
+    *,
+    endpoint: str,
+    path: Path | None = None,
+) -> Path:
+    """Atomically publish the local runtime identity receipt.
+
+    The receipt is deliberately local and permission-restricted.  Consumers
+    should still verify the live endpoint and process rather than treating a
+    stale file as proof of liveness.
+    """
+    destination = Path(path) if path is not None else default_runtime_identity_path()
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    payload = (
+        json.dumps(
+            build_runtime_identity(root, endpoint=endpoint),
+            indent=2,
+            sort_keys=True,
+        )
+        + "\n"
+    )
+    fd, temporary = tempfile.mkstemp(prefix="current.", suffix=".tmp", dir=destination.parent)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.replace(temporary, destination)
+        os.chmod(destination, 0o600)
+    except BaseException:
+        with suppress(OSError):
+            os.close(fd)
+        with suppress(OSError):
+            os.unlink(temporary)
+        raise
+    return destination

@@ -6,7 +6,11 @@ import json
 from pathlib import Path
 
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH
-from hyodo.identity import RUNTIME_IDENTITY_SCHEMA_VERSION, build_runtime_identity
+from hyodo.identity import (
+    RUNTIME_IDENTITY_SCHEMA_VERSION,
+    build_runtime_identity,
+    write_runtime_identity,
+)
 
 
 def test_identity_distinguishes_missing_ledger_and_connect_state(tmp_path: Path) -> None:
@@ -47,3 +51,20 @@ def test_identity_reports_observed_ledger_and_corruption(tmp_path: Path) -> None
     assert identity["ledger"]["state"] == "OBSERVED"
     assert identity["ledger"]["events"] == 1
     assert identity["ledger"]["corrupt_lines"] == 1
+
+
+def test_runtime_receipt_is_atomic_and_private(tmp_path: Path) -> None:
+    destination = tmp_path / "runtime" / "current.json"
+
+    written = write_runtime_identity(
+        tmp_path,
+        endpoint="127.0.0.1:8768",
+        path=destination,
+    )
+
+    assert written == destination
+    assert destination.stat().st_mode & 0o777 == 0o600
+    payload = json.loads(destination.read_text(encoding="utf-8"))
+    assert payload["service"]["endpoint"] == "127.0.0.1:8768"
+    assert payload["runtime"]["pid"] > 0
+    assert not list(destination.parent.glob("*.tmp"))

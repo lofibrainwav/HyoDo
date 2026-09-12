@@ -131,7 +131,7 @@ from hyodo.host_adapters.codex import map_codex_hook_payload
 from hyodo.host_adapters.codex_response import map_codex_permission_response
 from hyodo.host_adapters.cursor import map_cursor_hook_payload
 from hyodo.host_adapters.cursor_response import map_cursor_permission_response
-from hyodo.identity import build_runtime_identity
+from hyodo.identity import build_runtime_identity, write_runtime_identity
 from hyodo.mcp_config import (
     ALL_HOSTS,
     CHATGPT_UNOBSERVED_MESSAGE,
@@ -1086,6 +1086,11 @@ def dashboard(
             "project gates and safety scans are not executed."
         ),
     ),
+    runtime_identity: str | None = typer.Option(
+        None,
+        "--runtime-identity",
+        help="Write the canonical local runtime receipt here (default: ~/.hyodo/runtime/current.json).",
+    ),
 ):
     """Serve a local, evidence-only Jin-Seon-Mi-In-Hyo-Yeong dashboard."""
     try:
@@ -1149,6 +1154,16 @@ def dashboard(
     except OSError as exc:
         console.print(f"[red]Cannot bind {LOOPBACK_HOST}:{port}: {exc}[/red]")
         raise typer.Exit(1) from exc
+    try:
+        receipt_path = write_runtime_identity(
+            root,
+            endpoint=f"{LOOPBACK_HOST}:{port}",
+            path=Path(runtime_identity) if runtime_identity else None,
+        )
+    except OSError as exc:
+        console.print(f"[yellow]Runtime identity receipt unavailable: {exc}[/yellow]")
+    else:
+        console.print(f"[dim]Runtime identity: {receipt_path}[/dim]")
     console.print(f"[green]Dashboard: http://{LOOPBACK_HOST}:{port}[/green]")
     if interval:
         console.print(
