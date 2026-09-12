@@ -88,12 +88,44 @@ describe('fromEvidenceGraphV1', () => {
 		assert.equal(events[1].schemaKind, 'tool_call');
 		assert.equal(events[1].eventId, 'evt-call');
 		assert.equal(events[1].parentEventId, 'evt-prompt');
+		assert.deepEqual(events[1].parentEventIds, ['evt-prompt']);
 		assert.equal(events[1].tool?.name, 'read_file');
 		assert.equal(events[1].row, 'planner');
 		assert.equal(
 			events.some((event) => event.policy?.decision === 'ALLOW'),
 			false,
 		);
+	});
+
+	it('preserves every Graph v2 parent without choosing a first parent', () => {
+		const graph = {
+			schema_version: 'hyodo.evidence-graph/v1',
+			status: 'READY',
+			reason: null,
+			nodes: [
+				{ id: 'left', kind: 'tool_call', actor: 'agent', step_index: 1, run_id: 'run-1', ts: '1' },
+				{ id: 'right', kind: 'tool_call', actor: 'agent', step_index: 2, run_id: 'run-1', ts: '2' },
+				{
+					id: 'join',
+					kind: 'tool_result',
+					actor: 'agent',
+					step_index: 3,
+					run_id: 'run-1',
+					ts: '3',
+					parent_event_ids: ['right', 'left'],
+				},
+			],
+			edges: [
+				{ type: 'parent_event_id', source: 'right', target: 'join' },
+				{ type: 'parent_event_id', source: 'left', target: 'join' },
+			],
+			unresolved_refs: [],
+		};
+
+		const join = fromEvidenceGraphV1(graph).find((event) => event.eventId === 'join');
+		assert.ok(join);
+		assert.deepEqual(join.parentEventIds, ['left', 'right']);
+		assert.equal(join.parentEventId, null);
 	});
 
 	it('does not invent ALLOW when status is UNOBSERVED', () => {
