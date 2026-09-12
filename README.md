@@ -66,6 +66,8 @@ This table is the latest **published-package** boundary. It does not describe
 unreleased `main` work. For current source and measured-state readback, see
 [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
 
+<!-- markdownlint-disable MD013 -->
+
 | Capability | Status | Evidence boundary |
 | --- | --- | --- |
 | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
@@ -77,6 +79,8 @@ unreleased `main` work. For current source and measured-state readback, see
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
 | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
 | friction collector | NOT BUILT | No collector/uploader; transport disabled. |
+
+<!-- markdownlint-enable MD013 -->
 
 ## Honest boundaries
 
