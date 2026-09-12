@@ -119,18 +119,27 @@ This step is the one that was missing. Six releases were reconciled by hand
 and two were not, which is how 4.19.1 shipped a receipt claiming that none of
 a chain it had fully completed had happened.
 
-## Point the roadmap at this release
+## Keep published baseline and release target separate
 
-`ROADMAP.md` carries the shipped version as prose, so `check_version_sync`
-never covered it and it drifted three releases behind before anyone noticed.
+`ROADMAP.md` carries two different truths: the latest version users can actually
+install, and the version the source tree is preparing. A release candidate must
+not rewrite the first fact before the tag, Release, PyPI provenance, and install
+receipt exist.
 
 ```bash
-python -m scripts.release.check_roadmap_sync    # baseline + release entry
+python -m scripts.release.check_roadmap_sync
 ```
 
-Update the `Current public baseline` sentence and add a `### <version>` entry.
-The check fails closed: if the baseline sentence is rewritten past recognition
-it reports an error instead of quietly passing.
+During release preparation:
+
+- keep `Current public baseline` at the latest actually published version;
+- update `Current release target` to match `VERSION`;
+- add a `### <version>` candidate entry for that target.
+
+After publication is measured, advance `Current public baseline` in the receipt
+reconciliation change. The check fails closed if either required sentence is
+missing, if the release target differs from `VERSION`, if its release entry is
+missing, or if the public baseline is somehow newer than the target.
 
 ## Decision log
 
