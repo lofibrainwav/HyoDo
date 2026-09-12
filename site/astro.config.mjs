@@ -42,6 +42,7 @@ export default defineConfig({
 				{ label: 'Research', slug: 'docs/research' },
 				{ label: 'Roadmap', slug: 'docs/roadmap' },
 				{ label: 'Trust', slug: 'docs/trust' },
+				{ label: 'Runtime identity', slug: 'docs/runtime-identity' },
 			],
 		}),
 	],

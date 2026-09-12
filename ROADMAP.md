@@ -19,7 +19,7 @@ model metadata. A fresh canonical Codex host-canary receipt remains
 
 ## Current release target
 
-HyoDo 4.19.2 is the current release target.
+HyoDo 4.19.3 is the current release target.
 
 Landed and released:
 
@@ -149,6 +149,13 @@ evidence is not converted into a pass.
   second half an `event_id` conflict, and the ledger dropped it in silence.
 - Release chain receipts ask whether a version is on PyPI rather than whether
   it is the newest, so a receipt stops decaying when the next release ships.
+
+### 4.19.3 (candidate, not published)
+
+- Test both wheel and sdist manifests for the runtime identity v1 schema and
+  exact-byte pin.
+- Keep the separate Astro site current-state claims explicit and publish the
+  same schema and pin bytes at `/schemas/` during site deployment.
 
 ## Next candidates
 

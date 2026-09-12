@@ -14,6 +14,7 @@ not in a self-referential current-state page.
 
 - Canonical source branch: **`main`**
 - Latest public package: **4.19.2**
+- Next release target: **4.19.3** (candidate; not published)
 - Phase 0: **CLOSED**; Evidence Pack v1 is sealed with named residuals.
 - Active closure program: **#263 HyoDo Final Closure**
 

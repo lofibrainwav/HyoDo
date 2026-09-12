@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "build": "node scripts/sync-runtime-identity-contract.mjs && astro build",
     "preview": "astro preview",
     "verify:evidence-graph": "node scripts/verify-evidence-graph.mjs",
     "astro": "astro"

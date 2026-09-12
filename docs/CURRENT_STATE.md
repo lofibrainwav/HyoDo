@@ -9,6 +9,7 @@ or a measured runtime-identity receipt when an exact revision is required.
 
 - Canonical source branch: `main`
 - Latest public package: HyoDo `4.19.2`
+- Next release target: HyoDo `4.19.3` (candidate; not published)
 - Phase 0: CLOSED; Evidence Pack v1 is sealed with named residuals.
 - Active closure program: #263 HyoDo Final Closure.
 
