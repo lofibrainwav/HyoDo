@@ -131,6 +131,7 @@ from hyodo.host_adapters.codex import map_codex_hook_payload
 from hyodo.host_adapters.codex_response import map_codex_permission_response
 from hyodo.host_adapters.cursor import map_cursor_hook_payload
 from hyodo.host_adapters.cursor_response import map_cursor_permission_response
+from hyodo.identity import build_runtime_identity
 from hyodo.mcp_config import (
     ALL_HOSTS,
     CHATGPT_UNOBSERVED_MESSAGE,
@@ -872,7 +873,9 @@ class DashboardState:
 # pages at "/" and "/graph" are never CORS targets (a cross-origin page can
 # only read response bodies from these JSON endpoints when the browser
 # lets it).
-_CORS_ELIGIBLE_PATHS = frozenset({"/api/evidence", "/api/status", "/api/graph", "/api/actor"})
+_CORS_ELIGIBLE_PATHS = frozenset(
+    {"/api/evidence", "/api/status", "/api/graph", "/api/actor", "/api/identity"}
+)
 
 
 def make_dashboard_handler(
@@ -881,6 +884,7 @@ def make_dashboard_handler(
     refresh_token: str = "",
     allow_origins: tuple[str, ...] = (),
     root: Path | None = None,
+    service_endpoint: str = "127.0.0.1:8768",
 ) -> type[BaseHTTPRequestHandler]:
     """Build the loopback request handler serving the current snapshot.
 
@@ -937,6 +941,17 @@ def make_dashboard_handler(
                         404,
                     )
                 return json.dumps(rings[key]).encode("utf-8"), "application/json", 200
+            if path == "/api/identity":
+                if root is None:
+                    return None
+                return (
+                    json.dumps(
+                        build_runtime_identity(root, endpoint=service_endpoint),
+                        sort_keys=True,
+                    ).encode("utf-8"),
+                    "application/json",
+                    200,
+                )
             page, evidence_json = state.snapshot()
             if path == "/":
                 return page, "text/html; charset=utf-8", 200
@@ -1123,7 +1138,12 @@ def dashboard(
         server = ThreadingHTTPServer(
             (LOOPBACK_HOST, port),
             make_dashboard_handler(
-                state, _refresh_evidence, refresh_token, tuple(allow_origin), root=root
+                state,
+                _refresh_evidence,
+                refresh_token,
+                tuple(allow_origin),
+                root=root,
+                service_endpoint=f"{LOOPBACK_HOST}:{port}",
             ),
         )
     except OSError as exc:
