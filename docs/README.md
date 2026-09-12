@@ -35,6 +35,7 @@ language-agnostic.
 | [FRICTION_EVENT_V0.md](./FRICTION_EVENT_V0.md) | Read-only DAG observation and FrictionEvent v0 contract |
 | [MEASUREMENT_PROVENANCE.md](./MEASUREMENT_PROVENANCE.md) | Which HyoDo measured which target — the `hyodo.measurement-provenance/v1` contract |
 | [RUNTIME_IDENTITY.md](./RUNTIME_IDENTITY.md) | Runtime identity v1 schema and checkout-independent digest pin |
+| [RETRIEVAL_PROVENANCE.md](./RETRIEVAL_PROVENANCE.md) | Bounded QMD retrieval provenance — the `provenance.retrieval/v1` contract |
 | [DASHBOARD_REDESIGN.md](./DASHBOARD_REDESIGN.md) | Run-first dashboard baseline for Evidence Pack v1 |
 | [EYE.md](./EYE.md) | `hyodo eye capture` / `verify` — ephemeral visual evidence, no pixels stored |
 | [AUDIENCE.md](./AUDIENCE.md) | `--audience` profiles (vibe / engineer / professional) — wording only, same decision |

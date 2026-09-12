@@ -5,6 +5,29 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.4] - 2026-09-12
+
+Bounded retrieval provenance maintenance patch. HyoDo 4.19.3 remains the
+sealed baseline; this source tree carries the next patch contract only.
+
+### Added
+
+- `provenance.retrieval/v1` normalization with deterministic result digests and
+  projection IDs.
+- Fail-closed event validation, privacy bounds, and ledger round-trip coverage
+  for QMD retrieval provenance.
+
+### Changed
+
+- Raw retrieval receipts and QMD result bodies are rejected from the HyoDo
+  ledger carrier; gate `evidence_refs` remain separate.
+
+### Evidence
+
+- Local focused tests and static checks are the implementation evidence.
+- Public artifact, PyPI, KINGDOM, and Neo4j live-seal evidence remain
+  `UNOBSERVED` until their respective gates are run.
+
 ## [4.19.3] - 2026-09-11
 
 Final closure release for the post-4.19.2 source line.
@@ -23,7 +46,7 @@ Final closure release for the post-4.19.2 source line.
 - MCP access-audit write/read loss is fail-visible as `UNOBSERVED` rather than
   silently looking healthy while the tool operation succeeds.
 - Release-note drift has a read-only verifier; remote-unavailable evidence stays
-  UNOBSERVED and mutation requires explicit apply plus post-write readback.
+  `UNOBSERVED` and mutation requires explicit apply plus post-write readback.
 - The sdist guard validates declared package scope instead of enforcing a brittle
   compressed-byte ceiling.
 
