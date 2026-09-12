@@ -216,5 +216,5 @@ def test_prepare_release_refuses_stale_roadmap_target(tmp_path: Path) -> None:
     )
     (tmp_path / "ROADMAP.md").write_text(roadmap)
 
-    with pytest.raises(ReleasePrepError, match="release target is 4.10.0"):
+    with pytest.raises(ReleasePrepError, match=r"release target is 4\.10\.0"):
         prepare_release(tmp_path, "4.12.0", today="2026-09-05")
