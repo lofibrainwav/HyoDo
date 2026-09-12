@@ -48,6 +48,23 @@ MARKETPLACE_JSON = """{
 }
 """
 
+ROADMAP = """# HyoDo roadmap
+
+## Current public baseline
+
+HyoDo {version} is the latest published release after measured publication.
+
+## Current release target
+
+HyoDo {version} is the current release target.
+
+### {version}
+
+- Current release.
+
+## Next candidates
+"""
+
 
 def write_minimal_repo(root: Path, version: str = "4.11.0") -> None:
     (root / "hyodo").mkdir()
@@ -73,6 +90,7 @@ __version__ = "{version}"
         MARKETPLACE_JSON.replace("{version}", version)
     )
     (root / "CHANGELOG.md").write_text(HEADER + HISTORY)
+    (root / "ROADMAP.md").write_text(ROADMAP.format(version=version))
 
 
 def test_prepare_release_updates_all_version_sources(tmp_path: Path) -> None:
@@ -92,6 +110,16 @@ def test_prepare_release_updates_all_version_sources(tmp_path: Path) -> None:
     assert server["packages"][0]["version"] == "4.12.0"
     marketplace = json.loads((tmp_path / ".claude-plugin" / "marketplace.json").read_text())
     assert marketplace["plugins"][0]["version"] == "4.12.0"
+
+
+def test_prepare_release_updates_target_but_preserves_public_baseline(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+
+    prepare_release(tmp_path, "4.12.0", today="2026-09-05")
+
+    roadmap = (tmp_path / "ROADMAP.md").read_text()
+    assert "HyoDo 4.11.0 is the latest published release" in roadmap
+    assert "HyoDo 4.12.0 is the current release target." in roadmap
 
 
 def test_prepare_release_inserts_changelog_section_after_header(tmp_path: Path) -> None:
@@ -125,10 +153,6 @@ def test_prepare_release_creates_release_notes_file(tmp_path: Path) -> None:
     assert text.startswith("# HyoDo 4.12.0 Release Notes\n")
     assert "Signed verified tag" in text
     assert "PyPI provenance verified" in text
-    # A receipt written before the chain runs states UNOBSERVED, never a
-    # checkbox: an unticked box asserts "did not happen" and is false the
-    # moment the release succeeds, which is how 4.19.1 shipped claiming a
-    # chain it had already completed.
     assert "UNOBSERVED" in text
     assert "- [ ]" not in text
 
@@ -173,4 +197,24 @@ def test_prepare_release_rejects_divergent_extended_version_source(tmp_path: Pat
     (tmp_path / "server.json").write_text(SERVER_JSON.replace("{version}", "4.10.0"))
 
     with pytest.raises(ReleasePrepError, match="version sources are not synchronized"):
+        prepare_release(tmp_path, "4.12.0", today="2026-09-05")
+
+
+def test_prepare_release_refuses_missing_roadmap_target(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+    (tmp_path / "ROADMAP.md").write_text("# HyoDo roadmap\n")
+
+    with pytest.raises(ReleasePrepError, match="release target sentence not found"):
+        prepare_release(tmp_path, "4.12.0", today="2026-09-05")
+
+
+def test_prepare_release_refuses_stale_roadmap_target(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+    roadmap = (tmp_path / "ROADMAP.md").read_text().replace(
+        "HyoDo 4.11.0 is the current release target.",
+        "HyoDo 4.10.0 is the current release target.",
+    )
+    (tmp_path / "ROADMAP.md").write_text(roadmap)
+
+    with pytest.raises(ReleasePrepError, match="release target is 4.10.0"):
         prepare_release(tmp_path, "4.12.0", today="2026-09-05")
