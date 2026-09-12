@@ -21,7 +21,7 @@ from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
     get_mcp_server_class,  # pyright: ignore[reportAttributeAccessIssue]
     http_app_accepts_options,  # pyright: ignore[reportAttributeAccessIssue]
 )
-from hyodo.access_ledger import AccessEntry, record_access
+from hyodo.access_ledger import AccessEntry, record_access_result
 from hyodo.pairing import PairingState, load_pairing, touch_last_seen, verify_token
 
 _CLI_TIMEOUT_SECONDS = 120
@@ -100,11 +100,12 @@ def _record_access(
     exit_code: int,
     duration_ms: int,
     caller_id: str | None = None,
-) -> None:
-    """Best-effort: record one MCP tool invocation to the access ledger.
+) -> dict[str, str | None]:
+    """Record one MCP invocation while keeping audit loss fail-visible.
 
-    A write failure is logged to stderr but never propagated — the MCP
-    tool call that triggered this recording must succeed regardless.
+    Audit persistence is deliberately non-fatal to the operation.  The return
+    value therefore reports its own observation state instead of changing the
+    tool's exit contract or silently swallowing a failed write.
     """
     from datetime import datetime, timezone
 
@@ -117,12 +118,11 @@ def _record_access(
         duration_ms=duration_ms,
         caller_id=caller_id,
     )
-    try:  # noqa: SIM105
-        record_access(entry, root=root)
+    try:
+        observation = record_access_result(entry, root=root)
     except Exception:
-        # record_access itself never raises (it catches OSError), but
-        # guard against unexpected failures so the tool call survives.
-        pass
+        return {"state": "UNOBSERVED", "reason": "record_access_exception"}
+    return {"state": observation.state, "reason": observation.reason}
 
 
 def _run_git(root: Path, *args: str) -> tuple[bool, str]:
@@ -162,8 +162,21 @@ def create_server(
     """
     workspace = resolve_workspace_root(root)
 
-    def _record(tool_name: str, exit_code: int, duration_ms: int) -> None:
-        _record_access(tool_name, workspace, exit_code, duration_ms, caller_id=caller_id)
+    def _record(tool_name: str, exit_code: int, duration_ms: int) -> dict[str, str | None]:
+        return _record_access(
+            tool_name,
+            workspace,
+            exit_code,
+            duration_ms,
+            caller_id=caller_id,
+        )
+
+    def _finish(tool_name: str, result: dict[str, Any], started_at: float) -> dict[str, Any]:
+        elapsed_ms = int((time.monotonic() - started_at) * 1000)
+        raw_exit_code = result.get("exit_code", 0)
+        exit_code = raw_exit_code if isinstance(raw_exit_code, int) else 2
+        result["audit"] = _record(tool_name, exit_code, elapsed_ms)
+        return result
 
     server_class = get_mcp_server_class()
     constructor_kwargs: dict[str, Any] = {}
@@ -192,7 +205,6 @@ def create_server(
         t0 = time.monotonic()
         status_ok, status = _run_git(workspace, "status", "--short")
         diff_ok, diff = _run_git(workspace, "diff", "--stat")
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
         result = {
             "exit_code": 0,
             "root": str(workspace),
@@ -200,8 +212,7 @@ def create_server(
             "git_diff_stat": diff.strip() if diff_ok else "",
             "git_observed": status_ok and diff_ok,
         }
-        _record("get_local_context", result["exit_code"], elapsed_ms)
-        return result
+        return _finish("get_local_context", result, t0)
 
     @server.tool()
     def hyodo_safe(max_files: int | None = None) -> dict[str, Any]:
@@ -217,18 +228,14 @@ def create_server(
             args.extend(["--max-files", str(max_files)])
         t0 = time.monotonic()
         result = _run_cli(workspace, args)
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        _record("hyodo_safe", result["exit_code"], elapsed_ms)
-        return result
+        return _finish("hyodo_safe", result, t0)
 
     @server.tool()
     def hyodo_check() -> dict[str, Any]:
         """Run ``hyodo check`` against the configured host workspace."""
         t0 = time.monotonic()
         result = _run_cli(workspace, ["check", str(workspace)])
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        _record("hyodo_check", result["exit_code"], elapsed_ms)
-        return result
+        return _finish("hyodo_check", result, t0)
 
     @server.tool()
     def hyodo_event_record(
@@ -246,20 +253,20 @@ def create_server(
         passed through to ``--actor-id`` — it only fills in when *event*
         does not already carry one. HyoDo never derives identity from it.
         """
+        t0 = time.monotonic()
         args = ["event", "record", "--stdin", "--root", str(workspace), "--json"]
         if policy_path is not None:
             try:
                 args.extend(["--policy", str(_resolve_workspace_path(workspace, policy_path))])
             except ValueError as exc:
-                return {"exit_code": 2, "stdout": "", "stderr": "", "error": str(exc)}
+                result = {"exit_code": 2, "stdout": "", "stderr": "", "error": str(exc)}
+                return _finish("hyodo_event_record", result, t0)
         if actor_id is not None:
             args.extend(["--actor-id", actor_id])
         full_body_applied = bool(full_body and allow_full_body)
         if full_body_applied:
             args.append("--full-body")
-        t0 = time.monotonic()
         result = _run_cli(workspace, args, stdin=json.dumps(event))
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
         # Surfaced even when it matches the request: a silent downgrade would let a
         # client believe raw bodies were stored when they were not.
         result["full_body_requested"] = bool(full_body)
@@ -268,8 +275,7 @@ def create_server(
             result["full_body_denied_reason"] = (
                 "server started without operator consent for full-body storage"
             )
-        _record("hyodo_event_record", result["exit_code"], elapsed_ms)
-        return result
+        return _finish("hyodo_event_record", result, t0)
 
     @server.tool()
     def hyodo_policy_check(
@@ -281,29 +287,30 @@ def create_server(
         ASK. The adapter forwards that CLI contract without making a second
         policy decision.
         """
+        t0 = time.monotonic()
         try:
             config = _resolve_workspace_path(workspace, policy_path)
         except ValueError as exc:
-            return {"exit_code": 2, "stdout": "", "stderr": "", "error": str(exc)}
-        t0 = time.monotonic()
+            result = {"exit_code": 2, "stdout": "", "stderr": "", "error": str(exc)}
+            return _finish("hyodo_policy_check", result, t0)
         result = _run_cli(
             workspace,
             ["policy", "check", "--stdin", "--config", str(config), "--json"],
             stdin=json.dumps(event),
         )
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        _record("hyodo_policy_check", result["exit_code"], elapsed_ms)
-        return result
+        return _finish("hyodo_policy_check", result, t0)
 
     @server.tool()
     def hyodo_agent_rules() -> dict[str, Any]:
         """Return the current agent rules for the workspace."""
         from hyodo.agent_rules import DEFAULT_RULES, load_agent_rules
 
+        t0 = time.monotonic()
         rules = load_agent_rules(workspace)
         if not rules:
             rules = list(DEFAULT_RULES)
-        return {"rules": [r.to_dict() for r in rules]}
+        result: dict[str, Any] = {"rules": [r.to_dict() for r in rules]}
+        return _finish("hyodo_agent_rules", result, t0)
 
     return server
 
