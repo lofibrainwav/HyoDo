@@ -17,9 +17,10 @@ including a real output digest, causal call/result parent, and host-reported
 model metadata. A fresh canonical Codex host-canary receipt remains
 `UNOBSERVED`, and Cursor live callback observation remains `UNOBSERVED`.
 
-## Current public release
+## Current release target
 
-HyoDo 4.19.3 is the current published baseline. No newer release target is open.
+HyoDo 4.19.3 is the current release target and the current published baseline.
+No newer release target is open.
 
 Landed and released:
 
