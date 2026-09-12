@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/retrieval-provenance-v1.schema.json",
+  "title": "HyoDo bounded retrieval provenance",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "source_sha", "run_id", "qmd_uri", "evidence_ref", "result_digest", "receipt_id"],
+  "properties": {
+    "schema_version": {"const": "provenance.retrieval/v1"},
+    "source_sha": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"},
+    "run_id": {"type": "string", "minLength": 1},
+    "qmd_uri": {"type": "string", "pattern": "^qmd://.+"},
+    "evidence_ref": {"type": "string", "minLength": 1},
+    "result_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "receipt_id": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+    "result_metadata": {
+      "type": "object",
+      "maxProperties": 8,
+      "propertyNames": {"enum": ["chunk_id", "collection", "document_id", "language", "mime_type", "rank", "result_count", "score"]},
+      "additionalProperties": {
+        "oneOf": [
+          {"type": "string", "maxLength": 256},
+          {"type": "number"},
+          {"type": "boolean"},
+          {"type": "null"}
+        ]
+      }
+    }
+  }
+}

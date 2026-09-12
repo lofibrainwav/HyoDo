@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "4.19.3"
+version = "4.19.4"
 description = "Honest local guardrails for AI-assisted development: evidence, policy checks, and fail-closed quality gates"
 readme = "README.md"
 license = "MIT"
@@ -117,8 +117,8 @@ only-include = [
   "LICENSE",
   "CHANGELOG.md",
   "VERSION",
-  "schemas",
   "pyproject.toml",
+  "schemas",
   "SECURITY.md",
   "CONTRIBUTING.md",
   "CODE_OF_CONDUCT.md",
