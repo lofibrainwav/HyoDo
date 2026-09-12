@@ -5,6 +5,18 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.3] - 2026-09-11
+
+### Fixed
+
+- Test wheel and sdist manifests for the runtime identity v1 schema and pin.
+- Publish the exact runtime identity contract bytes through the Astro site's
+  `/schemas/` route when the separate site deployment is run.
+
+### Release status
+
+- Candidate only; no tag, publication, or deployment was performed.
+
 ## [4.19.2] - 2026-09-10
 
 Host adapter ledger fix: one tool call now leaves both of its canonical events.

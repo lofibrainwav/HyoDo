@@ -7,6 +7,7 @@ import hashlib
 import json
 import subprocess
 import sys
+import tarfile
 import zipfile
 from pathlib import Path
 
@@ -64,11 +65,11 @@ def test_schema_pin_references_existing_schema() -> None:
     assert (PIN.parent / pin["schema"]).resolve() == SCHEMA.resolve()
 
 
-def test_wheel_contains_exact_runtime_identity_contract_bytes(tmp_path: Path) -> None:
-    """The public wheel must carry the same checkout-independent contract files."""
+def test_built_artifacts_contain_exact_runtime_identity_contract_bytes(tmp_path: Path) -> None:
+    """Wheel and sdist manifests must carry the checkout-independent contracts."""
     dist = tmp_path / "dist"
     subprocess.run(
-        [sys.executable, "-m", "build", "--wheel", "--outdir", str(dist)],
+        [sys.executable, "-m", "build", "--outdir", str(dist)],
         cwd=ROOT,
         check=True,
         capture_output=True,
@@ -76,6 +77,8 @@ def test_wheel_contains_exact_runtime_identity_contract_bytes(tmp_path: Path) ->
     )
     wheels = sorted(dist.glob("hyodo-*.whl"))
     assert len(wheels) == 1
+    sdists = sorted(dist.glob("hyodo-*.tar.gz"))
+    assert len(sdists) == 1
 
     expected = {
         "schemas/runtime-identity-v1.schema.json": SCHEMA.read_bytes(),
@@ -85,3 +88,12 @@ def test_wheel_contains_exact_runtime_identity_contract_bytes(tmp_path: Path) ->
         assert set(expected).issubset(archive.namelist())
         for name, content in expected.items():
             assert archive.read(name) == content
+
+    with tarfile.open(sdists[0], "r:gz") as archive:
+        for name, content in expected.items():
+            member = next(
+                member for member in archive.getmembers() if member.name.endswith(f"/{name}")
+            )
+            extracted = archive.extractfile(member)
+            assert extracted is not None
+            assert extracted.read() == content
