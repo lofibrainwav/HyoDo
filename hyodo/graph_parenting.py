@@ -31,9 +31,7 @@ def single_parent_map(edges: list[dict[str, Any]]) -> dict[str, str]:
     first or last parent.
     """
     return {
-        target: parents[0]
-        for target, parents in parent_sets(edges).items()
-        if len(parents) == 1
+        target: parents[0] for target, parents in parent_sets(edges).items() if len(parents) == 1
     }
 
 
@@ -48,9 +46,7 @@ def hyo_chain_all_parents(
     parents, cross-run parents, disconnected roots and cycles resolve False.
     """
     node_by_id = {
-        node_id: node
-        for node in nodes
-        if isinstance((node_id := node.get("id")), str) and node_id
+        node_id: node for node in nodes if isinstance((node_id := node.get("id")), str) and node_id
     }
     parents_by_child = parent_sets(edges)
 
