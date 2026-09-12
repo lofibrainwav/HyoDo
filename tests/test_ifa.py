@@ -102,9 +102,7 @@ def test_sensitive_external_sink_is_risk_evidence_not_deny() -> None:
         [flow("f1", "A", "B", sink="external_network")],
         event_ids={"A", "B"},
     )
-    assert receipt["risks"] == [
-        {"flow_id": "f1", "reason": "sensitive_external_sink_observed"}
-    ]
+    assert receipt["risks"] == [{"flow_id": "f1", "reason": "sensitive_external_sink_observed"}]
     assert receipt["authority_decision"] is None
 
 
@@ -113,9 +111,7 @@ def test_unknown_external_sink_sensitivity_stays_unknown() -> None:
         [flow("f1", "A", "B", sensitivity="unknown", sink="external_network")],
         event_ids={"A", "B"},
     )
-    assert receipt["risks"] == [
-        {"flow_id": "f1", "reason": "external_sink_sensitivity_unobserved"}
-    ]
+    assert receipt["risks"] == [{"flow_id": "f1", "reason": "external_sink_sensitivity_unobserved"}]
     assert receipt["authority_decision"] is None
 
 
@@ -136,6 +132,4 @@ def test_invalid_observation_is_not_silently_dropped() -> None:
     bad["transformation"] = "magic"
     receipt = attest_information_flow([bad], event_ids={"A", "B"})
     assert receipt["status"] == "UNOBSERVED"
-    assert receipt["invalid"] == [
-        {"flow_id": "f1", "reasons": ["invalid_transformation"]}
-    ]
+    assert receipt["invalid"] == [{"flow_id": "f1", "reasons": ["invalid_transformation"]}]
