@@ -1,0 +1,394 @@
+name: One-shot public closeout sync
+
+on:
+  push:
+    branches:
+      - codex/hyodo-public-closeout-4193-20260911
+
+permissions:
+  contents: write
+
+jobs:
+  sync:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/hyodo-public-closeout-4193-20260911
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Reconcile 4.19.3 public truth
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+          import json
+          from pathlib import Path
+
+          ROOT = Path('.')
+
+          OLD_TABLE = '''| Capability | Status | Evidence boundary |
+          | --- | --- | --- |
+          | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
+          | Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
+          | Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
+          | Codex hooks | UNOBSERVED | Adapter built; no receipt; no installer. |
+          | Cursor hooks | UNOBSERVED | Adapter built; no live host observed. |
+          | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
+          | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
+          | friction collector | NOT BUILT | No collector/uploader; transport disabled. |'''.replace('          ', '')
+
+          NEW_TABLE = '''| Capability | Status | Evidence boundary |
+          | --- | --- | --- |
+          | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
+          | Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
+          | Graph v2 join | SHIPPED | Multi-parent runtime/viewer with v1 compatibility; public site remains fixture-only. |
+          | Codex host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; a fresh canonical live canary is separate evidence. |
+          | Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
+          | IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
+          | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
+          | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
+          | friction collector | NOT BUILT | No collector/uploader; transport disabled. |'''.replace('          ', '')
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              p = ROOT / path
+              text = p.read_text(encoding='utf-8')
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected exactly one match, got {count}')
+              p.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          for path in [
+              'README.md',
+              'docs/research/README.md',
+              'site/src/content/docs/docs/acl.md',
+              'site/src/content/docs/docs/research.md',
+          ]:
+              replace_once(path, OLD_TABLE, NEW_TABLE)
+
+          cap_path = ROOT / 'docs/capabilities.json'
+          caps = json.loads(cap_path.read_text(encoding='utf-8'))
+          caps['public_release'] = '4.19.3'
+          caps['public_claim_table'] = [
+              ['gates / ledger / friction preview', 'SHIPPED', 'Local preview/export; ledger.'],
+              ['Graph v1', 'SHIPPED (site DEMO FIXTURE)', 'Local dashboard; fixed demo site.'],
+              ['Graph v2 join', 'SHIPPED', 'Multi-parent runtime/viewer with v1 compatibility; public site remains fixture-only.'],
+              ['Codex host adapter', 'SHIPPED / LIVE UNOBSERVED', 'Native adapter shipped; a fresh canonical live canary is separate evidence.'],
+              ['Cursor host adapter', 'SHIPPED / LIVE UNOBSERVED', 'Native adapter shipped; fresh live host observation is not yet sealed.'],
+              ['IFA v0', 'SHIPPED', 'Observer-only information-flow attestation; never execution authority.'],
+              ['remote MCP / ChatGPT', 'CONTRACT ONLY', 'Hosted contract; runtime unobserved.'],
+              ['ACL runtime / Wisdom Reflex', 'RESEARCH', 'Hypothesis; no automatic router.'],
+              ['friction collector', 'NOT BUILT', 'No collector/uploader; transport disabled.'],
+          ]
+          for key in ('runtime_identity_v1', 'graph_v2_multi_parent', 'ifa_v0'):
+              caps['capabilities'][key]['public'] = 'SHIPPED'
+          cap_path.write_text(json.dumps(caps, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
+
+          current = '''# HyoDo current state
+
+          Snapshot: 2026-09-11 PT
+
+          This file separates shipped product capability from live/runtime observation. Exact
+          revision identity belongs in the signed release, CI receipt, or runtime identity
+          receipt rather than in this self-referential page.
+
+          - Canonical source branch: `main`
+          - Latest public package: HyoDo `4.19.3`
+          - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC provenance, neutral-cwd install smoke, and hosted runtime-identity schema readback verified.
+          - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
+          - HyoDo product status: release closure complete; remaining live-host and orchestration experiments are downstream integration/research work.
+
+          ## Current truth
+
+          | Capability | Public 4.19.3 | Current main / measured state |
+          | --- | --- | --- |
+          | gates, policy, event ledger | SHIPPED | SHIPPED |
+          | local Friction Contribution | SHIPPED | SHIPPED; no collector/uploader |
+          | MCP stdio, loopback, private Tailscale | SHIPPED | SHIPPED |
+          | canonical runtime identity v1 | SHIPPED | SHIPPED; `/api/identity` + receipt contract, KINGDOM consumer merged |
+          | MCP access-audit readback | SHIPPED | SHIPPED; operation outcome and `audit.state` are separate, audit loss is fail-visible |
+          | release-note drift verifier | SHIPPED | SHIPPED; repository notes are canonical, remote-unavailable is UNOBSERVED, mutation is explicit + readback verified |
+          | Codex host adapter | SHIPPED | SHIPPED; fresh canonical live canary remains UNOBSERVED |
+          | Codex output digest / causal parent / model provenance | SHIPPED | SHIPPED; historically observed, fresh canonical host receipt remains separate evidence |
+          | Cursor host adapter | SHIPPED | SHIPPED; fresh live callback remains UNOBSERVED |
+          | orchestration observation ingest | SHIPPED | SHIPPED |
+          | Graph v2 multi-parent runtime | SHIPPED | SHIPPED; deterministic multi-parent read/normalize/export/viewer + Tarjan SCC with v1 compatibility |
+          | Information Flow Attestation v0 | SHIPPED | SHIPPED observer-only; privacy lineage stays separate and non-authoritative |
+          | ACL / Wisdom Reflex automatic routing | RESEARCH | RESEARCH / shadow only |
+          | public remote MCP | CONTRACT ONLY | CONTRACT ONLY / UNOBSERVED |
+          | friction collector/uploader | NOT BUILT | NOT BUILT |
+
+          ## Ownership invariant
+
+          - KINGDOM executes and orchestrates.
+          - EROS / host policy owns execution authority.
+          - Evidence Gate judges completion evidence.
+          - ACL makes shadow recommendations.
+          - HyoDo observes, records, validates, attests and measures.
+
+          Capability existence is not run usage. Missing evidence is not green. Research is not shipped capability evidence.
+
+          ## Maintenance boundary
+
+          HyoDo 4.19.3 is the closed public baseline. Fresh Codex/Cursor host observations,
+          QMD/Neo4j closed-loop memory, and matched ACL/KINGDOM shadow experiments are
+          downstream integration/research work and must not silently reopen HyoDo product
+          authority or rewrite sealed release evidence.
+          '''.replace('          ', '')
+          (ROOT / 'docs/CURRENT_STATE.md').write_text(current, encoding='utf-8')
+
+          site_current = '''---
+          title: Current state
+          description: Public release, current main, and measured HyoDo state separated by evidence boundary.
+          ---
+
+          # HyoDo current state
+
+          Snapshot: **2026-09-11 PT**.
+
+          HyoDo **4.19.3** is the closed public baseline. Product capability and live host
+          observation remain separate evidence axes.
+
+          - Canonical source branch: **`main`**
+          - Latest public package: **4.19.3**
+          - Release chain: **CLOSED** — signed tag, GitHub Release + SBOM, PyPI provenance,
+            neutral-cwd install smoke, and hosted runtime-identity schema readback verified.
+          - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
+
+          | Capability | Public 4.19.3 | Current main / measured state |
+          | --- | --- | --- |
+          | gates, policy, event ledger | SHIPPED | SHIPPED |
+          | local Friction Contribution | SHIPPED | SHIPPED; local only |
+          | MCP stdio / loopback / private Tailscale | SHIPPED | SHIPPED |
+          | canonical runtime identity v1 | SHIPPED | SHIPPED; `/api/identity` + receipt contract |
+          | MCP access-audit readback | SHIPPED | SHIPPED; audit loss is fail-visible |
+          | release-note drift verifier | SHIPPED | SHIPPED; mutation requires explicit apply + readback |
+          | Codex host adapter | SHIPPED | SHIPPED; fresh canonical live canary remains UNOBSERVED |
+          | Cursor host adapter | SHIPPED | SHIPPED; fresh live callback remains UNOBSERVED |
+          | orchestration observation ingest | SHIPPED | SHIPPED |
+          | Graph v2 multi-parent runtime | SHIPPED | SHIPPED; deterministic multi-parent graph with v1 compatibility |
+          | Information Flow Attestation v0 | SHIPPED | SHIPPED observer-only; non-authoritative |
+          | ACL / Wisdom Reflex automatic routing | RESEARCH | RESEARCH / shadow only |
+          | public remote MCP | CONTRACT ONLY | CONTRACT ONLY / UNOBSERVED |
+          | friction collector/uploader | NOT BUILT | NOT BUILT |
+
+          ## Ownership stays separate
+
+          ```text
+          KINGDOM            executes / orchestrates
+          EROS / host policy owns execution authority
+          Evidence Gate      judges completion evidence
+          ACL                makes shadow recommendations
+          HyoDo              observes / records / validates / attests / measures
+          ```
+
+          Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
+          ACL/KINGDOM experiments are downstream integration/research work. They are not
+          prerequisites for calling the HyoDo 4.19.3 public artifact released and verified.
+          '''.replace('          ', '')
+          (ROOT / 'site/src/content/docs/docs/current-state.md').write_text(site_current, encoding='utf-8')
+
+          replace_once(
+              'ROADMAP.md',
+              '''HyoDo 4.19.2 is the latest published release after the public 4.18.0 measured
+          run.'''.replace('          ', ''),
+              '''HyoDo 4.19.3 is the latest published release after the public 4.18.0 measured
+          run.'''.replace('          ', ''),
+          )
+          replace_once(
+              'ROADMAP.md',
+              '## Current release target\n\nHyoDo 4.19.3 is the current release target.',
+              '## Current public release\n\nHyoDo 4.19.3 is the current published baseline. No newer release target is open.',
+          )
+          replace_once(
+              'ROADMAP.md',
+              '''### 4.19.3 (candidate, not published)
+
+          - Test both wheel and sdist manifests for the runtime identity v1 schema and
+            exact-byte pin.
+          - Keep the separate Astro site current-state claims explicit and publish the
+            same schema and pin bytes at `/schemas/` during site deployment.'''.replace('          ', ''),
+              '''### 4.19.3 (released 2026-09-11 PT)
+
+          - Graph v2 multi-parent runtime/viewer and observer-only IFA v0 ship with v1
+            compatibility and no transfer of execution authority.
+          - MCP audit loss is fail-visible, release-note drift has an explicit readback
+            verifier, and sdist scope is checked semantically rather than by byte size.
+          - Runtime identity v1 schema/pin bytes are packaged in wheel and sdist and
+            published by the Astro site under `/schemas/`.
+          - Signed tag, GitHub Release + SBOM, PyPI OIDC provenance, neutral-cwd install
+            smoke, and hosted schema readback completed the public release chain.'''.replace('          ', ''),
+          )
+
+          replace_once(
+              'CHANGELOG.md',
+              '''## [4.19.3] - 2026-09-11
+
+          ### Fixed
+
+          - Test wheel and sdist manifests for the runtime identity v1 schema and pin.
+          - Publish the exact runtime identity contract bytes through the Astro site's
+            `/schemas/` route when the separate site deployment is run.
+
+          ### Release status
+
+          - Candidate only; no tag, publication, or deployment was performed.'''.replace('          ', ''),
+              '''## [4.19.3] - 2026-09-11
+
+          Final closure release for the post-4.19.2 source line.
+
+          ### Added
+
+          - Graph v2 multi-parent DAG normalization/export/viewer support with deterministic
+            parent handling, Tarjan SCC validation, and preserved v1 compatibility.
+          - Information Flow Attestation v0 as an observer-only privacy-lineage surface;
+            attestation never grants execution authority.
+          - Canonical runtime identity v1 schema/pin bytes in public wheel, sdist, and the
+            Astro site's `/schemas/` route.
+
+          ### Fixed
+
+          - MCP access-audit write/read loss is fail-visible as `UNOBSERVED` rather than
+            silently looking healthy while the tool operation succeeds.
+          - Release-note drift has a read-only verifier; remote-unavailable evidence stays
+            UNOBSERVED and mutation requires explicit apply plus post-write readback.
+          - The sdist guard validates declared package scope instead of enforcing a brittle
+            compressed-byte ceiling.
+
+          ### Evidence
+
+          - Signed `v4.19.3` tag targets the canonical `main` release commit.
+          - GitHub Release is published with CycloneDX SBOM and checksum assets.
+          - PyPI wheel and sdist are published through OIDC provenance and pass a neutral-cwd
+            clean-install smoke.
+          - Wheel, sdist, source, and live `hyodo.app` runtime-identity contract bytes were
+            read back as matching.'''.replace('          ', ''),
+          )
+
+          release_notes = '''# HyoDo 4.19.3 Release Notes
+
+          ## Intent
+
+          4.19.3 closes the post-4.19.2 product line with public artifact truth aligned
+          across source, package, release evidence, and `hyodo.app`.
+
+          ## Shipped
+
+          - Graph v2 multi-parent runtime/viewer with deterministic parent handling,
+            Tarjan SCC validation, and v1 compatibility.
+          - Information Flow Attestation v0 as observer-only privacy lineage with no
+            execution-authority transfer.
+          - Fail-visible MCP audit state, semantic sdist scope verification, and
+            readback-verified GitHub Release note drift detection.
+          - Runtime identity v1 schema/pin included in wheel and sdist and served as exact
+            source bytes under `https://hyodo.app/schemas/`.
+
+          ## Release-chain readback
+
+          - signed tag `v4.19.3` targets canonical `main`;
+          - GitHub Release published with SBOM + checksum assets;
+          - PyPI wheel and sdist published through OIDC provenance;
+          - neutral-working-directory install smoke passed;
+          - wheel, sdist, source, and hosted runtime-identity schema/pin digests matched;
+          - hosted runtime-identity schema and documentation returned successfully.
+
+          ## Boundary
+
+          Fresh Codex/Cursor live-host observations, QMD/Neo4j closed-loop memory, and
+          matched ACL/KINGDOM shadow experiments are downstream integration/research work.
+          They do not create HyoDo execution authority and do not alter the sealed 4.19.3
+          release evidence.
+          '''.replace('          ', '')
+          (ROOT / 'docs/releases/4.19.3.md').write_text(release_notes, encoding='utf-8')
+
+          replace_once(
+              'docs/research/README.md',
+              '''Phase 0 is
+          closed; the active work is Phase 1 observation/passive-shadow expansion plus
+          Graph v2 and matched KINGDOM/ACL experiments.'''.replace('          ', ''),
+              '''Phase 0 is closed and HyoDo 4.19.3 is the verified public baseline. The
+          remaining matched KINGDOM/ACL and live-host work is downstream research and
+          integration, not unfinished HyoDo product capability.'''.replace('          ', ''),
+          )
+          old_gate_start = '''## Immediate roadmap gate
+
+          Phase 0 is already closed. Do not reopen it by copying historical prose into new
+          receipts or by treating older planning text as current state.
+
+          The current gate is:
+
+          1. keep `docs/CURRENT_STATE.md`, the public claim lock, and the technical roadmap
+             reconciled with measured `main` reality;
+          2. govern and publish the landed post-4.19.2 observation fixes through the full
+             release chain;
+          3. make that public package the canonical KINGDOM dogfood dependency;
+          4. freeze and implement Graph v2 multi-parent semantics without changing HyoDo
+             execution authority;
+          5. run matched serial / parallel / heuristic / current-KINGDOM shadow
+             experiments with HyoDo measuring actual versus shadow;
+          6. allow ACL/Wisdom Reflex to lose against simpler baselines;
+          7. promote only after independent readback, privacy/authority audit, and SSOT
+             update.
+
+          Research-source audit, interpretation collection, hostile baselines, Graph v2
+          fixtures, and experiment design may proceed in parallel. Truth registration,
+          release promotion, and execution authority remain serial convergence gates.'''.replace('          ', '')
+          new_gate = '''## Immediate roadmap gate
+
+          HyoDo 4.19.3 is the verified public baseline. Do not rewrite its sealed evidence
+          when later KINGDOM experiments run.
+
+          The downstream gate is:
+
+          1. consume the public package rather than a source checkout;
+          2. run fresh Codex/Cursor observations as integration evidence, not capability
+             existence claims;
+          3. run matched serial / parallel / heuristic / current-KINGDOM shadow
+             experiments with HyoDo measuring actual versus shadow;
+          4. allow ACL/Wisdom Reflex to lose against simpler baselines; and
+          5. promote any orchestration or support policy only after independent readback,
+             privacy/authority audit, and KINGDOM SSOT update.
+
+          HyoDo remains observer/evidence infrastructure in this phase; execution authority
+          stays outside HyoDo.'''.replace('          ', '')
+          replace_once('docs/research/README.md', old_gate_start, new_gate)
+
+          replace_once(
+              'site/src/content/docs/docs/acl.md',
+              '''- The current event model has one optional `parent_event_id` per event plus separate `evidence_refs`. It can represent fan-out through sibling events, but it does **not** explicitly model an arbitrary multi-parent execution join as multiple parent edges. That limitation should be measured before the schema is expanded.''',
+              '''- HyoDo 4.19.3 ships Graph v2 multi-parent causal joins while keeping `evidence_refs` separate from causality and preserving v1 compatibility. The public site graph remains a fixture/demo surface rather than a claim of live KINGDOM execution.''',
+          )
+
+          index = ROOT / 'site/src/pages/index.astro'
+          text = index.read_text(encoding='utf-8')
+          text = text.replace(
+              'solid = <code>parent_event_id</code>, dashed = <code>evidence_refs</code>',
+              'solid = causal parent edge (<code>parent_event_id</code> / <code>parent_event_ids</code>), dashed = <code>evidence_refs</code>',
+          )
+          old_para = '''\t\t\t\t\t<p>\n\t\t\t\t\t\tThe product boundary is measured separately from research direction.\n\t\t\t\t\t\tThe <a href="https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md">Measured Run #1 receipt</a>\n\t\t\t\t\t\tcontains the observed KINGDOM/HyoDo run.\n\t\t\t\t\t</p>'''
+          new_para = '''\t\t\t\t\t<p>\n\t\t\t\t\t\tPublished baseline: <strong>HyoDo 4.19.3</strong>. Graph v2, IFA v0,\n\t\t\t\t\t\truntime identity, and fail-visible audit state are shipped; fresh host\n\t\t\t\t\t\tobservations remain separate evidence. See <a href="/docs/current-state/">current state</a>.\n\t\t\t\t\t</p>'''
+          if text.count(old_para) != 1:
+              raise SystemExit('index claim paragraph match failed')
+          text = text.replace(old_para, new_para, 1)
+          old_rows = '''\t\t\t\t\t\t\t<tr><td>gates / ledger / friction preview</td><td>SHIPPED</td><td>Local preview/export; ledger.</td></tr>\n\t\t\t\t\t\t\t<tr><td>Graph v1</td><td>SHIPPED (site DEMO FIXTURE)</td><td>Local dashboard; fixed demo site.</td></tr>\n\t\t\t\t\t\t\t<tr><td>Graph v2 join</td><td>NOT BUILT</td><td>No join runtime/viewer; SCC oracle only.</td></tr>\n\t\t\t\t\t\t\t<tr><td>Cursor/Codex hooks</td><td>UNOBSERVED</td><td>No verified host adapter.</td></tr>\n\t\t\t\t\t\t\t<tr><td>remote MCP / ChatGPT</td><td>CONTRACT ONLY</td><td>Hosted contract; runtime unobserved.</td></tr>\n\t\t\t\t\t\t\t<tr><td>ACL runtime / Wisdom Reflex</td><td>RESEARCH</td><td>Hypothesis; no automatic router.</td></tr>\n\t\t\t\t\t\t\t<tr><td>friction collector</td><td>NOT BUILT</td><td>No collector/uploader; transport disabled.</td></tr>'''
+          new_rows = '''\t\t\t\t\t\t\t<tr><td>gates / ledger / friction preview</td><td>SHIPPED</td><td>Local preview/export; ledger.</td></tr>\n\t\t\t\t\t\t\t<tr><td>Graph v1</td><td>SHIPPED (site DEMO FIXTURE)</td><td>Local dashboard; fixed demo site.</td></tr>\n\t\t\t\t\t\t\t<tr><td>Graph v2 join</td><td>SHIPPED</td><td>Multi-parent runtime/viewer with v1 compatibility; site remains fixture-only.</td></tr>\n\t\t\t\t\t\t\t<tr><td>Codex host adapter</td><td>SHIPPED / LIVE UNOBSERVED</td><td>Native adapter shipped; fresh canonical canary is separate evidence.</td></tr>\n\t\t\t\t\t\t\t<tr><td>Cursor host adapter</td><td>SHIPPED / LIVE UNOBSERVED</td><td>Native adapter shipped; fresh live callback is not yet sealed.</td></tr>\n\t\t\t\t\t\t\t<tr><td>IFA v0</td><td>SHIPPED</td><td>Observer-only information-flow attestation; never execution authority.</td></tr>\n\t\t\t\t\t\t\t<tr><td>remote MCP / ChatGPT</td><td>CONTRACT ONLY</td><td>Hosted contract; runtime unobserved.</td></tr>\n\t\t\t\t\t\t\t<tr><td>ACL runtime / Wisdom Reflex</td><td>RESEARCH</td><td>Hypothesis; no automatic router.</td></tr>\n\t\t\t\t\t\t\t<tr><td>friction collector</td><td>NOT BUILT</td><td>No collector/uploader; transport disabled.</td></tr>'''
+          if text.count(old_rows) != 1:
+              raise SystemExit('index claim rows match failed')
+          index.write_text(text.replace(old_rows, new_rows, 1), encoding='utf-8')
+
+          workflow = ROOT / '.github/workflows/public-closeout-sync.yml'
+          workflow.unlink()
+          PY
+
+      - name: Commit reconciled public truth
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --check
+          git commit -m 'docs: seal 4.19.3 public closeout truth'
+          git push origin HEAD:codex/hyodo-public-closeout-4193-20260911
