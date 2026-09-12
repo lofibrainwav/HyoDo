@@ -46,7 +46,12 @@ def causal_parents(event: dict[str, Any]) -> list[str]:
         raw = event.get("parent_event_ids", [])
         if not isinstance(raw, list):
             return []
-        return sorted({_text(parent) for parent in raw if _text(parent) is not None})
+        parents: set[str] = set()
+        for parent in raw:
+            normalized_parent = _text(parent)
+            if normalized_parent is not None:
+                parents.add(normalized_parent)
+        return sorted(parents)
     return []
 
 
