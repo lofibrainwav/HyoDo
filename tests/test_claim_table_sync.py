@@ -1,21 +1,14 @@
-"""The claim-lock table is copied by hand into several documents.
-
-`README.md` is the source. The same block appears in the research notes and on
-the site, and nothing checked that the copies agreed -- so a status could be
-corrected in one place and stay wrong in three others. That is the drift
-`check_roadmap_sync` exists to stop, one table over.
-
-The copies are discovered rather than listed: a new copy is covered the day it
-is added, without anyone remembering to register it here.
-"""
+"""Keep every public capability claim synchronized with the registry SSOT."""
 
 from __future__ import annotations
 
+import json
 import subprocess
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HEADER = "| Capability | Status | Evidence boundary |"
+REGISTRY = REPO_ROOT / "docs" / "capabilities.json"
 
 
 def tracked_markdown() -> list[Path]:
@@ -30,7 +23,6 @@ def tracked_markdown() -> list[Path]:
 
 
 def claim_table(text: str) -> list[str] | None:
-    """The table block starting at HEADER, or None when the file has none."""
     lines = text.splitlines()
     try:
         start = lines.index(HEADER)
@@ -44,22 +36,54 @@ def claim_table(text: str) -> list[str] | None:
     return block
 
 
-def test_every_copy_of_the_claim_table_matches_the_readme() -> None:
-    source = claim_table((REPO_ROOT / "README.md").read_text(encoding="utf-8"))
-    assert source is not None, "README.md no longer carries the claim-lock table"
+def registry_table() -> list[str]:
+    payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    assert payload["schema"] == "hyodo.capabilities/v1"
+    rows = payload["public_claim_table"]
+    rendered = [HEADER, "| --- | --- | --- |"]
+    rendered.extend(
+        f"| {capability} | {status} | {evidence} |" for capability, status, evidence in rows
+    )
+    return rendered
 
+
+def test_every_copy_of_the_claim_table_matches_the_registry() -> None:
+    source = registry_table()
+    copies = 0
     mismatched: list[str] = []
     for path in tracked_markdown():
-        if path.name == "README.md" and path.parent == REPO_ROOT:
-            continue
         copy = claim_table(path.read_text(encoding="utf-8"))
-        if copy is not None and copy != source:
+        if copy is None:
+            continue
+        copies += 1
+        if copy != source:
             rel = path.relative_to(REPO_ROOT)
             extra = set(copy) - set(source)
             missing = set(source) - set(copy)
             mismatched.append(f"{rel}: +{sorted(extra)} -{sorted(missing)}")
 
-    assert not mismatched, "claim table copies disagree with README.md:\n" + "\n".join(mismatched)
+    assert copies >= 2, "expected the public claim table in multiple tracked documents"
+    assert not mismatched, "claim table copies disagree with docs/capabilities.json:\n" + "\n".join(
+        mismatched
+    )
+
+
+def test_registry_contains_current_state_axes() -> None:
+    payload = json.loads(REGISTRY.read_text(encoding="utf-8"))
+    capabilities = payload["capabilities"]
+    required = {
+        "runtime_identity_v1",
+        "graph_v2_multi_parent",
+        "codex_canonical_canary",
+        "cursor_live_callback",
+        "public_remote_mcp",
+        "acl_wisdom_routing",
+        "ifa_v0",
+        "friction_collector_uploader",
+    }
+    assert required <= set(capabilities)
+    for value in capabilities.values():
+        assert set(value) == {"public", "current"}
 
 
 def test_the_table_is_found_by_its_header_not_its_position() -> None:
