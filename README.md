@@ -2,10 +2,10 @@
 
 **Honest local guardrails for AI-assisted development.**
 
-HyoDo is a model-agnostic Python CLI that helps teams prove which checks ran, record agent actions, enforce local tool and path policy, and reuse existing tests and linters without turning missing evidence into a green result.
+HyoDo is a model-agnostic Python CLI that helps teams prove which checks ran,
+record agent actions, enforce local tool and path policy, and reuse existing
+tests and linters without turning missing evidence into a green result.
 Review signals never grant automatic approval. Unobserved is never green.
-
-For the latest measured project state, including work already landed on `main` after the current public package, see [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
@@ -15,7 +15,8 @@ For the latest measured project state, including work already landed on `main` a
 
 ## Why HyoDo exists
 
-AI coding tools can move quickly, but a normal green check does not always answer:
+AI coding tools can move quickly, but a normal green check does not always
+answer:
 
 - Did the check actually run?
 - Did the agent touch only approved tools and paths?
@@ -34,10 +35,14 @@ hyodo init
 hyodo check
 ```
 
-`safe` works immediately in any repository. `init` is optional: it detects tools you already use and writes `.hyodo/gates.toml`; `check` then runs those gates.
-No detected tooling means no invented green check. See [`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for every `gates.toml` field.
+`safe` works immediately in any repository. `init` is optional: it detects
+tools you already use and writes `.hyodo/gates.toml`; `check` then runs those
+gates. No detected tooling means no invented green check. See
+[`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for every `gates.toml` field.
 
-Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep the rest of `.hyodo/` out of version control — see [what to commit](docs/CONNECT.md#what-to-commit) for the `.gitignore` split.
+Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep
+the rest of `.hyodo/` out of version control — see
+[what to commit](docs/CONNECT.md#what-to-commit) for the `.gitignore` split.
 
 ## What it does
 
@@ -57,10 +62,9 @@ Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep t
 
 ## Current public claim lock
 
-This table is the latest **published-package** boundary. It is intentionally not used to describe unreleased `main` work.
-See [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md) for the current source and measured-state readback.
-
-Measured Run #1: [receipt](./docs/research/MEASURED_RUN_1_2026-09-08.md).
+This table is the latest **published-package** boundary. It does not describe
+unreleased `main` work. For current source and measured-state readback, see
+[`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
 
 | Capability | Status | Evidence boundary |
 | --- | --- | --- |
@@ -96,8 +100,6 @@ HyoDo is deliberately narrow:
 - run: pip install hyodo
 - run: hyodo safe --strict --json
 ```
-
-Composite action: pin a signed ref; SARIF needs `security-events: write`.
 
 ```yaml
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
@@ -160,10 +162,6 @@ SDK v1/v2 are in CI. `mcp.hyodo.app` is contract-only, not this path.
 | `event`, `policy` | 0 valid/ALLOW; 1 invalid/DENY; 2 unobserved; 3 ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
 
-## Engineering model
-
-See [`PHILOSOPHY.md`](./PHILOSOPHY.md) for evidence pillars and score lineage.
-
 ## Install and support
 
 Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
@@ -171,8 +169,10 @@ Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 - Docs index: [`docs/README.md`](./docs/README.md)
 - Quick start: [`QUICK_START.md`](./QUICK_START.md)
 - Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
-- Security: [`SECURITY.md`](./SECURITY.md); Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
-- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md); Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
+- Security: [`SECURITY.md`](./SECURITY.md);
+  Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)
+- Contributing: [`CONTRIBUTING.md`](./CONTRIBUTING.md);
+  Changelog: [`CHANGELOG.md`](./CHANGELOG.md)
 
 ## License
 
