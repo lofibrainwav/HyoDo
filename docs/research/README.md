@@ -5,9 +5,9 @@ Status: working research documentation
 This directory is the durable roadmap and protocol surface for the HyoDo / ACL / KINGDOM research program. The public `/docs/acl/` page remains a high-level field note; these repository documents define the stricter execution and research contracts.
 
 For the cross-cutting readback of the latest public package versus current
-`main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is
-closed; the active work is Phase 1 observation/passive-shadow expansion plus
-Graph v2 and matched KINGDOM/ACL experiments.
+`main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is closed and HyoDo 4.19.3 is the verified public baseline. The
+remaining matched KINGDOM/ACL and live-host work is downstream research and
+integration, not unfinished HyoDo product capability.
 
 Read them in this order.
 
@@ -55,9 +55,10 @@ is execution evidence; this table does not turn it into an ACL result.
 | --- | --- | --- |
 | gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
 | Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
-| Graph v2 join | NOT BUILT | No join runtime/viewer; SCC oracle only. |
-| Codex hooks | UNOBSERVED | Adapter built; no receipt; no installer. |
-| Cursor hooks | UNOBSERVED | Adapter built; no live host observed. |
+| Graph v2 join | SHIPPED | Multi-parent runtime/viewer with v1 compatibility; public site remains fixture-only. |
+| Codex host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; a fresh canonical live canary is separate evidence. |
+| Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
+| IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
 | ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
 | friction collector | NOT BUILT | No collector/uploader; transport disabled. |
@@ -159,27 +160,22 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 
 ## Immediate roadmap gate
 
-Phase 0 is already closed. Do not reopen it by copying historical prose into new
-receipts or by treating older planning text as current state.
+HyoDo 4.19.3 is the verified public baseline. Do not rewrite its sealed evidence
+when later KINGDOM experiments run.
 
-The current gate is:
+The downstream gate is:
 
-1. keep `docs/CURRENT_STATE.md`, the public claim lock, and the technical roadmap
-   reconciled with measured `main` reality;
-2. govern and publish the landed post-4.19.2 observation fixes through the full
-   release chain;
-3. make that public package the canonical KINGDOM dogfood dependency;
-4. freeze and implement Graph v2 multi-parent semantics without changing HyoDo
-   execution authority;
-5. run matched serial / parallel / heuristic / current-KINGDOM shadow
+1. consume the public package rather than a source checkout;
+2. run fresh Codex/Cursor observations as integration evidence, not capability
+   existence claims;
+3. run matched serial / parallel / heuristic / current-KINGDOM shadow
    experiments with HyoDo measuring actual versus shadow;
-6. allow ACL/Wisdom Reflex to lose against simpler baselines;
-7. promote only after independent readback, privacy/authority audit, and SSOT
-   update.
+4. allow ACL/Wisdom Reflex to lose against simpler baselines; and
+5. promote any orchestration or support policy only after independent readback,
+   privacy/authority audit, and KINGDOM SSOT update.
 
-Research-source audit, interpretation collection, hostile baselines, Graph v2
-fixtures, and experiment design may proceed in parallel. Truth registration,
-release promotion, and execution authority remain serial convergence gates.
+HyoDo remains observer/evidence infrastructure in this phase; execution authority
+stays outside HyoDo.
 
 ## Document hierarchy
 

@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.19.2 is the latest published release after the public 4.18.0 measured
+HyoDo 4.19.3 is the latest published release after the public 4.18.0 measured
 run. The 4.18.0 signed tag, public wheel and sdist, SBOM receipt, PyPI
 provenance, clean-install readback, and Evidence Pack v1 remain sealed. Every
 release in the 4.19.x line carries its own measured chain receipt under
@@ -17,9 +17,9 @@ including a real output digest, causal call/result parent, and host-reported
 model metadata. A fresh canonical Codex host-canary receipt remains
 `UNOBSERVED`, and Cursor live callback observation remains `UNOBSERVED`.
 
-## Current release target
+## Current public release
 
-HyoDo 4.19.3 is the current release target.
+HyoDo 4.19.3 is the current published baseline. No newer release target is open.
 
 Landed and released:
 
@@ -150,12 +150,16 @@ evidence is not converted into a pass.
 - Release chain receipts ask whether a version is on PyPI rather than whether
   it is the newest, so a receipt stops decaying when the next release ships.
 
-### 4.19.3 (candidate, not published)
+### 4.19.3 (released 2026-09-11 PT)
 
-- Test both wheel and sdist manifests for the runtime identity v1 schema and
-  exact-byte pin.
-- Keep the separate Astro site current-state claims explicit and publish the
-  same schema and pin bytes at `/schemas/` during site deployment.
+- Graph v2 multi-parent runtime/viewer and observer-only IFA v0 ship with v1
+  compatibility and no transfer of execution authority.
+- MCP audit loss is fail-visible, release-note drift has an explicit readback
+  verifier, and sdist scope is checked semantically rather than by byte size.
+- Runtime identity v1 schema/pin bytes are packaged in wheel and sdist and
+  published by the Astro site under `/schemas/`.
+- Signed tag, GitHub Release + SBOM, PyPI OIDC provenance, neutral-cwd install
+  smoke, and hosted schema readback completed the public release chain.
 
 ## Next candidates
 
