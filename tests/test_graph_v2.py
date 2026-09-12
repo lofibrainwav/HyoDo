@@ -54,9 +54,7 @@ def test_diamond_join_is_valid_and_deterministic() -> None:
 
 
 def test_unresolved_parent_is_not_cycle_evidence() -> None:
-    result = validate_graph_v2(
-        [event("A"), event("J", schema=V2_SCHEMA, parents=["A", "MISSING"])]
-    )
+    result = validate_graph_v2([event("A"), event("J", schema=V2_SCHEMA, parents=["A", "MISSING"])])
     assert result.acyclic is True
     assert result.references_resolved is False
     assert result.structurally_valid is False
@@ -80,9 +78,7 @@ def test_self_cycle_is_reported_once_by_scc_oracle() -> None:
     result = validate_graph_v2([event("A", schema=V2_SCHEMA, parents=["A"])])
     assert result.acyclic is False
     assert result.structurally_valid is False
-    assert result.cycles == [
-        {"reason": "self_cycle", "component": ["A"], "edge": ["A", "A"]}
-    ]
+    assert result.cycles == [{"reason": "self_cycle", "component": ["A"], "edge": ["A", "A"]}]
 
 
 def test_join_only_cycle_is_detected() -> None:
