@@ -210,9 +210,13 @@ def test_prepare_release_refuses_missing_roadmap_target(tmp_path: Path) -> None:
 
 def test_prepare_release_refuses_stale_roadmap_target(tmp_path: Path) -> None:
     write_minimal_repo(tmp_path)
-    roadmap = (tmp_path / "ROADMAP.md").read_text().replace(
-        "HyoDo 4.11.0 is the current release target.",
-        "HyoDo 4.10.0 is the current release target.",
+    roadmap = (
+        (tmp_path / "ROADMAP.md")
+        .read_text()
+        .replace(
+            "HyoDo 4.11.0 is the current release target.",
+            "HyoDo 4.10.0 is the current release target.",
+        )
     )
     (tmp_path / "ROADMAP.md").write_text(roadmap)
 
