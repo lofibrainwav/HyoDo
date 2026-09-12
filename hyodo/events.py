@@ -21,6 +21,8 @@ import stat
 from pathlib import Path
 from typing import Any
 
+from hyodo.retrieval_provenance import normalize_event_provenance
+
 AGENT_EVENT_SCHEMA_VERSION = "hyodo.agent-event/v1"
 AGENT_EVENTS_RELATIVE_PATH = Path(".hyodo") / "agent-events.jsonl"
 
@@ -137,6 +139,9 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
     reasons: list[str] = []
     if not isinstance(raw, dict):
         return False, ["not_an_object"], None
+
+    if "retrieval_receipt" in raw:
+        return False, ["unsupported_field:retrieval_receipt"], None
 
     schema = raw.get("schema_version")
     if schema != AGENT_EVENT_SCHEMA_VERSION:
@@ -368,6 +373,15 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
     else:
         evidence_refs_out = [ref.strip() for ref in evidence_refs_raw]
 
+    provenance_ok, provenance_reasons, provenance_out = normalize_event_provenance(
+        raw.get("provenance"),
+        event_run_id=str(raw.get("run_id", "")).strip(),
+        event_evidence_ref=(
+            raw.get("evidence_ref") if isinstance(raw.get("evidence_ref"), str) else None
+        ),
+    )
+    reasons.extend(provenance_reasons)
+
     meta_raw = raw.get("meta")
     meta_out: dict[str, Any] = {"model": None, "tags": [], "ephemeral": None}
     if meta_raw is not None:
@@ -464,6 +478,8 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
         "policy": unevaluated_policy(policy_claimed),
         "meta": meta_out,
     }
+    if provenance_ok and provenance_out is not None:
+        normalized["provenance"] = provenance_out
     # Full bodies only when provided (opt-in by presence).
     if full_bodies:
         normalized["io"] = {**io_out, **full_bodies}

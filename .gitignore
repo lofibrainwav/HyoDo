@@ -103,3 +103,4 @@ site/dist/
 site/.astro/
 
 site/verify-output/
+.seals/

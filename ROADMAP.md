@@ -5,22 +5,17 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.19.3 is the latest published release after the public 4.18.0 measured
+HyoDo 4.19.4 is the latest published release target after the public 4.18.0 measured
 run. The 4.18.0 signed tag, public wheel and sdist, SBOM receipt, PyPI
 provenance, clean-install readback, and Evidence Pack v1 remain sealed. Every
 release in the 4.19.x line carries its own measured chain receipt under
 `docs/releases/`: signed tag, GitHub Release, exact tag SBOM evidence, PyPI
 OIDC provenance, and post-publish install readback.
 
-An installed Codex host has historically been observed emitting through HyoDo,
-including a real output digest, causal call/result parent, and host-reported
-model metadata. A fresh canonical Codex host-canary receipt remains
-`UNOBSERVED`, and Cursor live callback observation remains `UNOBSERVED`.
-
-## Current release target
-
-HyoDo 4.19.3 is the current release target and the current published baseline.
-No newer release target is open.
+Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
+adapters are fixture-verified and the two-event recording path is measured on
+the published artifact, but no installed host has been observed emitting into
+a ledger.
 
 Landed and released:
 
@@ -151,16 +146,22 @@ evidence is not converted into a pass.
 - Release chain receipts ask whether a version is on PyPI rather than whether
   it is the newest, so a receipt stops decaying when the next release ships.
 
-### 4.19.3 (released 2026-09-11 PT)
+### 4.19.3 (released 2026-09-11)
 
-- Graph v2 multi-parent runtime/viewer and observer-only IFA v0 ship with v1
-  compatibility and no transfer of execution authority.
-- MCP audit loss is fail-visible, release-note drift has an explicit readback
-  verifier, and sdist scope is checked semantically rather than by byte size.
-- Runtime identity v1 schema/pin bytes are packaged in wheel and sdist and
-  published by the Astro site under `/schemas/`.
-- Signed tag, GitHub Release + SBOM, PyPI OIDC provenance, neutral-cwd install
-  smoke, and hosted schema readback completed the public release chain.
+- Final closure release for the post-4.19.2 source line.
+- Graph v2 multi-parent DAG normalization/export/viewer support.
+- Information Flow Attestation v0 as observer-only privacy-lineage surface.
+- Canonical runtime identity v1 schema/pin bytes in public wheel, sdist, and site.
+- MCP access-audit write/read loss is fail-visible as `UNOBSERVED`.
+- Release-note drift has a read-only verifier; the sdist guard validates declared
+  package scope instead of enforcing a brittle compressed-byte ceiling.
+
+### 4.19.4 (release target 2026-09-12)
+
+- Adds the bounded `provenance.retrieval/v1` carrier for KINGDOM/QMD retrieval
+  provenance, with deterministic digests and projection IDs.
+- Keeps raw retrieval bodies, queries, prompts, authority, and approval out of
+  the HyoDo event ledger; local and public release evidence remain separate.
 
 ## Next candidates
 
