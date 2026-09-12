@@ -21,6 +21,9 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution path
     )
 
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
+ROADMAP_TARGET_RE = re.compile(
+    r"(?m)^HyoDo (?P<version>\d+\.\d+\.\d+) is the current release target\.$"
+)
 CHANGELOG_HEADER_END = (
     "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n"
 )
@@ -75,6 +78,28 @@ TODO: describe release intent.
 {_unmeasured_receipt()}"""
 
 
+def _update_roadmap_target(root: Path, *, old_version: str, new_version: str) -> None:
+    roadmap = root / "ROADMAP.md"
+    try:
+        text = roadmap.read_text(encoding="utf-8")
+    except OSError as exc:
+        raise ReleasePrepError(f"ROADMAP.md unreadable at {roadmap}") from exc
+
+    match = ROADMAP_TARGET_RE.search(text)
+    if not match:
+        raise ReleasePrepError("ROADMAP.md: current release target sentence not found")
+    current = match.group("version")
+    if current != old_version:
+        raise ReleasePrepError(
+            f"ROADMAP.md release target is {current}, but synchronized VERSION is {old_version}"
+        )
+
+    roadmap.write_text(
+        text[: match.start("version")] + new_version + text[match.end("version") :],
+        encoding="utf-8",
+    )
+
+
 def prepare_release(root: Path, version: str, *, today: str | None = None) -> None:
     if not VERSION_RE.fullmatch(version):
         raise ReleasePrepError("version must be plain semver like 4.12.1, without a v prefix")
@@ -100,6 +125,11 @@ def prepare_release(root: Path, version: str, *, today: str | None = None) -> No
         raise ReleasePrepError(f"CHANGELOG.md already contains {marker}")
     if CHANGELOG_HEADER_END not in changelog_text:
         raise ReleasePrepError("CHANGELOG.md: expected changelog header marker not found")
+
+    # Validate and update the source release target before changing VERSION.
+    # The latest published baseline is intentionally untouched until the
+    # publication chain is measured.
+    _update_roadmap_target(root, old_version=old_version, new_version=version)
 
     try:
         update_version_sources(root, version)
