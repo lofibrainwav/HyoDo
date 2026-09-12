@@ -55,10 +55,6 @@ the rest of `.hyodo/` out of version control — see
 | Schema / eval / evidence report | `hyodo schema`, `eval`, `report` |
 | Local evidence panel | `hyodo dashboard --open` |
 | Optional MCP adapter | `hyodo mcp stdio` / `serve` |
-| MCP diagnostics and audit | `hyodo mcp doctor`, `access-log`, `rules` |
-| Onboarding, harness and host wiring | `hyodo start`, `connect`, `mcp config` |
-| Lens, absorption, graph, eye | `hyodo skills`, `inspect`, `graph`, `eye` |
-| Reader vocabulary, host continuity | `--audience`, `hyodo mcp continuity` |
 
 ## Current public claim lock
 
