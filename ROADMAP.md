@@ -5,12 +5,16 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.19.4 is the latest published release target after the public 4.18.0 measured
+HyoDo 4.19.3 is the latest published release after the public 4.18.0 measured
 run. The 4.18.0 signed tag, public wheel and sdist, SBOM receipt, PyPI
 provenance, clean-install readback, and Evidence Pack v1 remain sealed. Every
 release in the 4.19.x line carries its own measured chain receipt under
 `docs/releases/`: signed tag, GitHub Release, exact tag SBOM evidence, PyPI
 OIDC provenance, and post-publish install readback.
+
+## Current release target
+
+HyoDo 4.19.4 is the current release target; public publication is pending.
 
 Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
 adapters are fixture-verified and the two-event recording path is measured on
