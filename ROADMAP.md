@@ -3,18 +3,22 @@
 This roadmap describes direction, not a delivery promise. Work is accepted only
 when implementation, tests, documentation, and release evidence agree.
 
-## Current public baseline
+## Source-tree release baseline
 
-HyoDo 4.19.3 is the latest published release after the public 4.18.0 measured
-run. The 4.18.0 signed tag, public wheel and sdist, SBOM receipt, PyPI
-provenance, clean-install readback, and Evidence Pack v1 remain sealed. Every
-release in the 4.19.x line carries its own measured chain receipt under
+HyoDo 4.19.4 is the latest published release represented by this source tree.
+The public
+`main` branch and PyPI have since advanced to 4.19.5; this checkout is not that
+release source. The 4.19.4 signed tag, public wheel and sdist, SBOM receipt,
+PyPI provenance, clean-install readback, and Evidence Pack v1 remain sealed.
+Every release in the 4.19.x line carries its own measured chain receipt under
 `docs/releases/`: signed tag, GitHub Release, exact tag SBOM evidence, PyPI
 OIDC provenance, and post-publish install readback.
 
 ## Current release target
 
-HyoDo 4.19.4 is the current release target; public publication is pending.
+HyoDo 4.19.4 is the current release target for this source tree; the 4.19.5
+public release is already published. Future release work must update this
+section and the public current-state documents together with release evidence.
 
 Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
 adapters are fixture-verified and the two-event recording path is measured on

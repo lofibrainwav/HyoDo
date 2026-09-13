@@ -21,8 +21,15 @@ from hyodo.cli.main import (
     run_pytest_check,
     run_ruff_check,
 )
+from hyodo.gates import GATES_TRUST_ENV_VAR
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _preapprove_cli_execution_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep CLI helper tests focused on their target behavior after approval."""
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
 
 
 def test_tool_cmd_uses_current_interpreter():

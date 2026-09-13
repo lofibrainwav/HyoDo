@@ -14,11 +14,19 @@ from __future__ import annotations
 from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import app
+from hyodo.gates import GATES_TRUST_ENV_VAR
 
 runner = CliRunner()
+
+
+@pytest.fixture(autouse=True)
+def _preapprove_cli_execution_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The CLI tests explicitly exercise command outcomes after approval."""
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
 
 
 def _write_gates_toml(root: Path, body: str) -> Path:

@@ -20,6 +20,7 @@ from pathlib import Path
 import pytest
 
 from hyodo.gates import (
+    GATES_TRUST_ENV_VAR,
     SCHEMA_ID,
     GatesConfig,
     GatesConfigError,
@@ -27,6 +28,12 @@ from hyodo.gates import (
     load_gates_config,
     run_user_gates,
 )
+
+
+@pytest.fixture(autouse=True)
+def _preapprove_execution_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep shell-idiom tests focused on parsing and subprocess behavior."""
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
 
 
 def _write_gates(root: Path, body: str) -> None:

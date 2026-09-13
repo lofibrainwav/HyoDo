@@ -39,6 +39,41 @@
 	overflow-x: hidden;
 }
 
+.eg-page .navbar {
+	position: sticky;
+	top: 0;
+	z-index: 10;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	padding: 1rem 1.5rem;
+	background: rgba(10, 11, 13, 0.85);
+	backdrop-filter: blur(6px);
+	border-bottom: 1px solid var(--eg-border);
+}
+
+.eg-page .navbar .brand {
+	font-size: 0.95rem;
+	font-weight: 600;
+	color: var(--color-text);
+	text-decoration: none;
+}
+
+.eg-page .navbar .nav-links {
+	display: flex;
+	gap: 1.25rem;
+	font-size: 0.9rem;
+}
+
+.eg-page .navbar .nav-links a {
+	color: var(--color-text-dim);
+	text-decoration: none;
+}
+
+.eg-page .navbar .nav-links a:hover {
+	color: var(--color-accent);
+}
+
 .eg-page .sr-only {
 	position: absolute;
 	width: 1px;
@@ -229,6 +264,22 @@
 	border-radius: 50%;
 	display: inline-block;
 	flex: none;
+}
+
+.eg-page .lg-dot-observed {
+	background: var(--color-tile-observed);
+}
+
+.eg-page .lg-dot-ask {
+	background: var(--color-ask);
+}
+
+.eg-page .lg-dot-deny {
+	background: var(--color-deny);
+}
+
+.eg-page .lg-dot-unobserved {
+	background: var(--color-text-dim);
 }
 
 .eg-page .eg-main {

@@ -20,8 +20,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -r "$SCRIPT_DIR/VERSION" ]; then
     HYODO_VERSION="v$(tr -d '[:space:]' < "$SCRIPT_DIR/VERSION")"
 else
-    HYODO_VERSION="latest"
+    echo "VERSION is required to select an immutable release ref" >&2
+    exit 1
 fi
+HYODO_REF="${HYODO_REF:-$HYODO_VERSION}"
+REPOSITORY_URL="https://github.com/lofibrainwav/HyoDo.git"
+if [[ "$HYODO_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    EXPECTED_SHA="$HYODO_REF"
+else
+    EXPECTED_SHA="$(git ls-remote "$REPOSITORY_URL" "refs/tags/$HYODO_REF^{}" | head -n 1 | cut -f1)"
+fi
+if [ -z "$EXPECTED_SHA" ]; then
+    echo "Release tag or 40-character commit SHA not found: $HYODO_REF" >&2
+    exit 1
+fi
+clone_verified() {
+    if [[ "$HYODO_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        git clone --no-checkout --depth 1 "$REPOSITORY_URL" "$INSTALL_DIR"
+        git -C "$INSTALL_DIR" fetch --depth 1 origin "$HYODO_REF"
+        git -C "$INSTALL_DIR" checkout --detach "$HYODO_REF"
+    else
+        git clone --depth 1 --branch "$HYODO_REF" "$REPOSITORY_URL" "$INSTALL_DIR"
+    fi
+}
 
 print_header() {
     echo ""
@@ -202,8 +223,13 @@ step_install() {
     fi
 
     echo -e "${CYAN}Cloning repository...${NC}"
-    if git clone --depth 1 https://github.com/lofibrainwav/HyoDo.git "$INSTALL_DIR" 2>/dev/null; then
-        echo -e "${CHECK} Clone complete"
+    if clone_verified 2>/dev/null; then
+        ACTUAL_SHA="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
+        if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+            echo -e "${CROSS} ${RED}Ref changed during clone; refusing unverified source${NC}"
+            exit 1
+        fi
+        echo -e "${CHECK} Clone complete ($ACTUAL_SHA)"
     else
         echo -e "${CROSS} ${RED}Clone failed. Check network access.${NC}"
         exit 1
@@ -232,13 +258,13 @@ EOF
     fi
     echo -e "${CHECK} .env created"
 
-    if ask_yes_no "Install Python package now (pip install -e .)?" "y"; then
+    if ask_yes_no "Install Python package now (python3 -m pip install .)?" "y"; then
         echo -e "${CYAN}Installing package...${NC}"
         cd "$INSTALL_DIR"
-        if pip install -e "." 2>/dev/null; then
+        if python3 -m pip install "." 2>/dev/null; then
             echo -e "${CHECK} Package installed"
         else
-            echo -e "${WARN} Package install failed (later: cd $INSTALL_DIR && pip install -e .)"
+            echo -e "${WARN} Package install failed (later: cd $INSTALL_DIR && python3 -m pip install .)"
         fi
     fi
     echo ""
@@ -254,7 +280,7 @@ step_finish() {
     echo -e "${CYAN}Install path:${NC} ${INSTALL_DIR}"
     echo ""
     echo -e "${CYAN}Start with the CLI (recommended):${NC}"
-    echo -e "  ${GREEN}cd $INSTALL_DIR && pip install -e \".[dev]\"${NC}"
+    echo -e "  ${GREEN}cd $INSTALL_DIR && python3 -m pip install .${NC}"
     echo -e "  ${GREEN}hyodo check${NC}"
     echo -e "  ${GREEN}hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9${NC}"
     echo -e "  ${GREEN}hyodo safe${NC}"

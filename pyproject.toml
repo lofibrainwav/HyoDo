@@ -122,6 +122,7 @@ only-include = [
   "SECURITY.md",
   "CONTRIBUTING.md",
   "CODE_OF_CONDUCT.md",
+  "requirements.runtime.txt",
 ]
 
 [tool.ruff]

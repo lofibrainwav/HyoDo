@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/runtime-identity-v1.schema.json",
+  "title": "HyoDo Runtime Identity v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "observed_at", "service", "target", "measurer", "provenance", "connect", "connect_state_path", "ledger_path", "ledger", "runtime"],
+  "properties": {
+    "schema_version": {"const": "hyodo.runtime-identity/v1"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "service": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "endpoint", "http_observed"],
+      "properties": {"name": {"const": "hyodo-dashboard"}, "endpoint": {"type": "string"}, "http_observed": {"type": "boolean"}}
+    },
+    "target": {
+      "type": "object", "additionalProperties": false,
+      "required": ["root_realpath", "root_digest", "git_commit", "git_dirty"],
+      "properties": {"root_realpath": {"type": "string", "minLength": 1}, "root_digest": {"type": "string", "pattern": "^[0-9a-f]{16}$"}, "git_commit": {"type": ["string", "null"]}, "git_dirty": {"type": ["boolean", "null"]}}
+    },
+    "measurer": {
+      "type": "object", "additionalProperties": false,
+      "required": ["tool_name", "tool_version", "source_commit", "source_dirty", "install_mode"],
+      "properties": {"tool_name": {"type": ["string", "null"]}, "tool_version": {"type": ["string", "null"]}, "source_commit": {"type": ["string", "null"]}, "source_dirty": {"type": ["boolean", "null"]}, "install_mode": {"type": ["string", "null"], "enum": ["editable", "wheel", "source", "unknown", null]}}
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["schema_version", "relation", "validity"],
+      "properties": {"schema_version": {"type": ["string", "null"]}, "relation": {"type": ["string", "null"], "enum": ["EXTERNAL_TARGET", "SELF_SAME_CHECKOUT", "SELF_OTHER_CHECKOUT", "SOURCE_UNOBSERVED", null]}, "validity": {"type": ["string", "null"], "enum": ["OBSERVED", "MISMATCH", "UNOBSERVED", null]}}
+    },
+    "connect": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "schema_version", "targets"],
+      "properties": {"state": {"enum": ["ABSENT", "PRESENT", "UNOBSERVED"]}, "schema_version": {"type": ["string", "null"]}, "targets": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["name", "status", "drift"], "properties": {"name": {"type": "string"}, "status": {"type": "string"}, "drift": {"type": "boolean"}}}}}
+    },
+    "connect_state_path": {"const": ".hyodo/connect.json"},
+    "ledger_path": {"const": ".hyodo/agent-events.jsonl"},
+    "ledger": {
+      "type": "object", "additionalProperties": false,
+      "required": ["state", "schema_version", "path_digest", "events", "corrupt_lines"],
+      "properties": {"state": {"enum": ["ABSENT", "OBSERVED", "UNOBSERVED"]}, "schema_version": {"type": ["string", "null"]}, "path_digest": {"type": ["string", "null"], "pattern": "^[0-9a-f]{16}$"}, "events": {"type": ["integer", "null"], "minimum": 0}, "corrupt_lines": {"type": ["integer", "null"], "minimum": 0}}
+    },
+    "runtime": {
+      "type": "object", "additionalProperties": false,
+      "required": ["pid", "started_at"],
+      "properties": {"pid": {"type": "integer", "minimum": 1}, "started_at": {"type": "string", "format": "date-time"}}
+    }
+  }
+}

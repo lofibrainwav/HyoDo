@@ -1,47 +1,36 @@
 # HyoDo - model-agnostic quality gates for AI-assisted development
 
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+COPY pyproject.toml README.md requirements.runtime.txt ./
+COPY hyodo/ ./hyodo/
+COPY schemas/ ./schemas/
+COPY LICENSE CHANGELOG.md VERSION SECURITY.md CONTRIBUTING.md CODE_OF_CONDUCT.md ./
+
+# Resolve the lock-derived runtime set before building the application wheel.
+RUN python -m pip install --no-cache-dir --no-compile -r requirements.runtime.txt \
+    && python -m pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
+
 FROM python:3.12-slim
 
 LABEL maintainer="AFO Kingdom"
 LABEL version="4.19.4"
 LABEL description="HyoDo - AI Code Quality Automation"
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Set working directory
 WORKDIR /app
+COPY --from=builder /build/requirements.runtime.txt ./
+COPY --from=builder /wheels/ ./
 
-# Copy requirements first for better caching
-COPY pyproject.toml ./
-COPY README.md ./
+# The final image receives only exact runtime dependencies and the built wheel.
+RUN python -m pip install --no-cache-dir --no-compile -r requirements.runtime.txt \
+    && python -m pip install --no-cache-dir --no-compile --no-deps /app/hyodo-*.whl \
+    && python -m pip uninstall -y pip setuptools wheel >/dev/null 2>&1 || true
 
-# Install Python dependencies
-RUN pip install --no-cache-dir \
-    ruff \
-    pyright \
-    pytest \
-    pydantic \
-    typer \
-    rich
-
-# Copy application code (public surface only)
-COPY scripts/ ./scripts/
-COPY hyodo/ ./hyodo/
-
-# Install the package
-RUN pip install -e .
-
-# Create non-root user
 RUN useradd -m -u 1000 hyodo && chown -R hyodo:hyodo /app
 USER hyodo
 
-# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import hyodo; print('OK')" || exit 1
 
-# Default command
 CMD ["python", "-m", "hyodo.cli.main", "--help"]

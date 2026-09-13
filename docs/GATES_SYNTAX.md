@@ -23,6 +23,26 @@ gates) instead. If it exists but fails to parse or validate, the loader
 raises `GatesConfigError` and `hyodo check` prints the error and exits `2`
 ("This is not a validation pass.") rather than silently running zero gates.
 
+## Execution trust
+
+Commands in `.hyodo/gates.toml` are executable code supplied by the checkout.
+HyoDo therefore requires explicit approval before executing a new command set:
+
+- In an interactive terminal, `hyodo check` prints the exact commands and asks
+  for approval. A positive answer records the command-set fingerprint in the
+  local `.hyodo/gates-trust.json` receipt.
+- In CI, MCP, or another non-interactive context, an unseen or changed command
+  set is reported as `SKIP` and is not executed. Set
+  `HYODO_GATES_TRUST_ALL=1` only when the checkout has been reviewed out of
+  band and automation is intentionally pre-approving the current set.
+- A previously approved fingerprint runs without another prompt. Any changed
+  fingerprint requires a new approval and is never silently treated as PASS.
+
+The trust receipt is machine-local runtime state and should normally not be
+committed. Approval controls whether commands execute; it does not establish
+that the approved commands are safe or that their results authorize a merge or
+deployment.
+
 ## Table: top level
 
 | Field | Type | Required | Default | Meaning |

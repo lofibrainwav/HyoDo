@@ -21,6 +21,7 @@ language-agnostic.
 | [GATES_SYNTAX.md](./GATES_SYNTAX.md) | `.hyodo/gates.toml` field reference — types, defaults, and exact validation errors |
 | [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
 | [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
+| [THIRD_PARTY_SECURITY_REMEDIATION.md](./THIRD_PARTY_SECURITY_REMEDIATION.md) | Third-party findings, remediation plan, and closure evidence |
 | [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |
 | [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
 | [HOST_CONTRACT.md](./HOST_CONTRACT.md) | What the Claude Code hook mapper copies vs what the host still owns |
@@ -45,6 +46,7 @@ language-agnostic.
 | [M5_REMOTE_CONNECTOR_CONTRACT.md](./M5_REMOTE_CONNECTOR_CONTRACT.md) | Remote `https://mcp.hyodo.app/mcp` is contract-only, not `hyodo mcp stdio` |
 | [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Current implementer notes — not a 4.4.0 rebuild queue |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
+| [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md) | HyoDo and Kingdom ownership and status separation |
 
 ## Release and demo (demo last)
 

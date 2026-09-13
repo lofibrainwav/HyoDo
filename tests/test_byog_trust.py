@@ -2,13 +2,10 @@
 
 Covers the fix for the security report: `.hyodo/gates.toml` in a freshly
 cloned, unreviewed repository executed immediately on `hyodo check`, with no
-signal to the operator about what was about to run. The fix gates the
-command set through trust-on-first-use (see `hyodo.gates.resolve_gate_trust`)
-before a single subprocess starts: the first command set ever seen for a
-checkout becomes its trusted baseline (nothing to compare drift against
-yet); any later change is never executed silently -- refused (SKIP, never
-PASS) in a non-interactive environment unless pre-approved, or shown to an
-operator for approval interactively.
+signal to the operator about what was about to run. The command set now needs
+explicit approval before a single subprocess starts: a new or changed set is
+refused (SKIP, never PASS) in a non-interactive environment unless
+pre-approved, or shown to an operator for approval interactively.
 
 All commands are the running interpreter (``sys.executable -c ...``)
 writing a marker file to disk, or hermetic stdlib binaries (``true``/
@@ -32,6 +29,7 @@ from hyodo.gates import (
     GatesConfig,
     GateTrustDecision,
     UserGate,
+    UserGateResult,
     compute_gate_set_fingerprint,
     load_gates_config,
     resolve_gate_trust,
@@ -62,6 +60,15 @@ def _force_interactive(monkeypatch: pytest.MonkeyPatch, answer: str) -> None:
     monkeypatch.setattr("builtins.input", lambda prompt="": answer)
 
 
+def _approve_first_use(
+    config: GatesConfig, root: Path, monkeypatch: pytest.MonkeyPatch
+) -> list[UserGateResult]:
+    _force_interactive(monkeypatch, "y")
+    results = run_user_gates(config, root)
+    assert all(result.status == "PASS" for result in results)
+    return results
+
+
 def _write_gates_toml(root: Path, body: str) -> Path:
     hyodo_dir = root / ".hyodo"
     hyodo_dir.mkdir(parents=True, exist_ok=True)
@@ -75,13 +82,16 @@ def _trust_store(root: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
-# trust-on-first-use: first sighting is the trusted baseline
+# explicit approval: first sighting is not silently executable
 # ---------------------------------------------------------------------------
 
 
-def test_first_use_executes_and_records_trust(tmp_path: Path) -> None:
+def test_first_use_requires_interactive_approval_and_records_trust(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     marker = tmp_path / "marker.txt"
     config = _config(_marker_gate("write", marker))
+    _force_interactive(monkeypatch, "y")
 
     results = run_user_gates(config, tmp_path)
 
@@ -92,35 +102,34 @@ def test_first_use_executes_and_records_trust(tmp_path: Path) -> None:
     assert store["schema"] == "hyodo.gates-trust/v1"
     fingerprint = compute_gate_set_fingerprint(config)
     assert fingerprint in store["approved"]
-    assert store["approved"][fingerprint]["via"] == "first-use"
+    assert store["approved"][fingerprint]["via"] == "prompt"
 
 
-def test_resolve_gate_trust_first_use_is_approved(tmp_path: Path) -> None:
+def test_resolve_gate_trust_first_use_is_not_approved_without_prompt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     config = _config(UserGate(name="ok", pillar="truth", command=("true",), timeout=5))
+    _force_noninteractive(monkeypatch)
 
     decision = resolve_gate_trust(config, tmp_path)
 
     assert isinstance(decision, GateTrustDecision)
-    assert decision.approved is True
-    assert "first use" in decision.reason
+    assert decision.approved is False
+    assert GATES_TRUST_ENV_VAR in decision.reason
 
 
-def test_first_use_noninteractive_without_env_var_still_executes(
+def test_first_use_noninteractive_without_env_var_skips_without_executing(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Regression guard for the 'don't break existing CI' default: a
-    checkout's very first `hyodo check` run in a non-interactive
-    environment (nothing to compare against yet) executes normally -- no
-    escape-hatch env var required, so kingdom's existing CI is unaffected
-    the moment this fix ships."""
+    """A fresh checkout must not execute arbitrary project commands silently."""
     marker = tmp_path / "marker.txt"
     config = _config(_marker_gate("write", marker))
     _force_noninteractive(monkeypatch)
 
     results = run_user_gates(config, tmp_path)
 
-    assert results[0].status == "PASS"
-    assert marker.exists()
+    assert results[0].status == "SKIP"
+    assert not marker.exists()
 
 
 # ---------------------------------------------------------------------------
@@ -135,7 +144,7 @@ def test_drift_noninteractive_skips_without_executing(
     drift_marker = tmp_path / "drift.txt"
 
     baseline = _config(_marker_gate("write", baseline_marker))
-    baseline_results = run_user_gates(baseline, tmp_path)
+    baseline_results = _approve_first_use(baseline, tmp_path, monkeypatch)
     assert baseline_results[0].status == "PASS"
     assert baseline_marker.exists()
 
@@ -186,7 +195,7 @@ command = "true"
     )
     config = load_gates_config(tmp_path)
     assert config is not None
-    baseline_results = run_user_gates(config, tmp_path)
+    baseline_results = _approve_first_use(config, tmp_path, monkeypatch)
     assert baseline_results[0].status == "PASS"
 
     _write_gates_toml(
@@ -218,7 +227,7 @@ def test_drift_preapproved_via_env_var_executes(
 ) -> None:
     baseline_marker = tmp_path / "baseline.txt"
     drift_marker = tmp_path / "drift.txt"
-    run_user_gates(_config(_marker_gate("write", baseline_marker)), tmp_path)
+    _approve_first_use(_config(_marker_gate("write", baseline_marker)), tmp_path, monkeypatch)
 
     drifted = _config(_marker_gate("write", drift_marker, payload="drifted"))
     monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
@@ -239,7 +248,7 @@ def test_drift_approved_interactively_executes_and_persists(
 ) -> None:
     baseline_marker = tmp_path / "baseline.txt"
     drift_marker = tmp_path / "drift.txt"
-    run_user_gates(_config(_marker_gate("write", baseline_marker)), tmp_path)
+    _approve_first_use(_config(_marker_gate("write", baseline_marker)), tmp_path, monkeypatch)
 
     drifted = _config(_marker_gate("write", drift_marker, payload="drifted"))
     _force_interactive(monkeypatch, "y")
@@ -259,7 +268,7 @@ def test_drift_declined_interactively_skips_without_executing(
 ) -> None:
     baseline_marker = tmp_path / "baseline.txt"
     drift_marker = tmp_path / "drift.txt"
-    run_user_gates(_config(_marker_gate("write", baseline_marker)), tmp_path)
+    _approve_first_use(_config(_marker_gate("write", baseline_marker)), tmp_path, monkeypatch)
 
     drifted = _config(_marker_gate("write", drift_marker, payload="drifted"))
     _force_interactive(monkeypatch, "n")
@@ -275,7 +284,7 @@ def test_interactive_prompt_eof_declines_without_crashing(
 ) -> None:
     baseline_marker = tmp_path / "baseline.txt"
     drift_marker = tmp_path / "drift.txt"
-    run_user_gates(_config(_marker_gate("write", baseline_marker)), tmp_path)
+    _approve_first_use(_config(_marker_gate("write", baseline_marker)), tmp_path, monkeypatch)
 
     drifted = _config(_marker_gate("write", drift_marker, payload="drifted"))
     monkeypatch.setattr(gates, "_is_noninteractive", lambda: False)
@@ -299,7 +308,7 @@ def test_reverting_to_a_previously_approved_command_set_is_silent(
     config_a = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
     config_b = _config(UserGate(name="g", pillar="truth", command=("false",), timeout=5))
 
-    run_user_gates(config_a, tmp_path)  # first-use baseline
+    _approve_first_use(config_a, tmp_path, monkeypatch)  # explicitly approved baseline
 
     _force_interactive(monkeypatch, "y")
     results_b = run_user_gates(config_b, tmp_path)  # drift, approved once
@@ -368,7 +377,7 @@ def test_ci_env_var_falsy_values_are_not_truthy(
     assert gates._env_truthy("CI") is False
 
 
-def test_malformed_trust_store_is_treated_as_first_use(
+def test_malformed_trust_store_requires_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     hyodo_dir = tmp_path / ".hyodo"
@@ -380,10 +389,10 @@ def test_malformed_trust_store_is_treated_as_first_use(
 
     results = run_user_gates(config, tmp_path)
 
-    assert results[0].status == "PASS"  # a corrupt receipt does not brick execution
+    assert results[0].status == "SKIP"  # a corrupt receipt cannot silently approve execution
 
 
-def test_trust_store_with_non_dict_approved_field_is_treated_as_first_use(
+def test_trust_store_with_non_dict_approved_field_requires_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     hyodo_dir = tmp_path / ".hyodo"
@@ -398,4 +407,4 @@ def test_trust_store_with_non_dict_approved_field_is_treated_as_first_use(
 
     results = run_user_gates(config, tmp_path)
 
-    assert results[0].status == "PASS"
+    assert results[0].status == "SKIP"
