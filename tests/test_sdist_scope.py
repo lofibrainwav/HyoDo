@@ -42,6 +42,14 @@ def test_allowed_roots_come_from_pyproject_plus_hatch_metadata(tmp_path: Path) -
     }
 
 
+def test_real_public_sdist_allowlist_excludes_checkout_tests() -> None:
+    root = Path(__file__).resolve().parents[1]
+    roots = allowed_roots(root / "pyproject.toml")
+    assert "hyodo" in roots
+    assert "schemas" in roots
+    assert "tests" not in roots
+
+
 def test_declared_public_sdist_scope_passes_regardless_of_compressed_size(tmp_path: Path) -> None:
     pyproject = tmp_path / "pyproject.toml"
     write_pyproject(pyproject)
