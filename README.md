@@ -61,8 +61,6 @@ the rest of `.hyodo/` out of version control — see
 This table is the latest **published-package** boundary. It does not describe
 unreleased `main` work. For current source and measured-state readback, see
 [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
-HyoDo and Kingdom ownership is defined separately in
-[`docs/PRODUCT_BOUNDARY.md`](./docs/PRODUCT_BOUNDARY.md).
 
 <!-- markdownlint-disable MD013 -->
 
@@ -82,11 +80,7 @@ HyoDo and Kingdom ownership is defined separately in
 
 ## Honest boundaries
 
-HyoDo is deliberately narrow:
-
-- HyoDo observes and verifies external execution; Kingdom owns planning,
-  execution authority, workers, orchestration, recovery, and settlement.
-- Kingdom processes, tests, branches, and worktrees are not HyoDo status.
+HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
 
 - It is **not** a runtime sandbox or process interceptor.
 - `hyodo safe` is an early-warning scanner, not a full security audit.
