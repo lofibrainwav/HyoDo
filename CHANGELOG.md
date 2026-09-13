@@ -28,6 +28,25 @@ sealed baseline; this source tree carries the next patch contract only.
 - Public artifact, PyPI, KINGDOM, and Neo4j live-seal evidence remain
   `UNOBSERVED` until their respective gates are run.
 
+## [4.19.5] - 2026-09-13
+
+Public artifact convergence patch. This release republishes the corrected
+public sdist scope under a new immutable version; HyoDo 4.19.4 artifacts are
+not overwritten.
+
+### Fixed
+
+- Excludes checkout tests from the public sdist while preserving the public
+  package, release documents, and runtime identity schemas.
+- Aligns the release chain with the canonical `main` source and its measured
+  public artifact hashes.
+
+### Evidence
+
+- Release evidence will record the exact source SHA, wheel and sdist hashes,
+  sdist size and entry count, PyPI fresh-download equality, and OIDC
+  provenance after publication.
+
 ## [4.19.3] - 2026-09-11
 
 Final closure release for the post-4.19.2 source line.
