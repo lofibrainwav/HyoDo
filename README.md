@@ -58,11 +58,9 @@ the rest of `.hyodo/` out of version control — see
 
 ## Current public claim lock
 
-This table is the latest **published-package** boundary. It does not describe
-unreleased `main` work. For current source and measured-state readback, see
-[`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
-HyoDo and Kingdom ownership is defined separately in
-[`docs/PRODUCT_BOUNDARY.md`](./docs/PRODUCT_BOUNDARY.md).
+This table is the latest **published-package** boundary; current source and
+measured-state readback is in [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
+HyoDo/Kingdom ownership: [`docs/PRODUCT_BOUNDARY.md`](./docs/PRODUCT_BOUNDARY.md).
 
 <!-- markdownlint-disable MD013 -->
 
@@ -112,10 +110,6 @@ HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
 ```
 
-```bash
-hyodo init && hyodo check
-```
-
 `init` can absorb pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, and
 Makefile targets. Empty or malformed gate configuration exits **2**, not **0**.
 
@@ -158,7 +152,7 @@ hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
 ```
 
 The MCP adapter uses the same CLI contracts rather than a second engine.
-SDK v1/v2 are in CI. `mcp.hyodo.app` is contract-only, not this path.
+`mcp.hyodo.app` is contract-only, not this path.
 
 ## Exit contracts
 
