@@ -82,7 +82,7 @@ HyoDo and Kingdom ownership is defined separately in
 
 ## Honest boundaries
 
-HyoDo is deliberately narrow:
+HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
 
 - HyoDo observes and verifies external execution; Kingdom owns planning,
   execution authority, workers, orchestration, recovery, and settlement.

@@ -42,6 +42,7 @@ export default defineConfig({
 				{ label: 'Roadmap', slug: 'docs/roadmap' },
 				{ label: 'Trust', slug: 'docs/trust' },
 				{ label: 'Runtime identity', slug: 'docs/runtime-identity' },
+				{ label: 'Product boundary', slug: 'docs/product-boundary' },
 			],
 		}),
 	],

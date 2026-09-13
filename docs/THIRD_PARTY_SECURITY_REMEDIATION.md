@@ -59,7 +59,7 @@ deployed and tested.
 | --- | --- | --- |
 | Compose default exposure | IMPLEMENTED | YAML diff inspected; Docker runtime readback is `UNOBSERVED` because the current workstation has no `docker` executable |
 | Historical credential disposition | HOLD | No credential owner disposition or rotation receipt |
-| Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, and site source claims now name published `4.19.5`; local package source remains `4.19.4` and public deployment readback is separate |
+| Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, package metadata, and site source claims now name published `4.19.5`; public deployment readback is separate |
 | Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
 | Clean security verification | VERIFIED IN ISOLATED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Isolated Python 3.12 environment: `1499 passed, 7 skipped`; `ruff`, `pyright`, `pip-audit --local`, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. A later host-global `pip-audit` attempt could not start because that environment lacks `certifi`; it is not counted as a vulnerability result |
 | CI secret/dependency scan | IMPLEMENTED LOCALLY / NOT ON REMOTE MAIN | New SHA-pinned workflow runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; remote `main` still has no `security.yml`, and its existing Security Scan is only a dangerous-command grep |
@@ -301,8 +301,9 @@ image; the base image and actual build remain separate unobserved axes.
 
 ### Observed condition
 
-The public package currently reports `4.19.5`, while this checkout contains
-`4.19.4`. Public documentation still contains older claims such as:
+At the time of the initial audit, the public package reported `4.19.5` while
+the audit checkout contained `4.19.4`. Public documentation also contained
+older claims such as:
 
 - [`SECURITY.md`](../SECURITY.md) listing supported versions through `3.2.x`;
 - [`docs/CURRENT_STATE.md`](CURRENT_STATE.md) describing `4.19.3` as the latest

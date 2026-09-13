@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "4.19.4"
+version = "4.19.5"
 description = "Honest local guardrails for AI-assisted development: evidence, policy checks, and fail-closed quality gates"
 readme = "README.md"
 license = "MIT"
@@ -108,11 +108,13 @@ packages = ["hyodo"]
 "schemas/runtime-identity-v1.schema.json" = "schemas/runtime-identity-v1.schema.json"
 "schemas/runtime-identity-v1.pin.json" = "schemas/runtime-identity-v1.pin.json"
 
-# Public sdist must NOT ship afo_core (advisory tree) or repo tooling noise.
+# Public sdist ships the runtime package and public release documents only.
+# Tests remain in the checkout/CI source tree, not in the installable source
+# distribution; this keeps the public artifact focused without weakening the
+# structural no-afo_core and runtime-contract checks.
 [tool.hatch.build.targets.sdist]
 only-include = [
   "hyodo",
-  "tests",
   "README.md",
   "LICENSE",
   "CHANGELOG.md",
@@ -122,7 +124,6 @@ only-include = [
   "SECURITY.md",
   "CONTRIBUTING.md",
   "CODE_OF_CONDUCT.md",
-  "requirements.runtime.txt",
 ]
 
 [tool.ruff]

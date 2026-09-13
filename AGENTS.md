@@ -4,11 +4,22 @@ Instructions for coding agents working in this repository.
 
 ## Product boundary
 
+HyoDo is a public, host-neutral, model-agnostic trust, evidence, policy, and
+attestation layer. The integrating host or harness owns orchestration, memory,
+retrieval, runtime, execution, and final authority. HyoDo is not KINGDOM.
+
+The canonical virtue set is exactly six: Truth / 眞, Goodness / 善, Beauty / 美,
+Benevolence / 仁, Hyo / 孝, and Eternity / 永. A virtue is not evidence;
+evidence is not a decision; a score or receipt is not authority. Merged is not
+served, and UNOBSERVED is not GREEN. KINGDOM-specific behavior is upstreamed
+only when it generalizes into a reusable public primitive.
+
 - `hyodo/` is the public Python package and primary release surface.
 - `tests/` contains the public package tests.
 
-Do not describe HyoDo as a universal project scanner. Full `hyodo check` gates
-currently require a HyoDo checkout containing `pyproject.toml` and `hyodo/`.
+Do not describe HyoDo as a universal project scanner. The public `hyodo check`
+path supports BYOG project checks, while HyoDo's own full verification requires
+a checkout containing `pyproject.toml` and `hyodo/`; these are separate scopes.
 
 ## Working rules
 

@@ -62,7 +62,5 @@ default_language_version:
 
 ci:
   autofix_commit_msg: |
-    [pre-commit.ci]  
-
-    Co-Authored-By:  ( Sword) <jang@afo.kingdom>
+    [pre-commit.ci] automated formatting update
   autoupdate_commit_msg: "[pre-commit.ci] pre-commit  "

@@ -45,6 +45,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from hyodo.virtues import CANONICAL_VIRTUE_KEYS
+
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ImportError:  # pragma: no cover - py3.10 checkouts without tomllib
@@ -57,7 +59,7 @@ except ImportError:  # pragma: no cover - py3.10 checkouts without tomllib
         ) from exc
 
 SCHEMA_ID = "hyodo.gates/v1"
-VALID_PILLARS = frozenset({"truth", "goodness", "beauty", "benevolence", "hyo", "eternity"})
+VALID_PILLARS = frozenset(CANONICAL_VIRTUE_KEYS)
 DEFAULT_TIMEOUT_SECONDS = 120
 GATES_CONFIG_RELATIVE_PATH = Path(".hyodo") / "gates.toml"
 GATE_MESSAGE_TAIL_CHARS = 200

@@ -5,7 +5,7 @@ Status: working research documentation
 This directory is the durable roadmap and protocol surface for the HyoDo / ACL / KINGDOM research program. The public `/docs/acl/` page remains a high-level field note; these repository documents define the stricter execution and research contracts.
 
 For the cross-cutting readback of the latest public package versus current
-`main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is closed and HyoDo 4.19.3 is the verified public baseline. The
+`main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is closed and HyoDo 4.19.4 is the verified public baseline. The
 remaining matched KINGDOM/ACL and live-host work is downstream research and
 integration, not unfinished HyoDo product capability.
 
@@ -160,7 +160,7 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 
 ## Immediate roadmap gate
 
-HyoDo 4.19.3 is the verified public baseline. Do not rewrite its sealed evidence
+HyoDo 4.19.4 is the verified public baseline. Do not rewrite its sealed evidence
 when later KINGDOM experiments run.
 
 The downstream gate is:

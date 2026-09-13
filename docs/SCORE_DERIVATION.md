@@ -1,6 +1,6 @@
 # Score derivation (`hyodo score --from-check`)
 
-`hyodo score` computes the HyoDo Integrity Score from five pillar values
+`hyodo score` computes the historical HYOGOOK V5 compatibility score from five pillar values
 (Benevolence, Truth, Goodness, Hyo, Beauty) that the caller supplies as
 `0.0-1.0` flags. Nothing about that formula changes here. This document
 covers a separate, additive path: `hyodo score --from-check`, which derives
@@ -9,11 +9,14 @@ test-integrity scan already observe about a checkout, in-process (no
 subprocess calls), with full provenance for every number it produces.
 
 This stays a **review signal**, never an approval — see `hyodo score --help`.
+The V5 derived aggregate is named `harmony_aggregate` in new contracts; the
+printed/API `S_eternity` label remains for 4.19.4 compatibility.
 
 ## Rule table
 
 `hyodo/score_derive.py` defines `PILLAR_RULE_TABLE`, a `rule_id -> (pillar,
-max_weight, description)` mapping. Every provenance row a derivation can
+max_weight, description)` mapping. These are per-pillar contribution limits,
+not global F-score weights. Every provenance row a derivation can
 emit carries a `rule_id` that is a key in this table; a test
 (`tests/test_score_derive.py::test_rule_table_is_total`) enforces that the
 table only ever targets one of the five known pillars, and a second test
@@ -48,14 +51,14 @@ Each pillar reports one of three coverage states, alongside its value:
   rescaled over the rules that did.
 - **UNOBSERVED** — no rule for that pillar fired. The value is `None`, never
   a smuggled 0 or 100. `hyodo score --from-check` prints this pillar as
-  `UNOBSERVED` and excludes it from the Eternity geometric-mean term.
+`UNOBSERVED` and excludes it from the legacy harmony aggregate term.
 
-When every one of the five pillars is `OBSERVED` (after any `--truth`-style
+When every one of the five V5 pillars is `OBSERVED` (after any `--truth`-style
 override), `hyodo score --from-check` calls the unmodified
 `calculate_hygook_v5_score` and prints the usual F/S/TOTAL. When one or more
 pillars are `UNOBSERVED`, the command:
 
-- prints Eternity (S) computed only over the pillars that *were* observed
+- prints legacy harmony (S) computed only over the V5 pillars that *were* observed
   (`geometric_mean_observed`, not the five-pillar formula),
   marks Eternity/F as `PARTIAL`, and lists which pillars were excluded;
 - does **not** print a TOTAL score, since the formula requires all five
@@ -63,6 +66,14 @@ pillars are `UNOBSERVED`, the command:
   (`--benevolence 0.8`, etc.) to complete it.
 
 ## Overrides
+
+### Legacy flag compatibility
+
+`--eternity` and `--serenity` are legacy aliases retained for 4.19.4 CLI
+compatibility. They do not set the canonical `Eternity` virtue; they map to
+the historical V5 compatibility inputs. New integrations must use explicit
+virtue names. Removal requires a versioned deprecation cycle and must not be
+performed as part of this convergence.
 
 Any of `--benevolence` / `--truth` / `--goodness` / `--hyo` / `--beauty`
 (and the legacy `--serenity` / `--eternity` aliases) may be passed alongside

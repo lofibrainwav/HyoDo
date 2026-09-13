@@ -68,9 +68,10 @@ checkout or replacing the KINGDOM execution authority.
   `hyodo/graph_view.py`'s `assign_columns` mapping table places them on.
   The six spec-fixed pillar keys are always present, plus an additive
   seventh `"unclassified"` key for a decision the mapping table places
-  nowhere. `eternity` is always empty — Eternity is read off the local
-  graph viewer's orb, never a column, so no decision is ever assigned to
-  it.
+  nowhere. The v1 `eternity` cluster is retained for schema compatibility and
+  is empty because graph decisions are not longitudinal continuity evidence.
+  The canonical Eternity virtue is represented by a continuity indicator;
+  `harmony_aggregate` is a separate derived score namespace.
 
 A dangling `evidence_refs` entry (only possible in a hand-edited or
 truncated ledger; `hyodo/events.py`'s own recording path rejects one at
@@ -136,7 +137,8 @@ dict with.
 
 ## The `/graph` grid (local viewer second pass)
 
-`/graph` renders one grid — five virtue columns by actor row, per
+`/graph` renders one grid — five evidence columns by actor row, plus a
+separate Eternity continuity indicator — per
 `docs/superpowers/specs/2026-09-06-hyodo-core-engine-monitor-design.md`
 section 2 — not two separate lists. A few rendering details worth calling
 out for anyone reading the page's markup or extending it:
@@ -159,6 +161,11 @@ out for anyone reading the page's markup or extending it:
 - **The orb** is a 9x9 pixel grid, not a circle: the lit square count is
   the run's raw `observed` count (capped at 81), never a ratio or a
   percentage.
+
+The numeric terms describe different dimensions of the viewer, not competing
+virtue counts: the contract has **6 Virtues**, the grid has **5 evidence
+columns** because Eternity is rendered as the continuity indicator, and the
+viewer can show **4 actor rows** (`human`, `planner`, `executor`, `reviewer`).
 
 ## What this is not
 

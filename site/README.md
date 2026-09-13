@@ -40,8 +40,8 @@ Output goes to `dist/`, with `dist/index.html` for the landing page and
 
 ## Deploying on Vercel
 
-`site/vercel.json` is not present; instead, configure the following in the
-Vercel project settings:
+The repository owns the response security headers in `site/vercel.json`. The
+Vercel project settings must still use the following build configuration:
 
 | Setting | Value |
 | --- | --- |
