@@ -3,7 +3,7 @@
 FROM python:3.12-slim
 
 LABEL maintainer="AFO Kingdom"
-LABEL version="4.19.4"
+LABEL version="4.19.5"
 LABEL description="HyoDo - AI Code Quality Automation"
 
 # Install system dependencies

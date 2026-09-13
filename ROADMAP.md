@@ -17,7 +17,9 @@ OIDC provenance, and post-publish install readback.
 HyoDo 4.19.4 is published. Future work must distinguish current source from
 the measured public artifact and must not describe 4.19.4 as publication
 pending.
-HyoDo 4.19.4 is the current release target for this source tree.
+HyoDo 4.19.5 is the current release target for this source tree. It exists to
+converge the corrected public sdist with PyPI; 4.19.4 remains the latest
+published baseline until the new release chain is observed.
 
 Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
 adapters are fixture-verified and the two-event recording path is measured on
@@ -169,6 +171,13 @@ evidence is not converted into a pass.
   provenance, with deterministic digests and projection IDs.
 - Keeps raw retrieval bodies, queries, prompts, authority, and approval out of
   the HyoDo event ledger; local and public release evidence remain separate.
+
+### 4.19.5 (release target 2026-09-13)
+
+- Republishes the corrected public sdist scope under a new immutable patch
+  version; the 4.19.4 artifact is not overwritten.
+- Closes the source-build to PyPI artifact hash/readback chain after the
+  release workflow's provenance and install checks pass.
 
 ## Next candidates
 
