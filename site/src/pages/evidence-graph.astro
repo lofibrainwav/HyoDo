@@ -20,44 +20,6 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 			name="description"
 			content="A public, browser-only prototype of the HyoDo evidence graph. Defaults to fixed demo data; you can opt in to render a local hyodo.evidence-graph/v1 JSON file. Nothing is uploaded."
 		/>
-		<style>
-			/* Duplicated from index.astro's navbar/footer CSS on purpose — this
-			   page does not share a layout component with the landing page yet. */
-			.navbar {
-				position: sticky;
-				top: 0;
-				z-index: 10;
-				display: flex;
-				align-items: center;
-				justify-content: space-between;
-				padding: 1rem 1.5rem;
-				background: rgba(10, 11, 13, 0.85);
-				backdrop-filter: blur(6px);
-				border-bottom: 1px solid #24272e;
-			}
-
-			.navbar .brand {
-				font-size: 0.95rem;
-				font-weight: 600;
-				color: #eef0f3;
-				text-decoration: none;
-			}
-
-			.navbar .nav-links {
-				display: flex;
-				gap: 1.25rem;
-				font-size: 0.9rem;
-			}
-
-			.navbar .nav-links a {
-				color: #9aa1ac;
-				text-decoration: none;
-			}
-
-			.navbar .nav-links a:hover {
-				color: #6ee7b7;
-			}
-		</style>
 	</head>
 	<body class="eg-page">
 		<nav class="navbar">
@@ -101,21 +63,21 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 
 			<div class="legend" aria-hidden="false">
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-tile-observed)"
+					><span class="lg-dot lg-dot-observed"
 					></span><b>ALLOW</b></span
 				>
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-ask)"></span><b
+					><span class="lg-dot lg-dot-ask"></span><b
 						>ASK</b
 					></span
 				>
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-deny)"></span><b
+					><span class="lg-dot lg-dot-deny"></span><b
 						>DENY</b
 					></span
 				>
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-text-dim)"></span><b
+					><span class="lg-dot lg-dot-unobserved"></span><b
 						>UNOBSERVED</b
 					></span
 				>
@@ -147,99 +109,6 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> events inside optional local <code>hyodo.evidence-graph/v1</code> JSON (event_id, run_id, ts, kind, actor, step_index, tool, policy, optional parent_event_id/evidence_refs). Default view is the demo fixture. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
 		</main>
 
-		<script>
-			import { EVENTS, mountEvidenceGraph } from '../graph/evidence-graph';
-			import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../graph/from-v1';
-
-			const root = document.getElementById('eg-root');
-			const banner = document.getElementById('eg-banner');
-			const fileInput = document.getElementById('eg-file');
-			const resetBtn = document.getElementById('eg-reset');
-			const consoleSession = document.getElementById('eg-console-session');
-			const consoleView = document.getElementById('eg-console-view');
-			const consoleSteps = document.getElementById('eg-console-steps');
-			const consoleBoundary = document.getElementById('eg-console-boundary');
-			const fixtureBannerHtml = banner?.innerHTML ?? '';
-
-			let dispose = () => {};
-			if (root) dispose = mountEvidenceGraph(root);
-
-			function escapeHtml(value: string): string {
-				return value
-					.replace(/&/g, '&amp;')
-					.replace(/</g, '&lt;')
-					.replace(/>/g, '&gt;')
-					.replace(/"/g, '&quot;');
-			}
-
-			function remount(events: typeof EVENTS): void {
-				dispose();
-				if (root) dispose = mountEvidenceGraph(root, events);
-			}
-
-			function showFixture(): void {
-				remount(EVENTS);
-				if (consoleSession) consoleSession.textContent = 'SESSION / FIXTURE';
-				if (consoleView) consoleView.textContent = 'STATIC VIEW';
-				if (consoleSteps) consoleSteps.textContent = 't0 — t7';
-				if (consoleBoundary) consoleBoundary.textContent = 'DEMO DATA / NOT LIVE';
-				if (banner) {
-					banner.innerHTML = fixtureBannerHtml;
-					banner.dataset.source = 'fixture';
-				}
-			}
-
-			fileInput?.addEventListener('change', async () => {
-				const input = fileInput as HTMLInputElement;
-				const file = input.files?.[0];
-				input.value = '';
-				if (!file || !banner) return;
-
-				let parsed: unknown;
-				try {
-					parsed = JSON.parse(await file.text());
-				} catch {
-					showFixture();
-					banner.innerHTML =
-						'<strong>Load failed.</strong> That file is not valid JSON. Still showing the demo fixture. Nothing was uploaded, stored, or fetched from a network.';
-					banner.dataset.source = 'fixture';
-					return;
-				}
-
-				const info = inspectEvidenceGraphV1(parsed);
-				if (!info.ok) {
-					showFixture();
-					const why = info.reason ? ` (${escapeHtml(info.reason)})` : '';
-					banner.innerHTML =
-						`<strong>Load failed.</strong> Not a <code>hyodo.evidence-graph/v1</code> graph${why}. Still showing the demo fixture. Nothing was uploaded, stored, or fetched from a network.`;
-					banner.dataset.source = 'fixture';
-					return;
-				}
-
-				remount(fromEvidenceGraphV1(parsed));
-				const graphNodes = Array.isArray((parsed as { nodes?: unknown }).nodes)
-					? (parsed as { nodes: Array<{ step_index?: unknown }> }).nodes
-					: [];
-				const steps = graphNodes
-					.map((node) => (typeof node.step_index === 'number' ? node.step_index : null))
-					.filter((step): step is number => step !== null);
-				const maxStep = steps.length > 0 ? Math.max(...steps) : 0;
-				if (consoleSession) consoleSession.textContent = 'SESSION / LOCAL JSON';
-				if (consoleView) consoleView.textContent = 'STATIC VIEW';
-				if (consoleSteps) consoleSteps.textContent = `t0 — t${maxStep}`;
-				if (consoleBoundary) consoleBoundary.textContent = 'LOCAL DATA / NOT SEALED';
-				const status = escapeHtml(info.status ?? 'unknown');
-				const reason = info.reason ? ` (${escapeHtml(info.reason)})` : '';
-				const unobserved =
-					info.status === 'UNOBSERVED'
-						? ' Unobserved is never a pass.'
-						: '';
-				banner.innerHTML =
-					`<strong>Local file.</strong> Showing a <code>hyodo.evidence-graph/v1</code> payload selected in this browser — not a remote ledger. Graph status: <code>${status}</code>${reason}.${unobserved} Nothing was uploaded, stored, or fetched. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>.`;
-				banner.dataset.source = 'local';
-			});
-
-			resetBtn?.addEventListener('click', () => showFixture());
-		</script>
+		<script src="../scripts/evidence-graph-page.ts"></script>
 	</body>
 </html>

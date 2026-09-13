@@ -15,6 +15,18 @@ updates:
       prefix: "deps"
       include: "scope"
 
+  - package-ecosystem: "npm"
+    directory: "/site"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "site"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

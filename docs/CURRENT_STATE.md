@@ -1,13 +1,13 @@
 # HyoDo current state
 
-Snapshot: 2026-09-11 PT
+Snapshot: 2026-09-13 PT
 
 This file separates shipped product capability from live/runtime observation. Exact
 revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package: HyoDo `4.19.4`
+- Latest public package: HyoDo `4.19.5`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC provenance, neutral-cwd install smoke, and hosted runtime-identity schema readback verified.
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
 - HyoDo product status: release closure complete; remaining live-host and orchestration experiments are downstream integration/research work.
@@ -18,7 +18,7 @@ branches, and worktrees must not be folded into HyoDo closeout status.
 
 ## Current truth
 
-| Capability | Public 4.19.4 | Current main / measured state |
+| Capability | Public 4.19.5 | Current main / measured state |
 | --- | --- | --- |
 | gates, policy, event ledger | SHIPPED | SHIPPED |
 | local Friction Contribution | SHIPPED | SHIPPED; no collector/uploader |
@@ -48,7 +48,10 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 ## Maintenance boundary
 
-HyoDo 4.19.4 is the closed public baseline. Fresh Codex/Cursor host observations,
+HyoDo 4.19.5 is the closed public baseline and this checkout is now reconciled
+to that source version. Do not infer runtime identity from this page alone;
+use the signed release, CI receipt, or runtime identity receipt. Fresh
+Codex/Cursor host observations,
 QMD/Neo4j closed-loop memory, and matched ACL/KINGDOM shadow experiments are
 downstream integration/research work and must not silently reopen HyoDo product
 authority or rewrite sealed release evidence.

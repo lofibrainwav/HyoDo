@@ -343,21 +343,21 @@ const installCommand = 'pipx install hyodo';
 				<p class="eg-banner" role="note">This is demo fixture data; nothing is uploaded. The links are optional <code>hyodo.agent-event/v1</code> fields shipped since 4.14.0 and rendered from a real ledger by <code>hyodo dashboard</code>; this public page still renders fixture data.</p>
 			<div class="legend" aria-hidden="false">
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-tile-observed)"
+					><span class="lg-dot lg-dot-observed"
 					></span><b>ALLOW</b></span
 				>
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-ask)"></span><b
+					><span class="lg-dot lg-dot-ask"></span><b
 						>ASK</b
 					></span
 				>
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-deny)"></span><b
+					><span class="lg-dot lg-dot-deny"></span><b
 						>DENY</b
 					></span
 				>
 				<span class="lg-item"
-					><span class="lg-dot" style="background:var(--color-text-dim)"></span><b
+					><span class="lg-dot lg-dot-unobserved"></span><b
 						>UNOBSERVED</b
 					></span
 				>
@@ -410,24 +410,6 @@ const installCommand = 'pipx install hyodo';
 					</table>
 				</section>
 			</div>
-		<script>
-			const section = document.querySelector<HTMLElement>('.eg-embed');
-			const root = section?.querySelector<HTMLElement>('.graph-wrap');
-			if (section && root) {
-				let mounting: Promise<void> | undefined;
-				const mount = () => mounting ??= import('../graph/evidence-graph').then(m => {
-					m.mountEvidenceGraph(root);
-					section.dataset.mounted = 'true';
-					section.dispatchEvent(new Event('eg-ready'));
-				});
-				section.addEventListener('eg-mount', mount);
-				const observer = new IntersectionObserver(entries => {
-					if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); void mount(); }
-				}, { rootMargin: '100% 0px' });
-				observer.observe(section);
-			}
-		</script>
-
 			<div class="wrap">
 				<section class="layer">
 					<h2>For people who build with AI but cannot read code</h2>
@@ -473,48 +455,6 @@ const installCommand = 'pipx install hyodo';
 			</div>
 		</footer>
 
-		<script>
-			const btn = document.getElementById('copy-btn');
-			const cmd = document.getElementById('install-cmd');
-			btn?.addEventListener('click', async () => {
-				const text = cmd?.textContent ?? '';
-				try {
-					await navigator.clipboard.writeText(text);
-					const original = btn.textContent;
-					btn.textContent = 'Copied';
-					setTimeout(() => {
-						btn.textContent = original;
-					}, 1500);
-				} catch {
-					// Clipboard API unavailable; the command is already selectable text.
-				}
-			});
-		</script>
-
-		<script>
-			// Load the hero scene only after the headline has painted and only
-			// once the canvas is actually visible. mountHero() itself decides
-			// (via shouldAnimate) whether to do anything at all.
-			const canvas = document.getElementById('hero-canvas');
-
-			if (canvas instanceof HTMLCanvasElement) {
-				const start = () => {
-					const observer = new IntersectionObserver((entries) => {
-						for (const entry of entries) {
-							if (!entry.isIntersecting) continue;
-							observer.disconnect();
-							import('../hero/mount').then((module) => module.default(canvas));
-						}
-					});
-					observer.observe(canvas);
-				};
-
-				if ('requestIdleCallback' in window) {
-					requestIdleCallback(start);
-				} else {
-					setTimeout(start, 0);
-				}
-			}
-		</script>
+		<script src="../scripts/landing-page.ts"></script>
 	</body>
 </html>

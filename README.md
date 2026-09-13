@@ -58,9 +58,9 @@ the rest of `.hyodo/` out of version control — see
 
 ## Current public claim lock
 
-This table is the latest **published-package** boundary. It does not describe
-unreleased `main` work. For current source and measured-state readback, see
-[`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
+This table is the latest **published-package** boundary; current source and
+measured-state readback is in [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
+HyoDo/Kingdom ownership: [`docs/PRODUCT_BOUNDARY.md`](./docs/PRODUCT_BOUNDARY.md).
 
 <!-- markdownlint-disable MD013 -->
 
@@ -81,6 +81,10 @@ unreleased `main` work. For current source and measured-state readback, see
 ## Honest boundaries
 
 HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
+
+- HyoDo observes and verifies external execution; Kingdom owns planning,
+  execution authority, workers, orchestration, recovery, and settlement.
+- Kingdom processes, tests, branches, and worktrees are not HyoDo status.
 
 - It is **not** a runtime sandbox or process interceptor.
 - `hyodo safe` is an early-warning scanner, not a full security audit.
@@ -104,10 +108,6 @@ HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
 
 ```yaml
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
-```
-
-```bash
-hyodo init && hyodo check
 ```
 
 `init` can absorb pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, and
@@ -152,7 +152,7 @@ hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
 ```
 
 The MCP adapter uses the same CLI contracts rather than a second engine.
-SDK v1/v2 are in CI. `mcp.hyodo.app` is contract-only, not this path.
+`mcp.hyodo.app` is contract-only, not this path.
 
 ## Exit contracts
 

@@ -13,20 +13,20 @@ directly-observed subprocess outcome -- a missing binary is reported as
 ``SKIP``, never silently upgraded to ``PASS``.
 
 A checkout's ``.hyodo/gates.toml`` can define arbitrary commands, so
-`run_user_gates` records the command set it executes and refuses to run a
-changed one silently (see `resolve_gate_trust`): the first set seen for a
-checkout becomes its baseline in ``.hyodo/gates-trust.json``, and any later
-fingerprint is ``SKIP`` (never ``PASS``) non-interactively, or shown to an
-operator for approval interactively.
+`run_user_gates` records the command set it executes and refuses to run an
+unreviewed or changed one silently (see `resolve_gate_trust`): the first set
+seen for a checkout must be approved interactively or explicitly pre-approved
+for automation, and any later fingerprint is ``SKIP`` (never ``PASS``)
+non-interactively, or shown to an operator for approval interactively.
 
-**What this does and does not cover.** It catches *drift* — a repository that
-changes what it runs after you started trusting it. It does **not** vet a
-repository you have never run before: the first command set is trusted
-automatically, because refusing it would mean every clone and every CI job
-stops until someone clicks. Running ``hyodo check`` on an unreviewed checkout
-executes that checkout's commands, exactly like ``make`` or ``npm test``
-would. Read ``.hyodo/gates.toml`` before running HyoDo on code you do not
-trust; this module narrows the window, it does not close it.
+**What this does and does not cover.** It catches *drift* and first use: a
+repository that changes what it runs after you started trusting it, or a fresh
+checkout whose commands have not been reviewed yet. Running ``hyodo check`` on
+an unreviewed checkout will show the exact commands interactively and refuse
+to execute them without approval; automation must opt in explicitly with
+``HYODO_GATES_TRUST_ALL=1``. Read ``.hyodo/gates.toml`` before approving a
+repository you do not trust; this module controls execution, but it does not
+judge whether an approved command is semantically safe.
 """
 
 from __future__ import annotations
@@ -318,11 +318,8 @@ def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
 def resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
     """Decide whether *config*'s command set may execute against *root*.
 
-    Trust-on-first-use: the first command-set fingerprint ever recorded for
-    *root* becomes its trusted baseline (nothing to compare against yet, so
-    there is nothing to silently smuggle past a reviewer). Any later
-    fingerprint that does not match a previously approved one is drift --
-    never executed silently:
+    Explicit approval is required before any command-set fingerprint is
+    executed. Any unapproved fingerprint is never executed silently:
     - non-interactively (CI, or no attached terminal) it is refused unless
       `GATES_TRUST_ENV_VAR` pre-approves it.
     - interactively, the operator is shown the exact commands and asked.
@@ -334,10 +331,6 @@ def resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
     if fingerprint in approved:
         return GateTrustDecision(True, fingerprint, "previously approved command set")
 
-    if not approved:
-        _remember_gate_trust(root, store, fingerprint, via="first-use")
-        return GateTrustDecision(True, fingerprint, "trusted on first use")
-
     if _env_truthy(GATES_TRUST_ENV_VAR):
         _remember_gate_trust(root, store, fingerprint, via=f"env:{GATES_TRUST_ENV_VAR}")
         return GateTrustDecision(True, fingerprint, f"pre-approved via {GATES_TRUST_ENV_VAR}")
@@ -346,7 +339,7 @@ def resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
         return GateTrustDecision(
             False,
             fingerprint,
-            "gates.toml command set changed and is unapproved in a non-interactive "
+            "gates.toml command set is new or unapproved in a non-interactive "
             f"environment -- set {GATES_TRUST_ENV_VAR}=1 to pre-approve or run "
             "`hyodo check` interactively once to review and record trust",
         )

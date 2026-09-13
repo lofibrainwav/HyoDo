@@ -13,6 +13,7 @@ import pytest
 
 from hyodo.gates import (
     DEFAULT_TIMEOUT_SECONDS,
+    GATES_TRUST_ENV_VAR,
     SCHEMA_ID,
     GatesConfig,
     GatesConfigError,
@@ -23,6 +24,13 @@ from hyodo.gates import (
     render_gates_toml,
     run_user_gates,
 )
+
+
+@pytest.fixture(autouse=True)
+def _preapprove_execution_tests(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Keep gate execution tests focused on subprocess behavior, not trust UX."""
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
+
 
 # ---------------------------------------------------------------------------
 # helpers

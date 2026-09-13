@@ -13,11 +13,10 @@ export default defineConfig({
 			customCss: ['./src/styles/starlight.css'],
 			head: [
 				{
-					// Default to the dark theme (the landing page is always dark) until
-					// the visitor picks one with the theme selector.
+					// Default to the dark theme through an external asset so the
+					// repository-owned bootstrap does not require unsafe-inline.
 					tag: 'script',
-					content:
-						"try{if(!localStorage.getItem('starlight-theme')){localStorage.setItem('starlight-theme','dark')}}catch(e){}",
+					attrs: { src: '/theme-default.js' },
 				},
 			],
 			social: [

@@ -71,6 +71,7 @@ $PYTHON -m build --outdir "$VERIFY_DIR/dist"
 $PYTHON -m twine check "$VERIFY_DIR"/dist/*.whl "$VERIFY_DIR"/dist/*.tar.gz
 
 echo "-- sdist must not ship afo_core --"
+"$PYTHON" scripts/release/verify_sdist_scope.py "$VERIFY_DIR"/dist/*.tar.gz
 $PYTHON - "$VERIFY_DIR/dist" <<'PY'
 import sys
 import tarfile
@@ -92,11 +93,7 @@ if missing:
 bad = [n for n in names if "/afo_core/" in n or n.endswith("/afo_core")]
 if bad:
     raise SystemExit(f"ERROR: sdist contains afo_core paths ({len(bad)}), e.g. {bad[:3]}")
-size = sdists[0].stat().st_size
-# public sdist should stay small (no advisory tree)
-if size > 500_000:
-    raise SystemExit(f"ERROR: sdist too large ({size} bytes); expected < 500KB without afo_core")
-print(f"sdist ok: {sdists[0].name} ({size} bytes), {len(names)} entries")
+print(f"sdist content checks ok: {sdists[0].name}, {len(names)} entries")
 
 wheels = list(dist.glob("*.whl"))
 assert wheels, "no wheel found"

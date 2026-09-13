@@ -7,6 +7,7 @@ import pytest
 from typer.testing import CliRunner
 
 from hyodo.cli.main import app
+from hyodo.gates import GATES_TRUST_ENV_VAR
 
 
 @pytest.mark.parametrize("general", [False, True], ids=["fallback", "explicit"])
@@ -40,7 +41,10 @@ def test_sampled_check_discloses_scope(
 
 
 @pytest.mark.parametrize("output", ["--json", "--quiet"])
-def test_byog_check_is_not_labelled_sampled(tmp_path: Path, output: str) -> None:
+def test_byog_check_is_not_labelled_sampled(
+    tmp_path: Path, output: str, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
     config_dir = tmp_path / ".hyodo"
     config_dir.mkdir()
     (config_dir / "gates.toml").write_text(

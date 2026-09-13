@@ -6,11 +6,10 @@ version: '3.8'
 
 services:
   # Optional Redis for extended modules
+  # Container-network only by default. Do not publish Redis on the host unless
+  # an explicitly authenticated, local-only override is provided.
   redis:
     image: redis:7-alpine
-    container_name: hyodo-redis
-    ports:
-      - "6379:6379"
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -24,14 +23,15 @@ services:
       - hyodo-network
 
   # Optional PostgreSQL for extended modules
+  # Loopback-only development access. This stack is not a production database
+  # deployment and requires an operator-supplied password.
   postgres:
     image: postgres:15-alpine
-    container_name: hyodo-postgres
     ports:
-      - "15432:5432"
+      - "127.0.0.1:15432:5432"
     environment:
       POSTGRES_USER: hyodo
-      POSTGRES_PASSWORD: hyodo_dev
+      POSTGRES_PASSWORD: ${HYODO_POSTGRES_PASSWORD:?Set HYODO_POSTGRES_PASSWORD before starting Compose}
       POSTGRES_DB: hyodo
     volumes:
       - postgres_data:/var/lib/postgresql/data

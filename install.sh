@@ -2,7 +2,6 @@
 # HyoDo non-interactive installer (English)
 set -e
 
-RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
@@ -15,8 +14,29 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -r "$SCRIPT_DIR/VERSION" ]; then
     HYODO_VERSION="v$(tr -d '[:space:]' < "$SCRIPT_DIR/VERSION")"
 else
-    HYODO_VERSION="latest"
+    echo "VERSION is required to select an immutable release ref" >&2
+    exit 1
 fi
+HYODO_REF="${HYODO_REF:-$HYODO_VERSION}"
+REPOSITORY_URL="https://github.com/lofibrainwav/HyoDo.git"
+if [[ "$HYODO_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+    EXPECTED_SHA="$HYODO_REF"
+else
+    EXPECTED_SHA="$(git ls-remote "$REPOSITORY_URL" "refs/tags/$HYODO_REF^{}" | head -n 1 | cut -f1)"
+fi
+if [ -z "$EXPECTED_SHA" ]; then
+    echo "Release tag or 40-character commit SHA not found: $HYODO_REF" >&2
+    exit 1
+fi
+clone_verified() {
+    if [[ "$HYODO_REF" =~ ^[0-9a-fA-F]{40}$ ]]; then
+        git clone --no-checkout --depth 1 "$REPOSITORY_URL" "$INSTALL_DIR"
+        git -C "$INSTALL_DIR" fetch --depth 1 origin "$HYODO_REF"
+        git -C "$INSTALL_DIR" checkout --detach "$HYODO_REF"
+    else
+        git clone --depth 1 --branch "$HYODO_REF" "$REPOSITORY_URL" "$INSTALL_DIR"
+    fi
+}
 
 echo ""
 echo -e "${BLUE}=======================================================${NC}"
@@ -62,7 +82,13 @@ if [ -d "$INSTALL_DIR" ]; then
 fi
 
 echo -e "  ${CHECK} Cloning repository..."
-git clone --depth 1 https://github.com/lofibrainwav/HyoDo.git "$INSTALL_DIR"
+clone_verified
+ACTUAL_SHA="$(git -C "$INSTALL_DIR" rev-parse HEAD)"
+if [ "$ACTUAL_SHA" != "$EXPECTED_SHA" ]; then
+    echo "Ref changed during clone; expected $EXPECTED_SHA, got $ACTUAL_SHA" >&2
+    exit 1
+fi
+echo -e "  ${CHECK} Source commit: $ACTUAL_SHA"
 
 echo ""
 echo -e "${YELLOW}[3/3] Writing config...${NC}"
@@ -91,7 +117,7 @@ echo ""
 echo -e "Path: ${BLUE}$INSTALL_DIR${NC}"
 echo ""
 echo -e "Next:"
-echo -e "  1. ${YELLOW}cd $INSTALL_DIR && pip install -e \".[dev]\"${NC}"
+echo -e "  1. ${YELLOW}cd $INSTALL_DIR && python3 -m pip install .${NC}"
 echo -e "  2. ${YELLOW}hyodo check${NC}"
 echo -e "  3. ${YELLOW}hyodo safe${NC}"
 echo ""

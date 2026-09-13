@@ -14,12 +14,10 @@ OIDC provenance, and post-publish install readback.
 
 ## Current release
 
-HyoDo 4.19.4 is published. Future work must distinguish current source from
-the measured public artifact and must not describe 4.19.4 as publication
-pending.
-HyoDo 4.19.5 is the current release target for this source tree, and it is
-published. Its release chain receipt records the corrected public sdist
-converged with PyPI; 4.19.4 remains an immutable prior release.
+HyoDo 4.19.5 is the current release target and source-tree release baseline;
+it is published.
+Its release chain receipt records the corrected public sdist converged with
+PyPI; 4.19.4 remains an immutable prior release.
 
 Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
 adapters are fixture-verified and the two-event recording path is measured on
