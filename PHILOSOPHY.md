@@ -28,10 +28,10 @@ measurement axes; a computed aggregate is not a virtue.
 | --- | --- | --- | --- |
 | Truth | 진 / 眞 | Technical correctness | Tests, typing, static checks |
 | Goodness | 선 / 善 | Safety and stability | Safety findings and coverage |
-| Beauty | 미 / 美 | Clarity and maintainability | Lint, format, clarity evidence |
-| Benevolence | 인 / 仁 | Public and developer usability | Public-surface and onboarding evidence |
-| Hyo | 효 / 孝 | Consent, context alignment, and data protection | Policy, host-binding, access-ledger evidence |
-| Eternity / Yeong | 영 / 永 | Continuity, persistence, and longitudinal evidence | Append-only history and continuity evidence |
+| Beauty | 미 / 美 | Clarity | Lint and format |
+| Benevolence | 인 / 仁 | Public usability | API and onboarding |
+| Hyo | 효 / 孝 | Consent and data protection | Policy and access ledger |
+| Eternity / Yeong | 영 / 永 | Continuity and persistence | History ledger |
 
 ### Two measurement kinds
 
