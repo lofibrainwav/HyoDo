@@ -52,6 +52,7 @@ from hyodo import (
     SCORE_SUBSET_NAME,
     __version__,
 )
+from hyodo.admission_observation import append_admission_observation
 from hyodo.audience import (
     VALID_PROFILES,
     AudienceProfile,
@@ -279,6 +280,11 @@ eye_app = typer.Typer(
     help="Ephemeral visual evidence: capture, hash, show, destroy -- never store pixels",
     add_completion=False,
 )
+admission_app = typer.Typer(
+    name="admission",
+    help="Bounded policy-admission observations from an external executor",
+    add_completion=False,
+)
 mcp_app.add_typer(rules_app, name="rules")
 mcp_app.add_typer(pairing_app, name="pairing")
 app.add_typer(event_app, name="event")
@@ -290,7 +296,58 @@ app.add_typer(mcp_app, name="mcp")
 app.add_typer(skills_app, name="skills")
 app.add_typer(graph_app, name="graph")
 app.add_typer(eye_app, name="eye")
+app.add_typer(admission_app, name="admission")
 console = Console()
+
+
+@admission_app.command("record")
+def admission_record(
+    file: str | None = typer.Option(
+        None, "--file", "-f", help="Path to one hyodo.admission-observation/v1 JSON object"
+    ),
+    stdin_flag: bool = typer.Option(
+        False, "--stdin", help="Read one admission observation from stdin"
+    ),
+    root: str = typer.Option(
+        ".", "--root", help="Project root that owns .hyodo/admission-observations.jsonl"
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable JSON receipt"),
+):
+    """Validate and append one bounded external policy-admission observation."""
+    if (file is None) == (not stdin_flag):
+        result = {"ok": False, "reasons": ["provide_exactly_one_of_file_or_stdin"], "exit_code": 2}
+        if json_output:
+            console.print_json(json.dumps(result))
+        else:
+            console.print("[red]UNOBSERVED[/red] admission observation — input boundary invalid")
+        raise typer.Exit(2)
+
+    try:
+        if stdin_flag:
+            text = sys.stdin.read()
+        else:
+            assert file is not None
+            text = Path(file).read_text(encoding="utf-8")
+        payload = json.loads(text)
+        normalized = append_admission_observation(Path(root).resolve(), payload)
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError, ValueError) as error:
+        result = {"ok": False, "reasons": [str(error)], "exit_code": 2}
+        if json_output:
+            console.print_json(json.dumps(result))
+        else:
+            console.print(f"[red]UNOBSERVED[/red] admission observation — {error}")
+        raise typer.Exit(2) from error
+
+    result = {
+        "ok": True,
+        "schema": normalized["schema"],
+        "observation_id": normalized["observation_id"],
+        "exit_code": 0,
+    }
+    if json_output:
+        console.print_json(json.dumps(result))
+    else:
+        console.print(f"[green]RECORDED[/green] {normalized['observation_id']}")
 
 
 class GateStatus(str, Enum):
