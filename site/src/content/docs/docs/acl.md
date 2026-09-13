@@ -228,9 +228,12 @@ This page separates HyoDo from its experimental companion runtime, KINGDOM.
 - Friction Contribution v1 is implemented on the 4.17.0 line as a local-only, explicit-opt-in derived record. It does not ship a collector, uploader, or population backend.
 - The contribution contract is intentionally privacy-minimized: it derives coarse task / orchestration / retry / intervention / verification / evidence buckets rather than exporting raw prompts, responses, code, paths, or local identifiers.
 - HyoDo does **not** contain the KINGDOM strategy runtime and does not gain execution authority from wisdom or population evidence.
-- HyoDo 4.19.3 ships Graph v2 multi-parent causal joins while keeping `evidence_refs` separate from causality and preserving v1 compatibility. The public site graph remains a fixture/demo surface rather than a claim of live KINGDOM execution.
+- HyoDo 4.19.4 ships Graph v2 multi-parent causal joins while keeping `evidence_refs` separate from causality and preserving v1 compatibility. The public site graph remains a fixture/demo surface rather than a claim of live KINGDOM execution.
 
-### KINGDOM experimental runtime
+### KINGDOM reference implementation and research case study
+
+The following KINGDOM material is a reference-consumer case study, not part of
+the public HyoDo product or its execution authority.
 
 At the verified KINGDOM snapshot used for this note, several ingredients already exist:
 

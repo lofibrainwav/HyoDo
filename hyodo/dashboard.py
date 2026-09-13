@@ -22,6 +22,7 @@ from hyodo.graph_view import (
     column_coverage,
     orb_state,
 )
+from hyodo.virtues import VIRTUE_CONTRACT
 
 # Inline auto-refresh poller. The text must stay byte-identical to the sha256
 # CSP allowance below, so the page metadata travels in a data attribute instead
@@ -303,15 +304,13 @@ def _status_line(status: str, message: str) -> str:
     return f"{status}: {message}" if message else status
 
 
-# Single source of truth for the six-pillar identity and card order:
-# (key, Hanja, Korean, English, accent class). Headings are always trilingual.
-PILLAR_SPECS: tuple[tuple[str, str, str, str, str], ...] = (
-    ("jin", "眞", "진", "Truth", "blue"),
-    ("seon", "善", "선", "Goodness", "green"),
-    ("mi", "美", "미", "Beauty", "purple"),
-    ("in", "仁", "인", "Benevolence", "orange"),
-    ("hyo", "孝", "효", "Filial Piety", "gold"),
-    ("yeong", "永", "영", "Eternity", "indigo"),
+# Compatibility presentation tuple derived from the canonical six-virtue
+# ontology. The first five fields remain stable for existing renderers.
+_VIRTUE_SLUGS = ("jin", "seon", "mi", "in", "hyo", "yeong")
+_VIRTUE_COLORS = ("blue", "green", "purple", "orange", "gold", "indigo")
+PILLAR_SPECS: tuple[tuple[str, str, str, str, str], ...] = tuple(
+    (slug, v.hanja, v.korean, v.name if v.key != "hyo" else "Filial Piety", color)
+    for slug, v, color in zip(_VIRTUE_SLUGS, VIRTUE_CONTRACT, _VIRTUE_COLORS, strict=True)
 )
 
 # PILLAR_SPECS colour name -> (light-surface hex, dark-surface hex), kept
@@ -372,7 +371,7 @@ EDGE_COLORS: dict[str, str] = {
 # same numbers, so a tile's schematic SVG anchor lines up with its actual
 # `.grid-cell` position. Not measured pixels (the shared TypeScript
 # renderer, spec section 8, is the pending home for that); a row-label
-# column plus five equal virtue columns, each wide enough for a handful of
+# row-label column plus five equal evidence columns, each wide enough for a handful of
 # fixed-width tiles before a cell's own horizontal scrollbar takes over.
 GRID_LABEL_WIDTH = 180
 GRID_COLUMN_WIDTH = 200
@@ -997,7 +996,7 @@ def _build_grid_cells(
 ) -> tuple[list[str], dict[str, dict[str, list[str]]], dict[str, tuple[int, int, int]]]:
     """Place every column-assigned node at (row index, column index, cell position).
 
-    Brief finding 1: one grid whose columns are the five virtue columns and
+    Brief finding 1: one grid whose columns are the five evidence columns and
     whose rows are actors, each event a tile at (its column, its row),
     ordered left-to-right within a cell by time. A row's own `events` list
     (`build_actor_rows`) is already earliest-first, so filtering it by
@@ -1197,7 +1196,7 @@ def _render_grid_row(
     rings: dict[str, dict[str, Any]],
     children: dict[str | None, list[str]],
 ) -> str:
-    """Render one grid row (row-header cell + five virtue-column cells).
+    """Render one grid row (row-header cell + five evidence-column cells).
 
     Indented by `depth * 18px` (brief addendum item 8: nested child rows
     render indented); a row with children gets a `row-toggle` disclosure
@@ -1405,8 +1404,8 @@ def render_graph_html(
 
     Rollout step (b)
     (`docs/superpowers/specs/2026-09-06-hyodo-core-engine-monitor-design.md`,
-    sections 2-4, 9-10): the five fixed virtue columns in spec order, the
-    orb, actor rows with collapsible sub-agent nesting, an unclassified
+    sections 2-4, 9-10): the five fixed evidence columns in spec order, the
+    Eternity continuity indicator, actor rows with collapsible sub-agent nesting, an unclassified
     gutter, and a 5W1H detail panel. `graph` is a full
     `hyodo.evidence-graph/v1` dict (`hyodo.report.build_report_graph`).
 

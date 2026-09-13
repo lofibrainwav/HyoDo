@@ -6,15 +6,15 @@ Built with the Six-Virtue Model (HyoDo Integrity Score, philosophy V6):
 - Benevolence: Developer experience and user serenity
 - Truth: Technical accuracy
 - Goodness: Security and stability
-- Hyo: Reciprocal and voluntary continuity — SSOT discipline
+- Hyo: Consent, context alignment, and data protection
   (supersedes one-sided Loyalty; the `loyalty=` alias was removed in 4.0.0)
 - Beauty: Code clarity and UX
-- Eternity: Geometric mean of harmony (calculated)
+- Eternity: Continuity, persistence, and longitudinal evidence (measured)
 
-HyoDo Integrity Score formula (SSOT; Trinity Gates subset; formula lineage
-HYOGOOK V5; philosophy V6):
+HYOGOOK V5 compatibility formula (Trinity Gates subset; formula lineage;
+philosophy V6):
   F = sum(five pillars on 1–10 scale) + geometric_mean
-  S = geometric_mean
+  S = legacy harmony aggregate
 Review-emphasis percentages are philosophical labels only — not F weights.
 """
 
@@ -22,12 +22,13 @@ from __future__ import annotations
 
 __version__ = "4.19.4"
 __philosophy_version__ = "V6"
-__author__ = "AFO Kingdom"
+__author__ = "HyoDo contributors"
 __license__ = "MIT"
 SCORE_PUBLIC_NAME = "HyoDo Integrity Score"
 SCORE_MODEL_NAME = "Six-Virtue Model"
 SCORE_SUBSET_NAME = "Trinity Gates"
 SCORE_FORMULA_LINEAGE = "HYOGOOK V5"
+
 
 # Legacy compatibility weights (WEIGHTED_V1 / calculate_trinity_score legacy path).
 # Not used by the HyoDo Integrity Score. Sum is normalized at use site.
@@ -43,9 +44,11 @@ LEGACY_TRINITY_WEIGHTS = TRINITY_WEIGHTS
 
 
 def calculate_geometric_mean(values: list[float]) -> float:
-    """Calculate geometric mean for Eternity pillar.
+    """Calculate the legacy V5 derived harmony aggregate.
 
     S = ⁵√(T × G × In × B × C)
+
+    This compatibility helper is not the independent Eternity/Yeong virtue.
 
     Args:
         values: List of 5 pillar scores (0-1 or 1-10 scale)

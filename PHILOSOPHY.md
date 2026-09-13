@@ -18,16 +18,20 @@ Philosophy branding is intentional. Every public label pairs with a
 The `loyalty=` alias was removed in 4.0.0. Legacy
 `calculate_trinity_score()` stays frozen for historical reproducibility.
 
+The canonical six-virtue contract is defined in
+[`hyodo/virtues.py`](./hyodo/virtues.py). The six virtues are independent
+measurement axes; a computed aggregate is not a virtue.
+
 ## Pillar map
 
 | Pillar | KO / Hanja | Technical meaning | Evidence |
 | --- | --- | --- | --- |
-| Truth | 진 / 眞 | Type / static correctness | Command gate |
-| Goodness | 선 / 善 | Tests + safety stability | Command gate + `safe` |
-| Beauty | 미 / 美 | Lint / format | Command gate |
-| Benevolence | 인 / 仁 | Public-surface integrity | Native AST |
-| Hyo | 효 / 孝 | Consent + data protection | Native AST |
-| Yeong | 영 / 永 | Continuity of measurement | history ledger |
+| Truth | 진 / 眞 | Technical correctness | Tests, typing, static checks |
+| Goodness | 선 / 善 | Safety and stability | Safety findings and coverage |
+| Beauty | 미 / 美 | Clarity and maintainability | Lint, format, clarity evidence |
+| Benevolence | 인 / 仁 | Public and developer usability | Public-surface and onboarding evidence |
+| Hyo | 효 / 孝 | Consent, context alignment, and data protection | Policy, host-binding, access-ledger evidence |
+| Eternity / Yeong | 영 / 永 | Continuity, persistence, and longitudinal evidence | Append-only history and continuity evidence |
 
 ### Two measurement kinds
 
@@ -42,16 +46,26 @@ AST (Benevolence / Hyo) covers public docstrings, CLI help, message-less
 binds. Yeong uses append-only `.hyodo/history.jsonl` and counts all-PASS
 on **executed** gates only (skips never fake green).
 
-## Geometric mean = fail-closed gate
+## Aggregation and legacy compatibility
 
-Optional `hyodo score` uses a **geometric mean**:
+The canonical six-virtue aggregate uses raw 0–1 virtue measurements. A measured
+zero makes `harmony_aggregate` zero. Missing measurements remain
+`UNOBSERVED` and are not silently converted to zero or one.
+
+The public HYOGOOK V5 compatibility formula remains frozen. It scales raw
+values from `0 → 1` and `1 → 10`, and its returned `S_eternity` is a legacy
+derived harmony value, not the `Eternity` virtue.
+
+The legacy formula uses a **geometric mean**:
 
 - Arithmetic mean of (structure=1.0, security=0.0) → 0.5 (looks “ok”).
-- Geometric mean with any zero axis → **0** (whole signal collapses).
+- In the canonical aggregate, any measured zero axis → **0**.
+- In HYOGOOK V5, the `0 → 1` floor remains for compatibility.
 
 Document this as engineering, not only “harmony”:
 
-> **Fail-closed:** one pillar at 0 fails the whole review signal.
+> **Canonical fail-closed:** one measured virtue at 0 collapses the
+> `harmony_aggregate`; this statement does not describe HYOGOOK V5.
 
 `--partial` allows missing pillars and adds `SIGNAL_CONFIDENCE_WEAK`. It
 does not invent `REVIEW_SIGNAL_STRONG` via silent 1.0 fill-in (4.0.1).
@@ -63,6 +77,10 @@ does not invent `REVIEW_SIGNAL_STRONG` via silent 1.0 fill-in (4.0.1).
 3. Tiered model routing is design intent only — no cost guarantee.
 4. Prefer CLI + CI proof over vendor-locked demos.
 5. Keep philosophy names; always pair with technical meaning in UI/docs.
+
+HyoDo is a public, host-neutral evidence and policy lens. The integrating host
+or harness owns orchestration, memory, retrieval, runtime, execution, and final
+authority. HyoDo receipts and scores never grant execution authority.
 
 ## See also
 

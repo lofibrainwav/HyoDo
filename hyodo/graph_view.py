@@ -26,8 +26,9 @@ from typing import Any
 from hyodo.graph_parenting import hyo_chain_all_parents, parent_sets, single_parent_map
 from hyodo.policy import path_outside_root
 
-#: Fixed column order (spec section 2): Truth, Goodness, Beauty, Benevolence,
-#: Hyo. Eternity is not a column — it is read off the orb (section 4).
+#: Fixed evidence-column order (spec section 2): Truth, Goodness, Beauty,
+#: Benevolence, Hyo. The sixth virtue, Eternity, is a separate continuity
+#: indicator in this viewer (section 4), not a missing virtue axis.
 VIRTUE_COLUMNS: tuple[str, ...] = ("jin", "seon", "mi", "in", "hyo")
 
 #: Gutter sentinel for an event the mapping table (spec section 3, as
@@ -340,7 +341,7 @@ def orb_state(graph: dict[str, Any], root: Path | None = None) -> dict[str, Any]
     - `decision`: the latest `decision`-kind event's `policy.decision` by
       `ts`, or `"UNOBSERVED"` when the ledger is not `READY` or no decision
       event was observed — the orb never claims a clean run it did not see.
-    - `coverage`: `{"observed", "expected"}` summed across the five column
+    - `coverage`: `{"observed", "expected"}` summed across the five evidence-column
       badges (`column_coverage`), so the number is never a new synthesis,
       only a second rendering of numbers already on the page.
     - `latest_ts`: the most recent `ts` across every node (any kind), for
