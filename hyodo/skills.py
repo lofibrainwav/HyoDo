@@ -24,6 +24,7 @@ from typing import Any
 from urllib.parse import urlparse
 
 from hyodo.events import content_digest
+from hyodo.virtues import CANONICAL_VIRTUE_KEYS
 
 SKILLS_MANIFEST_SCHEMA = "hyodo.skills-manifest/v1"
 MANIFEST_RELATIVE_PATH = Path(".hyodo") / "skills" / "manifest.json"
@@ -44,7 +45,7 @@ _HEX12_RE = re.compile(r"^[0-9a-f]{12}$")
 _PROBABILITY_SHAPED_FIELDS = ("score", "probability", "percentage")
 
 #: Fixed, deterministic pillar order used everywhere in this module's output.
-PILLARS: tuple[str, ...] = ("truth", "goodness", "beauty", "benevolence", "hyo", "eternity")
+PILLARS: tuple[str, ...] = CANONICAL_VIRTUE_KEYS
 
 #: Keyword table used only when a rule carries no ``[pillars: ...]`` tag.
 #: A rule may match more than one pillar. A keyword matches only at the start of

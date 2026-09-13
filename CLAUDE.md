@@ -67,18 +67,27 @@ The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`
 
 ### Optional HyoDo Integrity Score
 
-| Pillar | Weight | Focus |
+| Virtue | Review emphasis | Focus |
 |--------|--------|-------|
 | Benevolence | 25% | Developer experience |
 | Truth | 22% | Technical accuracy |
 | Goodness | 18% | Security and stability |
 | Hyo | 15% | Project/context alignment |
 | Beauty | 15% | Clarity and UX |
-| Eternity | geometric mean | Long-term harmony |
+| Eternity | continuity evidence | Longitudinal evidence; V5 S is a separate derived harmony aggregate |
 
 The score uses the Six-Virtue Model and Trinity Gates subset; HYOGOOK V5 is the
 formula lineage. Scores are decision support only and do not authorize
 merge/deploy.
+
+HyoDo is public, host-neutral, and model-agnostic. It observes, validates,
+records, attests, and measures. The integrating host or harness owns
+orchestration, memory, retrieval, runtime, execution, and final authority.
+HyoDo is not KINGDOM; a HyoDo receipt or score is evidence, never authority.
+
+The canonical invariants are: Map is not Territory, Evidence is not a
+Decision, Capability is not Authority, Receipt is not Authority, Merged is not
+Served, and UNOBSERVED is not GREEN.
 
 ### Directory structure
 

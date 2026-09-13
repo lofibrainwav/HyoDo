@@ -7,7 +7,8 @@ explicit `check` and `safe` exit contracts; model-agnostic does not mean
 language-agnostic.
 
 `hyodo dashboard` now also serves `GET /graph`, a local evidence-graph viewer
-(five fixed virtue columns plus a core-engine-pulse orb) rendered live from
+(five evidence columns plus a separate Eternity continuity indicator; the
+viewer also has four actor rows) rendered live from
 `.hyodo/agent-events.jsonl`; `GET /api/graph` returns the same
 `hyodo.evidence-graph/v1` JSON `hyodo report --format graph` writes.
 
@@ -41,6 +42,7 @@ language-agnostic.
 | [AUDIENCE.md](./AUDIENCE.md) | `--audience` profiles (vibe / engineer / professional) — wording only, same decision |
 | [TEST_INTEGRITY.md](./TEST_INTEGRITY.md) | `hyodo check --strict-tests` — AST-based test-integrity scan |
 | [SCORE_DERIVATION.md](./SCORE_DERIVATION.md) | `hyodo score --from-check` — pillar derivation rule table and coverage semantics |
+| [VIRTUE_CONTRACT.md](./VIRTUE_CONTRACT.md) | Canonical six-virtue ontology and derived aggregate boundary |
 | [HYODO_MCP_CONNECTOR_DESIGN.md](./HYODO_MCP_CONNECTOR_DESIGN.md) | MCP design: local stdio/loopback/Tailscale shipped; remote contract-only |
 | [M5_REMOTE_CONNECTOR_CONTRACT.md](./M5_REMOTE_CONNECTOR_CONTRACT.md) | Remote `https://mcp.hyodo.app/mcp` is contract-only, not `hyodo mcp stdio` |
 | [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Current implementer notes — not a 4.4.0 rebuild queue |

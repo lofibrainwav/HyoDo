@@ -8,13 +8,13 @@ description: Why HyoDo exists, the six virtues it measures, the geometric mean t
 > I cannot read code. So when an AI told me 'it is done', I had no way to
 > know whether that was true. I believe friction in the world can be
 > measured. The six virtues are six axes of that friction, and the
-> geometric mean is the honest mathematics that says: if any one axis is
-> zero, the whole is zero. HyoDo carries that mathematics into an exit
+> geometric mean is the honest mathematics that says: if any one measured
+> axis is zero, the canonical harmony aggregate is zero. HyoDo carries that mathematics into an exit
 > code. It speaks only about what it observed, and it never shows a green
 > light for what it did not observe. It moves on its own exactly as far as
 > the trust you have given it, and it leaves a receipt for every step it
-> took. The Kingdom is my own operating system; HyoDo is meant to be a
-> digital wheelchair for everyone who cannot read the code.
+> took. HyoDo is a public, host-neutral trust and evidence layer for everyone
+> who cannot read the code.
 
 ## 2. Six virtues
 
@@ -25,7 +25,7 @@ description: Why HyoDo exists, the six virtues it measures, the geometric mean t
 | Beauty | 미 / 美 | Lint / format | Command gate |
 | Benevolence | 인 / 仁 | Public-surface integrity | Native AST |
 | Hyo | 효 / 孝 | Consent + data protection | Native AST |
-| Yeong | 영 / 永 | Continuity of measurement | history ledger |
+| Eternity / Yeong | 영 / 永 | Continuity, persistence, and longitudinal evidence | history ledger |
 
 Command gates (Truth, Goodness, Beauty) run tools the project already owns —
 `hyodo init` absorbs them into `.hyodo/gates.toml`. Native collectors
@@ -44,19 +44,23 @@ lineage needed for reproducibility, not a competing public product name.
 
 ## 3. The mathematics
 
-Optional `hyodo score` combines five pillar scores with a **geometric mean**,
+The canonical six-virtue harmony aggregate combines six measured virtue scores
+with a **geometric mean**,
 not an arithmetic one. The difference matters: an arithmetic mean of
 (structure=1.0, security=0.0) still comes out to 0.5, which looks "ok." A
-geometric mean with any zero axis collapses to 0 — the whole signal fails.
+geometric mean with any measured zero axis collapses to 0 — the derived
+harmony signal fails. The legacy HYOGOOK V5 formula retains its documented
+`0 → 1` floor and is not described by this rule.
 
-> **Fail-closed:** one pillar at 0 fails the whole review signal.
+> **Canonical fail-closed:** one measured virtue at 0 collapses the harmony
+> aggregate.
 
 That rule is implemented directly, not just claimed. From
 `hyodo/__init__.py`:
 
 ```python
 def calculate_geometric_mean(values: list[float]) -> float:
-    """Calculate geometric mean for Eternity pillar.
+    """Calculate the legacy geometric mean harmony aggregate.
 
     S = ⁵√(T × G × In × B × C)
 
@@ -74,7 +78,8 @@ not measured.
 
 ### Deriving the five inputs (`hyodo score --from-check`)
 
-`hyodo score` normally requires the caller to supply all five pillar
+The legacy `hyodo score` normally requires the caller to supply all five V5
+pillar
 values by hand. `hyodo score --from-check [--root R] [--json]` derives
 those same five inputs instead, in-process (no subprocess calls), from
 what `hyodo check`, `hyodo safe`, and the test-integrity scan already
@@ -83,7 +88,7 @@ observed about a checkout. `hyodo/score_derive.py` defines a literal
 a named source, and each pillar reports its own coverage —
 `OBSERVED` / `PARTIAL` / `UNOBSERVED` — alongside its value. An
 `UNOBSERVED` pillar reports `None`, never a smuggled 0 or 100, and is
-excluded from the Eternity geometric-mean term rather than defaulted; when
+excluded from the legacy harmony aggregate term rather than defaulted; when
 any pillar is `UNOBSERVED`, the command withholds the combined TOTAL score
 and names which pillar(s) still need an explicit `--benevolence 0.8`-style
 flag to complete it. The HyoDo Integrity Score formula itself is unchanged

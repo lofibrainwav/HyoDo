@@ -37,9 +37,6 @@ KEY_TO_SLUG: tuple[tuple[str, str], ...] = (
     ("yeong", "eternity"),
 )
 
-PILLAR_SPEC_ENTRY_RE = re.compile(
-    r'\(\s*"(?P<key>\w+)"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"[^"]*"\s*,\s*"(?P<color>\w+)"\s*\)'
-)
 DASHBOARD_ACCENT_RE = re.compile(
     r"\.(?P<name>\w+)\s*\{\{\s*--accent:(?P<hex>#[0-9a-fA-F]{6})\s*\}\}"
 )
@@ -96,14 +93,10 @@ def _dashboard_surfaces() -> tuple[list[str], list[str]]:
 
 def _dashboard_key_to_hex() -> dict[str, str]:
     text = DASHBOARD_PATH.read_text(encoding="utf-8")
+    from hyodo.dashboard import PILLAR_SPECS
 
-    specs_match = re.search(r"PILLAR_SPECS.*?=\s*\((.*?)\n\)", text, re.DOTALL)
-    assert specs_match, "PILLAR_SPECS tuple not found in hyodo/dashboard.py"
-    key_to_color = {
-        entry.group("key"): entry.group("color")
-        for entry in PILLAR_SPEC_ENTRY_RE.finditer(specs_match.group(1))
-    }
-    assert key_to_color, "no PILLAR_SPECS entries parsed"
+    key_to_color = {key: color for key, _h, _ko, _en, color in PILLAR_SPECS}
+    assert key_to_color, "no PILLAR_SPECS entries exposed"
 
     color_to_hex = _dashboard_color_to_pair(text)
     return {key: color_to_hex[color] for key, color in key_to_color.items()}

@@ -410,10 +410,10 @@ def apply_override(result: PillarResult, value: float) -> PillarResult:
 
 
 def geometric_mean_observed(values_0_100: list[float]) -> float:
-    """Geometric mean of 0-100 pillar values, scaled to the 1-10 range first.
+    """Legacy V5 harmony aggregate of 0-100 observed values.
 
-    Mirrors ``hyodo.calculate_geometric_mean``'s 1-10 scaling so a partial
-    Eternity computed here is on the same footing as the full one, but
+    Mirrors the HYOGOOK V5 1-10 scaling so a partial legacy harmony value is on
+    the same footing as the full one, but
     accepts any number of values (1-5) instead of requiring exactly five —
     used only when at least one pillar is UNOBSERVED and the full formula
     cannot be called.
@@ -430,6 +430,10 @@ def geometric_mean_observed(values_0_100: list[float]) -> float:
     return product ** (1 / len(values_0_100))
 
 
+# Backward-compatible name for callers that used the old derived label.
+calculate_v5_harmony_aggregate = geometric_mean_observed
+
+
 __all__ = [
     "PILLAR_NAMES",
     "PILLAR_RULE_TABLE",
@@ -439,6 +443,7 @@ __all__ = [
     "ProvenanceRow",
     "RuleSpec",
     "apply_override",
+    "calculate_v5_harmony_aggregate",
     "derive_pillars",
     "geometric_mean_observed",
 ]
