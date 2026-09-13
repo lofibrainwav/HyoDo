@@ -80,7 +80,7 @@ unreleased `main` work. For current source and measured-state readback, see
 
 ## Honest boundaries
 
-HyoDo is deliberately narrow:
+HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
 
 - It is **not** a runtime sandbox or process interceptor.
 - `hyodo safe` is an early-warning scanner, not a full security audit.

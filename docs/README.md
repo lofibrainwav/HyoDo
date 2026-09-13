@@ -47,6 +47,7 @@ viewer also has four actor rows) rendered live from
 | [M5_REMOTE_CONNECTOR_CONTRACT.md](./M5_REMOTE_CONNECTOR_CONTRACT.md) | Remote `https://mcp.hyodo.app/mcp` is contract-only, not `hyodo mcp stdio` |
 | [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Current implementer notes — not a 4.4.0 rebuild queue |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
+| [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md) | HyoDo and Kingdom ownership and status separation |
 
 ## Release and demo (demo last)
 

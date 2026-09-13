@@ -12,6 +12,10 @@ receipt rather than in this self-referential page.
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
 - HyoDo product status: release closure complete; remaining live-host and orchestration experiments are downstream integration/research work.
 
+The HyoDo/Kingdom ownership and status-separation contract is maintained in
+[`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
+branches, and worktrees must not be folded into HyoDo closeout status.
+
 ## Current truth
 
 | Capability | Public 4.19.4 | Current main / measured state |
