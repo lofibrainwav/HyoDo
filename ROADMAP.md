@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.19.4 is the latest published release after the public 4.18.0 measured
+HyoDo 4.19.5 is the latest published release after the public 4.18.0 measured
 run. The 4.18.0 signed tag, public wheel and sdist, SBOM receipt, PyPI
 provenance, clean-install readback, and Evidence Pack v1 remain sealed. Every
 release in the 4.19.x line carries its own measured chain receipt under
@@ -17,9 +17,9 @@ OIDC provenance, and post-publish install readback.
 HyoDo 4.19.4 is published. Future work must distinguish current source from
 the measured public artifact and must not describe 4.19.4 as publication
 pending.
-HyoDo 4.19.5 is the current release target for this source tree. It exists to
-converge the corrected public sdist with PyPI; 4.19.4 remains the latest
-published baseline until the new release chain is observed.
+HyoDo 4.19.5 is the current release target for this source tree, and it is
+published. Its release chain receipt records the corrected public sdist
+converged with PyPI; 4.19.4 remains an immutable prior release.
 
 Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
 adapters are fixture-verified and the two-event recording path is measured on
@@ -172,7 +172,7 @@ evidence is not converted into a pass.
 - Keeps raw retrieval bodies, queries, prompts, authority, and approval out of
   the HyoDo event ledger; local and public release evidence remain separate.
 
-### 4.19.5 (release target 2026-09-13)
+### 4.19.5 (released 2026-09-13)
 
 - Republishes the corrected public sdist scope under a new immutable patch
   version; the 4.19.4 artifact is not overwritten.
