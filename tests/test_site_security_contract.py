@@ -3,7 +3,6 @@
 import json
 from pathlib import Path
 
-
 REPO_ROOT = Path(__file__).resolve().parents[1]
 VERCEL_CONFIG = REPO_ROOT / "site" / "vercel.json"
 ROBOTS = REPO_ROOT / "site" / "public" / "robots.txt"
