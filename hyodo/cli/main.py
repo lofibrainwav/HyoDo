@@ -3395,7 +3395,13 @@ def mcp_config_cmd(
     for name in DEEP_LINK_HOSTS:
         link = plan.deep_links.get(name)
         if link:
-            console.print(f"[dim]{name} deep link ({DEEP_LINK_LABEL}):[/dim]\n  {link}")
+            # Keep the documented warning observable when Rich renders a
+            # long worker-specific path in a narrow non-interactive console.
+            console.print(
+                f"[dim]{name} deep link ({DEEP_LINK_LABEL}):[/dim]",
+                overflow="fold",
+            )
+            console.print(f"  {link}", markup=False, overflow="ignore")
     raise typer.Exit(0)
 
 
