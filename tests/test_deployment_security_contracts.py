@@ -43,3 +43,15 @@ def test_security_workflow_keeps_all_external_actions_sha_pinned() -> None:
     assert uses
     assert all("@" in line and len(line.rsplit("@", 1)[1].split()[0]) == 40 for line in uses)
     assert "dependency-review-action" in workflow
+
+
+def test_container_proof_binds_receipt_and_artifact_to_pr_head() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "container-proof.yml").read_text(
+        encoding="utf-8"
+    )
+
+    candidate_expression = "github.event.pull_request.head.sha"
+    assert candidate_expression in workflow
+    assert 'echo "candidate_sha=${CANDIDATE_SHA}"' in workflow
+    assert 'echo "workflow_sha=${GITHUB_SHA}"' in workflow
+    assert "hyodo-container-proof-${{ github.event_name == 'pull_request'" in workflow
