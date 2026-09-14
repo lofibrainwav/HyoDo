@@ -37,6 +37,7 @@ viewer also has four actor rows) rendered live from
 | [FRICTION_EVENT_V0.md](./FRICTION_EVENT_V0.md) | Read-only DAG observation and FrictionEvent v0 contract |
 | [MEASUREMENT_PROVENANCE.md](./MEASUREMENT_PROVENANCE.md) | Which HyoDo measured which target — the `hyodo.measurement-provenance/v1` contract |
 | [RUNTIME_IDENTITY.md](./RUNTIME_IDENTITY.md) | Runtime identity v1 schema and checkout-independent digest pin |
+| [MULTIMODAL_EVAL_CONTRACT.md](./MULTIMODAL_EVAL_CONTRACT.md) | Shadow-only multimodal evaluation fields, oracles, and authority boundary |
 | [RETRIEVAL_PROVENANCE.md](./RETRIEVAL_PROVENANCE.md) | Bounded QMD retrieval provenance — the `provenance.retrieval/v1` contract |
 | [DASHBOARD_REDESIGN.md](./DASHBOARD_REDESIGN.md) | Run-first dashboard baseline for Evidence Pack v1 |
 | [EYE.md](./EYE.md) | `hyodo eye capture` / `verify` — ephemeral visual evidence, no pixels stored |
@@ -49,6 +50,7 @@ viewer also has four actor rows) rendered live from
 | [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Current implementer notes — not a 4.4.0 rebuild queue |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
 | [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md) | HyoDo and Kingdom ownership and status separation |
+| [KINGDOM_INTEGRATION_CONTRACT_AUDIT.md](./KINGDOM_INTEGRATION_CONTRACT_AUDIT.md) | Expected versus observed external integration evidence |
 
 ## Release and demo (demo last)
 

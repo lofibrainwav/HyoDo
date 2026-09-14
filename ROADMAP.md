@@ -14,10 +14,9 @@ OIDC provenance, and post-publish install readback.
 
 ## Current release
 
-HyoDo 4.19.5 is the current release target and source-tree release baseline;
-it is published.
-Its release chain receipt records the corrected public sdist converged with
-PyPI; 4.19.4 remains an immutable prior release.
+HyoDo 4.19.6 is the current release target and source-tree release baseline;
+it is a release candidate and is not published. The latest published baseline
+remains 4.19.5 until the 4.19.6 release chain is measured and read back.
 
 Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
 adapters are fixture-verified and the two-event recording path is measured on
@@ -176,6 +175,16 @@ evidence is not converted into a pass.
   version; the 4.19.4 artifact is not overwritten.
 - Closes the source-build to PyPI artifact hash/readback chain after the
   release workflow's provenance and install checks pass.
+
+### 4.19.6 (release candidate 2026-09-13)
+
+- Adds the bounded `hyodo.admission-observation/v1` ledger and
+  `hyodo admission record` CLI for recording an external executor's admission
+  decision without claiming execution.
+- Keeps admission observations explicitly separate from execution observations;
+  `execution_attempted` and `execution_observed` must remain false.
+- Candidate source and package metadata are synchronized at 4.19.6; public
+  publication, PyPI provenance, deployment, and runtime proof remain unobserved.
 
 ## Next candidates
 

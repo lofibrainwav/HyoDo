@@ -43,7 +43,7 @@ corresponding proof receipt exist. A source change alone is **IMPLEMENTED**, not
 | P2 | Local verification environment could not execute all focused tests | Re-run in a clean supported environment and attach the receipt |
 | P2 | Public verifier used a brittle compressed sdist-size ceiling | Verify declared archive scope and unsafe paths instead of compressed size |
 | P2 security UX | BYOG first-use trust previously executed an unreviewed command set | Require interactive approval or explicit automation pre-approval before any user gate runs |
-| P3 hardening | Public CSP still allows `'unsafe-inline'` and broad HTTPS connections | Tighten after the current static site remains functionally equivalent |
+| P3 hardening | Public CSP tightening | Preserve the strict policy and re-read production headers after every site deployment |
 | P2 governance | Remediation work is not yet represented on the public tracking surface | Publish this register through a reviewed PR or linked issue and keep dispositions linked to receipts |
 | P3 release hardening | The latest GitHub Release is not immutable | Protect release/tag mutation or document an approved immutable release procedure |
 
@@ -59,20 +59,20 @@ deployed and tested.
 | --- | --- | --- |
 | Compose default exposure | IMPLEMENTED | YAML diff inspected; Docker runtime readback is `UNOBSERVED` because the current workstation has no `docker` executable |
 | Historical credential disposition | HOLD | No credential owner disposition or rotation receipt |
-| Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, package metadata, and site source claims now name published `4.19.5`; public deployment readback is separate |
+| Version/support-policy reconciliation | CANDIDATE LOCALLY / PUBLIC BASELINE OBSERVED | Candidate source/package metadata name `4.19.6`; public package and supported release remain `4.19.5` until publication |
 | Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
-| Clean security verification | VERIFIED IN ISOLATED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Isolated Python 3.12 environment: `1499 passed, 7 skipped`; `ruff`, `pyright`, `pip-audit --local`, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. A later host-global `pip-audit` attempt could not start because that environment lacks `certifi`; it is not counted as a vulnerability result |
-| CI secret/dependency scan | IMPLEMENTED LOCALLY / NOT ON REMOTE MAIN | New SHA-pinned workflow runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; remote `main` still has no `security.yml`, and its existing Security Scan is only a dangerous-command grep |
+| Clean security verification | VERIFIED IN SUPPORTED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Python 3.14.7 public verifier: `1513 passed, 7 skipped`; ruff, pyright, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. The ambient Python 3.9 verifier attempt was rejected by the package floor and is an environment result, not a vulnerability result |
+| CI secret/dependency scan | WORKFLOW PRESENT / REMOTE RUN UNOBSERVED | Current main contains the SHA-pinned security workflow that runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; a fresh terminal remote run receipt is not attached here |
 | CI action/dependency maintenance | IMPLEMENTED LOCALLY / PARTLY VERIFIED REMOTE | Local site artifact action is SHA-pinned and `/site` is included in Dependabot; remote `main` already has the merged site hardening, but this local branch's new security workflow is not published |
 | Public remediation tracking | IMPLEMENTED LOCALLY / NOT PUBLISHED | The register exists locally; the fresh remote readback found no open issue or PR dedicated to this remediation |
 | GitHub release immutability | OBSERVED RESIDUAL | Public `v4.19.5` reports `immutable: false`; signed tag and artifact provenance are separate evidence and do not establish release-record immutability |
 | Public sdist scope gate | IMPLEMENTED_AND_VERIFIED_LOCALLY | `verify-public.sh` now delegates archive-scope validation to `verify_sdist_scope.py`; a 512,954-byte sdist passed with 199 members and no `afo_core` |
-| Site dependency/build verification | IMPLEMENTED LOCALLY / BROWSER VERIFIED UNDER ENFORCING CSP / PRODUCTION CSP NOT YET TIGHTENED | `npm ci` previously reported 0 vulnerabilities; the build externalizes all generated inline scripts/style attributes, the docs artifact has zero inline assets and valid same-origin extracted assets, and the Evidence Graph browser regression passes with the strict CSP header; fresh production readback is healthy but still reports the old broad CSP |
+| Site dependency/build verification | VERIFIED LOCALLY AND IN PRODUCTION READBACK | Local source config and production `hyodo.app` readback agree on strict CSP, HSTS, frame denial, nosniff, referrer, permissions, and exact-origin CORS; production readback was HTTP 200 on 2026-09-14 UTC. Browser/build evidence remains separate from candidate publication |
 
 ### Remote governance readback
 
 The current public `main` was read back at commit
-`22f6983e72ff23594057e9e0b9f948574943d1c8` on 2026-09-13 PT. The classic
+`af028c62b075580830ad418614cb172af5e5e7a2` on 2026-09-13 PT. The classic
 branch-protection endpoint reports required status checks for the Python truth
 gates, goodness/beauty gates, install smoke, and integrity score; it also
 reports force-push and branch-deletion denial. Required approving review count
@@ -89,13 +89,12 @@ make the unpushed local remediation changes part of `main`.
 The fresh production readback on 2026-09-13 PT returned `200` for both `/` and
 `/docs/quickstart/`. HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options:
 DENY`, Referrer Policy, Permissions Policy, and exact-origin CORS were present.
-The deployed CSP still contains `style-src 'self' 'unsafe-inline'`,
-`script-src 'self' 'unsafe-inline'`, and `connect-src 'self' https:`. This is
-the expected pre-deployment state of the local strict-CSP repair, not evidence
-that the production hardening has landed. The deployed HTML also still
-contains inline scripts on `/` (4), `/docs/quickstart/` (16), and
-`/evidence-graph/` (2) plus one inline style tag on the latter; the local
-post-build artifact has removed these classes of inline content.
+The deployed CSP is strict: `style-src 'self'`, `script-src 'self'`, and
+`connect-src 'self'`. The fresh response also returned HSTS,
+`X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, strict-origin
+referrer policy, restrictive permissions policy, and exact-origin CORS. This
+production header readback is evidence for the deployed site surface only; it
+does not publish or prove the 4.19.6 candidate artifact.
 
 ### Public tracking and release mutability
 
@@ -403,9 +402,9 @@ non-editable.
 
 ### Observed condition
 
-`hyodo.app` currently returns useful headers including HSTS, frame blocking,
-`nosniff`, and CSP. The CSP still contains `'unsafe-inline'` for scripts and
-styles and permits `connect-src https:` broadly.
+`hyodo.app` currently returns HSTS, frame blocking, `nosniff`, restrictive
+permissions/referrer policy, exact-origin CORS, and an enforcing strict CSP:
+`style-src 'self'`, `script-src 'self'`, and `connect-src 'self'`.
 
 No immediate DOM XSS was confirmed in the static Evidence Graph review:
 dynamic text is escaped before the graph panel uses `innerHTML`. Nevertheless,
@@ -434,8 +433,9 @@ unobserved until this branch is published and deployed.
    `X-Content-Type-Options` while tightening the policy.
 
 The custom-page and generated-artifact extraction is implemented and locally
-browser-verified under the enforcing strict CSP header; the remaining work is
-production header rollout and fresh production readback.
+browser-verified under the enforcing strict CSP header, and production header
+rollout/readback is now observed. Keep the fresh readback as a deployment
+surface receipt; it does not establish package publication.
 
 The static build still emits nonblocking warnings for a large client chunk, an
 empty `i18n` collection, and the generated `docs → 404` content entry. These
@@ -544,14 +544,14 @@ protection and must not be described as security enforcement.
 5. Reconcile version/support claims across source, docs, PyPI, GitHub, and the
    site.
 6. Publish and require the security workflow after review.
-7. Publish the strict CSP, then perform a fresh production header and browser
-   readback against the deployed artifact.
+7. Preserve the strict CSP and perform a fresh production header/browser
+   readback after the candidate is separately deployed.
 8. Complete the operator handoff above and perform a final independent
    third-party readback of all six proof axes.
 
 Until step 8 is complete, the appropriate external statement is:
 
-> HyoDo has a documented remediation plan and several strong local/public
-> controls. Compose runtime readback, historical secret disposition, Docker
-> reproducibility, remote security-workflow enforcement, and CSP tightening
-> remain open or explicitly unobserved.
+> HyoDo has strong local/public controls. Compose runtime readback, historical
+> secret disposition, Docker reproducibility, and a fresh remote security-workflow
+> run remain open or explicitly unobserved; the strict CSP is observed in the
+> current production header readback.

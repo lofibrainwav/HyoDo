@@ -122,6 +122,26 @@ def test_prepare_release_updates_target_but_preserves_public_baseline(tmp_path: 
     assert "HyoDo 4.12.0 is the current release target." in roadmap
 
 
+def test_prepare_release_accepts_roadmap_target_with_baseline_suffix(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+    roadmap = (
+        (tmp_path / "ROADMAP.md")
+        .read_text()
+        .replace(
+            "HyoDo 4.11.0 is the current release target.",
+            "HyoDo 4.11.0 is the current release target and source-tree release baseline;",
+        )
+    )
+    (tmp_path / "ROADMAP.md").write_text(roadmap)
+
+    prepare_release(tmp_path, "4.12.0", today="2026-09-05")
+
+    assert (
+        "HyoDo 4.12.0 is the current release target and source-tree release baseline;"
+        in (tmp_path / "ROADMAP.md").read_text()
+    )
+
+
 def test_prepare_release_inserts_changelog_section_after_header(tmp_path: Path) -> None:
     write_minimal_repo(tmp_path)
 

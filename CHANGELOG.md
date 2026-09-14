@@ -5,6 +5,32 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.6] - 2026-09-13
+
+Admission observation contract candidate; public publication remains pending.
+
+### Added
+
+- Adds `hyodo.admission-observation/v1` validation and an append-only local
+  admission-observation ledger for bounded external policy decisions.
+
+### Changed
+
+- Adds `hyodo admission record` with file/stdin input boundaries and a JSON
+  receipt mode; admission records contain no execution result or authority.
+
+### Fixed
+
+- Rejects admission records that claim `execution_attempted` or
+  `execution_observed`, preserving the admission-versus-execution boundary.
+
+### Evidence
+
+- Local focused tests are measured on the 4.19.6 candidate based on fresh-main
+  `af028c62b075580830ad418614cb172af5e5e7a2`.
+- Public tag, GitHub Release, PyPI artifact/provenance, deployment, and runtime
+  evidence remain `UNOBSERVED` until their release gates run.
+
 ## [4.19.4] - 2026-09-12
 
 Bounded retrieval provenance maintenance patch. HyoDo 4.19.3 remains the

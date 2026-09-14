@@ -7,6 +7,7 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
+- Current source candidate: HyoDo `4.19.6`, based on fresh-main `af028c62b075580830ad418614cb172af5e5e7a2`
 - Latest public package: HyoDo `4.19.5`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC provenance, neutral-cwd install smoke, and hosted runtime-identity schema readback verified.
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
@@ -18,7 +19,7 @@ branches, and worktrees must not be folded into HyoDo closeout status.
 
 ## Current truth
 
-| Capability | Public 4.19.5 | Current main / measured state |
+| Capability | Public 4.19.5 | Current main / 4.19.6 candidate |
 | --- | --- | --- |
 | gates, policy, event ledger | SHIPPED | SHIPPED |
 | local Friction Contribution | SHIPPED | SHIPPED; no collector/uploader |
@@ -30,6 +31,7 @@ branches, and worktrees must not be folded into HyoDo closeout status.
 | Codex output digest / causal parent / model provenance | SHIPPED | SHIPPED; historically observed, fresh canonical host receipt remains separate evidence |
 | Cursor host adapter | SHIPPED | SHIPPED; fresh live callback remains UNOBSERVED |
 | orchestration observation ingest | SHIPPED | SHIPPED |
+| admission observation v1 / CLI | NOT IN 4.19.5 | CANDIDATE; execution remains UNOBSERVED |
 | Graph v2 multi-parent runtime | SHIPPED | SHIPPED; deterministic multi-parent read/normalize/export/viewer + Tarjan SCC with v1 compatibility |
 | Information Flow Attestation v0 | SHIPPED | SHIPPED observer-only; privacy lineage stays separate and non-authoritative |
 | ACL / Wisdom Reflex automatic routing | RESEARCH | RESEARCH / shadow only |
@@ -48,8 +50,9 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 ## Maintenance boundary
 
-HyoDo 4.19.5 is the closed public baseline and this checkout is now reconciled
-to that source version. Do not infer runtime identity from this page alone;
+HyoDo 4.19.5 is the closed public baseline. The current source candidate is
+4.19.6; it is not published and must not be inferred as a public artifact. Do
+not infer runtime identity from this page alone;
 use the signed release, CI receipt, or runtime identity receipt. Fresh
 Codex/Cursor host observations,
 QMD/Neo4j closed-loop memory, and matched ACL/KINGDOM shadow experiments are
