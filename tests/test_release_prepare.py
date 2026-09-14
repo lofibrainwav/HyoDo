@@ -82,7 +82,6 @@ version = "{version}"
 __version__ = "{version}"
 """
     )
-    (root / "Dockerfile").write_text(f'LABEL version="{version}"\n')
     (root / ".claude-plugin").mkdir()
     (root / ".claude-plugin" / "plugin.json").write_text(PLUGIN_JSON.replace("{version}", version))
     (root / "server.json").write_text(SERVER_JSON.replace("{version}", version))
@@ -101,7 +100,6 @@ def test_prepare_release_updates_all_version_sources(tmp_path: Path) -> None:
     assert (tmp_path / "VERSION").read_text() == "4.12.0\n"
     assert 'version = "4.12.0"' in (tmp_path / "pyproject.toml").read_text()
     assert '__version__ = "4.12.0"' in (tmp_path / "hyodo" / "__init__.py").read_text()
-    assert 'version="4.12.0"' in (tmp_path / "Dockerfile").read_text()
     assert (
         json.loads((tmp_path / ".claude-plugin" / "plugin.json").read_text())["version"] == "4.12.0"
     )

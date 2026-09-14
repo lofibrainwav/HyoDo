@@ -14,7 +14,6 @@ CROSS="ERR"
 WARN="WARN"
 
 INSTALL_DIR="${HOME}/.hyodo"
-MINIMAL_MODE=true
 API_KEY=""
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 if [ -r "$SCRIPT_DIR/VERSION" ]; then
@@ -52,7 +51,7 @@ print_header() {
     echo -e "${BLUE}=======================================================${NC}"
     echo ""
     echo -e "${CYAN}HyoDo is a model-agnostic quality-gate kit for AI-assisted code.${NC}"
-    echo -e "${CYAN}Minimal path: Python + CLI. Extended infra is optional.${NC}"
+    echo -e "${CYAN}Public path: Python + CLI. No container runtime is required.${NC}"
     echo ""
 }
 
@@ -82,36 +81,9 @@ ask_yes_no() {
 }
 
 step_welcome() {
-    print_step "1" "5" "Choose install mode"
+    print_step "1" "5" "Public CLI installation"
     echo ""
-    echo -e "${CYAN}Select install mode:${NC}"
-    echo ""
-    echo -e "  ${GREEN}1) Minimal (recommended)${NC}"
-    echo "     - Python 3.10+"
-    echo "     - No Docker/Redis/Postgres required"
-    echo "     - Public CLI gates only"
-    echo ""
-    echo -e "  ${YELLOW}2) Extended (optional)${NC}"
-    echo "     - Docker + optional local services"
-    echo "     - For optional extended services only"
-    echo ""
-
-    read -r -p "Choice (1 or 2): " mode_choice
-
-    case $mode_choice in
-        1)
-            MINIMAL_MODE=true
-            echo -e "\n${GREEN}${CHECK} Minimal mode selected${NC}"
-            ;;
-        2)
-            MINIMAL_MODE=false
-            echo -e "\n${GREEN}${CHECK} Extended mode selected${NC}"
-            ;;
-        *)
-            MINIMAL_MODE=true
-            echo -e "\n${YELLOW}${WARN} Defaulting to minimal mode${NC}"
-            ;;
-    esac
+    echo -e "${GREEN}Python 3.10+ and the public HyoDo CLI will be installed.${NC}"
     echo ""
 }
 
@@ -148,23 +120,6 @@ step_requirements() {
         echo -e "  ${CHECK} Claude Code: found (optional adapter)"
     else
         echo -e "  ${WARN} Claude Code: not found (optional)"
-    fi
-
-    if [ "$MINIMAL_MODE" = false ]; then
-        echo ""
-        echo -e "${YELLOW}Extended mode extra checks:${NC}"
-        if command -v docker &>/dev/null; then
-            echo -e "  ${CHECK} Docker: $(docker --version | awk '{print $3}' | sed 's/,//')"
-        else
-            echo -e "  ${CROSS} ${RED}Docker required for extended mode${NC}"
-            echo -e "     ${CYAN}-> https://docs.docker.com/get-docker/${NC}"
-            all_ok=false
-        fi
-        if command -v docker-compose &>/dev/null || docker compose version &>/dev/null 2>&1; then
-            echo -e "  ${CHECK} Docker Compose: found"
-        else
-            echo -e "  ${WARN} Docker Compose: verify installation"
-        fi
     fi
 
     if [ "$all_ok" = false ]; then
@@ -236,8 +191,7 @@ step_install() {
     fi
 
     echo -e "${CYAN}Writing environment file...${NC}"
-    if [ "$MINIMAL_MODE" = true ]; then
-        cat >"$INSTALL_DIR/.env" <<EOF
+    cat >"$INSTALL_DIR/.env" <<EOF
 # HyoDo minimal install
 # Created: $(date)
 
@@ -251,11 +205,6 @@ METRICS_ENABLED=true
 DEBUG=false
 LOG_LEVEL=INFO
 EOF
-    else
-        cp "$INSTALL_DIR/.env.example" "$INSTALL_DIR/.env"
-        sed -i '' "s/ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$API_KEY/" "$INSTALL_DIR/.env" 2>/dev/null ||
-            sed -i "s/ANTHROPIC_API_KEY=.*/ANTHROPIC_API_KEY=$API_KEY/" "$INSTALL_DIR/.env"
-    fi
     echo -e "${CHECK} .env created"
 
     if ask_yes_no "Install Python package now (python3 -m pip install .)?" "y"; then
@@ -285,12 +234,6 @@ step_finish() {
     echo -e "  ${GREEN}hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9${NC}"
     echo -e "  ${GREEN}hyodo safe${NC}"
     echo ""
-
-    if [ "$MINIMAL_MODE" = false ]; then
-        echo -e "${YELLOW}Extended infra (only if you need optional services):${NC}"
-        echo -e "  ${GREEN}cd $INSTALL_DIR && docker compose -f docker-compose.minimal.yml up -d${NC}"
-        echo ""
-    fi
 
     echo -e "${CYAN}Docs:${NC}"
     echo -e "  - $INSTALL_DIR/QUICK_START.md"

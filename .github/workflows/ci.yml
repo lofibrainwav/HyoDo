@@ -95,7 +95,6 @@ jobs:
           echo "Release surface files check..."
           required_files=(
             "install_interactive.sh"
-            "docker-compose.minimal.yml"
             ".env.minimal"
             "QUICK_START.md"
             "VERSION"

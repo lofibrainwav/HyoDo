@@ -4,6 +4,14 @@ Status: **OPEN — remediation plan only**
 Assessment date: **2026-09-13 PT**
 Assessment style: **read-only, non-destructive, external-first review**
 
+## Current product boundary
+
+HyoDo's public product is the Python package, CLI, and MCP adapter. Docker and
+the optional Compose service stack are not required for installation, CLI
+gates, MCP use, or public release, and are retired from the live product
+surface. The Docker references below are retained as historical remediation
+evidence only; they are not current setup instructions or release gates.
+
 This document records how HyoDo should address the findings from a third-party
 view of the repository, the published Python package, and `https://hyodo.app`.
 It is a remediation plan, not evidence that the fixes have already shipped.
@@ -57,7 +65,7 @@ deployed and tested.
 
 | Item | Status | Evidence boundary |
 | --- | --- | --- |
-| Compose default exposure | IMPLEMENTED | YAML diff inspected; Docker runtime readback is `UNOBSERVED` because the current workstation has no `docker` executable |
+| Compose default exposure | RETIRED | The Compose surface is no longer part of the live product; historical YAML/runtime evidence remains recorded below |
 | Historical credential disposition | HOLD | No credential owner disposition or rotation receipt |
 | Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, package metadata, and site source claims now name published `4.19.5`; public deployment readback is separate |
 | Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
@@ -113,7 +121,7 @@ readback. Until then, this lane is `IMPLEMENTED LOCALLY / NOT PUBLISHED`.
 
 ### Observed condition before repair
 
-[`docker-compose.minimal.yml`](../docker-compose.minimal.yml) previously published:
+The retired `docker-compose.minimal.yml` previously published:
 
 - Redis on host port `6379`, without authentication;
 - PostgreSQL on host port `15432`;
@@ -256,13 +264,13 @@ metadata. Do not commit populated `.env` files or raw scanner output.
 
 ### Observed condition before repair
 
-The pre-repair [`Dockerfile`](../Dockerfile) installed tools such as `ruff`, `pyright`,
+The retired `Dockerfile` installed tools such as `ruff`, `pyright`,
 `pytest`, `pydantic`, `typer`, and `rich` without version pins, then installs
 the package from a source tree whose runtime dependencies use ranges. The
 image also mixes runtime packaging with development verification tooling.
 
 This created time-dependent builds and made it difficult to prove which code
-and dependency set a user actually ran. The current Dockerfile now uses a
+and dependency set a user actually ran. The retired Dockerfile used a
 multi-stage build, consumes the repository-owned lock export in
 `requirements.runtime.txt`, and copies only the built wheel into the final
 image; the base image and actual build remain separate unobserved axes.
