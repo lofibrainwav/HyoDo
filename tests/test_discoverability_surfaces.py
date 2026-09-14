@@ -131,7 +131,7 @@ def test_discoverability_workflow_exercises_quality_hook_trust_boundary() -> Non
     assert "hyodo-safe-strict --all-files" in workflow
     assert "hyodo-check --all-files" in workflow
     assert "env -u HYODO_GATES_TRUST_ALL" in workflow
-    assert 'HYODO_GATES_TRUST_ALL: "1"' in workflow
+    assert "HYODO_GATES_TRUST_ALL=1 pre-commit run hyodo-check" in workflow
     assert 'schema = "hyodo.gates/v1"' in workflow
     assert 'command = "true"' in workflow
 
