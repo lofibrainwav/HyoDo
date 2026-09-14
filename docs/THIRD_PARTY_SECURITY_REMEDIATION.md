@@ -59,34 +59,38 @@ deployed and tested.
 | --- | --- | --- |
 | Compose default exposure | IMPLEMENTED | YAML diff inspected; Docker runtime readback is `UNOBSERVED` because the current workstation has no `docker` executable |
 | Historical credential disposition | HOLD | No credential owner disposition or rotation receipt |
-| Version/support-policy reconciliation | CANDIDATE LOCALLY / PUBLIC BASELINE OBSERVED | Candidate source/package metadata name `4.19.6`; public package and supported release remain `4.19.5` until publication |
+| Version/support-policy reconciliation | CANDIDATE LOCALLY / PUBLIC BASELINE OBSERVED | Candidate source/package metadata name `4.19.6`; PyPI and the published GitHub release remain `4.19.5` until publication |
 | Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
 | Clean security verification | VERIFIED IN SUPPORTED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Python 3.14.7 public verifier: `1513 passed, 7 skipped`; ruff, pyright, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. The ambient Python 3.9 verifier attempt was rejected by the package floor and is an environment result, not a vulnerability result |
-| CI secret/dependency scan | WORKFLOW PRESENT / REMOTE RUN UNOBSERVED | Current main contains the SHA-pinned security workflow that runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; a fresh terminal remote run receipt is not attached here |
+| CI secret/dependency scan | GREEN RUN / NOT REQUIRED | Current main's Security verification succeeded on `af028c62`; branch protection's required contexts still exclude `Security verification`, and the 2026-09-14 fresh gitleaks scan reports 16 historical findings |
 | CI action/dependency maintenance | IMPLEMENTED LOCALLY / PARTLY VERIFIED REMOTE | Local site artifact action is SHA-pinned and `/site` is included in Dependabot; remote `main` already has the merged site hardening, but this local branch's new security workflow is not published |
-| Public remediation tracking | IMPLEMENTED LOCALLY / NOT PUBLISHED | The register exists locally; the fresh remote readback found no open issue or PR dedicated to this remediation |
+| Public remediation tracking | IMPLEMENTED LOCALLY / NOT PUBLISHED | The register exists locally; the 2026-09-14 dry-run found no open candidate PR or dedicated remediation PR |
 | GitHub release immutability | OBSERVED RESIDUAL | Public `v4.19.5` reports `immutable: false`; signed tag and artifact provenance are separate evidence and do not establish release-record immutability |
 | Public sdist scope gate | IMPLEMENTED_AND_VERIFIED_LOCALLY | `verify-public.sh` now delegates archive-scope validation to `verify_sdist_scope.py`; a 512,954-byte sdist passed with 199 members and no `afo_core` |
-| Site dependency/build verification | VERIFIED LOCALLY AND IN PRODUCTION READBACK | Local source config and production `hyodo.app` readback agree on strict CSP, HSTS, frame denial, nosniff, referrer, permissions, and exact-origin CORS; production readback was HTTP 200 on 2026-09-14 UTC. Browser/build evidence remains separate from candidate publication |
+| Site dependency/build verification | VERIFIED LOCALLY AND IN PRODUCTION READBACK / SHA CONVERGENCE HOLD | Local source config and production `hyodo.app` readback agree on strict CSP, HSTS, frame denial, nosniff, referrer, permissions, and exact-origin CORS; production readback was HTTP 200 on 2026-09-14 UTC. The current-main deployment was reported canceled, so live site health does not prove main-to-production SHA convergence |
 
 ### Remote governance readback
 
 The current public `main` was read back at commit
-`af028c62b075580830ad418614cb172af5e5e7a2` on 2026-09-13 PT. The classic
+`af028c62b075580830ad418614cb172af5e5e7a2` on 2026-09-14 PT. The classic
 branch-protection endpoint reports required status checks for the Python truth
 gates, goodness/beauty gates, install smoke, and integrity score; it also
 reports force-push and branch-deletion denial. Required approving review count
 is currently `0`, and required signed commits are disabled. The rulesets
 endpoint returned an empty list. This is **partial governance evidence**, not a
 claim that security scanning is enforced: the required-check list does not
-include the locally prepared `security.yml` workflow.
+include the `Security verification` workflow.
+
+The 2026-09-14 readback still lists exactly seven required contexts: the three
+Python truth gates, Goodness, Beauty, Install and CLI Smoke, and HyoDo Integrity
+Score. Security verification is successful when run but is not a merge blocker.
 
 The public site hardening from [PR #296](https://github.com/lofibrainwav/HyoDo/pull/296)
 is merged and the corresponding Vercel production deployment is `READY`. That
 remote deployment is evidence for the public header surface only; it does not
 make the unpushed local remediation changes part of `main`.
 
-The fresh production readback on 2026-09-13 PT returned `200` for both `/` and
+The fresh production readback on 2026-09-14 PT returned `200` for `/` and
 `/docs/quickstart/`. HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options:
 DENY`, Referrer Policy, Permissions Policy, and exact-origin CORS were present.
 The deployed CSP is strict: `style-src 'self'`, `script-src 'self'`, and
@@ -94,11 +98,13 @@ The deployed CSP is strict: `style-src 'self'`, `script-src 'self'`, and
 `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`, strict-origin
 referrer policy, restrictive permissions policy, and exact-origin CORS. This
 production header readback is evidence for the deployed site surface only; it
-does not publish or prove the 4.19.6 candidate artifact.
+does not publish or prove the 4.19.6 candidate artifact. The current-main
+deployment was reported `CANCELED`, while the live site remains served by the
+prior production deployment; this is a convergence hold, not a site outage.
 
 ### Public tracking and release mutability
 
-As of the 2026-09-13 PT readback, the public repository had no open issues or
+As of the 2026-09-14 PT readback, the public repository had no open issues or
 open pull requests for this remediation. The local register therefore remains
 an implementation artifact until it is published through a reviewed PR or an
 explicitly linked security issue. The latest public GitHub Release, `v4.19.5`,
