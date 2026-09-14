@@ -51,11 +51,14 @@ jobs:
             -o cyclonedx-json=/out/image.sbom.cyclonedx.json
 
       - name: Write proof receipt
+        env:
+          CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
         run: |
           set -euo pipefail
           test -s image.sbom.cyclonedx.json
           {
-            echo "commit=${GITHUB_SHA}"
+            echo "candidate_sha=${CANDIDATE_SHA}"
+            echo "workflow_sha=${GITHUB_SHA}"
             cat image.identity.txt
             sha256sum image.sbom.cyclonedx.json
           } > container-proof.receipt
@@ -63,7 +66,7 @@ jobs:
       - name: Upload container proof
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: hyodo-container-proof-${{ github.sha }}
+          name: hyodo-container-proof-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
           path: |
             image.inspect.json
             image.identity.txt

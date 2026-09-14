@@ -23,6 +23,7 @@ viewer also has four actor rows) rendered live from
 | [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
 | [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
 | [THIRD_PARTY_SECURITY_REMEDIATION.md](./THIRD_PARTY_SECURITY_REMEDIATION.md) | Third-party findings, remediation plan, and closure evidence |
+| [VERIFICATION_ORCHESTRATION.md](./VERIFICATION_ORCHESTRATION.md) | Parallel discovery lanes, serial promotion gates, and update procedure |
 | [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |
 | [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
 | [HOST_CONTRACT.md](./HOST_CONTRACT.md) | What the Claude Code hook mapper copies vs what the host still owns |
