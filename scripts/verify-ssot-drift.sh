@@ -4,6 +4,16 @@ set -euo pipefail
 base_ref="${1:?usage: verify-ssot-drift.sh BASE [HEAD]}"
 head_ref="${2:-HEAD}"
 
+branch_name="$(git symbolic-ref --quiet --short HEAD || true)"
+if [[ -n "$branch_name" ]]; then
+  branch_worktrees="$(git worktree list --porcelain | awk -v target="refs/heads/$branch_name" '$1 == "branch" && $2 == target { count++ } END { print count + 0 }')"
+  if (( branch_worktrees > 1 )); then
+    echo "SSOT_DRIFT: branch $branch_name is checked out in $branch_worktrees worktrees" >&2
+    echo "Use one unique branch per lane before pushing." >&2
+    exit 1
+  fi
+fi
+
 untracked="$(git ls-files --others --exclude-standard)"
 if ! git diff --quiet || ! git diff --cached --quiet || [[ -n "$untracked" ]]; then
   echo "SSOT_DRIFT: worktree has unstaged or staged changes" >&2
