@@ -296,6 +296,34 @@ jobs:
           check_success "Safety fixtures" "$SAFETY_FIXTURES_RESULT"
           echo "All Goodness safety lanes succeeded."
 
+  # Advisory experiment: compare process-distributed pytest with the required
+  # serial public-package lane before changing the release contract. This job
+  # intentionally does not feed goodness-gate or trinity-score.
+  goodness-xdist-shadow:
+    name: "Goodness - xdist Shadow"
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e ".[dev]" "pytest-xdist>=3.0,<4"
+
+      - name: Run distributed public package tests (advisory)
+        run: |
+          python -m pytest tests -q --tb=short --cov=hyodo \
+            --cov-fail-under=80 -n 2 --dist loadfile
+
   # -------------------------------------------------------------------------
   # Public language - commit and PR text
   #
