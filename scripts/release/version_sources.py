@@ -68,7 +68,7 @@ def _render_json_update(path: Path, old: str, new: str, fields: tuple[tuple[str,
 
 
 def synchronized_version(root: Path) -> str:
-    """Return the shared version after validating all seven sources."""
+    """Return the shared version after validating all six sources."""
     root = root.resolve()
     try:
         sources = collect_sources(root)
@@ -83,7 +83,7 @@ def synchronized_version(root: Path) -> str:
 
 
 def update_version_sources(root: Path, new_version: str) -> str:
-    """Validate and update all seven version-bearing repository sources."""
+    """Validate and update all six version-bearing repository sources."""
     root = root.resolve()
     old_version = synchronized_version(root)
 
@@ -100,12 +100,6 @@ def update_version_sources(root: Path, new_version: str) -> str:
             f'__version__ = "{old_version}"',
             f'__version__ = "{new_version}"',
             path="hyodo/__init__.py",
-        ),
-        root / "Dockerfile": _replace_once(
-            (root / "Dockerfile").read_text(encoding="utf-8"),
-            f'LABEL version="{old_version}"',
-            f'LABEL version="{new_version}"',
-            path="Dockerfile",
         ),
     }
     for relative, fields in _JSON_FIELDS.items():

@@ -6,7 +6,6 @@ Sources checked:
 - ``VERSION`` (plain text)
 - ``pyproject.toml`` (``[project] version = "..."``)
 - ``hyodo/__init__.py`` (``__version__ = "..."``)
-- ``Dockerfile`` (``LABEL version="..."``)
 - ``.claude-plugin/plugin.json`` (``"version"`` field)
 - ``server.json`` (``"version"`` field, the MCP Registry manifest)
 - ``.claude-plugin/marketplace.json`` (``plugins[0].version`` field)
@@ -62,10 +61,6 @@ def read_init_version(root: Path = ROOT) -> str:
         r'^__version__\s*=\s*"([^"]+)"',
         "hyodo/__init__.py",
     )
-
-
-def read_dockerfile_version(root: Path = ROOT) -> str:
-    return _read_regex_version(root / "Dockerfile", r'^LABEL\s+version="([^"]+)"', "Dockerfile")
 
 
 def read_plugin_manifest_version(root: Path = ROOT) -> str:
@@ -126,7 +121,6 @@ def collect_sources(root: Path = ROOT) -> dict[str, str]:
         "VERSION": read_version_file(root),
         "pyproject.toml": read_pyproject_version(root),
         "hyodo/__init__.py": read_init_version(root),
-        "Dockerfile": read_dockerfile_version(root),
         ".claude-plugin/plugin.json": read_plugin_manifest_version(root),
         "server.json": read_server_manifest_version(root),
         ".claude-plugin/marketplace.json": read_marketplace_manifest_version(root),
