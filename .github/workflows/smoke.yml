@@ -81,12 +81,15 @@ jobs:
           echo "$out" | grep -Fq "hyodo[mcp]"
 
       - name: Validate package import and public API
+        env:
+          EXPECTED_VERSION: ${{ env.EXPECTED_VERSION }}
         run: |
-          python - <<PY
+          python - <<'PY'
+          import os
           import hyodo
           from hyodo import calculate_hygook_v5_score, calculate_trinity_score, is_strong_review_signal
 
-          assert hyodo.__version__ == "${{ env.EXPECTED_VERSION }}"
+          assert hyodo.__version__ == os.environ["EXPECTED_VERSION"]
           f_score, s_score = calculate_hygook_v5_score(1, 1, 1, 1, 1)
           assert round(f_score, 2) == 60.00
           assert round(s_score, 2) == 10.00

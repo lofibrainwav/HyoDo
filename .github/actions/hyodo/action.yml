@@ -35,9 +35,12 @@ runs:
     - name: Run HyoDo gates
       id: run_gates
       shell: bash
+      env:
+        HYODO_ARGS: ${{ inputs.args }}
       run: |
         set +e
-        hyodo check ${{ inputs.args }} 2>&1 | tee "$RUNNER_TEMP/hyodo-check.log"
+        read -r -a args <<< "$HYODO_ARGS"
+        hyodo check "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/hyodo-check.log"
         status=${PIPESTATUS[0]}
         set -e
         exit "$status"
