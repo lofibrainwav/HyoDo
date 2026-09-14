@@ -1,5 +1,12 @@
 # HyoDo Verification Orchestration
 
+> **DERIVED OPERATIONS MAP — NOT PRODUCT SSOT**
+>
+> This file is an operator-generated map. Source truth remains in the cited
+> repository files, GitHub run records, artifact metadata, branch-protection
+> readbacks, release records, and live endpoint readbacks. Do not treat a map
+> row as evidence unless its full source identifier is cited.
+
 This document is the saved map for moving HyoDo from partial evidence to
 closeout. It keeps independent observations parallel and only opens a
 dependent edge after its predecessor has a durable receipt.
@@ -48,7 +55,8 @@ single candidate SHA and no unresolved blocker is being hidden as `GREEN`.
 | --- | --- | --- | --- |
 | Historical secrets | `HOLD` | owner disposition for all findings, then fresh gitleaks receipt | security required gate |
 | Security governance | `OBSERVED` | Security verification required context readback | merge enforcement |
-| Container | `OBSERVED` | Previous candidate `293456cf…` verified by CI run `34862789517`; latest head requires a fresh receipt | artifact/release gate |
+| Container | `VERIFIED` | Candidate `216f93fc1d8986b08cf2696552072b1ef7851d57`; run `34864148335`; artifact `hyodo-container-proof-216f93fc1d8986b08cf2696552072b1ef7851d57` | artifact/release gate |
+| Site evidence graph | `HOLD` | Run `34864148312` failed at `site/scripts/verify-evidence-graph.mjs`: `Runtime.evaluate` timeout | site gate |
 | Production provenance | `HOLD` | live deployment SHA equals canonical main SHA | production closeout |
 | Public release | `HOLD` | signed tag, GitHub assets, PyPI version and provenance all bind to main | release closeout |
 | KINGDOM boundary | `UNOBSERVED` | host-side integration evidence or explicit non-claim receipt | integration closeout |
@@ -145,13 +153,15 @@ state: UNOBSERVED | OBSERVED | VERIFIED | CLOSED | HOLD | BLOCKED
 
 ## Receipt anchors
 
-The previous candidate `293456cf0141cc77f3201714784d98f151e073fa` had a
-verified container receipt from workflow run `34862789517`. Its workflow SHA
-was recorded separately because pull-request runs execute on a synthetic merge
-ref. The artifact was
-`hyodo-container-proof-293456cf0141cc77f3201714784d98f151e073fa`.
+The current candidate is
+`216f93fc1d8986b08cf2696552072b1ef7851d57`. Its container workflow run is
+`34864148335`, and the artifact is
+`hyodo-container-proof-216f93fc1d8986b08cf2696552072b1ef7851d57`.
 
-The current candidate must receive a new receipt after any subsequent commit.
+The container receipt records `candidate_sha` as
+`216f93fc1d8986b08cf2696552072b1ef7851d57` and records the separate synthetic
+PR workflow SHA. Any subsequent commit invalidates this receipt and requires a
+new run before the container row can remain `VERIFIED`.
 
 ## Update procedure
 
