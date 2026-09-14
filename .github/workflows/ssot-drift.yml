@@ -1,0 +1,29 @@
+name: SSOT Drift Guard
+
+"on":
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ssot:
+    name: SSOT base and clean-head guard
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify candidate is based on current base
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: bash scripts/verify-ssot-drift.sh "$BASE_SHA" "$HEAD_SHA"
