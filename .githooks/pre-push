@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+repo_root="$(git rev-parse --show-toplevel)"
+base_ref="${HYODO_SSOT_BASE_REF:-origin/main}"
+
+if ! git show-ref --verify --quiet "refs/remotes/${base_ref#origin/}"; then
+  echo "SSOT_UNOBSERVED: $base_ref is unavailable; fetch it before pushing" >&2
+  exit 1
+fi
+
+exec "$repo_root/scripts/verify-ssot-drift.sh" "$base_ref" HEAD
