@@ -67,7 +67,7 @@ deployed and tested.
 | Public remediation tracking | CANDIDATE PR OPEN / DISPOSITION HOLD | The remediation documents and register are in candidate PR #308; the register still needs owner dispositions and closeout receipts for all 16 findings |
 | GitHub release immutability | OBSERVED RESIDUAL | Public `v4.19.5` reports `immutable: false`; signed tag and artifact provenance are separate evidence and do not establish release-record immutability |
 | Public sdist scope gate | IMPLEMENTED_AND_VERIFIED_LOCALLY | `verify-public.sh` now delegates archive-scope validation to `verify_sdist_scope.py`; a 512,954-byte sdist passed with 199 members and no `afo_core` |
-| Site dependency/build verification | VERIFIED LOCALLY AND IN PRODUCTION READBACK / SHA CONVERGENCE HOLD | Candidate Site Build succeeded and production `hyodo.app` readback remains HTTP 200 with strict CSP, HSTS, frame denial, nosniff, referrer, permissions, and exact-origin CORS. The candidate has no production deployment readback, so live site health does not prove candidate/main-to-production SHA convergence |
+| Site dependency/build verification | VERIFIED LOCALLY AND IN PRODUCTION READBACK / SHA CONVERGENCE HOLD | Candidate Site Build succeeded and production `hyodo.app` readback remains HTTP 200 with strict CSP, HSTS, frame denial, nosniff, referrer, permissions, and exact-origin CORS. The candidate changes `site/**`, but its Vercel deployment is `Ignored Build Step`; without a deployment SHA readback, live site health does not prove candidate/main-to-production SHA convergence |
 
 ### Remote governance readback
 

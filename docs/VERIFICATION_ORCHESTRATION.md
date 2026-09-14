@@ -75,13 +75,33 @@ source at checkpoint time and record the full IDs in the checkpoint report.
 | Security governance | GitHub branch-protection API | Security verification appears in required contexts | merge enforcement |
 | Container | Container proof workflow + named artifact | run head, artifact head, receipt candidate SHA, and image/SBOM evidence all match | artifact/release gate |
 | Site evidence graph | HyoDo Site Build run | current candidate run completes successfully with no failed verification step | site gate |
-| Production provenance | Vercel deployment readback + live endpoint | live deployment SHA equals canonical main SHA | production closeout |
+| Production provenance | Vercel deployment readback + live endpoint | for web-impacting changes, live deployment SHA equals canonical main SHA; for non-web changes, an explicit ignored-build receipt and unchanged-surface readback exist | production closeout |
 | Public release | Git tag, GitHub Release, PyPI API, provenance receipts | signed tag, assets, and public package all bind to canonical main | release closeout |
 | KINGDOM boundary | explicit host-side integration receipt | observed readback or explicit non-claim receipt exists | integration closeout |
 
 The container lane is `OBSERVED` only after the `Container proof` workflow
 completes successfully. A workflow definition or queued run is not a proof
 receipt.
+
+## Production impact routing
+
+Classify the candidate diff before interpreting a Vercel result:
+
+```text
+site/** changed
+  -> web-impacting
+  -> Vercel deployment is required
+  -> deployment SHA and live endpoint must be read back
+
+site/** unchanged
+  -> non-web
+  -> ignored-build receipt is acceptable only when the project rule is observed
+  -> unchanged production surface must still be read back
+```
+
+`Canceled by Ignored Build Step` is not automatically a successful non-web
+receipt. If `site/**` changed, or if the project ignore rule was not measured,
+the state remains `UNKNOWN` or `HOLD` and production convergence is not proven.
 
 ## Parallel dry-run contract
 
