@@ -3397,10 +3397,8 @@ def mcp_config_cmd(
         if link:
             # Keep the documented warning observable when Rich renders a
             # long worker-specific path in a narrow non-interactive console.
-            console.print(
-                f"[dim]{name} deep link ({DEEP_LINK_LABEL}):[/dim]",
-                overflow="fold",
-            )
+            console.print(f"[dim]{name} deep link:[/dim]")
+            console.print(f"  {DEEP_LINK_LABEL}", markup=False, overflow="ignore")
             console.print(f"  {link}", markup=False, overflow="ignore")
     raise typer.Exit(0)
 
