@@ -21,6 +21,33 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
+  actionlint:
+    name: "Actionlint - Workflows"
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install pinned actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="1.7.12"
+          archive="actionlint_${version}_linux_amd64.tar.gz"
+          url="https://github.com/rhysd/actionlint/releases/download/v${version}/${archive}"
+          curl --fail --location --retry 3 --output "$archive" "$url"
+          printf '%s  %s\n' \
+            "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8" \
+            "$archive" | sha256sum --check
+          tar --extract --gzip --file "$archive" actionlint
+          install --mode 0755 actionlint "$RUNNER_TEMP/actionlint"
+
+      - name: Check workflow files
+        shell: bash
+        run: |
+          set -euo pipefail
+          "$RUNNER_TEMP/actionlint"
+
   # -------------------------------------------------------------------------
   # Truth Gate - Public package release gate
   # -------------------------------------------------------------------------
@@ -435,14 +462,15 @@ jobs:
           set -o pipefail
           echo "Public docs external-first regression guard..."
           fail=0
-          DOCS="README.md QUICK_START.md SECURITY.md"
+          DOCS=(README.md QUICK_START.md SECURITY.md)
+          PUBLIC_SURFACES=("${DOCS[@]}" CONTRIBUTING.md RELEASE_CHECKLIST.md hyodo/cli/main.py)
           # 1. Unevidenced cost claim: "Saves 50-70%" badge/text
-          if grep -rEn "Saves[ _-]?50[-–]?70|badge/Saves.*50.*70" $DOCS 2>/dev/null; then
+          if grep -rEn "Saves[ _-]?50[-–]?70|badge/Saves.*50.*70" "${DOCS[@]}" 2>/dev/null; then
             echo "::error::Banned: 'Saves 50-70%' cost claim (unevidenced). Use softened wording like 'designed to reduce unnecessary expensive-model usage'."
             fail=1
           fi
           # 2. Automation overclaim: auto-approve language on public surfaces
-          if grep -rEn "Auto-approve|AUTO_RUN" $DOCS CONTRIBUTING.md RELEASE_CHECKLIST.md hyodo/cli/main.py 2>/dev/null; then
+          if grep -rEn "Auto-approve|AUTO_RUN" "${PUBLIC_SURFACES[@]}" 2>/dev/null; then
             echo "::error::Banned: auto-approve / AUTO_RUN phrasing on public surfaces. Scores support review, not replace it."
             fail=1
           fi

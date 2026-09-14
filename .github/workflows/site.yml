@@ -48,7 +48,7 @@ jobs:
           preview_pid=$!
           trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
           ready=0
-          for attempt in $(seq 1 30); do
+          for ((attempt=1; attempt<=30; attempt++)); do
             if curl -sf http://localhost:4321/evidence-graph/ > /dev/null; then
               ready=1
               break
