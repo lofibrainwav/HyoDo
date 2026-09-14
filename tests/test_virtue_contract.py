@@ -12,6 +12,7 @@ from hyodo.gates import VALID_PILLARS
 from hyodo.skills import PILLARS
 from hyodo.virtues import (
     CANONICAL_VIRTUE_KEYS,
+    DOCUMENT_VIRTUE_NAMES,
     HARMONY_AGGREGATE_KEY,
     LEGACY_V5_AGGREGATE_KEY,
     VIRTUE_CONTRACT,
@@ -42,6 +43,18 @@ def test_canonical_contract_has_exactly_six_ordered_virtues() -> None:
     assert set(CANONICAL_VIRTUE_KEYS) == VALID_PILLARS
 
 
+def test_document_labels_follow_philosophy_definition_without_renaming_keys() -> None:
+    assert tuple(DOCUMENT_VIRTUE_NAMES[key] for key in CANONICAL_VIRTUE_KEYS) == (
+        "Truth",
+        "Good",
+        "Beauty",
+        "Humanity",
+        "Hyo",
+        "Longevity",
+    )
+    assert tuple(DOCUMENT_VIRTUE_NAMES) == CANONICAL_VIRTUE_KEYS
+
+
 def test_aggregate_namespace_is_not_the_eternity_virtue() -> None:
     assert HARMONY_AGGREGATE_KEY == "harmony_aggregate"
     assert LEGACY_V5_AGGREGATE_KEY == "s_eternity"
@@ -52,11 +65,11 @@ def test_dashboard_has_six_cards_in_canonical_order() -> None:
     assert len(PILLAR_SPECS) == 6
     assert tuple(spec[3] for spec in PILLAR_SPECS) == (
         "Truth",
-        "Goodness",
+        "Good",
         "Beauty",
-        "Benevolence",
-        "Filial Piety",
-        "Eternity",
+        "Humanity",
+        "Hyo",
+        "Longevity",
     )
 
 

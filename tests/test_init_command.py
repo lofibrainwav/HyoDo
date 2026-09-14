@@ -54,10 +54,10 @@ def test_init_shows_trilingual_pillar_labels(tmp_path: Path) -> None:
     result = runner.invoke(app, ["init", str(tmp_path)])
 
     assert result.exit_code == 0
-    # pytest -> goodness (善/선/Goodness)
+    # pytest -> goodness (善/선/Good)
     assert "善" in result.output
     assert "선" in result.output
-    assert "Goodness" in result.output
+    assert "Good" in result.output
     # mypy -> truth (眞/진/Truth)
     assert "眞" in result.output
     assert "진" in result.output

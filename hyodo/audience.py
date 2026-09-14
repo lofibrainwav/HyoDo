@@ -30,6 +30,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from hyodo.virtues import DOCUMENT_VIRTUE_NAMES
+
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
 except ModuleNotFoundError:  # Python 3.10
@@ -147,17 +149,16 @@ def write_config(root: Path, profile: str, domain: str | None = None) -> Path:
 # --------------------------------------------------------------------------- #
 # Keyed identically to hyodo.dashboard.PILLAR_SPECS's first column (jin, seon,
 # mi, in, hyo, yeong) so a caller can zip the two without changing
-# PILLAR_SPECS itself. Exposed as data for `--explain` headers and a future
-# dashboard column-header source; this PR does not wire it into either
-# surface yet.
+# PILLAR_SPECS itself. The engineer labels follow the philosophy document;
+# profile-specific questions remain audience vocabulary.
 VIRTUE_LABELS: dict[str, dict[str, str]] = {
     "engineer": {
         "jin": "Truth",
-        "seon": "Goodness",
-        "mi": "Beauty",
-        "in": "Benevolence",
-        "hyo": "Filial Piety",
-        "yeong": "Eternity",
+        "seon": DOCUMENT_VIRTUE_NAMES["goodness"],
+        "mi": DOCUMENT_VIRTUE_NAMES["beauty"],
+        "in": DOCUMENT_VIRTUE_NAMES["benevolence"],
+        "hyo": DOCUMENT_VIRTUE_NAMES["hyo"],
+        "yeong": DOCUMENT_VIRTUE_NAMES["eternity"],
     },
     "vibe": {
         "jin": "Is it true?",

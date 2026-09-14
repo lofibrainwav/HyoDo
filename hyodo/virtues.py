@@ -97,6 +97,16 @@ VIRTUE_CONTRACT: tuple[VirtueContract, ...] = (
 
 CANONICAL_VIRTUE_KEYS: tuple[str, ...] = tuple(v.key for v in VIRTUE_CONTRACT)
 CANONICAL_VIRTUE_NAMES: tuple[str, ...] = tuple(v.name for v in VIRTUE_CONTRACT)
+# Philosophy-to-engineering document labels. Machine keys and historical names
+# remain stable so existing receipts and consumers are not silently renamed.
+DOCUMENT_VIRTUE_NAMES: Mapping[str, str] = {
+    "truth": "Truth",
+    "goodness": "Good",
+    "beauty": "Beauty",
+    "benevolence": "Humanity",
+    "hyo": "Hyo",
+    "eternity": "Longevity",
+}
 HARMONY_AGGREGATE_KEY = "harmony_aggregate"
 LEGACY_V5_AGGREGATE_KEY = "s_eternity"
 

@@ -22,7 +22,7 @@ from hyodo.graph_view import (
     column_coverage,
     orb_state,
 )
-from hyodo.virtues import VIRTUE_CONTRACT
+from hyodo.virtues import DOCUMENT_VIRTUE_NAMES, VIRTUE_CONTRACT
 
 # Inline auto-refresh poller. The text must stay byte-identical to the sha256
 # CSP allowance below, so the page metadata travels in a data attribute instead
@@ -309,7 +309,7 @@ def _status_line(status: str, message: str) -> str:
 _VIRTUE_SLUGS = ("jin", "seon", "mi", "in", "hyo", "yeong")
 _VIRTUE_COLORS = ("blue", "green", "purple", "orange", "gold", "indigo")
 PILLAR_SPECS: tuple[tuple[str, str, str, str, str], ...] = tuple(
-    (slug, v.hanja, v.korean, v.name if v.key != "hyo" else "Filial Piety", color)
+    (slug, v.hanja, v.korean, DOCUMENT_VIRTUE_NAMES[v.key], color)
     for slug, v, color in zip(_VIRTUE_SLUGS, VIRTUE_CONTRACT, _VIRTUE_COLORS, strict=True)
 )
 

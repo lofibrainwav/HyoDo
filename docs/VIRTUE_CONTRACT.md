@@ -4,18 +4,21 @@ HyoDo has exactly six independent virtue axes. The executable source of truth
 is [`hyodo/virtues.py`](../hyodo/virtues.py); this document explains the
 contract without creating a second list.
 
-| Canonical virtue | Label | Measurement | Score role | Graph role |
-|---|---|---|---|---|
-| Truth | 眞 / 진 | Tests, typing, static checks | Independent measured axis | Pillar column |
-| Goodness | 善 / 선 | Safety findings and coverage | Independent measured axis | Pillar column |
-| Beauty | 美 / 미 | Lint, format, clarity evidence | Independent measured axis | Pillar column |
-| Benevolence | 仁 / 인 | Public-surface and onboarding evidence | Independent measured axis | Pillar column |
-| Hyo | 孝 / 효 | Policy, host-binding, access-ledger evidence | Independent measured axis | Pillar column |
-| Eternity / Yeong | 永 / 영 | Append-only history and continuity evidence | Independent measured axis | Continuity indicator |
+| Canonical virtue | Document label | Machine key / compatibility label | Measurement | Score role | Graph role |
+|---|---|---|---|---|---|
+| Truth | Truth | `truth` / Truth | 眞 / 진; tests, typing, static checks | Independent measured axis | Pillar column |
+| Goodness | Good | `goodness` / Goodness | 善 / 선; safety findings and coverage | Independent measured axis | Pillar column |
+| Beauty | Beauty | `beauty` / Beauty | 美 / 미; lint, format, clarity evidence | Independent measured axis | Pillar column |
+| Benevolence | Humanity | `benevolence` / Benevolence | 仁 / 인; public-surface and onboarding evidence | Independent measured axis | Pillar column |
+| Hyo | Hyo | `hyo` / Hyo | 孝 / 효; policy, host-binding, access-ledger evidence | Independent measured axis | Pillar column |
+| Eternity / Yeong | Longevity | `eternity` / Eternity | 永 / 영; append-only history and continuity evidence | Independent measured axis | Continuity indicator |
 
-Presentation aliases must not create new axes: the dashboard may show the
-English display phrase `Filial Piety` for the canonical `Hyo` key, while
-contracts and machine fields use `hyo` / `Hyo`.
+The philosophy-to-engineering definition uses the document labels `Truth`,
+`Good`, `Beauty`, `Humanity`, `Hyo`, and `Longevity`. These are presentation
+labels, not new axes. Existing machine keys and compatibility labels remain
+stable: `goodness`, `benevolence`, and `eternity` are not renamed in this
+compatibility-preserving step. The dashboard may still show the audience label
+`Filial Piety` for the canonical `Hyo` key.
 
 Every measured virtue reports `OBSERVED`, `PARTIAL`, or `UNOBSERVED`. A virtue
 is not evidence; evidence is not a decision; a score or receipt is not
