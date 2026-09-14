@@ -96,7 +96,7 @@ jobs:
           persist-credentials: false
 
       - name: Run local composite action
-        uses: ./.github/actions/hyodo
+        uses: ./.github/actions/hyodo # zizmor: ignore[self-repository] pinned actionlint does not yet parse GitHub's $/ syntax
         with:
           args: "--general"
           upload-sarif: "false"

@@ -21,6 +21,7 @@
   "devDependencies": {
     "@astrojs/check": "0.9.10",
     "@types/three": "0.185.4",
+    "markdownlint-cli": "0.47.0",
     "typescript": "5.9.3"
   }
 }

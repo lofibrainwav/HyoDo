@@ -433,11 +433,11 @@ jobs:
           node-version: "20"
 
       - name: Install markdownlint
-        run: npm install -g markdownlint-cli
+        run: npm ci --prefix site
 
       - name: Lint Public Entry Documentation
         run: |
-          markdownlint README.md QUICK_START.md CONTRIBUTING.md AGENTS.md ROADMAP.md PHILOSOPHY.md docs/README.md
+          site/node_modules/.bin/markdownlint README.md QUICK_START.md CONTRIBUTING.md AGENTS.md ROADMAP.md PHILOSOPHY.md docs/README.md
           echo "Public entry documentation lint passed"
 
       - name: Check Required Files
