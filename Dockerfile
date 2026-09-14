@@ -1,6 +1,6 @@
 # HyoDo - model-agnostic quality gates for AI-assisted development
 
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea AS builder
 
 WORKDIR /build
 COPY pyproject.toml README.md requirements.runtime.txt ./
@@ -12,7 +12,7 @@ COPY LICENSE CHANGELOG.md VERSION SECURITY.md CONTRIBUTING.md CODE_OF_CONDUCT.md
 RUN python -m pip install --no-cache-dir --no-compile -r requirements.runtime.txt \
     && python -m pip wheel --no-cache-dir --no-deps --wheel-dir /wheels .
 
-FROM python:3.12-slim
+FROM python:3.12-slim@sha256:78387bc3881b8273120a12ebe6c1ab22b018ccc2c9adf565ae1ac9b536e184ea
 
 LABEL maintainer="AFO Kingdom"
 LABEL version="4.19.6"
