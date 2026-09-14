@@ -4,6 +4,14 @@ Status: **OPEN — remediation plan only**
 Assessment date: **2026-09-13 PT**
 Assessment style: **read-only, non-destructive, external-first review**
 
+## Current product boundary
+
+HyoDo's public product is the Python package, CLI, and MCP adapter. Docker and
+the optional Compose service stack are not required for installation, CLI
+gates, MCP use, or public release, and are retired from the live product
+surface. The Docker references below are retained as historical remediation
+evidence only; they are not current setup instructions or release gates.
+
 This document records how HyoDo should address the findings from a third-party
 view of the repository, the published Python package, and `https://hyodo.app`.
 It is a remediation plan, not evidence that the fixes have already shipped.
@@ -57,44 +65,42 @@ deployed and tested.
 
 | Item | Status | Evidence boundary |
 | --- | --- | --- |
-| Compose default exposure | IMPLEMENTED | YAML diff inspected; Docker runtime readback is `UNOBSERVED` because the current workstation has no `docker` executable |
+| Compose default exposure | RETIRED | The Compose surface is no longer part of the live product; historical YAML/runtime evidence remains recorded below |
 | Historical credential disposition | HOLD | No credential owner disposition or rotation receipt |
 | Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, package metadata, and site source claims now name published `4.19.5`; public deployment readback is separate |
 | Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
 | Clean security verification | VERIFIED IN ISOLATED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Isolated Python 3.12 environment: `1499 passed, 7 skipped`; `ruff`, `pyright`, `pip-audit --local`, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. A later host-global `pip-audit` attempt could not start because that environment lacks `certifi`; it is not counted as a vulnerability result |
-| CI secret/dependency scan | IMPLEMENTED LOCALLY / NOT ON REMOTE MAIN | New SHA-pinned workflow runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; remote `main` still has no `security.yml`, and its existing Security Scan is only a dangerous-command grep |
-| CI action/dependency maintenance | IMPLEMENTED LOCALLY / PARTLY VERIFIED REMOTE | Local site artifact action is SHA-pinned and `/site` is included in Dependabot; remote `main` already has the merged site hardening, but this local branch's new security workflow is not published |
+| CI secret/dependency scan | VERIFIED ON REMOTE MAIN / REQUIRED | SHA-pinned `security.yml` runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; required contexts include the historical secret scan and runtime dependency audit |
+| CI action/dependency maintenance | VERIFIED ON REMOTE MAIN | Site and security workflow actions are SHA-pinned; remote `main` contains the merged site hardening and security workflow |
 | Public remediation tracking | IMPLEMENTED LOCALLY / NOT PUBLISHED | The register exists locally; the fresh remote readback found no open issue or PR dedicated to this remediation |
 | GitHub release immutability | OBSERVED RESIDUAL | Public `v4.19.5` reports `immutable: false`; signed tag and artifact provenance are separate evidence and do not establish release-record immutability |
 | Public sdist scope gate | IMPLEMENTED_AND_VERIFIED_LOCALLY | `verify-public.sh` now delegates archive-scope validation to `verify_sdist_scope.py`; a 512,954-byte sdist passed with 199 members and no `afo_core` |
-| Site dependency/build verification | IMPLEMENTED LOCALLY / BROWSER VERIFIED UNDER ENFORCING CSP / PRODUCTION CSP NOT YET TIGHTENED | `npm ci` previously reported 0 vulnerabilities; the build externalizes all generated inline scripts/style attributes, the docs artifact has zero inline assets and valid same-origin extracted assets, and the Evidence Graph browser regression passes with the strict CSP header; fresh production readback is healthy but still reports the old broad CSP |
+| Site dependency/build verification | PRODUCTION HEADER VERIFIED / ARTIFACT READBACK SEPARATE | `npm ci` previously reported 0 vulnerabilities; local build/browser evidence remains separate, while a fresh 2026-09-14 production readback returned `200` with strict same-origin CSP on `/` and `/docs/quickstart/` |
 
 ### Remote governance readback
 
 The current public `main` was read back at commit
-`22f6983e72ff23594057e9e0b9f948574943d1c8` on 2026-09-13 PT. The classic
+`38830d7bf98a9ea476165b214c2f3412c4a8b119` on 2026-09-14 PT. The classic
 branch-protection endpoint reports required status checks for the Python truth
-gates, goodness/beauty gates, install smoke, and integrity score; it also
-reports force-push and branch-deletion denial. Required approving review count
-is currently `0`, and required signed commits are disabled. The rulesets
-endpoint returned an empty list. This is **partial governance evidence**, not a
-claim that security scanning is enforced: the required-check list does not
-include the locally prepared `security.yml` workflow.
+gates, goodness/beauty gates, install smoke, integrity score, historical secret
+scan, and runtime dependency audit; it also reports force-push and
+branch-deletion denial. Required approving review count is currently `0`, and
+required signed commits are disabled. The rulesets endpoint returned an empty
+list. Security scan enforcement is observed on remote `main`; the historical
+findings themselves remain an independent owner-disposition hold.
 
 The public site hardening from [PR #296](https://github.com/lofibrainwav/HyoDo/pull/296)
-is merged and the corresponding Vercel production deployment is `READY`. That
-remote deployment is evidence for the public header surface only; it does not
-make the unpushed local remediation changes part of `main`.
+is merged and the corresponding Vercel production deployment is `READY`. A
+fresh 2026-09-14 production readback also returned the strict CSP headers for
+the root and representative docs route. This is evidence for the public header
+surface only; it does not close the historical secret or Docker proof holds.
 
-The fresh production readback on 2026-09-13 PT returned `200` for both `/` and
+The fresh production readback on 2026-09-14 PT returned `200` for both `/` and
 `/docs/quickstart/`. HSTS, `X-Content-Type-Options: nosniff`, `X-Frame-Options:
-DENY`, Referrer Policy, Permissions Policy, and exact-origin CORS were present.
-The deployed CSP still contains `style-src 'self' 'unsafe-inline'`,
-`script-src 'self' 'unsafe-inline'`, and `connect-src 'self' https:`. This is
-the expected pre-deployment state of the local strict-CSP repair, not evidence
-that the production hardening has landed. The deployed HTML also still
-contains inline scripts on `/` (4), `/docs/quickstart/` (16), and
-`/evidence-graph/` (2) plus one inline style tag on the latter; the local
+DENY`, Referrer Policy, Permissions Policy, exact-origin CORS, and strict
+same-origin CSP were present. The production header readback is separate from
+local artifact/browser evidence and does not close the historical secret or
+Docker proof holds. The local
 post-build artifact has removed these classes of inline content.
 
 ### Public tracking and release mutability
@@ -115,7 +121,7 @@ readback. Until then, this lane is `IMPLEMENTED LOCALLY / NOT PUBLISHED`.
 
 ### Observed condition before repair
 
-[`docker-compose.minimal.yml`](../docker-compose.minimal.yml) previously published:
+The retired `docker-compose.minimal.yml` previously published:
 
 - Redis on host port `6379`, without authentication;
 - PostgreSQL on host port `15432`;
@@ -258,13 +264,13 @@ metadata. Do not commit populated `.env` files or raw scanner output.
 
 ### Observed condition before repair
 
-The pre-repair [`Dockerfile`](../Dockerfile) installed tools such as `ruff`, `pyright`,
+The retired `Dockerfile` installed tools such as `ruff`, `pyright`,
 `pytest`, `pydantic`, `typer`, and `rich` without version pins, then installs
 the package from a source tree whose runtime dependencies use ranges. The
 image also mixes runtime packaging with development verification tooling.
 
 This created time-dependent builds and made it difficult to prove which code
-and dependency set a user actually ran. The current Dockerfile now uses a
+and dependency set a user actually ran. The retired Dockerfile used a
 multi-stage build, consumes the repository-owned lock export in
 `requirements.runtime.txt`, and copies only the built wheel into the final
 image; the base image and actual build remain separate unobserved axes.

@@ -47,8 +47,7 @@ jobs:
       - name: Install HyoDo for consumer quality-hook smoke
         run: python -m pip install "$GITHUB_WORKSPACE"
 
-      - name: Verify quality hook fails closed before trust
-        shell: bash
+      - name: Verify quality hook trust boundary in one consumer
         run: |
           set -euo pipefail
           consumer="$(mktemp -d)"
@@ -79,42 +78,11 @@ jobs:
 
           set +e
           env -u HYODO_GATES_TRUST_ALL pre-commit run hyodo-check --all-files
-          status=$?
+          untrusted_status=$?
           set -e
-          test "$status" -ne 0
+          test "$untrusted_status" -ne 0
 
-      - name: Verify quality hook after explicit trust
-        shell: bash
-        env:
-          HYODO_GATES_TRUST_ALL: "1"
-        run: |
-          set -euo pipefail
-          consumer="$(mktemp -d)"
-          cd "$consumer"
-          git init -q
-          git config user.email "hyodo-ci@users.noreply.github.com"
-          git config user.name "HyoDo CI"
-          printf 'print("hello from consumer")\n' > app.py
-          mkdir -p .hyodo
-          cat > .hyodo/gates.toml <<'EOF'
-          schema = "hyodo.gates/v1"
-
-          [gates.smoke]
-          pillar = "truth"
-          command = "true"
-          EOF
-          cat > .pre-commit-config.yaml <<'EOF'
-          repos:
-            - repo: local
-              hooks:
-                - id: hyodo-check
-                  name: HyoDo quality gates
-                  entry: hyodo check
-                  language: system
-                  pass_filenames: false
-          EOF
-          git add app.py .hyodo/gates.toml .pre-commit-config.yaml
-          pre-commit run hyodo-check --all-files
+          HYODO_GATES_TRUST_ALL=1 pre-commit run hyodo-check --all-files
 
   composite-action-consumer:
     name: Composite action consumer smoke

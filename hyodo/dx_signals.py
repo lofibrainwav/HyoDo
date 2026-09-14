@@ -33,7 +33,6 @@ _START_COMMANDS = (
     "pip install -e",
     "uv sync",
     "cargo run",
-    "docker compose up",
 )
 
 # Headings that count as an onboarding section when followed by a code block.

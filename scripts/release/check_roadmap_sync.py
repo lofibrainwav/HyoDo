@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Check ROADMAP release-target truth without rewriting published history.
 
-``check_version_sync`` covers the seven sources that carry a version as a
+``check_version_sync`` covers the six sources that carry a version as a
 field. ROADMAP.md carries two different prose facts and they must stay separate:
 
 1. the latest version actually published to users; and

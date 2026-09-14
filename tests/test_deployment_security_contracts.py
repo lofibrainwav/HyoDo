@@ -1,34 +1,10 @@
-"""Regression contracts for the hardened optional deployment surfaces."""
+"""Regression contracts for public security surfaces."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-
-
-def test_compose_keeps_redis_private_and_postgres_secret_required() -> None:
-    compose = (REPO_ROOT / "docker-compose.minimal.yml").read_text(encoding="utf-8")
-
-    assert "container_name:" not in compose
-    redis_block = compose.split("  redis:\n", 1)[1].split("  postgres:\n", 1)[0]
-    assert "ports:" not in redis_block
-    assert '"127.0.0.1:15432:5432"' in compose
-    assert "${HYODO_POSTGRES_PASSWORD:?" in compose
-    assert "POSTGRES_PASSWORD: hyodo_dev" not in compose
-
-
-def test_dockerfile_builds_a_non_editable_runtime_image_without_dev_tools() -> None:
-    dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
-
-    assert "FROM python:3.12-slim AS builder" in dockerfile
-    assert "pip wheel --no-cache-dir --no-deps" in dockerfile
-    assert "pip install --no-cache-dir --no-compile --no-deps /app/hyodo-*.whl" in dockerfile
-    assert "pip install -e" not in dockerfile
-    assert "USER hyodo" in dockerfile
-    assert "pip install ruff" not in dockerfile
-    assert "pip install pyright" not in dockerfile
-    assert "pip install pytest" not in dockerfile
 
 
 def test_security_workflow_keeps_all_external_actions_sha_pinned() -> None:
