@@ -55,8 +55,8 @@ single candidate SHA and no unresolved blocker is being hidden as `GREEN`.
 | --- | --- | --- | --- |
 | Historical secrets | `HOLD` | owner disposition for all findings, then fresh gitleaks receipt | security required gate |
 | Security governance | `OBSERVED` | Security verification required context readback | merge enforcement |
-| Container | `VERIFIED` | Candidate `216f93fc1d8986b08cf2696552072b1ef7851d57`; run `34864148335`; artifact `hyodo-container-proof-216f93fc1d8986b08cf2696552072b1ef7851d57` | artifact/release gate |
-| Site evidence graph | `HOLD` | Run `34864148312` failed at `site/scripts/verify-evidence-graph.mjs`: `Runtime.evaluate` timeout | site gate |
+| Container | `VERIFIED` | Candidate `548302f437bcbd8632e9a58638fd58edaba556de`; run `34864457529`; artifact `hyodo-container-proof-548302f437bcbd8632e9a58638fd58edaba556de` | artifact/release gate |
+| Site evidence graph | `VERIFIED` | Candidate `548302f437bcbd8632e9a58638fd58edaba556de`; run `34864457628`; completed successfully | site gate |
 | Production provenance | `HOLD` | live deployment SHA equals canonical main SHA | production closeout |
 | Public release | `HOLD` | signed tag, GitHub assets, PyPI version and provenance all bind to main | release closeout |
 | KINGDOM boundary | `UNOBSERVED` | host-side integration evidence or explicit non-claim receipt | integration closeout |
@@ -154,12 +154,12 @@ state: UNOBSERVED | OBSERVED | VERIFIED | CLOSED | HOLD | BLOCKED
 ## Receipt anchors
 
 The current candidate is
-`216f93fc1d8986b08cf2696552072b1ef7851d57`. Its container workflow run is
-`34864148335`, and the artifact is
-`hyodo-container-proof-216f93fc1d8986b08cf2696552072b1ef7851d57`.
+`548302f437bcbd8632e9a58638fd58edaba556de`. Its container workflow run is
+`34864457529`, and the artifact is
+`hyodo-container-proof-548302f437bcbd8632e9a58638fd58edaba556de`.
 
 The container receipt records `candidate_sha` as
-`216f93fc1d8986b08cf2696552072b1ef7851d57` and records the separate synthetic
+`548302f437bcbd8632e9a58638fd58edaba556de` and records the separate synthetic
 PR workflow SHA. Any subsequent commit invalidates this receipt and requires a
 new run before the container row can remain `VERIFIED`.
 
