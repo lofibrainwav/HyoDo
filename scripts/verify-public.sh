@@ -48,7 +48,9 @@ echo "-- pyright --"
 $PYTHON -m pyright --pythonpath "$PYTHON" hyodo
 
 echo "-- pytest --"
-$PYTHON -m pytest tests -q --tb=short
+# Exercise the opt-in SBOM build/venv/inventory path in the bounded public
+# verification lane so the published test result does not hide that coverage.
+HYODO_SBOM_INTEGRATION=1 $PYTHON -m pytest tests -q --tb=short
 
 echo "-- shell syntax --"
 bash -n install.sh

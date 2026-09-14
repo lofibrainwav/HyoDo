@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import asyncio
 import importlib.util
+import inspect
 import json
 import sys
 import threading
 import time
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -20,11 +22,15 @@ from mcp.client.stdio import stdio_client
 try:  # HTTP bridge tests need extras the base test lane does not install.
     import httpx
     import uvicorn
-    from mcp.client.streamable_http import streamablehttp_client
+
+    try:
+        from mcp.client.streamable_http import streamable_http_client
+    except ImportError:  # MCP SDK v1 spelling
+        from mcp.client.streamable_http import streamablehttp_client as streamable_http_client
 except ImportError:  # pragma: no cover - exercised only in the base lane
     httpx = None  # type: ignore[assignment]
     uvicorn = None  # type: ignore[assignment]
-    streamablehttp_client = None  # type: ignore[assignment]
+    streamable_http_client = None  # type: ignore[assignment]
 
 from typer.testing import CliRunner
 
@@ -33,7 +39,7 @@ from hyodo.cli.main import app
 from hyodo.pairing import PAIRING_RELATIVE_PATH, create_pairing, revoke_pairing
 
 needs_http_bridge = pytest.mark.skipif(
-    httpx is None or uvicorn is None or streamablehttp_client is None,
+    httpx is None or uvicorn is None or streamable_http_client is None,
     reason="httpx, uvicorn, and the streamable HTTP client are required",
 )
 
@@ -75,10 +81,11 @@ class _LoopbackServerThread:
 
 async def _call_tool_over_http(port: int, token: str, name: str, arguments: dict) -> dict:
     async with (
-        streamablehttp_client(
-            f"http://127.0.0.1:{port}/mcp",
-            headers={"Authorization": f"Bearer {token}"},
-        ) as (read, write, _get_session_id),
+        _streamable_http_session(f"http://127.0.0.1:{port}/mcp", token) as (
+            read,
+            write,
+            _get_session_id,
+        ),
         ClientSession(read, write) as session,
     ):
         await session.initialize()
@@ -88,6 +95,21 @@ async def _call_tool_over_http(port: int, token: str, name: str, arguments: dict
             if text is not None:
                 return json.loads(text)
         raise AssertionError(f"no text content block in {result!r}")
+
+
+@asynccontextmanager
+async def _streamable_http_session(url: str, token: str):
+    """Bridge MCP SDK v1/v2 client keyword differences in one test helper."""
+    headers = {"Authorization": f"Bearer {token}"}
+    if "http_client" in inspect.signature(streamable_http_client).parameters:
+        async with (
+            httpx.AsyncClient(headers=headers) as client,
+            streamable_http_client(url, http_client=client) as streams,
+        ):
+            yield (*streams, None) if len(streams) == 2 else streams
+    else:
+        async with streamable_http_client(url, headers=headers) as streams:
+            yield streams
 
 
 def _valid_event(**overrides: object) -> dict:
