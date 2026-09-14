@@ -52,6 +52,7 @@ viewer also has four actor rows) rendered live from
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
 | [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md) | HyoDo and Kingdom ownership and status separation |
 | [KINGDOM_INTEGRATION_CONTRACT_AUDIT.md](./KINGDOM_INTEGRATION_CONTRACT_AUDIT.md) | Expected versus observed external integration evidence |
+| [KINGDOM_AFO_STRANGLER_MIGRATION.md](./KINGDOM_AFO_STRANGLER_MIGRATION.md) | Staged AFO legacy isolation and retirement contract |
 
 ## Release and demo (demo last)
 
