@@ -48,7 +48,7 @@ single candidate SHA and no unresolved blocker is being hidden as `GREEN`.
 | --- | --- | --- | --- |
 | Historical secrets | `HOLD` | owner disposition for all findings, then fresh gitleaks receipt | security required gate |
 | Security governance | `OBSERVED` | Security verification required context readback | merge enforcement |
-| Container | `VERIFIED` | CI run `34862789517`; receipt binds candidate `293456cf…`, image user `hyodo`, image ID, and SBOM SHA | artifact/release gate |
+| Container | `OBSERVED` | Previous candidate `293456cf…` verified by CI run `34862789517`; latest head requires a fresh receipt | artifact/release gate |
 | Production provenance | `HOLD` | live deployment SHA equals canonical main SHA | production closeout |
 | Public release | `HOLD` | signed tag, GitHub assets, PyPI version and provenance all bind to main | release closeout |
 | KINGDOM boundary | `UNOBSERVED` | host-side integration evidence or explicit non-claim receipt | integration closeout |
@@ -87,12 +87,15 @@ missing, record `BLOCKED`, not a successful empty result.
 No step may promote a missing receipt, a queued workflow, or a prior release's
 evidence.
 
-## Latest receipt anchors
+## Receipt anchors
 
-The current candidate `293456cf0141cc77f3201714784d98f151e073fa` has a verified
-container receipt from workflow run `34862789517`. Its workflow SHA is recorded
-separately because pull-request runs execute on a synthetic merge ref. The
-artifact is `hyodo-container-proof-293456cf0141cc77f3201714784d98f151e073fa`.
+The previous candidate `293456cf0141cc77f3201714784d98f151e073fa` had a
+verified container receipt from workflow run `34862789517`. Its workflow SHA
+was recorded separately because pull-request runs execute on a synthetic merge
+ref. The artifact was
+`hyodo-container-proof-293456cf0141cc77f3201714784d98f151e073fa`.
+
+The current candidate must receive a new receipt after any subsequent commit.
 
 ## Update procedure
 
