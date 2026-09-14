@@ -19,7 +19,8 @@ current `origin/main`.
 Enable the repository hook once per worktree:
 
 ```bash
-git config core.hooksPath .githooks
+bash scripts/install-hooks.sh
+git config --get core.hooksPath
 ```
 
 The pre-push hook refuses to push a dirty worktree, a branch checked out in
