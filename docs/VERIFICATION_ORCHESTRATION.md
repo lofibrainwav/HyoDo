@@ -87,6 +87,62 @@ missing, record `BLOCKED`, not a successful empty result.
 No step may promote a missing receipt, a queued workflow, or a prior release's
 evidence.
 
+## Assembly method: raw evidence to verified graph
+
+Use this order when the surface is unfamiliar or the existing map is stale:
+
+1. **Research first.** Freeze the candidate SHA and collect raw, redacted
+   readbacks before proposing a fix. Preserve command output, timestamps, run
+   IDs, artifact names, and endpoint status without copying secret values.
+2. **Fan out independent lanes.** Dispatch one lane per independent domain.
+   Each lane has an explicit write-set, deny-set, owner, and expected receipt.
+   Shared files, shared mutable services, and dependent conclusions stay out of
+   parallel execution.
+3. **Report six facts.** For every observation record who owns it, what was
+   observed, when it was observed, where the evidence lives, why it matters,
+   and how it was measured. Classify the statement as `fact`, `inference`, or
+   `unknown`.
+4. **Draw edges.** Connect an observation to its next action only when the
+   receipt supplies the required input. Mark missing edges as `UNOBSERVED`,
+   not as a successful no-op. Name the single bottleneck that prevents the
+   next edge.
+5. **Promote serially.** After all independent lanes return, review conflicts,
+   verify candidate-SHA binding, and promote only the first three ready gates.
+   Pause for a checkpoint before external mutation or the next batch.
+6. **Close the loop.** Re-read the authoritative surface after every mutation.
+   If the SHA, workflow run, artifact, deployment, release, or owner decision
+   changes, invalidate downstream receipts and reopen their edges.
+
+This is the Lego rule: parallel lanes find the pieces, the graph shows which
+pieces connect, and serial gates decide which assembled section is safe to
+carry forward.
+
+## Drift and silent-failure invariants
+
+The following invariants are mandatory for every update:
+
+- Every receipt names the candidate SHA; PR synthetic merge SHA is recorded as
+  a separate workflow identity.
+- Every artifact is checked against its workflow run and candidate SHA before
+  being cited.
+- A successful workflow with an unresolved register, missing owner, or absent
+  required context remains `HOLD`.
+- A queued, cancelled, stale, or capability-blocked run is never `GREEN`.
+- External mutation requires an explicit owner, rollback trigger, and
+  post-mutation readback.
+- A final audit is bounded and then parked; it reopens on a declared change
+  trigger rather than silently drifting.
+
+## Checkpoint report format
+
+At each checkpoint, report left-to-right in time order:
+
+```text
+head -> parallel observations -> receipts -> conflicts -> next serial gate
+owner / what / when / where / why / how
+state: UNOBSERVED | OBSERVED | VERIFIED | CLOSED | HOLD | BLOCKED
+```
+
 ## Receipt anchors
 
 The previous candidate `293456cf0141cc77f3201714784d98f151e073fa` had a
