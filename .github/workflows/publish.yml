@@ -98,9 +98,11 @@ jobs:
             --repository "$GITHUB_REPOSITORY" \
             --tag "$TAG" \
             --expected-commit "$COMMIT"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "commit=$COMMIT" >> "$GITHUB_OUTPUT"
+          {
+            echo "version=$VERSION"
+            echo "tag=$TAG"
+            echo "commit=$COMMIT"
+          } >> "$GITHUB_OUTPUT"
           echo "Publishing verified candidate: $TAG @ $COMMIT"
 
       - name: Verify published durable Release evidence
