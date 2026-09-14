@@ -7,6 +7,21 @@
 > readbacks, release records, and live endpoint readbacks. Do not treat a map
 > row as evidence unless its full source identifier is cited.
 
+## Ownership boundary: HyoDo and KINGDOM
+
+HyoDo and KINGDOM are not interchangeable nodes in this map.
+
+- **HyoDo is the mind:** a public, host-neutral layer for truth, evidence,
+  policy, trust signals, and attestation contracts. It can describe an
+  observation and its receipt, but it does not own execution authority.
+- **KINGDOM is the system:** the integrating host owns orchestration, memory,
+  retrieval, runtime, credentials, external mutations, and final authority.
+
+HyoDo must never claim that a score, receipt, or observation caused a KINGDOM
+action. KINGDOM evidence must come from the host's own authoritative readback.
+If that readback is absent, the HyoDo-side statement is `UNOBSERVED`, not a
+KINGDOM success. This boundary is a product contract, not merely a lane label.
+
 This document is the saved map for moving HyoDo from partial evidence to
 closeout. It keeps independent observations parallel and only opens a
 dependent edge after its predecessor has a durable receipt.
@@ -49,17 +64,20 @@ The six discovery lanes are independent and should run in parallel. The
 integration gate is serial: it must not run until the lane receipts identify a
 single candidate SHA and no unresolved blocker is being hidden as `GREEN`.
 
-## Lane register
+## Lane register (procedure, not live state)
 
-| Lane | Current state | Evidence required to advance | Next edge |
+Live state is intentionally not stored in this document. Read the authoritative
+source at checkpoint time and record the full IDs in the checkpoint report.
+
+| Lane | Authoritative source | Promotion rule | Next edge |
 | --- | --- | --- | --- |
-| Historical secrets | `HOLD` | owner disposition for all findings, then fresh gitleaks receipt | security required gate |
-| Security governance | `OBSERVED` | Security verification required context readback | merge enforcement |
-| Container | `VERIFIED` | Candidate `548302f437bcbd8632e9a58638fd58edaba556de`; run `34864457529`; artifact `hyodo-container-proof-548302f437bcbd8632e9a58638fd58edaba556de` | artifact/release gate |
-| Site evidence graph | `VERIFIED` | Candidate `548302f437bcbd8632e9a58638fd58edaba556de`; run `34864457628`; completed successfully | site gate |
-| Production provenance | `HOLD` | live deployment SHA equals canonical main SHA | production closeout |
-| Public release | `HOLD` | signed tag, GitHub assets, PyPI version and provenance all bind to main | release closeout |
-| KINGDOM boundary | `UNOBSERVED` | host-side integration evidence or explicit non-claim receipt | integration closeout |
+| Historical secrets | gitleaks receipt + `docs/security/GITLEAKS_DISPOSITION.md` | every finding has an owner disposition and fresh scan | security required gate |
+| Security governance | GitHub branch-protection API | Security verification appears in required contexts | merge enforcement |
+| Container | Container proof workflow + named artifact | run head, artifact head, receipt candidate SHA, and image/SBOM evidence all match | artifact/release gate |
+| Site evidence graph | HyoDo Site Build run | current candidate run completes successfully with no failed verification step | site gate |
+| Production provenance | Vercel deployment readback + live endpoint | live deployment SHA equals canonical main SHA | production closeout |
+| Public release | Git tag, GitHub Release, PyPI API, provenance receipts | signed tag, assets, and public package all bind to canonical main | release closeout |
+| KINGDOM boundary | explicit host-side integration receipt | observed readback or explicit non-claim receipt exists | integration closeout |
 
 The container lane is `OBSERVED` only after the `Container proof` workflow
 completes successfully. A workflow definition or queued run is not a proof
@@ -153,15 +171,25 @@ state: UNOBSERVED | OBSERVED | VERIFIED | CLOSED | HOLD | BLOCKED
 
 ## Receipt anchors
 
-The current candidate is
-`548302f437bcbd8632e9a58638fd58edaba556de`. Its container workflow run is
-`34864457529`, and the artifact is
-`hyodo-container-proof-548302f437bcbd8632e9a58638fd58edaba556de`.
+Live receipt anchors are not stored in this procedure document. At every
+checkpoint, read the workflow run and artifact APIs again. A receipt from a
+different candidate SHA is historical evidence and cannot promote the current
+candidate.
 
-The container receipt records `candidate_sha` as
-`548302f437bcbd8632e9a58638fd58edaba556de` and records the separate synthetic
-PR workflow SHA. Any subsequent commit invalidates this receipt and requires a
-new run before the container row can remain `VERIFIED`.
+For PR workflows, record both the candidate head SHA and the synthetic workflow
+SHA. Never replace either with an abbreviated identifier.
+
+## Assistant self-audit
+
+Before reporting any status, compare these values from raw sources:
+
+```text
+candidate HEAD == PR head == workflow head == artifact workflow_run.head_sha
+```
+
+If the equality cannot be proven, report `UNKNOWN` or `HOLD`. Never infer
+`latest`, `current`, `GREEN`, or `VERIFIED` from a previous checkpoint or from
+this document itself.
 
 ## Update procedure
 
