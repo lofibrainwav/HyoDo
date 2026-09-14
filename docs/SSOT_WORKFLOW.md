@@ -7,7 +7,7 @@ current `origin/main`.
 ## Required sequence
 
 1. Read `origin/main`, candidate `HEAD`, and worktree status before starting.
-2. Give each lane an isolated worktree and a narrow write-set.
+2. Give each lane an isolated worktree, a unique branch, and a narrow write-set.
 3. Reconcile the candidate onto the current `origin/main` in a clean worktree.
 4. Run `scripts/verify-ssot-drift.sh origin/main HEAD` before pushing.
 5. Let the `SSOT Drift Guard` workflow verify the exact PR head against the PR
@@ -22,5 +22,6 @@ Enable the repository hook once per worktree:
 git config core.hooksPath .githooks
 ```
 
-The pre-push hook refuses to push a dirty worktree or a candidate that is not
-based on `origin/main`. It does not delete, stash, reset, or merge changes.
+The pre-push hook refuses to push a dirty worktree, a branch checked out in
+multiple worktrees, or a candidate that is not based on `origin/main`. It does
+not delete, stash, reset, or merge changes.
