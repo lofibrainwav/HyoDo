@@ -211,6 +211,8 @@ jobs:
           PY
 
       - name: Run Public Package Tests (release blocker)
+        env:
+          HYODO_SBOM_INTEGRATION: "1"
         run: |
           echo "Running public package tests (blocking)..."
           python -m pytest tests -q --tb=short --cov=hyodo --cov-fail-under=80
