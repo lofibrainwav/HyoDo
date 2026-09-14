@@ -1,0 +1,74 @@
+name: Container proof
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  container-proof:
+    name: Build, run, and inventory image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Build pinned image
+        env:
+          IMAGE: hyodo:proof-${{ github.sha }}
+        run: docker build --pull --tag "$IMAGE" .
+
+      - name: Capture image identity and require non-root runtime
+        env:
+          IMAGE: hyodo:proof-${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker image inspect "$IMAGE" > image.inspect.json
+          test "$(docker image inspect "$IMAGE" --format '{{.Config.User}}')" = hyodo
+          docker image inspect "$IMAGE" --format 'image_id={{.Id}}' > image.identity.txt
+          docker image inspect "$IMAGE" --format 'config_user={{.Config.User}}' >> image.identity.txt
+
+      - name: Run isolated CLI smoke
+        env:
+          IMAGE: hyodo:proof-${{ github.sha }}
+        run: docker run --rm --network none --entrypoint python "$IMAGE" -m hyodo.cli.main --version
+
+      - name: Generate image SBOM
+        env:
+          IMAGE: hyodo:proof-${{ github.sha }}
+        run: |
+          set -euo pipefail
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v "$PWD:/out" \
+            anchore/syft@sha256:825cad3a952c87676a6d07e9a3bb05ac9c401d598360070e970aa46d54c1727e \
+            "docker:$IMAGE" \
+            -o cyclonedx-json=/out/image.sbom.cyclonedx.json
+
+      - name: Write proof receipt
+        env:
+          CANDIDATE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+        run: |
+          set -euo pipefail
+          test -s image.sbom.cyclonedx.json
+          {
+            echo "candidate_sha=${CANDIDATE_SHA}"
+            echo "workflow_sha=${GITHUB_SHA}"
+            cat image.identity.txt
+            sha256sum image.sbom.cyclonedx.json
+          } > container-proof.receipt
+
+      - name: Upload container proof
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hyodo-container-proof-${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          path: |
+            image.inspect.json
+            image.identity.txt
+            image.sbom.cyclonedx.json
+            container-proof.receipt

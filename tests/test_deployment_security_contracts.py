@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -21,7 +22,11 @@ def test_compose_keeps_redis_private_and_postgres_secret_required() -> None:
 def test_dockerfile_builds_a_non_editable_runtime_image_without_dev_tools() -> None:
     dockerfile = (REPO_ROOT / "Dockerfile").read_text(encoding="utf-8")
 
-    assert "FROM python:3.12-slim AS builder" in dockerfile
+    base_images = re.findall(
+        r"^FROM (python:3\.12-slim@sha256:[0-9a-f]{64})", dockerfile, re.MULTILINE
+    )
+    assert len(base_images) == 2
+    assert base_images[0] == base_images[1]
     assert "pip wheel --no-cache-dir --no-deps" in dockerfile
     assert "pip install --no-cache-dir --no-compile --no-deps /app/hyodo-*.whl" in dockerfile
     assert "pip install -e" not in dockerfile
@@ -29,6 +34,18 @@ def test_dockerfile_builds_a_non_editable_runtime_image_without_dev_tools() -> N
     assert "pip install ruff" not in dockerfile
     assert "pip install pyright" not in dockerfile
     assert "pip install pytest" not in dockerfile
+
+
+def test_container_proof_binds_receipt_and_artifact_to_pr_head() -> None:
+    workflow = (REPO_ROOT / ".github" / "workflows" / "container-proof.yml").read_text(
+        encoding="utf-8"
+    )
+
+    candidate_expression = "github.event.pull_request.head.sha"
+    assert candidate_expression in workflow
+    assert 'echo "candidate_sha=${CANDIDATE_SHA}"' in workflow
+    assert 'echo "workflow_sha=${GITHUB_SHA}"' in workflow
+    assert "hyodo-container-proof-${{ github.event_name == 'pull_request'" in workflow
 
 
 def test_security_workflow_keeps_all_external_actions_sha_pinned() -> None:
