@@ -19,3 +19,5 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Verify orchestration contract
         run: python scripts/check_orchestration_contract.py
+      - name: Verify HyoDo/KINGDOM boundary
+        run: python scripts/check_hyodo_boundary.py
