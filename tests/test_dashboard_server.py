@@ -353,10 +353,10 @@ def test_card_headings_are_trilingual_hanja_korean_english():
     html = render_dashboard_html(dict(EVIDENCE))
     for heading in (
         "眞 진</span> Truth",
-        "善 선</span> Goodness",
+        "善 선</span> Good",
         "美 미</span> Beauty",
-        "仁 인</span> Benevolence",
-        "孝 효</span> Filial Piety",
-        "永 영</span> Eternity",
+        "仁 인</span> Humanity",
+        "孝 효</span> Hyo",
+        "永 영</span> Longevity",
     ):
         assert heading in html
