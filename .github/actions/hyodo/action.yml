@@ -35,9 +35,12 @@ runs:
     - name: Run HyoDo gates
       id: run_gates
       shell: bash
+      env:
+        HYODO_ARGS: ${{ inputs.args }}
       run: |
         set +e
-        hyodo check ${{ inputs.args }} 2>&1 | tee "$RUNNER_TEMP/hyodo-check.log"
+        read -r -a args <<< "$HYODO_ARGS"
+        hyodo check "${args[@]}" 2>&1 | tee "$RUNNER_TEMP/hyodo-check.log"
         status=${PIPESTATUS[0]}
         set -e
         exit "$status"
@@ -75,7 +78,7 @@ runs:
     - name: Upload SARIF report
       if: inputs.upload-sarif == 'true'
       id: upload_sarif
-      uses: github/codeql-action/upload-sarif@6f5948dfacef28e207b48d0905cf90c03365536d # v3
+      uses: github/codeql-action/upload-sarif@faaca9a8f6edddba5725ffe5adefdab6669a2eca # v3
       with:
         sarif_file: .hyodo/reports/hyodo-report.sarif
     - name: Summarize SARIF upload failure
