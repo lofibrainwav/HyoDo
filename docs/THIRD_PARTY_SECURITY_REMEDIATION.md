@@ -60,14 +60,14 @@ deployed and tested.
 | Compose default exposure | IMPLEMENTED | YAML diff inspected; Docker runtime readback is `UNOBSERVED` because the current workstation has no `docker` executable |
 | Historical credential disposition | HOLD | No credential owner disposition or rotation receipt |
 | Version/support-policy reconciliation | CANDIDATE LOCALLY / PUBLIC BASELINE OBSERVED | Candidate source/package metadata name `4.19.6`; PyPI and the published GitHub release remain `4.19.5` until publication |
-| Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
+| Docker image boundary | VERIFIED IN CANDIDATE CI / MAIN NOT YET MERGED | Candidate Container proof completed with a candidate-SHA-bound receipt, `config_user=hyodo`, image identity, and CycloneDX image SBOM; the proof belongs to the open candidate PR and is not yet main/release evidence |
 | Clean security verification | VERIFIED IN SUPPORTED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Python 3.14.7 public verifier: `1513 passed, 7 skipped`; ruff, pyright, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. The ambient Python 3.9 verifier attempt was rejected by the package floor and is an environment result, not a vulnerability result |
-| CI secret/dependency scan | GREEN RUN / NOT REQUIRED | Current main's Security verification succeeded on `af028c62`; branch protection's required contexts still exclude `Security verification`, and the 2026-09-14 fresh gitleaks scan reports 16 historical findings |
+| CI secret/dependency scan | REQUIRED / FINDINGS HOLD | Branch protection now requires `Historical and working-tree secret scan` and `Runtime dependency audit`; the current candidate checks succeeded, while the fresh register still has 16 historical findings at `PENDING_OWNER` |
 | CI action/dependency maintenance | IMPLEMENTED LOCALLY / PARTLY VERIFIED REMOTE | Local site artifact action is SHA-pinned and `/site` is included in Dependabot; remote `main` already has the merged site hardening, but this local branch's new security workflow is not published |
-| Public remediation tracking | IMPLEMENTED LOCALLY / NOT PUBLISHED | The register exists locally; the 2026-09-14 dry-run found no open candidate PR or dedicated remediation PR |
+| Public remediation tracking | CANDIDATE PR OPEN / DISPOSITION HOLD | The remediation documents and register are in candidate PR #308; the register still needs owner dispositions and closeout receipts for all 16 findings |
 | GitHub release immutability | OBSERVED RESIDUAL | Public `v4.19.5` reports `immutable: false`; signed tag and artifact provenance are separate evidence and do not establish release-record immutability |
 | Public sdist scope gate | IMPLEMENTED_AND_VERIFIED_LOCALLY | `verify-public.sh` now delegates archive-scope validation to `verify_sdist_scope.py`; a 512,954-byte sdist passed with 199 members and no `afo_core` |
-| Site dependency/build verification | VERIFIED LOCALLY AND IN PRODUCTION READBACK / SHA CONVERGENCE HOLD | Local source config and production `hyodo.app` readback agree on strict CSP, HSTS, frame denial, nosniff, referrer, permissions, and exact-origin CORS; production readback was HTTP 200 on 2026-09-14 UTC. The current-main deployment was reported canceled, so live site health does not prove main-to-production SHA convergence |
+| Site dependency/build verification | VERIFIED LOCALLY AND IN PRODUCTION READBACK / SHA CONVERGENCE HOLD | Candidate Site Build succeeded and production `hyodo.app` readback remains HTTP 200 with strict CSP, HSTS, frame denial, nosniff, referrer, permissions, and exact-origin CORS. The candidate has no production deployment readback, so live site health does not prove candidate/main-to-production SHA convergence |
 
 ### Remote governance readback
 
@@ -81,9 +81,11 @@ endpoint returned an empty list. This is **partial governance evidence**, not a
 claim that security scanning is enforced: the required-check list does not
 include the `Security verification` workflow.
 
-The 2026-09-14 readback still lists exactly seven required contexts: the three
-Python truth gates, Goodness, Beauty, Install and CLI Smoke, and HyoDo Integrity
-Score. Security verification is successful when run but is not a merge blocker.
+The 2026-09-14 governance update preserves the seven existing required
+contexts and adds the two concrete Security verification job contexts:
+`Historical and working-tree secret scan` and `Runtime dependency audit`.
+Both are now merge blockers. This enforcement does not resolve the historical
+register; owner disposition and a fresh closure scan remain separate gates.
 
 The public site hardening from [PR #296](https://github.com/lofibrainwav/HyoDo/pull/296)
 is merged and the corresponding Vercel production deployment is `READY`. That
@@ -104,10 +106,9 @@ prior production deployment; this is a convergence hold, not a site outage.
 
 ### Public tracking and release mutability
 
-As of the 2026-09-14 PT readback, the public repository had no open issues or
-open pull requests for this remediation. The local register therefore remains
-an implementation artifact until it is published through a reviewed PR or an
-explicitly linked security issue. The latest public GitHub Release, `v4.19.5`,
+As of the 2026-09-14 PT readback, remediation candidate PR #308 is open and its
+checks are green, but the register still contains 16 pending owner decisions.
+The latest public GitHub Release, `v4.19.5`,
 reported `immutable: false`; the signed tag, artifact hashes, and PyPI
 provenance remain valuable independent evidence, but they do not prove that
 the GitHub release record cannot be changed.
