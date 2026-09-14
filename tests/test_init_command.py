@@ -75,7 +75,7 @@ def test_init_refuses_to_overwrite_existing_config_without_force(tmp_path: Path)
     result = runner.invoke(app, ["init", str(tmp_path)])
 
     assert result.exit_code == 1
-    assert "already exists" in result.output
+    assert "already exists" in " ".join(result.output.split())
     assert gates_path.read_text(encoding="utf-8") == original
 
 

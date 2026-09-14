@@ -63,6 +63,9 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=8.0",
+    # Advisory parallel shadow lane; keep the major bounded until fixture
+    # isolation and worker distribution are proven stable.
+    "pytest-xdist>=3.6,<4",
     "pytest-asyncio>=0.23",
     "pytest-cov>=4.0",
     "hypothesis>=6.0",
