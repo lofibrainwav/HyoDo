@@ -49,6 +49,7 @@ viewer also has four actor rows) rendered live from
 | [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Current implementer notes — not a 4.4.0 rebuild queue |
 | [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
 | [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md) | HyoDo and Kingdom ownership and status separation |
+| [CONVERGENCE_WORKFLOW.md](./CONVERGENCE_WORKFLOW.md) | Evidence-first parallel, dry-run, and sequential integration runbook |
 
 ## Release and demo (demo last)
 
