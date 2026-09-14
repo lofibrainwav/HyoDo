@@ -31,6 +31,7 @@ from hyodo.report import SARIF_SCHEMA_URI
 REPO_ROOT = Path(__file__).resolve().parents[1]
 HOOKS_PATH = REPO_ROOT / ".pre-commit-hooks.yaml"
 ACTION_PATH = REPO_ROOT / ".github" / "actions" / "hyodo" / "action.yml"
+DISCOVERABILITY_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "discoverability-smoke.yml"
 README_PATH = REPO_ROOT / "README.md"
 SARIF_SCHEMA_PATH = Path(__file__).parent / "fixtures" / "sarif-schema-2.1.0.json"
 
@@ -116,6 +117,23 @@ def test_new_surfaces_do_not_claim_they_exist_in_v4_11_0() -> None:
     hooks = HOOKS_PATH.read_text(encoding="utf-8")
     assert ".github/actions/hyodo@v4.11.0" not in readme
     assert "rev: v4.11.0" not in hooks
+
+
+def test_discoverability_workflow_exercises_quality_hook_trust_boundary() -> None:
+    """The consumer smoke must cover both safe and quality-hook contracts.
+
+    ``hyodo-check`` intentionally blocks a fresh BYOG command set until trust
+    is explicit.  Keep both halves in the workflow so a green smoke run proves
+    fail-closed behavior and the documented trusted path, not only hook
+    installation.
+    """
+    workflow = DISCOVERABILITY_WORKFLOW_PATH.read_text(encoding="utf-8")
+    assert "hyodo-safe-strict --all-files" in workflow
+    assert "hyodo-check --all-files" in workflow
+    assert "env -u HYODO_GATES_TRUST_ALL" in workflow
+    assert 'HYODO_GATES_TRUST_ALL: "1"' in workflow
+    assert 'schema = "hyodo.gates/v1"' in workflow
+    assert 'command = "true"' in workflow
 
 
 # --- SARIF report surface -----------------------------------------------------
