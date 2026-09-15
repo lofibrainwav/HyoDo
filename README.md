@@ -1,11 +1,12 @@
 # HyoDo
 
-**Open, model-agnostic evidence and verification for AI-assisted systems.**
+**See which checks ran on AI-assisted work, what they found, and what remains
+unknown.**
 
-HyoDo is an open trust framework, delivered today as a public Python CLI for
-fail-closed quality gates, evidence, and policy checks. Reuse the tests and
-linters you already run. Missing evidence stays `UNOBSERVED`; review signals
-never authorize approval.
+HyoDo is an open-source Python tool that runs on your computer. It reuses the
+tests and linters your project already has, reports their results, and marks
+missing evidence `UNOBSERVED`. It helps people review work; it does not approve
+merges or deployments.
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
