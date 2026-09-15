@@ -15,6 +15,11 @@ never authorize approval.
 
 ## Why HyoDo exists
 
+HyoDo asks a human question: is this AI system good for people, and can we
+show the evidence? Its guiding Hyo (孝) principle is that technology should
+carry its share of the burden, not shift it onto people. HyoDo records checks
+and uncertainty; it does not make the moral judgment or authorize actions.
+
 AI coding tools can move quickly, but a normal green check does not always
 answer:
 

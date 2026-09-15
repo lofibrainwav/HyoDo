@@ -3,6 +3,11 @@ title: Why HyoDo
 description: Why HyoDo exists next to the tools you already run, and what it deliberately does not do.
 ---
 
+HyoDo is an open framework for making the evidence and unknowns behind
+AI-assisted work visible. Its guiding Hyo (孝) principle is that technology
+should carry its share of the burden, not shift it onto people. HyoDo records
+what it can observe; people and their host systems keep decision authority.
+
 ## Why not just run ruff / pytest in CI?
 
 You already can, and HyoDo does not replace that. The gap it closes is

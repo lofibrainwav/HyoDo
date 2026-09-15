@@ -18,13 +18,18 @@ integrating host still owns orchestration and action authority.
 | Goodness | 선 / 善 | Tests + safety stability | Command gate + `safe` |
 | Beauty | 미 / 美 | Lint / format | Command gate |
 | Benevolence | 인 / 仁 | Public-surface integrity | Native AST |
-| Hyo | 효 / 孝 | Consent + data protection | Native AST |
-| Eternity / Yeong | 영 / 永 | Continuity, persistence, and longitudinal evidence | history ledger |
+| Hyo | 효 / 孝 | Consent + context + privacy | Policy + host/access ledger |
+| Eternity/Yeong | 영 / 永 | Long-term continuity evidence | History ledger |
 
 Command gates (Truth, Goodness, Beauty) run tools the project already owns —
 `hyodo init` absorbs them into `.hyodo/gates.toml`. Native collectors
 (Benevolence, Hyo, Yeong) are never replaced by a shell command; when they
 are unavailable, they are reported as "Not measured," not silently skipped.
+
+In HyoDo, Hyo (孝) expresses a practical principle: technology should carry
+its share of the burden, not shift it onto people. The current technical
+contract represents this axis through consent, context alignment, and data
+protection. HyoDo does not claim to measure every form of human cost.
 
 ### Existing score-command compatibility
 
@@ -86,7 +91,7 @@ in use:
 | --- | --- |
 | `safe` | `0` report · `1` strict high finding · `2` bad path |
 | `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
-| `event` / `policy` | `0` valid/ALLOW · `1` invalid/DENY · `2` unobserved · `3` ASK |
+| `event` / `policy` | `0` ALLOW · `1` DENY · `2` UNOBSERVED · `3` ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
 
 The policy gate speaks in four decision words, documented directly in
