@@ -12,12 +12,13 @@ import json
 from contextlib import contextmanager
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
+from socket import socket
 from threading import Event, Thread
 from time import sleep
 
 import pytest
 
-from hyodo.cli.main import DASHBOARD_CSP, DashboardState, make_dashboard_handler
+from hyodo.cli.main import DASHBOARD_CSP, DashboardState, app, make_dashboard_handler
 from hyodo.dashboard import POLL_SCRIPT, POLL_SCRIPT_SHA256, render_dashboard_html
 
 EVIDENCE: dict[str, object] = {
@@ -155,6 +156,163 @@ def test_state_update_swaps_served_snapshot(dashboard_server):
     assert json.loads(after)["measured_at"] == "2026-07-20T01:00:00+00:00"
 
 
+def test_dashboard_listener_serves_unobserved_status_while_initial_collection_is_blocked(
+    tmp_path, monkeypatch
+):
+    """Startup status is reachable before the first real evidence snapshot exists."""
+    from http.server import ThreadingHTTPServer as RealServer
+
+    from typer.testing import CliRunner
+
+    import hyodo.cli.main as cli_main
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='sample'\n", encoding="utf-8")
+    (tmp_path / "hyodo").mkdir()
+    with socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    entered = Event()
+    release = Event()
+    server_holder = []
+
+    def blocked_collection(_root):
+        entered.set()
+        assert release.wait(timeout=5)
+        measured = dict(EVIDENCE)
+        measured["schema_version"] = "hyodo.dashboard-evidence/v2"
+        return measured
+
+    def capture_server(*args, **kwargs):
+        server = RealServer(*args, **kwargs)
+        server_holder.append(server)
+        return server
+
+    monkeypatch.setattr(cli_main, "collect_dashboard_evidence", blocked_collection)
+    monkeypatch.setattr(cli_main, "write_runtime_identity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cli_main, "ThreadingHTTPServer", capture_server)
+    result_holder = []
+    runner = CliRunner()
+    command = Thread(
+        target=lambda: result_holder.append(
+            runner.invoke(app, ["dashboard", str(tmp_path), "--port", str(port)])
+        ),
+        daemon=True,
+    )
+    command.start()
+    try:
+        assert entered.wait(timeout=5)
+        import time
+
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                status_code, _, status_body = _request(port, "GET", "/api/status")
+                break
+            except OSError:
+                assert time.monotonic() < deadline, "listener did not bind"
+                sleep(0.01)
+        assert status_code == 200
+        assert json.loads(status_body)["readiness"] == "starting"
+        evidence_status, _, evidence_body = _request(port, "GET", "/api/evidence")
+        assert evidence_status == 200
+        initial = json.loads(evidence_body)
+        assert "startup_status" not in initial
+        assert initial["measured_at"] is None
+        assert all(gate["status"] == "UNOBSERVED" for gate in initial["gates"].values())
+        assert initial["safety"]["risk_score_state"] == "not_executed"
+        release.set()
+        deadline = time.monotonic() + 5
+        while True:
+            _, _, status_body = _request(port, "GET", "/api/status")
+            if json.loads(status_body)["readiness"] == "ready":
+                break
+            assert time.monotonic() < deadline, "real evidence was not installed"
+            sleep(0.01)
+        _, _, evidence_body = _request(port, "GET", "/api/evidence")
+        observed = json.loads(evidence_body)
+        assert "startup_status" not in observed
+        assert observed["schema_version"] == "hyodo.dashboard-evidence/v2"
+        assert observed["measured_at"] == EVIDENCE["measured_at"]
+        assert observed["gates"]["tests"]["status"] == "PASS"
+    finally:
+        release.set()
+        if server_holder:
+            server_holder[0].shutdown()
+        command.join(timeout=5)
+    assert result_holder
+    assert result_holder[0].exit_code == 0
+
+
+def test_dashboard_remains_reachable_with_unobserved_evidence_when_initial_collection_raises(
+    tmp_path, monkeypatch
+):
+    """A failed initial measurement keeps the listener up without inventing evidence."""
+    from http.server import ThreadingHTTPServer as RealServer
+
+    from typer.testing import CliRunner
+
+    import hyodo.cli.main as cli_main
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='sample'\n", encoding="utf-8")
+    (tmp_path / "hyodo").mkdir()
+    with socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    server_holder = []
+
+    def failed_collection(_root):
+        raise RuntimeError("initial measurement failed")
+
+    def capture_server(*args, **kwargs):
+        server = RealServer(*args, **kwargs)
+        server_holder.append(server)
+        return server
+
+    monkeypatch.setattr(cli_main, "collect_dashboard_evidence", failed_collection)
+    monkeypatch.setattr(cli_main, "write_runtime_identity", lambda *args, **kwargs: None)
+    monkeypatch.setattr(cli_main, "ThreadingHTTPServer", capture_server)
+    result_holder = []
+    runner = CliRunner()
+    command = Thread(
+        target=lambda: result_holder.append(
+            runner.invoke(app, ["dashboard", str(tmp_path), "--port", str(port)])
+        ),
+        daemon=True,
+    )
+    command.start()
+    try:
+        import time
+
+        deadline = time.monotonic() + 5
+        while True:
+            try:
+                status_code, _, status_body = _request(port, "GET", "/api/status")
+                status_payload = json.loads(status_body)
+                if status_code == 200 and status_payload["readiness"] == "failed":
+                    break
+            except OSError:
+                pass
+            assert time.monotonic() < deadline, "failed startup status was not reachable"
+            sleep(0.01)
+
+        evidence_status, _, evidence_body = _request(port, "GET", "/api/evidence")
+        assert evidence_status == 200
+        evidence = json.loads(evidence_body)
+        assert "startup_status" not in evidence
+        assert evidence["schema_version"] == "hyodo.dashboard-evidence/v2"
+        assert evidence["measured_at"] is None
+        assert all(gate["status"] == "UNOBSERVED" for gate in evidence["gates"].values())
+        assert evidence["safety"]["risk_score_state"] == "not_executed"
+    finally:
+        if server_holder:
+            server_holder[0].shutdown()
+        command.join(timeout=5)
+    assert result_holder
+    assert result_holder[0].exit_code == 0
+
+
 def test_manual_refresh_requires_token_and_redirects_after_replacing_snapshot():
     state = DashboardState(dict(EVIDENCE), refresh_token="issued-token", interval=30)
     refreshed = dict(EVIDENCE)
@@ -232,6 +390,7 @@ def test_manual_refresh_failure_keeps_snapshot_and_exposes_failure_status():
             "refreshing": False,
             "message": "Measurement failed; the last successful snapshot is still shown.",
             "started_at": None,
+            "readiness": "ready",
         }
     finally:
         server.shutdown()

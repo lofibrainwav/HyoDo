@@ -138,7 +138,11 @@ def test_dashboard_marks_safety_risk_measured_when_a_corpus_was_scanned(tmp_path
 def test_run_pytest_check_uses_python_m_pytest(tmp_path):
     root = tmp_path
     (root / "tests").mkdir()
-    mock_result = MagicMock(returncode=0, stdout="5 passed in 0.01s\n", stderr="")
+    mock_result = MagicMock(
+        returncode=0,
+        stdout="5 passed, 1 skipped in 0.01s\n\nSKIPPED [1] test_lane.py:4: integration lane disabled\n",
+        stderr="",
+    )
     with (
         patch("hyodo.cli.main._module_importable", return_value=True),
         patch("hyodo.cli.main.subprocess.run", return_value=mock_result) as run,
@@ -146,9 +150,11 @@ def test_run_pytest_check_uses_python_m_pytest(tmp_path):
         result = run_pytest_check(root, verbose=False)
     assert result.status is GateStatus.PASS
     assert "passed" in result.message.lower()
+    assert "integration lane disabled" in result.message
     cmd = run.call_args.args[0]
     assert cmd[0] == sys.executable
     assert cmd[1:3] == ["-m", "pytest"]
+    assert cmd[-1] == "-ra"
 
 
 def test_run_pyright_check_uses_host_interpreter_for_import_resolution(tmp_path):

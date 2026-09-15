@@ -572,14 +572,21 @@ def run_pytest_check(root: Path | None, verbose: bool = False) -> GateResult:
     if not _module_importable("pytest"):
         return _missing_tool_result("pytest", root)
 
-    cmd = _tool_cmd("pytest", str(root / "tests"), "-q", "--tb=short")
+    cmd = _tool_cmd("pytest", str(root / "tests"), "-q", "--tb=short", "-ra")
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(root))
+        output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+        skipped = [
+            line.strip()
+            for line in output.splitlines()
+            if line.strip().startswith(("SKIPPED ", "XFAIL "))
+        ]
+        skip_detail = f"; skips: {'; '.join(skipped)[:240]}" if skipped else ""
         if result.returncode == 0:
-            for line in result.stdout.split("\n"):
+            for line in output.split("\n"):
                 if "passed" in line.lower():
-                    return GateResult(GateStatus.PASS, line.strip())
-            return GateResult(GateStatus.PASS, "All tests passed!")
+                    return GateResult(GateStatus.PASS, f"{line.strip()}{skip_detail}")
+            return GateResult(GateStatus.PASS, f"All tests passed!{skip_detail}")
 
         detail = (result.stdout or result.stderr or "").strip()
         if verbose and detail:
@@ -854,16 +861,27 @@ class DashboardState:
     """Thread-safe holder for the latest rendered snapshot."""
 
     def __init__(
-        self, evidence: dict[str, object], *, refresh_token: str = "", interval: int = 0
+        self,
+        evidence: dict[str, object],
+        *,
+        refresh_token: str = "",
+        interval: int = 0,
+        readiness: str = "ready",
     ) -> None:
         """Initialize the state with optional local refresh controls."""
         self._lock = threading.Lock()
         self._refresh_token = refresh_token
         self._interval = interval
         self._refreshing = False
-        self._refresh_message = "Snapshot ready."
+        self._refresh_message = (
+            "Startup evidence collection is running."
+            if readiness == "starting"
+            else "Snapshot ready."
+        )
         self._refresh_started_at: str | None = None
-        self.update(evidence)
+        self._readiness = readiness
+        self._evidence = evidence
+        self._render_locked()
 
     def _render_locked(self) -> None:
         """Render the page and evidence JSON while the state lock is held."""
@@ -883,6 +901,7 @@ class DashboardState:
         """Render and atomically replace the dashboard snapshot from evidence."""
         with self._lock:
             self._evidence = evidence
+            self._readiness = "ready"
             self._refreshing = False
             self._refresh_message = "Measurement complete."
             self._refresh_started_at = None
@@ -901,6 +920,7 @@ class DashboardState:
                     "refreshing": self._refreshing,
                     "message": self._refresh_message,
                     "started_at": self._refresh_started_at,
+                    "readiness": self._readiness,
                 }
             ).encode("utf-8")
 
@@ -924,6 +944,36 @@ class DashboardState:
             )
             self._refresh_started_at = None
             self._render_locked()
+
+    def fail_startup(self, message: str) -> None:
+        """Keep startup evidence unobserved and expose the collection failure."""
+        with self._lock:
+            self._readiness = "failed"
+            self._refresh_message = f"Startup evidence collection failed: {message}"
+            self._render_locked()
+
+
+def _dashboard_starting_evidence(root: Path) -> dict[str, object]:
+    """Return an explicitly unobserved placeholder while first measurement runs."""
+    return {
+        "schema_version": EVIDENCE_SCHEMA_VERSION,
+        "target": str(root),
+        "measured_at": None,
+        "provenance": {"status": "UNOBSERVED"},
+        "gates": {
+            "typecheck": {"status": "UNOBSERVED", "message": "initial collection running"},
+            "lint_format": {"status": "UNOBSERVED", "message": "initial collection running"},
+            "tests": {"status": "UNOBSERVED", "message": "initial collection running"},
+            "sbom": {"status": "UNOBSERVED", "message": "initial collection running"},
+        },
+        "safety": {
+            "risk_score": None,
+            "risk_score_state": "not_executed",
+            "source": "initial collection running",
+            "findings": [],
+        },
+        "pillars": {},
+    }
 
 
 # Only these routes carry evidence read from the loopback board. The HTML
@@ -1186,7 +1236,12 @@ def dashboard(
                 else collect_dashboard_evidence(root)
             )
 
-    state = DashboardState(_refresh_evidence(), refresh_token=refresh_token, interval=interval)
+    state = DashboardState(
+        _dashboard_starting_evidence(root),
+        refresh_token=refresh_token,
+        interval=interval,
+        readiness="starting",
+    )
     stop_refresh = threading.Event()
 
     def _refresh_loop() -> None:
@@ -1211,6 +1266,16 @@ def dashboard(
     except OSError as exc:
         console.print(f"[red]Cannot bind {LOOPBACK_HOST}:{port}: {exc}[/red]")
         raise typer.Exit(1) from exc
+    server_thread = threading.Thread(
+        target=server.serve_forever, name="hyodo-dashboard-http", daemon=True
+    )
+    server_thread.start()
+    try:
+        initial_evidence = _refresh_evidence()
+        state.update(initial_evidence)
+    except Exception as exc:
+        state.fail_startup(str(exc))
+        console.print(f"[yellow]Initial evidence unavailable: {exc}[/yellow]")
     try:
         receipt_path = write_runtime_identity(
             root,
@@ -1234,12 +1299,15 @@ def dashboard(
     if open_browser:
         webbrowser.open(f"http://{LOOPBACK_HOST}:{port}/")
     try:
-        server.serve_forever()
+        while server_thread.is_alive():
+            server_thread.join(timeout=0.5)
     except KeyboardInterrupt:
         console.print("\nDashboard stopped.")
     finally:
         stop_refresh.set()
+        server.shutdown()
         server.server_close()
+        server_thread.join(timeout=5)
 
 
 @app.command()
