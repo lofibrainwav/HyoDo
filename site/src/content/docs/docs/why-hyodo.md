@@ -19,10 +19,11 @@ Most AI review bots are advisory and cloud-hosted: they comment on a pull
 request from the outside, after the fact. HyoDo is local-first and
 fail-closed by default — it runs in your own environment, reuses your own
 tooling, and reports missing or unreadable evidence as `UNOBSERVED` instead of
-turning it into a pass. Its optional HyoDo Integrity Score is a review signal,
-not permission to merge or deploy. The current command retains an older
-five-input geometric-mean method, internally named HYOGOOK V5, while its
-replacement is being updated.
+turning it into a pass. Its optional legacy HyoDo score is a review signal,
+not permission to merge or deploy. The compatibility command retains an older
+five-input geometric-mean method, internally named HYOGOOK V5, while HyoDo's
+replacement evaluation model is being updated. That model does not define the
+six reference values as one canonical score.
 
 ## Is it a sandbox?
 

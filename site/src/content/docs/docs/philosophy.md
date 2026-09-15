@@ -30,11 +30,14 @@ are unavailable, they are reported as "Not measured," not silently skipped.
 
 - **CLI display name:** HyoDo Integrity Score.
 - **Legacy command labels:** Six-Virtue Model; Trinity Gates subset.
-- **Current implementation status:** the score command retains an older
-  five-input geometric-mean method while its replacement is being updated.
+- **Current implementation status:** the command retains the older five-input
+  geometric-mean method for compatibility while HyoDo's replacement evaluation
+  model is being updated.
 
 HYOGOOK V5 is the internal name for that older method, not HyoDo's current
-score direction. The public name remains HyoDo Integrity Score.
+evaluation model. The public CLI label remains HyoDo Integrity Score for
+compatibility; HyoDo does not define its six reference values as one canonical
+score.
 
 ## 3. What a score means
 

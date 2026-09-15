@@ -10,9 +10,10 @@ HyoDo is deliberately narrow:
 - It is **not** a runtime sandbox or process interceptor.
 - `hyodo safe` is an early-warning scanner, not a full security audit.
 - A DENY result must still be enforced by the caller.
-- HyoDo Integrity Score is a review signal, never approval. The current score
-  command retains an older five-input geometric-mean method, internally named
-  HYOGOOK V5, while its replacement is being updated.
+- The legacy HyoDo score command is a review signal, never approval. It retains
+  the older five-input geometric-mean method, internally named HYOGOOK V5, for
+  compatibility while HyoDo's replacement evaluation model is being updated.
+  The six reference values are not one canonical score.
 - The public MCP server supports loopback or authenticated Tailscale binding;
   public `0.0.0.0` listeners are not supported.
 - Missing, unreadable, or unmeasured evidence is never reported as healthy.
