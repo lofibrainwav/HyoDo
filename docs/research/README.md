@@ -6,7 +6,7 @@ This directory is the durable roadmap and protocol surface for the HyoDo / ACL /
 
 For the cross-cutting readback of the latest public package versus current
 `main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is
-closed and HyoDo 4.19.5 is the latest published baseline. The
+closed and HyoDo 4.19.6 is the latest published baseline. The
 remaining matched KINGDOM/ACL and live-host work is downstream research and
 integration, not unfinished HyoDo product capability.
 
@@ -161,7 +161,7 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 
 ## Immediate roadmap gate
 
-HyoDo 4.19.5 is the verified public baseline. Do not rewrite its sealed evidence
+HyoDo 4.19.6 is the verified public baseline. Do not rewrite its sealed evidence
 when later KINGDOM experiments run.
 
 The downstream gate is:
