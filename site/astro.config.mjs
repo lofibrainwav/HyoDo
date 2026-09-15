@@ -18,6 +18,7 @@ export default defineConfig({
 	integrations: [
 		starlight({
 			title: 'HyoDo',
+			disable404Route: true,
 			customCss: ['./src/styles/starlight.css'],
 			head: [
 				{

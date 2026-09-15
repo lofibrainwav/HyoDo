@@ -1,3 +1,4 @@
 {
-	"404.text": "This page could not be found. Use the site navigation or return to the HyoDo homepage."
+  "404.text": "This page may have moved or the address may be mistyped.",
+  "404.action": "Return to HyoDo"
 }
