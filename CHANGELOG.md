@@ -14,6 +14,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   is measured.
 - Includes pytest skip and expected-failure reasons in the test-gate message.
 
+### Documentation
+
+- Reframes the public product description around open, model-agnostic evidence
+  and verification; the site headline asks what proves an AI completion claim.
+- Clarifies that HyoDo's six reference values do not define one canonical
+  score. The existing five-input geometric-mean score remains for compatibility
+  while its replacement is being updated; `HYOGOOK V5` is explained as the
+  internal name for that older calculation.
+- Separates HyoDo's in-scope evidence decisions from an integrating host's
+  action authorization, and labels release-readiness checks as gates rather
+  than a computed score.
+
 ## [4.19.5] - 2026-09-13
 
 Public artifact convergence patch. This release republishes the corrected

@@ -22,9 +22,11 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 
 ### Documentation
 
-- [ ] `README.md` leads with model-agnostic quality gate (CLI + CI) and honest check scope
+- [ ] `README.md` leads with open, model-agnostic evidence and verification;
+      identifies delivered CLI capabilities and boundaries
 - [ ] `CHANGELOG.md` has a section for the target version
-- [ ] `QUICK_START.md` / `CONTRIBUTING.md` use Integrity Score + formula-lineage language
+- [ ] Score mentions are advisory. Explain the legacy five-input geometric mean
+      in plain language; do not frame its internal name as current direction
 - [ ] `SECURITY.md` + `docs/SECURITY_SURFACE.md` document the public package security surface
 - [ ] No public claim language that implies automatic merge/write authority
 - [ ] Exit-code contracts for `check` / `safe` documented in README or quick start
@@ -34,7 +36,8 @@ Expected: exit 0, version synchronized, sdist limited to the public package, CLI
 
 - [ ] Wheel installs and imports `hyodo`
 - [ ] `hyodo --version` matches `VERSION`
-- [ ] `hyodo score` emits REVIEW_SIGNAL (not approval)
+- [ ] `hyodo score` emits a review signal (not approval); label its current
+      calculation as compatibility behavior
 - [ ] `hyodo safe` flags secret fixtures; `--strict` exits 1 on high findings
 - [ ] Empty/no-executable-gates `hyodo check` exits 2 (not false green)
 - [ ] Outside a HyoDo checkout, `check` uses `.hyodo/gates.toml` (BYOG) when present;
