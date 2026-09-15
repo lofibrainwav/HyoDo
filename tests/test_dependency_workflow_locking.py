@@ -40,7 +40,11 @@ def test_setup_uv_version_comes_from_the_project_ssot() -> None:
 
 
 def test_security_workflow_audits_every_lock_profile() -> None:
+    workflow = yaml.safe_load(
+        (ROOT / ".github" / "workflows" / "security.yml").read_text(encoding="utf-8")
+    )
     content = (ROOT / ".github" / "workflows" / "security.yml").read_text(encoding="utf-8")
+    assert workflow["jobs"]["dependencies"]["name"] == "Runtime dependency audit"
     assert "uv sync --locked --all-extras --all-groups --no-editable" in content
     assert "inputs: ci/mcp-v1/requirements.txt" in content
     assert "require-hashes: true" in content

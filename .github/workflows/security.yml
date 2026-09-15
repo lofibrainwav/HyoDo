@@ -25,7 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   dependencies:
-    name: Locked dependency audit (all groups and extras)
+    name: Runtime dependency audit
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
