@@ -182,6 +182,7 @@ jobs:
   goodness-public-tests:
     name: "Goodness - Public Package Tests"
     runs-on: ubuntu-latest
+    timeout-minutes: 20
 
     steps:
       - name: Checkout
@@ -228,6 +229,7 @@ jobs:
   goodness-orchestration:
     name: "Goodness - CLI Orchestration"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
