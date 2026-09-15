@@ -55,13 +55,21 @@ def test_site_workflow_audits_the_locked_npm_tree() -> None:
 
 def test_wheel_smoke_install_is_constrained_by_the_runtime_lock() -> None:
     content = (ROOT / ".github" / "workflows" / "smoke.yml").read_text(encoding="utf-8")
-    assert "uv pip install --constraint requirements.runtime.txt dist/*.whl" in content
+    assert 'core_venv="$RUNNER_TEMP/hyodo-core-venv"' in content
+    assert 'uv pip install --python "$core_venv/bin/python"' in content
+    assert "--constraint requirements.runtime.txt dist/*.whl" in content
+    assert '>> "$GITHUB_PATH"' in content
 
 
 def test_mcp_v1_lane_uses_an_audited_hash_lock() -> None:
     workflow = (ROOT / ".github" / "workflows" / "ci.yml").read_text(encoding="utf-8")
+    test_requirements = (ROOT / "ci" / "mcp-v1" / "test-requirements.in").read_text(
+        encoding="utf-8"
+    )
     requirements = (ROOT / "ci" / "mcp-v1" / "requirements.txt").read_text(encoding="utf-8")
     assert "--require-hashes -r ci/mcp-v1/requirements.txt" in workflow
+    assert "hypothesis>=6.0" in test_requirements
+    assert re.search(r"^hypothesis==", requirements, re.MULTILINE)
     assert "--hash=sha256:" in requirements
     assert re.search(r"^mcp==1\.", requirements, re.MULTILINE)
 

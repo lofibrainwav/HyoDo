@@ -1,3 +1,4 @@
-# Only the test runner is additional to HyoDo's runtime and MCP extras.
+# Test runner and pytest's global conftest dependencies.
 pytest>=8.0
 pytest-asyncio>=0.23
+hypothesis>=6.0

@@ -62,7 +62,11 @@ jobs:
 
       - name: Install package
         run: |
-          uv pip install --constraint requirements.runtime.txt dist/*.whl
+          core_venv="$RUNNER_TEMP/hyodo-core-venv"
+          uv venv --python 3.12 "$core_venv"
+          uv pip install --python "$core_venv/bin/python" \
+            --constraint requirements.runtime.txt dist/*.whl
+          echo "$core_venv/bin" >> "$GITHUB_PATH"
 
       - name: Validate CLI entrypoint
         run: |
