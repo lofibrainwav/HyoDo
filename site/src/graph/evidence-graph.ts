@@ -569,6 +569,7 @@ export function mountEvidenceGraph(
 	}
 
 	const cellEls = new Map<string, HTMLButtonElement>();
+	let measuredCellRects = new Map<string, DOMRect>();
 	const cleanupFns: Array<() => void> = [];
 	// Every grid cell (occupied button or empty div), indexed [rowIndex][col].
 	// Used for grid geometry (colGapX/rowGapY) and occupancy checks below —
@@ -641,9 +642,7 @@ export function mountEvidenceGraph(
 	const activeTokens: SVGGElement[] = [];
 
 	function cellRect(id: string): DOMRect | null {
-		const btn = cellEls.get(id);
-		if (!btn) return null;
-		return btn.getBoundingClientRect();
+		return measuredCellRects.get(id) ?? null;
 	}
 
 	/**
@@ -679,24 +678,17 @@ export function mountEvidenceGraph(
 		top: number;
 		bottom: number;
 	}
+	let measuredGridBoxes: Array<Array<Box | null>> = [];
 
 	/** Any grid cell's box (occupied or empty), in SVG-viewport-relative coordinates. */
-	function cellBoxAt(rowIdx: number, col: number, wrapRect: DOMRect): Box | null {
-		const elm = gridCells[rowIdx]?.[col];
-		if (!elm) return null;
-		const r = elm.getBoundingClientRect();
-		return {
-			left: r.left - wrapRect.left,
-			right: r.right - wrapRect.left,
-			top: r.top - wrapRect.top,
-			bottom: r.bottom - wrapRect.top,
-		};
+	function cellBoxAt(rowIdx: number, col: number): Box | null {
+		return measuredGridBoxes[rowIdx]?.[col] ?? null;
 	}
 
 	/** X centre of the grid gap immediately after column c. */
-	function colGapX(c: number, wrapRect: DOMRect): number {
-		const a = cellBoxAt(0, c, wrapRect);
-		const b = cellBoxAt(0, c + 1, wrapRect);
+	function colGapX(c: number): number {
+		const a = cellBoxAt(0, c);
+		const b = cellBoxAt(0, c + 1);
 		if (a && b) return (a.right + b.left) / 2;
 		if (a) return a.right + 7;
 		if (b) return b.left - 7;
@@ -704,9 +696,9 @@ export function mountEvidenceGraph(
 	}
 
 	/** Y centre of the grid gap immediately after row r. */
-	function rowGapY(r: number, wrapRect: DOMRect): number {
-		const a = cellBoxAt(r, 0, wrapRect);
-		const b = cellBoxAt(r + 1, 0, wrapRect);
+	function rowGapY(r: number): number {
+		const a = cellBoxAt(r, 0);
+		const b = cellBoxAt(r + 1, 0);
 		if (a && b) return (a.bottom + b.top) / 2;
 		if (a) return a.bottom + 7;
 		if (b) return b.top - 7;
@@ -737,9 +729,9 @@ export function mountEvidenceGraph(
 			// One row gap beyond the nearest lane, with unchanged endpoint ports.
 			const nearest = rt > rs ? rt - 1 : rt;
 			const next = rt >= rs ? Math.min(ROW_ORDER.length - 1, nearest + 1) : Math.max(-1, nearest - 1);
-			const y = rowGapY(next, wrapRect);
-			const x1 = colGapX(forward ? cs : cs - 1, wrapRect);
-			const x2 = colGapX(forward ? ct - 1 : ct, wrapRect);
+			const y = rowGapY(next);
+			const x1 = colGapX(forward ? cs : cs - 1);
+			const x2 = colGapX(forward ? ct - 1 : ct);
 			return roundedElbow([p1, { x: x1, y: p1.y }, { x: x1, y }, { x: x2, y }, { x: x2, y: p2.y }, p2]);
 		}
 
@@ -756,9 +748,9 @@ export function mountEvidenceGraph(
 			}
 			if (!blocked) return roundedElbow([p1, p2]);
 			const gapRowIdx = rt < ROW_ORDER.length - 1 ? rt : Math.max(0, rt - 1);
-			const gapY = rowGapY(gapRowIdx, wrapRect);
-			const bendNear = forward ? colGapX(cs, wrapRect) : colGapX(cs - 1, wrapRect);
-			const bendFar = forward ? colGapX(ct - 1, wrapRect) : colGapX(ct, wrapRect);
+			const gapY = rowGapY(gapRowIdx);
+			const bendNear = forward ? colGapX(cs) : colGapX(cs - 1);
+			const bendFar = forward ? colGapX(ct - 1) : colGapX(ct);
 			return roundedElbow([
 				p1,
 				{ x: bendNear, y: p1.y },
@@ -780,7 +772,7 @@ export function mountEvidenceGraph(
 				break;
 			}
 		}
-		const bendX = forward ? colGapX(cs, wrapRect) : colGapX(cs - 1, wrapRect);
+		const bendX = forward ? colGapX(cs) : colGapX(cs - 1);
 		if (!blockedOnTargetRow) {
 			return roundedElbow([p1, { x: bendX, y: p1.y }, { x: bendX, y: p2.y }, p2]);
 		}
@@ -788,8 +780,8 @@ export function mountEvidenceGraph(
 		// through the row gap just outside the target row instead of cutting
 		// across the target row's own cells.
 		const gapRowIdx = rt > rs ? rt - 1 : rt;
-		const gapY = rowGapY(gapRowIdx, wrapRect);
-		const bendX2 = forward ? colGapX(ct - 1, wrapRect) : colGapX(ct, wrapRect);
+		const gapY = rowGapY(gapRowIdx);
+		const bendX2 = forward ? colGapX(ct - 1) : colGapX(ct);
 		return roundedElbow([
 			p1,
 			{ x: bendX, y: p1.y },
@@ -818,7 +810,9 @@ export function mountEvidenceGraph(
 		excludeB: string,
 		onCollision?: (cellId: string) => void,
 	): boolean {
-		const margin = (parseFloat(win.getComputedStyle(pathEl).strokeWidth) || 1.6) / 2;
+		// Conservatively cover the widest focused stroke (2.2px) without
+		// forcing style calculation for every temporary candidate path.
+		const margin = 1.1;
 		const len = pathEl.getTotalLength();
 		const steps = Math.max(1, Math.ceil(len / 2));
 		for (let i = 0; i <= steps; i++) {
@@ -859,12 +853,39 @@ export function mountEvidenceGraph(
 	}
 
 	function drawEdges(): void {
+		// Read all layout geometry before mutating the SVG. Reusing this snapshot
+		// avoids synchronous layout after clearing/appending SVG edge nodes.
+		const wrapRect = svgRoot.getBoundingClientRect();
+		const nextCellRects = new Map<string, DOMRect>();
+		for (const ev of events) {
+			const btn = cellEls.get(ev.eventId);
+			if (btn) nextCellRects.set(ev.eventId, btn.getBoundingClientRect());
+		}
+		const nextGridBoxes = gridCells.map((row) => row.map((elm) => {
+			const rect = elm.getBoundingClientRect();
+			return {
+				left: rect.left - wrapRect.left,
+				right: rect.right - wrapRect.left,
+				top: rect.top - wrapRect.top,
+				bottom: rect.bottom - wrapRect.top,
+			};
+		}));
+		measuredCellRects = nextCellRects;
+		measuredGridBoxes = nextGridBoxes;
+		occupiedBoxes = new Map();
+		for (const [eventId, rect] of measuredCellRects) {
+			occupiedBoxes.set(eventId, {
+				left: rect.left - wrapRect.left + 1,
+				right: rect.right - wrapRect.left - 1,
+				top: rect.top - wrapRect.top + 1,
+				bottom: rect.bottom - wrapRect.top - 1,
+			});
+		}
+
 		svgRoot.innerHTML = '';
 		parentEdges = [];
 		evidenceEdges = [];
 
-		// Use the actual SVG viewport, including its border/scroll offset.
-		const wrapRect = svgRoot.getBoundingClientRect();
 		svgRoot.setAttribute('viewBox', `0 0 ${wrapRect.width} ${wrapRect.height}`);
 
 		const defs = svgEl(doc, 'defs');
@@ -879,20 +900,6 @@ export function mountEvidenceGraph(
 		svgRoot.appendChild(gParent);
 		svgRoot.appendChild(gEvidence);
 		svgRoot.appendChild(gBroken);
-
-		// Occupied-cell boxes (inset 1px; sampler adds half the stroke width) for collision testing below —
-		// rebuilt every redraw since cell positions can change on resize.
-		occupiedBoxes = new Map();
-		for (const ev of events) {
-			const r = cellRect(ev.eventId);
-			if (!r) continue;
-			occupiedBoxes.set(ev.eventId, {
-				left: r.left - wrapRect.left + 1,
-				right: r.right - wrapRect.left - 1,
-				top: r.top - wrapRect.top + 1,
-				bottom: r.bottom - wrapRect.top - 1,
-			});
-		}
 
 		// Cells that receive a resolved parent arrow — used below so a
 		// co-located evidence arrow can be inset instead of overlapping it.
@@ -1092,9 +1099,6 @@ export function mountEvidenceGraph(
 
 	const resizeObserver = new win.ResizeObserver(() => redraw());
 	resizeObserver.observe(root);
-
-	// Initial paint: layout must settle before measuring cell rects.
-	redraw();
 
 	return function dispose(): void {
 		root.removeEventListener('keydown', onKeydown);

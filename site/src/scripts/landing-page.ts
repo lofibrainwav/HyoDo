@@ -23,17 +23,19 @@ if (section && root) {
 
 const btn = document.getElementById('copy-btn');
 const cmd = document.getElementById('install-cmd');
+const copyStatus = document.getElementById('copy-status');
 btn?.addEventListener('click', async () => {
 	const text = cmd?.textContent ?? '';
 	try {
 		await navigator.clipboard.writeText(text);
 		const original = btn.textContent;
 		btn.textContent = 'Copied';
+		if (copyStatus) copyStatus.textContent = 'Install command copied to clipboard.';
 		setTimeout(() => {
 			btn.textContent = original;
 		}, 1500);
 	} catch {
-		// Clipboard API unavailable; the command is already selectable text.
+		if (copyStatus) copyStatus.textContent = 'Clipboard unavailable. Select and copy the install command above.';
 	}
 });
 

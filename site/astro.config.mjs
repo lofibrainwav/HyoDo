@@ -5,6 +5,9 @@ import starlight from '@astrojs/starlight';
 // https://astro.build/config
 export default defineConfig({
 	site: 'https://hyodo.app',
+	// Keep the strict `style-src 'self'` policy effective: Astro's default
+	// `auto` may inline small global stylesheets as blocked `<style>` elements.
+	build: { inlineStylesheets: 'never' },
 	// Ship source maps: the hero bundle is large and the repository is public.
 	vite: {
 		build: {
