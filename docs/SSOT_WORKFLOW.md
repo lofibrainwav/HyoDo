@@ -16,12 +16,17 @@ current `origin/main`.
 
 ## Local hook
 
-Enable the repository hook once per worktree:
+Enable the repository hook for this clone:
 
 ```bash
 bash scripts/install-hooks.sh
 git config --get core.hooksPath
 ```
+
+The installer writes `.githooks` to this clone's local Git configuration and
+refuses to replace a different existing `core.hooksPath`. Git runs worktree
+hooks from that worktree's root, so the relative path resolves to the matching
+`.githooks` directory in each checkout.
 
 The pre-push hook refuses to push a dirty worktree, a branch checked out in
 multiple worktrees, or a candidate that is not based on `origin/main`. It does

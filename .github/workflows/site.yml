@@ -37,6 +37,10 @@ jobs:
         working-directory: site
         run: npm ci
 
+      - name: Audit locked npm dependencies
+        working-directory: site
+        run: npm audit --audit-level=low
+
       - name: Build
         working-directory: site
         run: npm run build

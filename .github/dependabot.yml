@@ -17,6 +17,21 @@ updates:
       prefix: "deps"
       include: "scope"
 
+  - package-ecosystem: "pip"
+    directory: "/ci/mcp-v1"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    ignore:
+      - dependency-name: "mcp"
+        versions: [">=2"]
+    commit-message:
+      prefix: "ci-deps"
+      include: "scope"
+
   - package-ecosystem: "npm"
     directory: "/site"
     schedule:

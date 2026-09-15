@@ -50,8 +50,9 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-          cache: pip
-          cache-dependency-path: pyproject.toml
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
 
       - name: Verify annotated tag trust
         env:
@@ -65,10 +66,10 @@ jobs:
             --tag "$TAG" \
             --expected-commit "$COMMIT"
 
-      - name: Install public verification dependencies
+      - name: Install locked public verification dependencies
         run: |
-          python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          uv sync --locked --extra dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Generate exact-tag public-surface SBOM
         run: python scripts/generate_sbom.py -o dist/sbom.cyclonedx.json
