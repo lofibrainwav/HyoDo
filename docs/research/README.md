@@ -5,7 +5,8 @@ Status: working research documentation
 This directory is the durable roadmap and protocol surface for the HyoDo / ACL / KINGDOM research program. The public `/docs/acl/` page remains a high-level field note; these repository documents define the stricter execution and research contracts.
 
 For the cross-cutting readback of the latest public package versus current
-`main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is closed and HyoDo 4.19.4 is the verified public baseline. The
+`main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is
+closed and HyoDo 4.19.5 is the latest published baseline. The
 remaining matched KINGDOM/ACL and live-host work is downstream research and
 integration, not unfinished HyoDo product capability.
 
@@ -45,10 +46,10 @@ Current top-level doctrine:
 
 ## Current public claim lock
 
-This matrix is the shared **published-package** boundary for the root README,
-public site, and research page. It is not the status of unreleased `main`.
-See [`../CURRENT_STATE.md`](../CURRENT_STATE.md) for the newer source and
-measured-state readback. The [Measured Run #1 receipt](./MEASURED_RUN_1_2026-09-08.md)
+This registry-backed matrix is mirrored on the public research pages. It is
+the **published-package** boundary, not unreleased source status. See
+[`../CURRENT_STATE.md`](../CURRENT_STATE.md) for the dated source and
+measured-state snapshot. The [Measured Run #1 receipt](./MEASURED_RUN_1_2026-09-08.md)
 is execution evidence; this table does not turn it into an ACL result.
 
 | Capability | Status | Evidence boundary |
@@ -160,7 +161,7 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 
 ## Immediate roadmap gate
 
-HyoDo 4.19.4 is the verified public baseline. Do not rewrite its sealed evidence
+HyoDo 4.19.5 is the verified public baseline. Do not rewrite its sealed evidence
 when later KINGDOM experiments run.
 
 The downstream gate is:

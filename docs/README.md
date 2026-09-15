@@ -1,69 +1,55 @@
-# HyoDo docs index
+# HyoDo documentation
 
-Public, English-first documentation. Prefer these over root historical notes.
+Public documentation is written in English. Start with the product overview,
+then use the focused reference that matches your task. Source version is in the
+root `VERSION` file; the dated measured-state snapshot and published-package
+limits are in [Current State](./CURRENT_STATE.md).
 
-Current public version: see the root `VERSION` source of truth. HyoDo preserves
-explicit `check` and `safe` exit contracts; model-agnostic does not mean
-language-agnostic.
+## Getting started
 
-`hyodo dashboard` now also serves `GET /graph`, a local evidence-graph viewer
-(five evidence columns plus a separate Eternity continuity indicator; the
-viewer also has four actor rows) rendered live from
-`.hyodo/agent-events.jsonl`; `GET /api/graph` returns the same
-`hyodo.evidence-graph/v1` JSON `hyodo report --format graph` writes.
+- [Product overview](../README.md) — purpose, main surfaces, and boundaries.
+- [Quick Start](../QUICK_START.md) — install and run the first checks.
+- [Onboarding](./ONBOARDING.md) — `hyodo start`, MCP host setup, and support status.
+- [Node.js onboarding](./onboarding-nodejs.md) — Node project setup.
+- [Gate syntax](./GATES_SYNTAX.md) — `.hyodo/gates.toml` fields and validation.
 
-## Start here
+## Security and trust
 
-| Doc | Purpose |
-| --- | --- |
-| [../README.md](../README.md) | Product overview + exit contracts |
-| [../QUICK_START.md](../QUICK_START.md) | Install + CLI path |
-| [ONBOARDING.md](./ONBOARDING.md) | `hyodo start` first-use flow, MCP host table, `hyodo mcp config` |
-| [GATES_SYNTAX.md](./GATES_SYNTAX.md) | `.hyodo/gates.toml` field reference — types, defaults, and exact validation errors |
-| [PROVIDER_PROOF.md](./PROVIDER_PROOF.md) | Model-agnostic provider map |
-| [SECURITY_SURFACE.md](./SECURITY_SURFACE.md) | Public security surface |
-| [THIRD_PARTY_SECURITY_REMEDIATION.md](./THIRD_PARTY_SECURITY_REMEDIATION.md) | Third-party findings, remediation plan, and closure evidence |
-| [POLICY_TRUST.md](./POLICY_TRUST.md) | Policy trust ladder and levels |
-| [CONNECT.md](./CONNECT.md) | `hyodo connect` — harness wiring (Claude Code hooks, pre-commit, GitHub Actions) and shadow mode |
-| [HOST_CONTRACT.md](./HOST_CONTRACT.md) | What the Claude Code hook mapper copies vs what the host still owns |
-| [HOST_ADAPTERS.md](./HOST_ADAPTERS.md) | Native Cursor/Codex adapter boundary and live-canary contract |
-| [MISREAD.md](./MISREAD.md) | Easy over-reads: missing policy, CI `check`, shadow, starter policy, trust |
-| [FULL_BODY.md](./FULL_BODY.md) | `--full-body` consent, no rotation/redaction, clients cannot self-upgrade |
-| [CLAIMS.md](./CLAIMS.md) | What public pages do not claim (no implied installed base) |
-| [../examples/host-policies/](../examples/host-policies/) | Dual-host `allowed_tools` copy file — not a Cursor/Codex hook adapter |
-| [SKILLS.md](./SKILLS.md) | `hyodo skills ingest` / `lens` / `propose` — skill lens over the six pillars |
-| [INSPECT.md](./INSPECT.md) | `hyodo inspect` — field-deployment folder absorption, digests and chunks |
-| [GRAPH_EXPORT.md](./GRAPH_EXPORT.md) | `hyodo graph export` — evidence-graph export bridge and actor rings |
-| [FRICTION_EVENT_V0.md](./FRICTION_EVENT_V0.md) | Read-only DAG observation and FrictionEvent v0 contract |
-| [MEASUREMENT_PROVENANCE.md](./MEASUREMENT_PROVENANCE.md) | Which HyoDo measured which target — the `hyodo.measurement-provenance/v1` contract |
-| [RUNTIME_IDENTITY.md](./RUNTIME_IDENTITY.md) | Runtime identity v1 schema and checkout-independent digest pin |
-| [RETRIEVAL_PROVENANCE.md](./RETRIEVAL_PROVENANCE.md) | Bounded QMD retrieval provenance — the `provenance.retrieval/v1` contract |
-| [DASHBOARD_REDESIGN.md](./DASHBOARD_REDESIGN.md) | Run-first dashboard baseline for Evidence Pack v1 |
-| [EYE.md](./EYE.md) | `hyodo eye capture` / `verify` — ephemeral visual evidence, no pixels stored |
-| [AUDIENCE.md](./AUDIENCE.md) | `--audience` profiles (vibe / engineer / professional) — wording only, same decision |
-| [TEST_INTEGRITY.md](./TEST_INTEGRITY.md) | `hyodo check --strict-tests` — AST-based test-integrity scan |
-| [SCORE_DERIVATION.md](./SCORE_DERIVATION.md) | `hyodo score --from-check` — pillar derivation rule table and coverage semantics |
-| [VIRTUE_CONTRACT.md](./VIRTUE_CONTRACT.md) | Canonical six-virtue ontology and derived aggregate boundary |
-| [HYODO_MCP_CONNECTOR_DESIGN.md](./HYODO_MCP_CONNECTOR_DESIGN.md) | MCP design: local stdio/loopback/Tailscale shipped; remote contract-only |
-| [M5_REMOTE_CONNECTOR_CONTRACT.md](./M5_REMOTE_CONNECTOR_CONTRACT.md) | Remote `https://mcp.hyodo.app/mcp` is contract-only, not `hyodo mcp stdio` |
-| [CODEX_HANDOFF_NEXT.md](./CODEX_HANDOFF_NEXT.md) | Current implementer notes — not a 4.4.0 rebuild queue |
-| [EXTERNAL_CLAIM_AUDIT.md](./EXTERNAL_CLAIM_AUDIT.md) | External claim evidence |
-| [PRODUCT_BOUNDARY.md](./PRODUCT_BOUNDARY.md) | HyoDo and Kingdom ownership and status separation |
-| [CONVERGENCE_WORKFLOW.md](./CONVERGENCE_WORKFLOW.md) | Evidence-first parallel, dry-run, and sequential integration runbook |
+- [Security policy](../SECURITY.md) — reporting and security commitments.
+- [Product boundary](./PRODUCT_BOUNDARY.md) — HyoDo and host responsibilities.
+- [Policy trust](./POLICY_TRUST.md) — policy sources and trust levels.
+- [Misread guide](./MISREAD.md) — common incorrect interpretations.
+- [Full-body consent](./FULL_BODY.md) — payload handling and consent limits.
+- [Public claims](./CLAIMS.md) — scope of public product claims.
+- [Security surface](./SECURITY_SURFACE.md) — exposed package and service surface.
 
-## Release and demo (demo last)
+## Integrations and evidence
 
-| Doc | Purpose |
-| --- | --- |
-| [../RELEASE_CHECKLIST.md](../RELEASE_CHECKLIST.md) | Release readiness |
-| [DEMO_SCRIPT_3_MIN.md](./DEMO_SCRIPT_3_MIN.md) | Recording script (after verify) |
-| [DEMO_READY_CHECKLIST.md](./DEMO_READY_CHECKLIST.md) | Pre-record gates |
-| [SCAN_EXCEPTIONS.md](./SCAN_EXCEPTIONS.md) | Auditable local scan exceptions |
-| [../scripts/demo-dry-run.sh](../scripts/demo-dry-run.sh) | Local demo receipt script |
-| [../scripts/release/verify_release_chain.py](../scripts/release/verify_release_chain.py) | Measure the release chain and write the receipt |
+- [Connect](./CONNECT.md) — hooks, pre-commit, GitHub Actions, and shadow mode.
+- [Host adapters](./HOST_ADAPTERS.md) — native adapter and live-canary boundary.
+- [MCP design](./HYODO_MCP_CONNECTOR_DESIGN.md) — local connector and remote contract.
+- [Remote MCP contract](./M5_REMOTE_CONNECTOR_CONTRACT.md) — hosted endpoint is
+  contract-only; it is not `hyodo mcp stdio`.
+- [Measurement provenance](./MEASUREMENT_PROVENANCE.md) — what measured which target.
+- [Runtime identity](./RUNTIME_IDENTITY.md) — checkout-independent runtime identity.
+- [Retrieval provenance](./RETRIEVAL_PROVENANCE.md) — bounded retrieval
+  receipt contract.
+- [Test integrity](./TEST_INTEGRITY.md) — strict test-integrity checks.
+- [Score derivation](./SCORE_DERIVATION.md) — score inputs and coverage semantics.
 
-## Optional
+## Project status and contributor workflow
 
-| Doc | Purpose |
-| --- | --- |
-| [ANTHROPIC_PROOF.md](./ANTHROPIC_PROOF.md) | Claude-specific adapter map |
+- [Current State](./CURRENT_STATE.md) — measured source and published status.
+- [External Claim Audit](./EXTERNAL_CLAIM_AUDIT.md) — evidence for external claims.
+- [Convergence workflow](./CONVERGENCE_WORKFLOW.md) — parallel research
+  and safe integration.
+- [Implementer notes](./CODEX_HANDOFF_NEXT.md) — current-truth notes, not a
+  4.4.0 rebuild queue.
+- [Release checklist](../RELEASE_CHECKLIST.md) — release gates and evidence.
+- [Changelog](../CHANGELOG.md) — user-visible release history.
+- [Research index](./research/README.md) — proposals, experiments, and
+  historical receipts.
+- [Release notes](./releases/) — detailed release records.
+
+Other focused references, research notes, and historical plans remain in this
+directory; browse by filename when you need a specialized topic.

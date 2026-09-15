@@ -5,7 +5,7 @@ import '../styles/evidence-graph.css';
 const pypiUrl = 'https://pypi.org/project/hyodo/';
 const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
 const installCommand = 'pipx install hyodo';
-const siteDescription = 'HyoDo is a model-agnostic quality-gate kit for AI-assisted development. Unobserved is never green.';
+const siteDescription = 'Model-agnostic local guardrails for AI-assisted development: quality gates, evidence, and policy. Unobserved is never green; review scores are advisory.';
 const canonicalUrl = 'https://hyodo.app/';
 ---
 
@@ -14,16 +14,16 @@ const canonicalUrl = 'https://hyodo.app/';
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>HyoDo — Honest local guardrails for AI-assisted development</title>
+		<title>HyoDo — Model-agnostic local guardrails for AI-assisted development</title>
 		<meta name="description" content={siteDescription} />
 		<link rel="canonical" href={canonicalUrl} />
 		<meta property="og:type" content="website" />
 		<meta property="og:site_name" content="HyoDo" />
-		<meta property="og:title" content="HyoDo — Honest local guardrails for AI-assisted development" />
+		<meta property="og:title" content="HyoDo — Model-agnostic local guardrails for AI-assisted development" />
 		<meta property="og:description" content={siteDescription} />
 		<meta property="og:url" content={canonicalUrl} />
 		<meta name="twitter:card" content="summary" />
-		<meta name="twitter:title" content="HyoDo — Honest local guardrails for AI-assisted development" />
+		<meta name="twitter:title" content="HyoDo — Model-agnostic local guardrails for AI-assisted development" />
 		<meta name="twitter:description" content={siteDescription} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<link rel="icon" href="/favicon.ico" sizes="32x32" />
@@ -388,8 +388,8 @@ const canonicalUrl = 'https://hyodo.app/';
 					When your AI says "done," HyoDo tells you whether that is true.
 				</h1>
 				<p class="subline">
-					Honest local guardrails for AI-assisted development. Unobserved is never
-					green.
+					Model-agnostic local guardrails for AI-assisted development. Unobserved
+					is never green.
 				</p>
 				<div class="install-block">
 					<code id="install-cmd">{installCommand}</code>

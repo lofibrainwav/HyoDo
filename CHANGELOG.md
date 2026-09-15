@@ -5,28 +5,14 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.19.4] - 2026-09-12
+## [4.19.6] - 2026-09-15
 
-Bounded retrieval provenance maintenance patch. HyoDo 4.19.3 remains the
-sealed baseline; this source tree carries the next patch contract only.
+### Fixed
 
-### Added
-
-- `provenance.retrieval/v1` normalization with deterministic result digests and
-  projection IDs.
-- Fail-closed event validation, privacy bounds, and ledger round-trip coverage
-  for QMD retrieval provenance.
-
-### Changed
-
-- Raw retrieval receipts and QMD result bodies are rejected from the HyoDo
-  ledger carrier; gate `evidence_refs` remain separate.
-
-### Evidence
-
-- Local focused tests and static checks are the implementation evidence.
-- Public artifact, PyPI, KINGDOM, and Neo4j live-seal evidence remain
-  `UNOBSERVED` until their respective gates are run.
+- Binds the dashboard loopback listener before initial evidence collection and
+  reports explicit `starting`, `failed`, and `UNOBSERVED` states until evidence
+  is measured.
+- Includes pytest skip and expected-failure reasons in the test-gate message.
 
 ## [4.19.5] - 2026-09-13
 
@@ -43,9 +29,33 @@ not overwritten.
 
 ### Evidence
 
-- Release evidence will record the exact source SHA, wheel and sdist hashes,
+- Release evidence records the exact source SHA, wheel and sdist hashes,
   sdist size and entry count, PyPI fresh-download equality, and OIDC
   provenance after publication.
+
+## [4.19.4] - 2026-09-12
+
+Bounded retrieval provenance maintenance patch. The 4.19.3 artifacts remain
+unchanged; see the [4.19.4 release receipt](docs/releases/4.19.4.md).
+
+### Added
+
+- `provenance.retrieval/v1` normalization with deterministic result digests and
+  projection IDs.
+- Fail-closed event validation, privacy bounds, and ledger round-trip coverage
+  for QMD retrieval provenance.
+
+### Changed
+
+- Raw retrieval receipts and QMD result bodies are rejected from the HyoDo
+  ledger carrier; gate `evidence_refs` remain separate.
+
+### Evidence
+
+- Local focused tests and static checks are the implementation evidence.
+- The signed tag, GitHub Release, SBOM, PyPI artifact, provenance, and install
+  smoke are recorded in the [release receipt](docs/releases/4.19.4.md).
+- KINGDOM and Neo4j downstream evidence is separate from HyoDo release status.
 
 ## [4.19.3] - 2026-09-11
 

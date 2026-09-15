@@ -1,7 +1,7 @@
 {
   "name": "hyodo",
-  "version": "4.19.5",
-  "description": "Model-agnostic local quality gates and agent-event/policy evidence for AI-assisted development. Review signals never authorize approval.",
+  "version": "4.19.6",
+  "description": "Model-agnostic local guardrails for AI-assisted development: quality gates, evidence, and policy. Unobserved is never green; review scores are advisory.",
   "author": {
     "name": "AFO Kingdom",
     "url": "https://github.com/lofibrainwav"
