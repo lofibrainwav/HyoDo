@@ -9,11 +9,11 @@ import {
 	InstancedMesh,
 	PlaneGeometry,
 	InstancedBufferAttribute,
-	MeshBasicNodeMaterial,
 	Object3D,
 	Color,
 	Vector4,
-} from 'three/webgpu';
+} from 'three';
+import MeshBasicNodeMaterial from 'three/src/materials/nodes/MeshBasicNodeMaterial.js';
 import {
 	uniform,
 	time,
@@ -23,7 +23,7 @@ import {
 	float,
 	instancedBufferAttribute,
 	instancedDynamicBufferAttribute,
-} from 'three/tsl';
+} from 'three/src/nodes/TSL.js';
 
 const REGION_COUNT = 6; // one region per HyoDo virtue pillar
 const TILE_FILL = 0.82; // tile size as a fraction of its grid cell (leaves a gap)

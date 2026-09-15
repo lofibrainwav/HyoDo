@@ -2,7 +2,7 @@
 // module and calls mountHero() only after the headline has painted and the
 // canvas is intersecting. Every listener added here is removed by the
 // returned dispose().
-import { WebGPURenderer } from 'three/webgpu';
+import WebGPURenderer from 'three/src/renderers/webgpu/WebGPURenderer.js';
 import { createHeroScene } from './scene';
 import { shouldAnimate } from './fallback';
 
