@@ -83,8 +83,10 @@ def test_ci_precommit_is_private_dependency_group() -> None:
     workflow = (ROOT / ".github" / "workflows" / "discoverability-smoke.yml").read_text(
         encoding="utf-8"
     )
-    assert "[dependency-groups]" in project
-    assert '"pre-commit==4.3.0"' in project
+    dependency_groups = project.split("[dependency-groups]", 1)[1].split("\n[", 1)[0]
+    ci_group = re.search(r"(?ms)^ci\s*=\s*\[(?P<dependencies>.*?)^\]", dependency_groups)
+    assert ci_group is not None
+    assert re.search(r'"pre-commit==[^\"]+"', ci_group.group("dependencies"))
     assert "uv sync --locked --group ci --no-default-groups" in workflow
 
 

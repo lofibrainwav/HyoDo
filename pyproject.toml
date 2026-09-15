@@ -98,7 +98,7 @@ mutation = [
 [dependency-groups]
 # CI-only tooling stays locked without expanding HyoDo's published extras.
 ci = [
-    "pre-commit==4.3.0",
+    "pre-commit==4.6.2",
 ]
 
 [project.scripts]
