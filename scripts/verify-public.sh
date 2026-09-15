@@ -22,6 +22,28 @@ if [[ -x .venv/bin/python ]]; then
 elif [[ -x venv/bin/python ]]; then
   PYTHON="venv/bin/python"
   BINDIR="venv/bin"
+else
+  # Fresh macOS/Homebrew Python may be externally managed (PEP 668). Create
+  # an isolated environment instead of attempting to mutate system packages.
+  VENV_CREATOR="${PYTHON}"
+  if ! "${VENV_CREATOR}" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))' 2>/dev/null; then
+    VENV_CREATOR=""
+    for candidate in python3.14 python3.13 python3.12 python3.11 python3.10; do
+      if command -v "${candidate}" >/dev/null 2>&1 && \
+         "${candidate}" -c 'import sys; raise SystemExit(sys.version_info < (3, 10))' 2>/dev/null; then
+        VENV_CREATOR="${candidate}"
+        break
+      fi
+    done
+  fi
+  if [[ -z "${VENV_CREATOR}" ]]; then
+    echo "ERROR: Python 3.10+ is required to create the verification environment" >&2
+    exit 1
+  fi
+  echo "no project virtualenv found; creating .venv"
+  "${VENV_CREATOR}" -m venv .venv
+  PYTHON=".venv/bin/python"
+  BINDIR=".venv/bin"
 fi
 
 echo "python: $PYTHON ($($PYTHON --version 2>&1))"
