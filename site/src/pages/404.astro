@@ -11,23 +11,79 @@ const canonical = 'https://hyodo.app/404.html';
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<meta name="robots" content="noindex" />
+		<meta
+			name="description"
+			content="This page could not be found. Return to HyoDo or start with the quickstart guide."
+		/>
 		<link rel="canonical" href={canonical} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<script src="/theme-default.js" is:inline></script>
 		<title>Page not found | HyoDo</title>
 	</head>
 	<body>
-		<header><a href="/" aria-label="HyoDo home">HyoDo</a></header>
+		<header class="site-header">
+			<a class="brand" href="/" aria-label="HyoDo home">
+				<span class="brand-mark" aria-hidden="true"></span>
+				<span>HyoDo</span>
+			</a>
+			<nav aria-label="Primary navigation">
+				<a href="/docs/quickstart/">Docs</a>
+			</nav>
+		</header>
+
 		<main>
-			<p class="status">404</p>
-			<h1>Page not found</h1>
-			<p>{messages['404.text']}</p>
-			<a class="home" href="/">{messages['404.action']}</a>
+			<section class="message" aria-labelledby="page-title">
+				<p class="eyebrow"><span class="status-dot" aria-hidden="true"></span>404 <span class="eyebrow-label">· PAGE NOT FOUND</span></p>
+				<h1 id="page-title">This page isn’t here.</h1>
+				<p class="description">{messages['404.text']}</p>
+				<div class="actions" aria-label="Ways to continue">
+					<a class="action action-primary" href="/">{messages['404.action']} <span aria-hidden="true">→</span></a>
+					<a class="action action-secondary" href="/docs/quickstart/">Read the quickstart</a>
+				</div>
+				<p class="hint">No dead end: choose a safe route back into HyoDo.</p>
+			</section>
+
+			<div class="signal-panel" aria-hidden="true">
+				<div class="panel-heading"><span>ROUTE TRACE</span><span>UNOBSERVED</span></div>
+				<svg class="route-map" viewBox="0 0 440 300" fill="none" xmlns="http://www.w3.org/2000/svg">
+					<path class="route-base" d="M52 223H148L196 175H246" />
+					<path class="route-dashed" d="M270 175H330L376 129H400" />
+					<path class="route-base" d="M52 78H122L168 124" />
+					<path class="route-base" d="M122 78L168 32H246" />
+					<path class="route-base" d="M246 32L292 78H330" />
+					<path class="route-base" d="M246 175L292 222H376" />
+					<circle class="node node-observed" cx="52" cy="223" r="5" />
+					<circle class="node" cx="148" cy="223" r="5" />
+					<circle class="node" cx="196" cy="175" r="5" />
+					<circle class="node node-observed" cx="52" cy="78" r="5" />
+					<circle class="node" cx="122" cy="78" r="5" />
+					<circle class="node" cx="168" cy="124" r="5" />
+					<circle class="node node-observed" cx="168" cy="32" r="5" />
+					<circle class="node" cx="246" cy="32" r="5" />
+					<circle class="node" cx="292" cy="78" r="5" />
+					<circle class="node" cx="330" cy="78" r="5" />
+					<circle class="node node-observed" cx="376" cy="129" r="5" />
+					<circle class="node" cx="292" cy="222" r="5" />
+					<circle class="node" cx="376" cy="222" r="5" />
+					<rect class="break-marker" x="247" y="158" width="22" height="34" rx="5" />
+					<path class="break-slash" d="M252 183L264 167" />
+				</svg>
+				<div class="panel-footer"><span>ADDRESS</span><span>NO MATCHING PAGE</span></div>
+			</div>
 		</main>
+
+		<footer class="site-footer">
+			<span>HyoDo · evidence before assumptions</span>
+			<a href="/docs/quickstart/">Start with the docs <span aria-hidden="true">↗</span></a>
+		</footer>
 	</body>
 </html>
 
 <style>
+	:global(*) {
+		box-sizing: border-box;
+	}
+
 	:global(html) {
 		min-height: 100%;
 		background: var(--color-bg);
@@ -36,53 +92,326 @@ const canonical = 'https://hyodo.app/404.html';
 	}
 
 	:global(body) {
+		position: relative;
+		display: flex;
 		min-height: 100vh;
+		min-height: 100svh;
+		flex-direction: column;
 		margin: 0;
+		overflow-x: hidden;
+		background:
+			radial-gradient(ellipse at 78% 48%, rgb(26 31 37 / 54%), transparent 40rem),
+			var(--color-bg);
 	}
 
-	header {
-		padding: 1.25rem clamp(1.25rem, 6vw, 5rem);
-		border-bottom: 1px solid var(--color-tile-unlit);
+	:global(body)::before {
+		position: absolute;
+		z-index: 0;
+		inset: 0;
+		background-image: radial-gradient(rgb(139 146 154 / 13%) 0.65px, transparent 0.65px);
+		background-size: 19px 19px;
+		content: '';
+		mask-image: linear-gradient(90deg, transparent 22%, #000 100%);
+		pointer-events: none;
 	}
 
-	header a,
-	.home {
+	.site-header,
+	main,
+	.site-footer {
+		position: relative;
+		z-index: 1;
+		width: min(100% - 3rem, 75rem);
+		margin-inline: auto;
+	}
+
+	.site-header {
+		display: flex;
+		min-height: 5.25rem;
+		align-items: center;
+		justify-content: space-between;
+		border-bottom: 1px solid rgb(139 146 154 / 14%);
+	}
+
+	.brand {
+		display: inline-flex;
+		align-items: center;
+		gap: 0.65rem;
 		color: var(--color-text);
-		font-weight: 650;
+		font-size: 1.05rem;
+		font-weight: 700;
+		letter-spacing: -0.035em;
 		text-decoration: none;
+	}
+
+	.brand-mark {
+		width: 0.7rem;
+		aspect-ratio: 1;
+		border: 1px solid var(--color-tile-observed);
+		border-radius: 2px;
+		box-shadow: 0 0 14px rgb(61 220 132 / 24%);
+	}
+
+	nav a,
+	.site-footer a {
+		color: var(--color-text-dim);
+		font-size: 0.875rem;
+		text-decoration: none;
+		transition: color 160ms ease;
+	}
+
+	nav a:hover,
+	.site-footer a:hover {
+		color: var(--color-text);
 	}
 
 	main {
 		display: grid;
-		min-height: 70vh;
-		align-content: center;
-		justify-items: start;
-		max-width: 42rem;
-		margin: auto;
-		padding: 3rem 1.5rem;
+		flex: 1;
+		grid-template-columns: minmax(0, 1fr) minmax(20rem, 0.92fr);
+		align-items: center;
+		gap: clamp(3rem, 8vw, 8rem);
+		padding-block: clamp(4rem, 12vh, 9rem);
 	}
 
-	.status {
-		margin: 0;
+	.message {
+		max-width: 34rem;
+	}
+
+	.eyebrow,
+	.panel-heading,
+	.panel-footer {
+		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+		font-size: 0.7rem;
+		letter-spacing: 0.11em;
+	}
+
+	.eyebrow {
+		display: flex;
+		align-items: center;
+		gap: 0.65rem;
+		margin: 0 0 1.25rem;
+		color: var(--color-text);
+	}
+
+	.status-dot {
+		width: 0.48rem;
+		aspect-ratio: 1;
+		border-radius: 50%;
+		background: var(--color-warn);
+		box-shadow: 0 0 12px rgb(245 180 0 / 30%);
+	}
+
+	.eyebrow-label {
 		color: var(--color-text-dim);
-		font-size: 0.9rem;
-		letter-spacing: 0.12em;
 	}
 
 	h1 {
-		margin: 0.5rem 0;
-		font-size: clamp(2.5rem, 7vw, 4.5rem);
+		max-width: 10ch;
+		margin: 0;
+		font-size: clamp(3.4rem, 7.7vw, 6.25rem);
+		font-weight: 620;
+		letter-spacing: -0.075em;
+		line-height: 0.98;
 	}
 
-	main > p:not(.status) {
+	.description {
+		max-width: 29rem;
+		margin: 1.5rem 0 0;
 		color: var(--color-text-dim);
-		line-height: 1.6;
+		font-size: clamp(1rem, 1.7vw, 1.15rem);
+		line-height: 1.75;
 	}
 
-	.home {
-		margin-top: 1rem;
+	.actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 0.75rem;
+		margin-top: 2rem;
+	}
+
+	.action {
+		display: inline-flex;
+		min-height: 3rem;
+		align-items: center;
+		justify-content: center;
+		gap: 0.65rem;
 		padding: 0.75rem 1rem;
-		border: 1px solid var(--color-tile-unlit);
-		border-radius: 0.5rem;
+		border: 1px solid transparent;
+		border-radius: 0.4rem;
+		font-size: 0.9rem;
+		font-weight: 620;
+		text-decoration: none;
+		transition: border-color 160ms ease, background-color 160ms ease, transform 160ms ease;
+	}
+
+	.action:hover {
+		transform: translateY(-1px);
+	}
+
+	.action-primary {
+		background: var(--color-tile-observed);
+		color: #07130c;
+	}
+
+	.action-primary:hover {
+		background: #62e59a;
+	}
+
+	.action-secondary {
+		border-color: rgb(139 146 154 / 25%);
+		background: rgb(11 13 16 / 56%);
+		color: var(--color-text);
+	}
+
+	.action-secondary:hover {
+		border-color: rgb(139 146 154 / 55%);
+		background: var(--color-tile-unlit);
+	}
+
+	.hint {
+		margin: 1.25rem 0 0;
+		color: var(--color-text-dim);
+		font-size: 0.8rem;
+	}
+
+	.signal-panel {
+		padding: 1rem 1rem 0.85rem;
+		border: 1px solid rgb(139 146 154 / 17%);
+		border-radius: 0.6rem;
+		background: linear-gradient(145deg, rgb(26 31 37 / 74%), rgb(11 13 16 / 85%));
+		box-shadow: 0 1.5rem 5rem rgb(0 0 0 / 23%);
+	}
+
+	.panel-heading,
+	.panel-footer {
+		display: flex;
+		justify-content: space-between;
+		gap: 1rem;
+		color: var(--color-text-dim);
+	}
+
+	.panel-heading span:last-child {
+		color: var(--color-warn);
+	}
+
+	.route-map {
+		display: block;
+		width: 100%;
+		margin-block: 0.85rem;
+	}
+
+	.route-base {
+		stroke: #3a424b;
+		stroke-width: 1.5;
+	}
+
+	.route-dashed {
+		stroke: #66717d;
+		stroke-dasharray: 4 7;
+		stroke-linecap: round;
+		stroke-width: 1.5;
+	}
+
+	.node {
+		fill: #0b0d10;
+		stroke: #68727d;
+		stroke-width: 1.5;
+	}
+
+	.node-observed {
+		fill: var(--color-tile-observed);
+		stroke: var(--color-tile-observed);
+	}
+
+	.break-marker {
+		fill: #1a1f25;
+		stroke: #424b55;
+	}
+
+	.break-slash {
+		stroke: var(--color-warn);
+		stroke-linecap: round;
+		stroke-width: 1.5;
+	}
+
+	.site-footer {
+		display: flex;
+		min-height: 4.5rem;
+		align-items: center;
+		justify-content: space-between;
+		gap: 1rem;
+		border-top: 1px solid rgb(139 146 154 / 14%);
+		color: var(--color-text-dim);
+		font-size: 0.8rem;
+	}
+
+	:global(a:focus-visible) {
+		outline: 2px solid var(--color-ask);
+		outline-offset: 4px;
+	}
+
+	@media (max-width: 760px) {
+		.site-header,
+		main,
+		.site-footer {
+			width: min(100% - 2rem, 38rem);
+		}
+
+		main {
+			grid-template-columns: 1fr;
+			gap: 3rem;
+			padding-block: 5rem 3rem;
+		}
+
+		.message {
+			max-width: 36rem;
+		}
+
+		h1 {
+			max-width: 12ch;
+			font-size: clamp(3.25rem, 13vw, 5.5rem);
+		}
+
+		.signal-panel {
+			max-width: 32rem;
+		}
+	}
+
+	@media (max-width: 420px) {
+		.site-header,
+		main,
+		.site-footer {
+			width: min(100% - 1.5rem, 38rem);
+		}
+
+		main {
+			gap: 2.5rem;
+			padding-top: 4rem;
+		}
+
+		.actions {
+			align-items: stretch;
+			flex-direction: column;
+		}
+
+		.action {
+			width: 100%;
+		}
+
+		.site-footer {
+			align-items: flex-start;
+			flex-direction: column;
+			justify-content: center;
+			padding-block: 1rem;
+		}
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		*,
+		*::before,
+		*::after {
+			scroll-behavior: auto !important;
+			transition-duration: 0.01ms !important;
+		}
 	}
 </style>
