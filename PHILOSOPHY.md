@@ -32,8 +32,13 @@ measurement axes; a computed aggregate is not a virtue.
 | Goodness | 선 / 善 | Safety and stability | Safety findings and coverage |
 | Beauty | 미 / 美 | Clarity | Lint and format |
 | Benevolence | 인 / 仁 | Public usability | API and onboarding |
-| Hyo | 효 / 孝 | Consent and data protection | Policy and access ledger |
+| Hyo | 효 / 孝 | Consent + context + privacy | Policy + host/access ledger |
 | Eternity / Yeong | 영 / 永 | Continuity and persistence | History ledger |
+
+Hyo (孝) expresses a practical human-centered principle: technology should
+carry its share of the burden, not shift it onto people. The current public
+contract represents this axis through consent, context alignment, and data
+protection; it does not claim to measure every form of human cost.
 
 ### Two measurement kinds
 
