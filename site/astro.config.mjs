@@ -6,10 +6,19 @@ import starlight from '@astrojs/starlight';
 export default defineConfig({
 	site: 'https://hyodo.app',
 	// Ship source maps: the hero bundle is large and the repository is public.
-	vite: { build: { sourcemap: true } },
+	vite: {
+		build: {
+			sourcemap: true,
+			// The hero renderer is intersection-lazy. Its ~915 KB minified chunk
+			// is ~248 KB over gzip; scripts/check-bundle-size.mjs enforces the
+			// user-transfer budget instead of Vite's source-byte heuristic.
+			chunkSizeWarningLimit: 1000,
+		},
+	},
 	integrations: [
 		starlight({
 			title: 'HyoDo',
+			disable404Route: true,
 			customCss: ['./src/styles/starlight.css'],
 			head: [
 				{

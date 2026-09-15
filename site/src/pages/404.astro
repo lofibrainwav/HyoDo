@@ -1,0 +1,88 @@
+---
+import messages from '../content/i18n/en.json';
+import '../styles/tokens.css';
+
+const canonical = 'https://hyodo.app/404.html';
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta name="robots" content="noindex" />
+		<link rel="canonical" href={canonical} />
+		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+		<script src="/theme-default.js" is:inline></script>
+		<title>Page not found | HyoDo</title>
+	</head>
+	<body>
+		<header><a href="/" aria-label="HyoDo home">HyoDo</a></header>
+		<main>
+			<p class="status">404</p>
+			<h1>Page not found</h1>
+			<p>{messages['404.text']}</p>
+			<a class="home" href="/">{messages['404.action']}</a>
+		</main>
+	</body>
+</html>
+
+<style>
+	:global(html) {
+		min-height: 100%;
+		background: var(--color-bg);
+		color: var(--color-text);
+		font-family: ui-sans-serif, system-ui, sans-serif;
+	}
+
+	:global(body) {
+		min-height: 100vh;
+		margin: 0;
+	}
+
+	header {
+		padding: 1.25rem clamp(1.25rem, 6vw, 5rem);
+		border-bottom: 1px solid var(--color-tile-unlit);
+	}
+
+	header a,
+	.home {
+		color: var(--color-text);
+		font-weight: 650;
+		text-decoration: none;
+	}
+
+	main {
+		display: grid;
+		min-height: 70vh;
+		align-content: center;
+		justify-items: start;
+		max-width: 42rem;
+		margin: auto;
+		padding: 3rem 1.5rem;
+	}
+
+	.status {
+		margin: 0;
+		color: var(--color-text-dim);
+		font-size: 0.9rem;
+		letter-spacing: 0.12em;
+	}
+
+	h1 {
+		margin: 0.5rem 0;
+		font-size: clamp(2.5rem, 7vw, 4.5rem);
+	}
+
+	main > p:not(.status) {
+		color: var(--color-text-dim);
+		line-height: 1.6;
+	}
+
+	.home {
+		margin-top: 1rem;
+		padding: 0.75rem 1rem;
+		border: 1px solid var(--color-tile-unlit);
+		border-radius: 0.5rem;
+	}
+</style>
