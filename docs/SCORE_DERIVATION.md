@@ -9,8 +9,10 @@ test-integrity scan already observe about a checkout, in-process (no
 subprocess calls), with full provenance for every number it produces.
 
 This stays a **review signal**, never an approval — see `hyodo score --help`.
-The V5 derived aggregate is named `harmony_aggregate` in new contracts; the
-printed/API `S_eternity` label remains for 4.19.4 compatibility.
+The CLI preserves the historical `S_eternity` label for its five-input V5
+harmony value. `harmony_aggregate` is only a reserved namespace constant; this
+command does not emit it as a six-axis aggregate or define a canonical summary
+over all six virtues.
 
 ## Rule table
 

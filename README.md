@@ -67,9 +67,10 @@ and [security model](./SECURITY.md) for the authoritative details.
 The legacy HyoDo Integrity Score command is advisory only. It retains a
 five-input geometric-mean method for compatibility; `HYOGOOK V5` is its
 internal name.
-HyoDo's replacement evaluation model is being updated and does not define the
-six reference values as one canonical score. Current source status may differ
-from the latest published package.
+HyoDo's replacement evaluation model is being updated; it does not define the
+six reference values as one canonical score. The current package does not yet
+provide a general per-axis evaluator. Current source status may differ from
+the latest published package.
 
 ## Use your existing CI
 

@@ -12,7 +12,8 @@ Philosophy branding is intentional. Every public label pairs with a
 - **Legacy CLI display name:** HyoDo Integrity Score.
 - **Legacy command labels:** Six-Virtue Model; Trinity Gates subset.
 - **Current implementation status:** the score command retains an older
-  five-input geometric-mean method while its replacement is being updated.
+  five-input geometric-mean method for compatibility. The replacement
+  per-axis evaluator is not yet implemented as a general public API.
 - **HYOGOOK V5** is the internal name for that older method, not a separate
   philosophy or HyoDo's current score direction.
 
@@ -50,9 +51,10 @@ on **executed** gates only (skips never fake green).
 ## Evaluation and legacy compatibility
 
 HyoDo does not turn its six reference virtues directly into one canonical
-score. An evaluation keeps its value, confidence, evidence, context, and
-observation state distinct. Missing evidence remains `UNOBSERVED`; it is not
-converted into a numeric zero or one.
+score. The reference model keeps an evaluation's value, confidence, evidence,
+context, and observation state distinct; the current public package does not
+yet implement a general per-axis evaluator. Missing evidence remains
+`UNOBSERVED`; it is not converted into a numeric zero or one.
 
 The current command still accepts five inputs and combines them with a
 geometric mean. It floors a zero input for historical compatibility and

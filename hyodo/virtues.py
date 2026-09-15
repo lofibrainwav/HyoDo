@@ -107,6 +107,9 @@ DOCUMENT_VIRTUE_NAMES: Mapping[str, str] = {
     "hyo": "Hyo",
     "eternity": "Longevity",
 }
+# Reserved non-virtue namespace only. HyoDo defines and emits no canonical
+# aggregate over the six axes; the current score CLI remains the separate V5
+# compatibility path under its historical S_eternity label.
 HARMONY_AGGREGATE_KEY = "harmony_aggregate"
 LEGACY_V5_AGGREGATE_KEY = "s_eternity"
 
