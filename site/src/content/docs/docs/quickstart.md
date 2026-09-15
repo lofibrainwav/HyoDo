@@ -33,14 +33,15 @@ printed in text mode as `Scope: <scope> · Coverage: <coverage>
 `Coverage: PARTIAL` with a lower scanned-of-total count means raise
 `--max-files` (or pass `0` for unlimited) to see the rest.
 
-## 3. Absorb your existing checks
+## 3. Set up your project checks
 
 ```bash
 hyodo init
 ```
 
-`hyodo init` detects tooling you already use — pytest, Ruff, mypy, Pyright,
-npm scripts, Go, Cargo, Makefile targets — and writes `.hyodo/gates.toml`.
+`hyodo init` detects tools your project already uses — pytest, Ruff, mypy,
+Pyright, npm scripts, Go, Cargo, and Makefile targets — and lists their
+commands in `.hyodo/gates.toml`.
 If nothing supported is detected, it writes a commented starter file instead
 of guessing at a check that doesn't exist.
 
@@ -53,17 +54,19 @@ hyodo check
 `hyodo check` runs the gates recorded in `.hyodo/gates.toml`. An empty or
 malformed gate configuration is not treated as a pass — it exits `2`.
 
-## 5. Connect
+## 5. Optional: connect an AI coding tool
+
+Skip this step if you only want to run project checks. `hyodo start` can help
+connect a detected host; it previews the changes and asks before writing.
 
 ```bash
 hyodo start
 ```
 
-`hyodo start` shows detected hosts, asks one audience question, then offers
-to connect one host with a preview and a single yes/no confirm. Claude Code
-gets hook wiring plus MCP; Cursor, VS Code, Claude Desktop, and Codex get
-MCP config only. `hyodo connect cursor` and `hyodo connect codex` stay
-`UNOBSERVED`. To write MCP config directly:
+Claude Code gets hook wiring plus MCP. Cursor, VS Code, Claude Desktop, and
+Codex get MCP config only. Direct `hyodo connect cursor` and
+`hyodo connect codex` installers are not available (`UNOBSERVED`). To write
+MCP config directly, use the matching host name:
 
 ```bash
 hyodo mcp config claude-code --write
@@ -110,21 +113,6 @@ Exit `2` means "not measured," not "measured and fine." A gate that never ran
 does not get to look like a gate that passed.
 
 ## Next steps
-
-Once the basics are running, these commands cover harness wiring and the
-Stage 2 field-deployment tools:
-
-- [Connect](/docs/connect/) — wire Claude Code hooks, pre-commit, or GitHub
-  Actions to the gates above.
-- [Skills](/docs/skills/) — ingest a project's own skill files as a lens
-  over the six pillars.
-- [Inspect](/docs/inspect/) — absorb a directory into a digest inventory.
-- [Graph Export](/docs/graph-export/) — export the evidence graph's
-  structure for an external note system.
-- [Eye](/docs/eye/) — prove what was on screen without storing a picture
-  of it.
-
-## Next
 
 - [Why HyoDo](/docs/why-hyodo/)
 - [Philosophy → Math → Code](/docs/philosophy/)
