@@ -25,7 +25,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   dependencies:
-    name: Runtime dependency audit
+    name: Locked dependency audit (all groups and extras)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -44,17 +44,20 @@ jobs:
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:
           python-version: "3.12"
-      - name: Install the public runtime package
-        run: |
-          python -m venv .venv
-          . .venv/bin/activate
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.runtime.txt
-          python -m pip install --no-deps .
-      - name: Audit installed runtime dependencies
+
+      - name: Install every locked dependency group
+        run: uv sync --locked --all-extras --all-groups --no-editable
+
+      - name: Audit all installed locked dependencies
         uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
         with:
           virtual-environment: .venv/
+
+      - name: Audit the MCP v1 compatibility lock
+        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266 # v1.1.0
+        with:
+          inputs: ci/mcp-v1/requirements.txt
+          require-hashes: true
 
   dependency-review:
     name: Pull request dependency review

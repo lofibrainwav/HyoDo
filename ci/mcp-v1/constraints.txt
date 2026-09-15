@@ -1,0 +1,2 @@
+# Keep the compatibility lane on the supported MCP SDK v1 line.
+mcp>=1.27,<2

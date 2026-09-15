@@ -1,0 +1,3 @@
+# Only the test runner is additional to HyoDo's runtime and MCP extras.
+pytest>=8.0
+pytest-asyncio>=0.23

@@ -62,6 +62,9 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    # generate_sbom.py builds and installs into a disposable env via the
+    # interpreter's `-m pip`; uv-created project environments do not seed pip.
+    "pip>=25.0",
     "pytest>=8.0",
     "pytest-asyncio>=0.23",
     "pytest-cov>=4.0",
@@ -90,6 +93,12 @@ mutation = [
     # until the mutation parser and configs are revalidated against an upgrade.
     "mutmut==3.7.0",
     "cosmic-ray==8.7.0",
+]
+
+[dependency-groups]
+# CI-only tooling stays locked without expanding HyoDo's published extras.
+ci = [
+    "pre-commit==4.3.0",
 ]
 
 [project.scripts]
@@ -131,6 +140,10 @@ only-include = [
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.uv]
+# setup-uv reads this single SSOT instead of silently tracking the moving latest.
+required-version = "==0.12.13"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "C4", "SIM", "PT", "RUF"]
