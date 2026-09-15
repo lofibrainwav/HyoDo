@@ -32,7 +32,8 @@ are unavailable, they are reported as "Not measured," not silently skipped.
 - **Legacy command labels:** Six-Virtue Model; Trinity Gates subset.
 - **Current implementation status:** the command retains the older five-input
   geometric-mean method for compatibility while HyoDo's replacement evaluation
-  model is being updated.
+  model is being updated; a general per-axis evaluator is not yet in the public
+  package.
 
 HYOGOOK V5 is the internal name for that older method, not HyoDo's current
 evaluation model. The public CLI label remains HyoDo Integrity Score for
@@ -42,8 +43,10 @@ score.
 ## 3. What a score means
 
 HyoDo does not turn its six reference virtues directly into one canonical
-score. An evaluation keeps its value, confidence, evidence, and observation
-state distinct. Missing evidence remains `UNOBSERVED`. The current
+score. The reference model keeps an evaluation's value, confidence, evidence,
+and observation state distinct, but the current public package does not yet
+implement a general per-axis evaluator. Missing evidence remains
+`UNOBSERVED`. The current
 `hyodo score` command still combines five inputs with a geometric mean and
 floors zero inputs for historical compatibility. **HYOGOOK V5** is the
 internal name for that older calculation. It is advisory and is not HyoDo's

@@ -13,7 +13,8 @@ HyoDo is deliberately narrow:
 - The legacy HyoDo score command is a review signal, never approval. It retains
   the older five-input geometric-mean method, internally named HYOGOOK V5, for
   compatibility while HyoDo's replacement evaluation model is being updated.
-  The six reference values are not one canonical score.
+  The current package has no general per-axis evaluator and defines no
+  canonical score across the six reference values.
 - The public MCP server supports loopback or authenticated Tailscale binding;
   public `0.0.0.0` listeners are not supported.
 - Missing, unreadable, or unmeasured evidence is never reported as healthy.

@@ -70,8 +70,9 @@ checkout or replacing the KINGDOM execution authority.
   seventh `"unclassified"` key for a decision the mapping table places
   nowhere. The v1 `eternity` cluster is retained for schema compatibility and
   is empty because graph decisions are not longitudinal continuity evidence.
-  The canonical Eternity virtue is represented by a continuity indicator;
-  `harmony_aggregate` is a separate derived score namespace.
+  The canonical Eternity virtue is represented by a continuity indicator.
+  Graph export computes no composite score; `harmony_aggregate` is a reserved
+  namespace constant, not a graph field or a canonical six-axis result.
 
 A dangling `evidence_refs` entry (only possible in a hand-edited or
 truncated ledger; `hyodo/events.py`'s own recording path rejects one at

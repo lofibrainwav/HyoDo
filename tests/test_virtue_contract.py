@@ -59,6 +59,9 @@ def test_aggregate_namespace_is_not_the_eternity_virtue() -> None:
     assert HARMONY_AGGREGATE_KEY == "harmony_aggregate"
     assert LEGACY_V5_AGGREGATE_KEY == "s_eternity"
     assert HARMONY_AGGREGATE_KEY not in CANONICAL_VIRTUE_KEYS
+    contract = (REPO_ROOT / "docs" / "VIRTUE_CONTRACT.md").read_text(encoding="utf-8")
+    assert "does **not** define or emit a canonical aggregate across the six virtue" in contract
+    assert "reserved namespace constant" in contract
 
 
 def test_dashboard_has_six_cards_in_canonical_order() -> None:
@@ -75,7 +78,7 @@ def test_dashboard_has_six_cards_in_canonical_order() -> None:
 
 def test_hygook_v5_keeps_its_historical_floor() -> None:
     # V5 compatibility remains 0 -> 1 on its 1-10 scale; it is not the
-    # canonical raw-zero aggregate semantics.
+    # independent Eternity axis or a six-virtue aggregate.
     f_score, s_value = calculate_hygook_v5_score(0, 0, 0, 0, 0)
     assert f_score == pytest.approx(6.0)
     assert s_value == pytest.approx(1.0)

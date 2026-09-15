@@ -24,12 +24,27 @@ Every measured virtue reports `OBSERVED`, `PARTIAL`, or `UNOBSERVED`. A virtue
 is not evidence; evidence is not a decision; a score or receipt is not
 execution authority.
 
-## Derived aggregate namespaces
+## Score and aggregation boundary
 
-`harmony_aggregate` is the canonical derived aggregate over six raw virtue
-measurements. It is not the Eternity virtue. The 4.19.4 HYOGOOK V5 compatibility
-path retains its public `S_eternity` output and its `0 → 1` floor; this is a
-historical derived harmony value, not a measured Eternity result.
+HyoDo does **not** define or emit a canonical aggregate across the six virtue
+axes. The `HARMONY_AGGREGATE_KEY` value `harmony_aggregate` in
+`hyodo/virtues.py` is a reserved namespace constant, not a formula, measured
+axis, graph field, or current CLI output.
+
+The current `hyodo score` and `hyodo score --from-check` paths are legacy
+HYOGOOK V5 compatibility behavior. They use five inputs (Benevolence, Truth,
+Goodness, Hyo, and Beauty); their derived `S_eternity` / harmony value is not
+the independent Eternity virtue and does not represent a six-axis summary.
+When `--from-check` cannot observe one or more inputs, it may show a partial
+observed-input harmony signal but withholds TOTAL. See
+[`SCORE_DERIVATION.md`](SCORE_DERIVATION.md) for the exact behavior.
+
+The philosophy-to-engineering reference defines an evaluation record as
+`(value, confidence, evidence, state)` for an individual axis, with missing
+evidence reported as `UNOBSERVED`. That axis-evaluation contract is not yet
+implemented as a general HyoDo API in the current public package. A host may
+define a separately governed, profile-specific summary; HyoDo does not supply
+that host-owned aggregation or turn it into action authority.
 
 HyoDo is a host-neutral public layer. Integrating hosts own orchestration,
 memory, retrieval, runtime, execution, and final authority. KINGDOM is a
