@@ -64,8 +64,9 @@ scan, not a full security audit, and callers must enforce DENY decisions. The
 package stores evidence digests and receipts, not captured payloads. See the
 [product boundary](./docs/PRODUCT_BOUNDARY.md), [measured state snapshot](./docs/CURRENT_STATE.md),
 and [security model](./SECURITY.md) for the authoritative details.
-The legacy HyoDo score command is advisory only. It retains a five-input
-geometric-mean method for compatibility; `HYOGOOK V5` is its internal name.
+The legacy HyoDo Integrity Score command is advisory only. It retains a
+five-input geometric-mean method for compatibility; `HYOGOOK V5` is its
+internal name.
 HyoDo's replacement evaluation model is being updated and does not define the
 six reference values as one canonical score. Current source status may differ
 from the latest published package.
