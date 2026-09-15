@@ -26,10 +26,11 @@ Command gates (Truth, Goodness, Beauty) run tools the project already owns —
 (Benevolence, Hyo, Yeong) are never replaced by a shell command; when they
 are unavailable, they are reported as "Not measured," not silently skipped.
 
-In HyoDo, Hyo (孝) expresses a practical principle: technology should carry
-its share of the burden, not shift it onto people. The current technical
-contract represents this axis through consent, context alignment, and data
-protection. HyoDo does not claim to measure every form of human cost.
+In HyoDo, Hyo (孝) is the idea that technology should respect people's time,
+choices, and relationships, and carry its share of the burden. The current
+package represents this axis through consent, context alignment, and evidence
+about data protection. This is a bounded part of the philosophy: HyoDo does not
+measure every human cost or implement a general evaluator for all six values.
 
 ### Existing score-command compatibility
 
