@@ -14,11 +14,17 @@ const required = [
 ];
 
 const missing = required.filter((fragment) => !output.includes(fragment));
-if (!/<h1\b[^>]*>\s*Page not found\s*<\/h1>/.test(output)) {
+if (!/<h1\b[^>]*id="page-title"[^>]*>\s*This page isn’t here\.\s*<\/h1>/.test(output)) {
 	missing.push('404 heading');
 }
-if (!new RegExp(`<a\\b[^>]*href="/"[^>]*>\\s*${messages['404.action']}\\s*<\\/a>`).test(output)) {
+if (!new RegExp(`<a\\b[^>]*href="/"[^>]*>[\\s\\S]*?${messages['404.action']}[\\s\\S]*?<\\/a>`).test(output)) {
 	missing.push('home action link');
+}
+if (!/<a\b[^>]*href="\/docs\/quickstart\/"[^>]*>[\s\S]*?Read the quickstart[\s\S]*?<\/a>/.test(output)) {
+	missing.push('quickstart recovery link');
+}
+if (!/<main\b[^>]*>[\s\S]*?<\/main>/.test(output) || !/<nav\b[^>]*aria-label="Primary navigation"/.test(output)) {
+	missing.push('semantic landmarks');
 }
 if (missing.length > 0) {
 	throw new Error(`Generated 404 page is missing required output: ${missing.join('; ')}`);
