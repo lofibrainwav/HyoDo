@@ -1,6 +1,7 @@
-"""HyoDo - AI Code Quality Automation
+"""HyoDo - Open evidence and verification for AI-assisted systems.
 
-The Way of Devotion: Philosophy-driven code review for AI-assisted development.
+HyoDo is an open trust framework, delivered today as a Python package and CLI
+for local quality gates, policy checks, and inspectable evidence.
 
 Built with the Six-Virtue Model (HyoDo Integrity Score, philosophy V6):
 - Benevolence: Developer experience and user serenity
@@ -11,8 +12,9 @@ Built with the Six-Virtue Model (HyoDo Integrity Score, philosophy V6):
 - Beauty: Code clarity and UX
 - Eternity: Continuity, persistence, and longitudinal evidence (measured)
 
-HYOGOOK V5 compatibility formula (Trinity Gates subset; formula lineage;
-philosophy V6):
+The reference philosophy has six values; it does not define one canonical
+score. The older score command is retained for compatibility (five-input
+geometric mean; internal name HYOGOOK V5):
   F = sum(five pillars on 1–10 scale) + geometric_mean
   S = legacy harmony aggregate
 Review-emphasis percentages are philosophical labels only — not F weights.
@@ -20,13 +22,15 @@ Review-emphasis percentages are philosophical labels only — not F weights.
 
 from __future__ import annotations
 
-__version__ = "4.19.5"
+__version__ = "4.19.6"
 __philosophy_version__ = "V6"
 __author__ = "HyoDo contributors"
 __license__ = "MIT"
 SCORE_PUBLIC_NAME = "HyoDo Integrity Score"
 SCORE_MODEL_NAME = "Six-Virtue Model"
 SCORE_SUBSET_NAME = "Trinity Gates"
+# Kept as a public compatibility constant; this is the legacy method's internal
+# identifier, not the current HyoDo evaluation model.
 SCORE_FORMULA_LINEAGE = "HYOGOOK V5"
 
 
@@ -75,9 +79,10 @@ def calculate_hygook_v5_score(
     hyo: float,
     beauty: float,
 ) -> tuple[float, float]:
-    """Calculate the HyoDo Integrity Score formula and S (Eternity) value.
+    """Calculate the legacy five-input score and its derived harmony value.
 
-    The formula lineage is HYOGOOK V5.
+    HYOGOOK V5 is the internal name for this historical compatibility method;
+    its S output is not the independent Eternity/Yeong virtue.
 
     F = (T + G + In + B + C) + ⁵√(T × G × In × B × C)
     S = ⁵√(T × G × In × B × C)
@@ -117,11 +122,11 @@ def calculate_trinity_score(
 ) -> float:
     """Calculate the legacy Trinity Gates score from pillar values.
 
-    The V5 mode remains available for historical compatibility with the
-    HyoDo Integrity Score formula lineage.
+    The V5 mode remains available for historical score compatibility.
 
     Legacy mode: Uses weighted compatibility if benevolence/loyalty are not provided.
-    V5 mode: Uses HYOGOOK V5 formula if all V5 pillars are provided.
+    V5 mode: Uses the older five-input formula (internally named HYOGOOK V5)
+    if all V5 pillars are provided.
 
     Args:
         truth: Technical accuracy score (0-1)

@@ -97,7 +97,7 @@ guessing at a config format.
 | --- | --- |
 | `safe` | `0` report · `1` strict high finding · `2` bad path |
 | `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
-| `event` / `policy` | `0` valid/ALLOW · `1` invalid/DENY · `2` unobserved |
+| `event` / `policy` | `0` valid · `1` invalid · `2` unobserved · `3` ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
 
 Exit `2` means "not measured," not "measured and fine." A gate that never ran

@@ -18,11 +18,11 @@ can never be reported as "passed."
 Most AI review bots are advisory and cloud-hosted: they comment on a pull
 request from the outside, after the fact. HyoDo is local-first and
 fail-closed by default — it runs in your own environment, reuses your own
-tooling, and treats missing or unreadable evidence as a failure to
-investigate rather than something to average away. Its HyoDo Integrity Score
-is decision support only; it does not authorize merge or deploy on its own. The
-score uses the Six-Virtue Model and Trinity Gates subset, with HYOGOOK V5
-retained as the formula lineage.
+tooling, and reports missing or unreadable evidence as `UNOBSERVED` instead of
+turning it into a pass. Its optional HyoDo Integrity Score is a review signal,
+not permission to merge or deploy. The current command retains an older
+five-input geometric-mean method, internally named HYOGOOK V5, while its
+replacement is being updated.
 
 ## Is it a sandbox?
 

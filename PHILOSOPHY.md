@@ -9,11 +9,12 @@ Philosophy branding is intentional. Every public label pairs with a
 ## Philosophy version
 
 - **Philosophy:** V6 (Hyo supersedes one-sided Loyalty).
-- **Public name:** HyoDo Integrity Score.
-- **Model:** Six-Virtue Model.
-- **Subset:** Trinity Gates.
-- **Formula lineage:** HYOGOOK V5 (geometric mean).
-- Formula lineage and philosophy version are separate identifiers on purpose.
+- **Legacy CLI display name:** HyoDo Integrity Score.
+- **Legacy command labels:** Six-Virtue Model; Trinity Gates subset.
+- **Current implementation status:** the score command retains an older
+  five-input geometric-mean method while its replacement is being updated.
+- **HYOGOOK V5** is the internal name for that older method, not a separate
+  philosophy or HyoDo's current score direction.
 
 The `loyalty=` alias was removed in 4.0.0. Legacy
 `calculate_trinity_score()` stays frozen for historical reproducibility.
@@ -46,26 +47,28 @@ AST (Benevolence / Hyo) covers public docstrings, CLI help, message-less
 binds. Yeong uses append-only `.hyodo/history.jsonl` and counts all-PASS
 on **executed** gates only (skips never fake green).
 
-## Aggregation and legacy compatibility
+## Evaluation and legacy compatibility
 
-The canonical six-virtue aggregate uses raw 0–1 virtue measurements. A measured
-zero makes `harmony_aggregate` zero. Missing measurements remain
-`UNOBSERVED` and are not silently converted to zero or one.
+HyoDo does not turn its six reference virtues directly into one canonical
+score. An evaluation keeps its value, confidence, evidence, context, and
+observation state distinct. Missing evidence remains `UNOBSERVED`; it is not
+converted into a numeric zero or one.
 
-The public HYOGOOK V5 compatibility formula remains frozen. It scales raw
-values from `0 → 1` and `1 → 10`, and its returned `S_eternity` is a legacy
-derived harmony value, not the `Eternity` virtue.
+The current command still accepts five inputs and combines them with a
+geometric mean. It floors a zero input for historical compatibility and
+scales the result to its legacy score range. `HYOGOOK V5` is simply the
+internal name for this older calculation; its `S_eternity` is not the
+`Eternity` virtue.
 
-The legacy formula uses a **geometric mean**:
+The older formula uses a **geometric mean**:
 
-- Arithmetic mean of (structure=1.0, security=0.0) → 0.5 (looks “ok”).
-- In the canonical aggregate, any measured zero axis → **0**.
-- In HYOGOOK V5, the `0 → 1` floor remains for compatibility.
+- A geometric mean makes all five inputs matter; a low input pulls the result
+  down more than an arithmetic mean would.
+- This legacy calculation floors a zero input to `1` on its `1–10` scale, so
+  its historical score does not represent an observed zero faithfully.
 
-Document this as engineering, not only “harmony”:
-
-> **Canonical fail-closed:** one measured virtue at 0 collapses the
-> `harmony_aggregate`; this statement does not describe HYOGOOK V5.
+Those mechanics describe only the legacy five-input method. They do not define
+HyoDo's current evaluation model.
 
 `--partial` allows missing pillars and adds `SIGNAL_CONFIDENCE_WEAK`. It
 does not invent `REVIEW_SIGNAL_STRONG` via silent 1.0 fill-in (4.0.1).

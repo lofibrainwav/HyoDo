@@ -14,6 +14,13 @@ HyoDo is a verification and evidence plane. It does not plan tasks, execute
 workers, own worker lifecycle, orchestrate dependencies, recover work, or
 settle execution.
 
+HyoDo policy decisions and gates apply within HyoDo's declared product scope.
+They validate evidence and report HyoDo outcomes; they do not authorize a
+user's action in an integrating host. The host owns action-specific
+authorization under its own delegated policy. A host's virtue lens or a HyoDo
+receipt may inform that policy only through an explicit, versioned contract;
+neither silently grants or expands authority.
+
 ## Kingdom owns
 
 - task planning and dispatch;

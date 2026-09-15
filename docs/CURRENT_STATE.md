@@ -48,9 +48,11 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 ## Maintenance boundary
 
-HyoDo 4.19.5 is the closed public baseline and this checkout is now reconciled
-to that source version. Do not infer runtime identity from this page alone;
-use the signed release, CI receipt, or runtime identity receipt. Fresh
+At this snapshot date, HyoDo 4.19.5 was the closed public baseline and the
+source checkout was reconciled to that version. Later release preparation is
+tracked in [`../ROADMAP.md`](../ROADMAP.md). Do not infer runtime identity from
+this page alone; use the signed release, CI receipt, or runtime identity
+receipt. Fresh
 Codex/Cursor host observations,
 QMD/Neo4j closed-loop memory, and matched ACL/KINGDOM shadow experiments are
 downstream integration/research work and must not silently reopen HyoDo product

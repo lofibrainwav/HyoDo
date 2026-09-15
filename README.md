@@ -1,11 +1,11 @@
 # HyoDo
 
-**Honest local guardrails for AI-assisted development.**
+**Open, model-agnostic evidence and verification for AI-assisted systems.**
 
-HyoDo is a model-agnostic Python CLI that helps teams prove which checks ran,
-record agent actions, enforce local tool and path policy, and reuse existing
-tests and linters without turning missing evidence into a green result.
-Review signals never grant automatic approval. Unobserved is never green.
+HyoDo is an open trust framework, delivered today as a public Python CLI for
+fail-closed quality gates, evidence, and policy checks. Reuse the tests and
+linters you already run. Missing evidence stays `UNOBSERVED`; review signals
+never authorize approval.
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
@@ -56,45 +56,18 @@ the rest of `.hyodo/` out of version control — see
 | Local evidence panel | `hyodo dashboard --open` |
 | Optional MCP adapter | `hyodo mcp stdio` / `serve` |
 
-## Current public claim lock
+## Boundaries and current status
 
-This table is the latest **published-package** boundary; current source and
-measured-state readback is in [`docs/CURRENT_STATE.md`](./docs/CURRENT_STATE.md).
-HyoDo/Kingdom ownership: [`docs/PRODUCT_BOUNDARY.md`](./docs/PRODUCT_BOUNDARY.md).
-
-<!-- markdownlint-disable MD013 -->
-
-| Capability | Status | Evidence boundary |
-| --- | --- | --- |
-| gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
-| Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
-| Graph v2 join | SHIPPED | Multi-parent runtime/viewer with v1 compatibility; public site remains fixture-only. |
-| Codex host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; a fresh canonical live canary is separate evidence. |
-| Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
-| IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
-| remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
-| ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
-| friction collector | NOT BUILT | No collector/uploader; transport disabled. |
-
-<!-- markdownlint-enable MD013 -->
-
-## Honest boundaries
-
-HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
-
-- HyoDo observes and verifies external execution; Kingdom owns planning,
-  execution authority, workers, orchestration, recovery, and settlement.
-- Kingdom processes, tests, branches, and worktrees are not HyoDo status.
-
-- It is **not** a runtime sandbox or process interceptor.
-- `hyodo safe` is an early-warning scanner, not a full security audit.
-- A DENY result must still be enforced by the caller.
-- HyoDo Integrity Score: advisory only, never approval; HYOGOOK V5 lineage.
-- The public MCP server supports loopback or authenticated Tailscale binding;
-  public `0.0.0.0` listeners are not supported.
-- Missing, unreadable, or unmeasured evidence is never reported as healthy.
-- Embeddings, model calls, capture tools, and remote inventories stay outside
-  the package: HyoDo keeps digests, hashes, and receipts, never the payload.
+HyoDo provides local checks and evidence contracts; it does not grant execution
+authority or turn missing evidence into a pass. `hyodo safe` is an early-warning
+scan, not a full security audit, and callers must enforce DENY decisions. The
+package stores evidence digests and receipts, not captured payloads. See the
+[product boundary](./docs/PRODUCT_BOUNDARY.md), [measured state snapshot](./docs/CURRENT_STATE.md),
+and [security model](./SECURITY.md) for the authoritative details.
+The HyoDo Integrity Score is advisory only. The score command retains an older
+method that combines five inputs with a geometric mean; `HYOGOOK V5` is its
+internal name. That compatibility method is being replaced. Current source
+status may differ from the latest published package.
 
 ## Use your existing CI
 
@@ -110,8 +83,8 @@ HyoDo is narrow; see [the boundary contract](./docs/PRODUCT_BOUNDARY.md).
 - uses: lofibrainwav/HyoDo/.github/actions/hyodo@vX.Y.Z
 ```
 
-`init` can absorb pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, and
-Makefile targets. Empty or malformed gate configuration exits **2**, not **0**.
+`init` detects existing test and lint tooling. Empty or malformed gate
+configuration exits **2**, not **0**. See the [gate configuration reference](./docs/GATES_SYNTAX.md).
 
 ## Hooks and SARIF
 
@@ -154,21 +127,12 @@ hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
 The MCP adapter uses the same CLI contracts rather than a second engine.
 `mcp.hyodo.app` is contract-only, not this path.
 
-## Exit contracts
-
-| Command | Contract |
-| --- | --- |
-| `safe` | `0` report · `1` strict high finding · `2` bad path |
-| `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
-| `event`, `policy` | 0 valid/ALLOW; 1 invalid/DENY; 2 unobserved; 3 ASK |
-| `schema check` | `0` valid · `1` validation error · `2` unobserved input |
-
 ## Install and support
 
 Python **3.10+**: `pipx install hyodo` or `pip install -U hyodo`.
 
 - Docs index: [`docs/README.md`](./docs/README.md)
-- Quick start: [`QUICK_START.md`](./QUICK_START.md)
+- Command contracts and first-run steps: [`QUICK_START.md`](./QUICK_START.md)
 - Node.js: [`docs/onboarding-nodejs.md`](./docs/onboarding-nodejs.md)
 - Security: [`SECURITY.md`](./SECURITY.md);
   Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)

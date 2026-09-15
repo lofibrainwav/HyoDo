@@ -14,10 +14,10 @@ OIDC provenance, and post-publish install readback.
 
 ## Current release
 
-HyoDo 4.19.5 is the current release target and source-tree release baseline;
-it is published.
-Its release chain receipt records the corrected public sdist converged with
-PyPI; 4.19.4 remains an immutable prior release.
+HyoDo 4.19.6 is the current release target and source-tree release baseline;
+release preparation is in progress. HyoDo 4.19.5 remains the latest published
+package. Its release chain receipt records the corrected public sdist
+converged with PyPI; 4.19.4 remains an immutable prior release.
 
 Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
 adapters are fixture-verified and the two-event recording path is measured on
@@ -163,7 +163,7 @@ evidence is not converted into a pass.
 - Release-note drift has a read-only verifier; the sdist guard validates declared
   package scope instead of enforcing a brittle compressed-byte ceiling.
 
-### 4.19.4 (release target 2026-09-12)
+### 4.19.4 (released 2026-09-12)
 
 - Adds the bounded `provenance.retrieval/v1` carrier for KINGDOM/QMD retrieval
   provenance, with deterministic digests and projection IDs.
@@ -176,6 +176,13 @@ evidence is not converted into a pass.
   version; the 4.19.4 artifact is not overwritten.
 - Closes the source-build to PyPI artifact hash/readback chain after the
   release workflow's provenance and install checks pass.
+
+### 4.19.6 (release preparation, 2026-09-15)
+
+- Includes the dashboard startup-readiness and test-gate reporting fix merged
+  in PR #343.
+- Version metadata and public docs are being prepared; no tag or package
+  publication is claimed by this entry.
 
 ## Next candidates
 

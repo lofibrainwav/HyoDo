@@ -1,22 +1,16 @@
 ---
-title: Philosophy → Math → Code
-description: Why HyoDo exists, the six virtues it measures, the geometric mean that makes the signal fail-closed, and the exit codes that carry it into practice.
+title: From values to evidence
+description: How HyoDo turns its reference values into observable evidence, clear uncertainty, and bounded decisions.
 ---
 
 ## 1. Why this exists
 
-> I cannot read code. So when an AI told me 'it is done', I had no way to
-> know whether that was true. I believe friction in the world can be
-> measured. The six virtues are six axes of that friction, and the
-> geometric mean is the honest mathematics that says: if any one measured
-> axis is zero, the canonical harmony aggregate is zero. HyoDo carries that mathematics into an exit
-> code. It speaks only about what it observed, and it never shows a green
-> light for what it did not observe. It moves on its own exactly as far as
-> the trust you have given it, and it leaves a receipt for every step it
-> took. HyoDo is a public, host-neutral trust and evidence layer for everyone
-> who cannot read the code.
+When an AI says "done," HyoDo helps show what was checked and what remains
+unknown. It is an open framework for examining human–AI work through evidence,
+not a moral judge or an agent runtime. HyoDo records what it can observe; the
+integrating host still owns orchestration and action authority.
 
-## 2. Six virtues
+## 2. Six reference values
 
 | Pillar | KO / Hanja | Technical meaning | Evidence |
 | --- | --- | --- | --- |
@@ -32,45 +26,25 @@ Command gates (Truth, Goodness, Beauty) run tools the project already owns —
 (Benevolence, Hyo, Yeong) are never replaced by a shell command; when they
 are unavailable, they are reported as "Not measured," not silently skipped.
 
-### Public score naming
+### Existing score-command compatibility
 
-- **Public name:** HyoDo Integrity Score.
-- **Model:** Six-Virtue Model.
-- **Subset:** Trinity Gates.
-- **Formula lineage:** HYOGOOK V5.
+- **CLI display name:** HyoDo Integrity Score.
+- **Legacy command labels:** Six-Virtue Model; Trinity Gates subset.
+- **Current implementation status:** the score command retains an older
+  five-input geometric-mean method while its replacement is being updated.
 
-The name is the operator-facing label. `HYOGOOK V5` remains the formula
-lineage needed for reproducibility, not a competing public product name.
+HYOGOOK V5 is the internal name for that older method, not HyoDo's current
+score direction. The public name remains HyoDo Integrity Score.
 
-## 3. The mathematics
+## 3. What a score means
 
-The canonical six-virtue harmony aggregate combines six measured virtue scores
-with a **geometric mean**,
-not an arithmetic one. The difference matters: an arithmetic mean of
-(structure=1.0, security=0.0) still comes out to 0.5, which looks "ok." A
-geometric mean with any measured zero axis collapses to 0 — the derived
-harmony signal fails. The legacy HYOGOOK V5 formula retains its documented
-`0 → 1` floor and is not described by this rule.
-
-> **Canonical fail-closed:** one measured virtue at 0 collapses the harmony
-> aggregate.
-
-That rule is implemented directly, not just claimed. From
-`hyodo/__init__.py`:
-
-```python
-def calculate_geometric_mean(values: list[float]) -> float:
-    """Calculate the legacy geometric mean harmony aggregate.
-
-    S = ⁵√(T × G × In × B × C)
-
-    Args:
-        values: List of 5 pillar scores (0-1 or 1-10 scale)
-
-    Returns:
-        Geometric mean using the same scale as the input values.
-    """
-```
+HyoDo does not turn its six reference virtues directly into one canonical
+score. An evaluation keeps its value, confidence, evidence, and observation
+state distinct. Missing evidence remains `UNOBSERVED`. The current
+`hyodo score` command still combines five inputs with a geometric mean and
+floors zero inputs for historical compatibility. **HYOGOOK V5** is the
+internal name for that older calculation. It is advisory and is not HyoDo's
+current evaluation model.
 
 `--partial` allows missing pillars and adds `SIGNAL_CONFIDENCE_WEAK`. It
 does not invent a strong signal via a silent fill-in of 1.0 for whatever was
@@ -91,12 +65,12 @@ a named source, and each pillar reports its own coverage —
 excluded from the legacy harmony aggregate term rather than defaulted; when
 any pillar is `UNOBSERVED`, the command withholds the combined TOTAL score
 and names which pillar(s) still need an explicit `--benevolence 0.8`-style
-flag to complete it. The HyoDo Integrity Score formula itself is unchanged
+flag to complete it. The legacy compatibility formula is unchanged
 by `--from-check` — it only proposes inputs — and the command still prints
 "review signal, not automatic approval." See `docs/SCORE_DERIVATION.md`
 for the full rule table and a calibration run.
 
-## 4. The code
+## 4. What HyoDo does today
 
 The mathematics above is what an optional review score does. The exit codes
 below are what every HyoDo command does, always, whether or not scoring is
