@@ -59,8 +59,14 @@ status are documented there; remote ChatGPT MCP remains contract-only.
 | `safe` | `0` report · `1` strict high finding · `2` bad path |
 | `init` | `0` config written · `1` config exists without `--force` |
 | `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
-| `event` / `policy` | `0` valid · `1` invalid · `2` unobserved · `3` ASK |
+| `event validate` | `0` valid · `1` invalid · `2` unreadable input |
+| Policy result | `0` ALLOW · `1` DENY · `2` UNOBSERVED · `3` ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
+
+`UNOBSERVED` means there is not enough evidence to say whether a check passed
+or failed. It is neither a pass nor a failure.
+Policy results come from `event record --policy` and `policy check`; an invalid
+event can stop before policy evaluation.
 
 Missing or unmeasured evidence is never a healthy result. Scores are review
 signals, not approval. See the [product boundaries](./docs/PRODUCT_BOUNDARY.md)

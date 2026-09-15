@@ -52,7 +52,8 @@ HyoDo does not turn its six reference virtues directly into one canonical
 score. The reference model keeps an evaluation's value, confidence, evidence,
 and observation state distinct, but the current public package does not yet
 implement a general per-axis evaluator. Missing evidence remains
-`UNOBSERVED`. The current
+`UNOBSERVED`. That means there is not enough evidence to say whether a check
+passed or failed; it is neither a pass nor a failure. The current
 `hyodo score` command still combines five inputs with a geometric mean and
 floors zero inputs for historical compatibility. **HYOGOOK V5** is the
 internal name for that older calculation. It is advisory and is not HyoDo's
@@ -92,8 +93,12 @@ in use:
 | --- | --- |
 | `safe` | `0` report · `1` strict high finding · `2` bad path |
 | `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
-| `event` / `policy` | `0` ALLOW · `1` DENY · `2` UNOBSERVED · `3` ASK |
+| `event validate` | `0` valid · `1` invalid · `2` unreadable input |
+| Policy result | `0` ALLOW · `1` DENY · `2` UNOBSERVED · `3` ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
+
+Policy results come from `event record --policy` and `policy check`; an invalid
+event can stop before policy evaluation.
 
 The policy gate speaks in four decision words, documented directly in
 `hyodo/policy.py`:

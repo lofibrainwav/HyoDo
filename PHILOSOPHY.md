@@ -59,7 +59,9 @@ HyoDo does not turn its six reference virtues directly into one canonical
 score. The reference model keeps an evaluation's value, confidence, evidence,
 context, and observation state distinct; the current public package does not
 yet implement a general per-axis evaluator. Missing evidence remains
-`UNOBSERVED`; it is not converted into a numeric zero or one.
+`UNOBSERVED`; it is not converted into a numeric zero or one. That means there
+is not enough evidence to say whether a check passed or failed; it is neither a
+pass nor a failure.
 
 The current command still accepts five inputs and combines them with a
 geometric mean. It floors a zero input for historical compatibility and

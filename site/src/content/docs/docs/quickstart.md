@@ -97,8 +97,14 @@ guessing at a config format.
 | --- | --- |
 | `safe` | `0` report · `1` strict high finding · `2` bad path |
 | `check` | `0` executed gates passed · `1` gate failed · `2` none/malformed |
-| `event` / `policy` | `0` valid · `1` invalid · `2` unobserved · `3` ASK |
+| `event validate` | `0` valid · `1` invalid · `2` unreadable input |
+| Policy result | `0` ALLOW · `1` DENY · `2` UNOBSERVED · `3` ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
+
+`UNOBSERVED` means there is not enough evidence to say whether a check passed
+or failed. It is neither a pass nor a failure.
+Policy results come from `event record --policy` and `policy check`; an invalid
+event can stop before policy evaluation.
 
 Exit `2` means "not measured," not "measured and fine." A gate that never ran
 does not get to look like a gate that passed.
