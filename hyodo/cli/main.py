@@ -2445,7 +2445,8 @@ def score(
     """
     Compute the HyoDo Integrity Score review signal.
 
-    Model: Six-Virtue Model. Subset: Trinity Gates. Formula lineage: HYOGOOK V5.
+    Model: Six-Virtue Model. Subset: Trinity Gates.
+    Legacy five-input geometric-mean formula (internal name: HYOGOOK V5).
 
     F = sum(five pillars on 1–10 scale) + geometric_mean
     S = geometric_mean
@@ -2509,7 +2510,7 @@ def score(
         if not json_output:
             console.print(
                 f"[dim]Model: {SCORE_MODEL_NAME} · Subset: {SCORE_SUBSET_NAME} · "
-                f"Formula lineage: {SCORE_FORMULA_LINEAGE} · derived from: {root}[/dim]"
+                f"Legacy five-input geometric-mean formula (internal name: {SCORE_FORMULA_LINEAGE}) · derived from: {root}[/dim]"
             )
             _print_derived_pillars(derived)
 
@@ -2592,7 +2593,7 @@ def score(
 
     console.print(
         f"[dim]Model: {SCORE_MODEL_NAME} · Subset: {SCORE_SUBSET_NAME} · "
-        f"Formula lineage: {SCORE_FORMULA_LINEAGE}[/dim]"
+        f"Legacy five-input geometric-mean formula (internal name: {SCORE_FORMULA_LINEAGE})[/dim]"
     )
     table = Table(
         title=SCORE_PUBLIC_NAME,
@@ -2627,8 +2628,8 @@ def score(
     console.print(table)
     console.print(
         "[dim]Review emphasis is not used in the F formula "
-        f"(F = sum(1–10 pillars) + geometric mean). Formula lineage "
-        f"{SCORE_FORMULA_LINEAGE} · philosophy V6.[/dim]"
+        f"(F = sum(1–10 pillars) + geometric mean). Legacy five-input method "
+        f"(internal name: {SCORE_FORMULA_LINEAGE}) · philosophy V6.[/dim]"
     )
 
     if score_value >= 90:

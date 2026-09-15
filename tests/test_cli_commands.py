@@ -157,7 +157,8 @@ def test_score_output_uses_public_integrity_score_labels():
     assert "HyoDo Integrity Score" in result.output
     assert "Six-Virtue Model" in result.output
     assert "Trinity Gates" in result.output
-    assert "HYOGOOK V5" in result.output
+    rendered = " ".join(result.output.lower().split())
+    assert "legacy five-input geometric-mean formula (internal name: hyogook v5)" in rendered
     assert "HYOGOOK F-score Review Signal" not in result.output
 
 

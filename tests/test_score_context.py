@@ -16,12 +16,14 @@ def _load_workflow() -> dict:
     return data
 
 
-def test_score_check_uses_public_name_and_keeps_formula_lineage() -> None:
+def test_score_check_keeps_review_signal_advisory_and_checks_readiness() -> None:
     data = _load_workflow()
     job = data["jobs"]["trinity-score"]
 
     assert job["name"] == "HyoDo Integrity Score"
     run_text = "\n".join(step.get("run", "") for step in job["steps"])
-    assert "HyoDo Integrity Score" in run_text
-    assert "HYOGOOK V5" in run_text
+    assert any(
+        step.get("name") == "Validate HyoDo public release readiness" for step in job["steps"]
+    )
+    assert "Scores are advisory; required release gates determine readiness" in run_text
     assert "HYOGOOK V5 Score" not in job["name"]

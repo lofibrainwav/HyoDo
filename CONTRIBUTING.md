@@ -85,8 +85,9 @@ a silent pass, and it should be noted on the pull request.
 ## Review principles
 
 HyoDo's optional Integrity Score can help structure a review, but tests,
-security checks, maintainability, and human judgment remain authoritative. It
-uses the Six-Virtue Model and retains HYOGOOK V5 as its formula lineage. See
+security checks, maintainability, and human judgment remain authoritative. The
+current score command retains the older five-input geometric-mean method
+(internally named HYOGOOK V5) while its replacement is being updated. See
 [PHILOSOPHY.md](./PHILOSOPHY.md) for the short description.
 
 ## Security and conduct

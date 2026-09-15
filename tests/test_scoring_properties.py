@@ -1,11 +1,11 @@
-"""Property-based tests for the scoring math — invariants derived from philosophy.
+"""Properties of the legacy five-input score formula for compatibility.
 
-Philosophy version V6 defines the HyoDo Integrity Score with HYOGOOK V5
-formula lineage:
+These tests preserve the historical HYOGOOK V5 implementation:
   F = Σ(five pillars on 1-10 scale) + ⁵√(Π of those five)
   S = ⁵√(Π)
 
-Three invariants flow directly from the philosophy document (PHILOSOPHY.md):
+Three invariants apply to this legacy implementation, not HyoDo's current
+philosophy or its replacement score model:
 
 1. **Monotonicity (Benevolence):** Raising any pillar must never lower F or S.
    If an agent reports a higher score, the review signal must not weaken.

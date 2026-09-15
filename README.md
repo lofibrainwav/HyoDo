@@ -1,10 +1,11 @@
 # HyoDo
 
-**Model-agnostic local guardrails for AI-assisted development.**
+**Open, model-agnostic evidence and verification for AI-assisted systems.**
 
-HyoDo is a public Python CLI for fail-closed quality gates, evidence, and
-policy checks. It reuses the tests and linters you already run; missing
-evidence never becomes a pass. Review signals never authorize approval.
+HyoDo is an open trust framework, delivered today as a public Python CLI for
+fail-closed quality gates, evidence, and policy checks. Reuse the tests and
+linters you already run. Missing evidence stays `UNOBSERVED`; review signals
+never authorize approval.
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
@@ -63,7 +64,9 @@ scan, not a full security audit, and callers must enforce DENY decisions. The
 package stores evidence digests and receipts, not captured payloads. See the
 [product boundary](./docs/PRODUCT_BOUNDARY.md), [measured state snapshot](./docs/CURRENT_STATE.md),
 and [security model](./SECURITY.md) for the authoritative details. The HyoDo
-Integrity Score is advisory only (HYOGOOK V5 formula lineage). Current source
+Integrity Score is advisory only. The current score command retains an older
+method that combines five inputs with a geometric mean; `HYOGOOK V5` is its
+internal name. That compatibility method is being replaced. Current source
 status may differ from the latest published package.
 
 ## Use your existing CI

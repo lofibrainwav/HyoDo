@@ -473,13 +473,14 @@ jobs:
             fi
           done
 
-      - name: Check documentation version consistency
+      - name: Check documentation and version consistency
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
           grep -q "$VERSION" CHANGELOG.md
-          grep -q "HYOGOOK V5" README.md
-          grep -q "HYOGOOK V5" PHILOSOPHY.md
-          grep -q "HYOGOOK V5" CONTRIBUTING.md
+          grep -q "HyoDo Integrity Score" README.md
+          grep -q "advisory only" README.md
+          grep -q "legacy" PHILOSOPHY.md
+          grep -q "replacement is being updated" CONTRIBUTING.md
           grep -q "Release readiness" RELEASE_CHECKLIST.md
           echo "Documentation consistency verified for $VERSION"
 
@@ -616,11 +617,11 @@ jobs:
 
           echo "All required upstream jobs succeeded."
 
-      - name: Calculate HyoDo Integrity Score
+      - name: Validate HyoDo public release readiness
         run: |
           echo "============================================"
-          echo "     HyoDo Integrity Score Validation"
-          echo "     Formula lineage: HYOGOOK V5"
+          echo "     HyoDo Public Release Readiness"
+          echo "     Scores are advisory; required release gates determine readiness"
           echo "============================================"
           echo ""
           echo "Public OSS Release readiness (see VERSION)"
@@ -640,7 +641,6 @@ jobs:
           echo "     Status: READY_FOR_RELEASE_REVIEW"
           echo "============================================"
 
-      - name: Create Score Badge Artifact
+      - name: Record Release Readiness
         run: |
-          echo "HYOGOOK V5" > trinity_score.txt
-          echo "Status: READY_FOR_RELEASE_REVIEW" >> trinity_score.txt
+          echo "Release readiness: READY_FOR_RELEASE_REVIEW (not score or authority)"

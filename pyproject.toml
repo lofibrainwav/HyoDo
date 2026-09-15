@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hyodo"
 version = "4.19.6"
-description = "Model-agnostic local guardrails for AI-assisted development: quality gates, evidence, and policy. Unobserved is never green; review scores are advisory."
+description = "Open, model-agnostic evidence and verification for AI-assisted systems. Reuse your checks; missing evidence stays UNOBSERVED; scores never authorize."
 readme = "README.md"
 license = "MIT"
 authors = [

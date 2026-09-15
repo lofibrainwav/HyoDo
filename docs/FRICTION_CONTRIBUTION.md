@@ -163,9 +163,11 @@ A future population prior can answer questions such as “how much supervision
 usually reduced retries for this task class?” It cannot answer “may this user
 perform this action?”
 
-EROS/local authority decides **whether** an action is permitted. ACL decides
-**how much support** is appropriate. The Evidence Gate decides whether the
-claimed result is actually proven.
+The integrating host's action policy decides **whether** an external action is
+permitted. Any host-specific support-level control decides **how much
+assistance** is appropriate. HyoDo's Evidence Gate decides whether a claimed
+result is proven within HyoDo's evidence scope; it does not grant host action
+authority.
 
 ## State file
 
