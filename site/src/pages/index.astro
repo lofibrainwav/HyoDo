@@ -5,6 +5,8 @@ import '../styles/evidence-graph.css';
 const pypiUrl = 'https://pypi.org/project/hyodo/';
 const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
 const installCommand = 'pipx install hyodo';
+const siteDescription = 'HyoDo is a model-agnostic quality-gate kit for AI-assisted development. Unobserved is never green.';
+const canonicalUrl = 'https://hyodo.app/';
 ---
 
 <!doctype html>
@@ -13,14 +15,20 @@ const installCommand = 'pipx install hyodo';
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
 		<title>HyoDo — Honest local guardrails for AI-assisted development</title>
+		<meta name="description" content={siteDescription} />
+		<link rel="canonical" href={canonicalUrl} />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="HyoDo" />
+		<meta property="og:title" content="HyoDo — Honest local guardrails for AI-assisted development" />
+		<meta property="og:description" content={siteDescription} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta name="twitter:card" content="summary" />
+		<meta name="twitter:title" content="HyoDo — Honest local guardrails for AI-assisted development" />
+		<meta name="twitter:description" content={siteDescription} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<link rel="icon" href="/favicon.ico" sizes="32x32" />
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 		<meta name="theme-color" content="#0b0d10" />
-		<meta
-			name="description"
-			content="HyoDo is a model-agnostic quality-gate kit for AI-assisted development. Unobserved is never green."
-		/>
 		<style>
 			:root {
 				--bg: #0a0b0d;
@@ -60,6 +68,29 @@ const installCommand = 'pipx install hyodo';
 				max-width: 860px;
 				margin: 0 auto;
 				padding: 0 1.5rem;
+			}
+
+			.skip-link {
+				position: fixed;
+				z-index: 30;
+				top: 0.75rem;
+				left: 0.75rem;
+				transform: translateY(calc(-100% - 1rem));
+				padding: 0.65rem 0.85rem;
+				border: 1px solid var(--accent);
+				border-radius: 0.35rem;
+				background: var(--bg-raised);
+				color: var(--text);
+				text-decoration: none;
+			}
+
+			.skip-link:focus {
+				transform: translateY(0);
+			}
+
+			:focus-visible {
+				outline: 2px solid #5aa9ff;
+				outline-offset: 4px;
 			}
 
 			.eyebrow {
@@ -117,8 +148,38 @@ const installCommand = 'pipx install hyodo';
 				color: #06231a;
 			}
 
+			.copy-status {
+				position: absolute;
+				width: 1px;
+				height: 1px;
+				padding: 0;
+				margin: -1px;
+				overflow: hidden;
+				clip: rect(0, 0, 0, 0);
+				white-space: nowrap;
+				border: 0;
+			}
+
+			.quickstart-link {
+				display: inline-flex;
+				min-height: 2.75rem;
+				align-items: center;
+				margin-top: 0.6rem;
+				font-size: 0.9rem;
+				text-decoration: none;
+			}
+
+			.quickstart-link:hover {
+				text-decoration: underline;
+				text-underline-offset: 0.25em;
+			}
+
 			main {
-				padding: 3rem 0;
+				padding: 0 0 3rem;
+			}
+
+			main > .eg-page.eg-embed {
+				margin-top: 3rem;
 			}
 
 			section.layer {
@@ -221,7 +282,7 @@ const installCommand = 'pipx install hyodo';
 			 * absolutely positioned full-bleed background; the copy overlays
 			 * it, anchored to the bottom of the section.
 			 */
-			header.hero {
+			.hero {
 				position: relative;
 				min-height: 100svh;
 				overflow: hidden;
@@ -297,31 +358,33 @@ const installCommand = 'pipx install hyodo';
 		</style>
 	</head>
 	<body>
+		<a class="skip-link" href="#main-content">Skip to content</a>
 		<nav class="navbar" data-hero-navbar>
 			<a class="brand" href="/">HyoDo</a>
 			<div class="nav-links">
 				<a href="/docs/quickstart/">Docs</a>
-				<a href="/docs/acl/">ACL</a>
-				<a href="/docs/research/">Research</a>
 				<a href={githubUrl}>GitHub</a>
 				<a href={pypiUrl}>PyPI</a>
 			</div>
 		</nav>
 
+		<main id="main-content">
 		<header class="hero">
 			<div class="hero-canvas-wrap" id="hero-canvas-wrap">
 				<img
 					class="hero-poster"
 					data-hero-poster
 					src="/hero-poster.svg"
-					alt="A dim grid of tiles with a few observed tiles glowing green"
+					fetchpriority="high"
+					alt=""
+					aria-hidden="true"
 				/>
-				<canvas id="hero-canvas"></canvas>
+				<canvas id="hero-canvas" aria-hidden="true"></canvas>
 				<div class="hero-scrim"></div>
 			</div>
 			<div class="wrap hero-content">
 				<span class="eyebrow">HyoDo</span>
-				<h1 data-hero-headline>
+				<h1 id="hero-heading" data-hero-headline>
 					When your AI says "done," HyoDo tells you whether that is true.
 				</h1>
 				<p class="subline">
@@ -332,10 +395,11 @@ const installCommand = 'pipx install hyodo';
 					<code id="install-cmd">{installCommand}</code>
 					<button class="copy-btn" id="copy-btn" type="button">Copy</button>
 				</div>
+				<p class="copy-status" id="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
+				<a class="quickstart-link" href="/docs/quickstart/">New to HyoDo? Read the quickstart →</a>
 			</div>
 		</header>
 
-		<main>
 		<section class="eg-page eg-embed" aria-labelledby="eg-heading">
 			<div class="eg-wrap">
 				<h2 id="eg-heading">Evidence graph <span class="eg-badge">Prototype</span></h2>
