@@ -407,8 +407,8 @@ const canonicalUrl = 'https://hyodo.app/';
 		<section class="eg-page eg-embed" aria-labelledby="eg-heading">
 			<div class="eg-wrap">
 				<h2 id="eg-heading">Evidence graph <span class="eg-badge">Prototype</span></h2>
-				<p class="eg-key">Rows are participants, columns are steps, cells are events; solid = causal parent edge (<code>parent_event_id</code> / <code>parent_event_ids</code>), dashed = <code>evidence_refs</code>, red stub = broken link — demo fixture data, nothing is uploaded.</p>
-				<p class="eg-banner" role="note">This is demo fixture data; nothing is uploaded. The links are optional <code>hyodo.agent-event/v1</code> fields shipped since 4.14.0 and rendered from a real ledger by <code>hyodo dashboard</code>; this public page still renders fixture data.</p>
+				<p class="eg-key">Rows show participants, columns show steps, and cells show events. A solid line links a causal parent, a dashed line points to supporting evidence, and a red stub marks a broken link.</p>
+				<p class="eg-banner" role="note">This interactive example uses sample data only; nothing is uploaded. A local HyoDo dashboard can show the same relationships from a real event ledger.</p>
 			<div class="legend" aria-hidden="false">
 				<span class="lg-item"
 					><span class="lg-dot lg-dot-observed"
@@ -456,35 +456,31 @@ const canonicalUrl = 'https://hyodo.app/';
 
 			<div class="wrap">
 				<section class="layer" aria-labelledby="claim-lock-heading">
-					<h2 id="claim-lock-heading">Current claim lock</h2>
+					<h2 id="claim-lock-heading">What HyoDo offers today</h2>
 					<p>
-						Published baseline: <strong>HyoDo 4.19.6</strong>. Graph v2, IFA v0,
-						runtime identity, and fail-visible audit state are shipped; fresh host
-						observations remain separate evidence. See <a href="/docs/current-state/">current state</a>.
+						Public version: <strong>HyoDo 4.19.6</strong>. A shipped adapter is
+						not evidence that a host is connected right now. See <a href="/docs/current-state/">how current status is measured</a>.
 					</p>
 					<table>
-						<thead><tr><th>Capability</th><th>Status</th><th>Evidence boundary</th></tr></thead>
+						<thead><tr><th>Feature</th><th>Status</th><th>What that means</th></tr></thead>
 						<tbody>
-							<tr><td>gates / ledger / friction preview</td><td>SHIPPED</td><td>Local preview/export; ledger.</td></tr>
-							<tr><td>Graph v1</td><td>SHIPPED (site DEMO FIXTURE)</td><td>Local dashboard; fixed demo site.</td></tr>
-							<tr><td>Graph v2 join</td><td>SHIPPED</td><td>Multi-parent runtime/viewer with v1 compatibility; site remains fixture-only.</td></tr>
-							<tr><td>Codex host adapter</td><td>SHIPPED / LIVE UNOBSERVED</td><td>Native adapter shipped; fresh canonical canary is separate evidence.</td></tr>
-							<tr><td>Cursor host adapter</td><td>SHIPPED / LIVE UNOBSERVED</td><td>Native adapter shipped; fresh live callback is not yet sealed.</td></tr>
-							<tr><td>IFA v0</td><td>SHIPPED</td><td>Observer-only information-flow attestation; never execution authority.</td></tr>
-							<tr><td>remote MCP / ChatGPT</td><td>CONTRACT ONLY</td><td>Hosted contract; runtime unobserved.</td></tr>
-							<tr><td>ACL runtime / Wisdom Reflex</td><td>RESEARCH</td><td>Hypothesis; no automatic router.</td></tr>
-							<tr><td>friction collector</td><td>NOT BUILT</td><td>No collector/uploader; transport disabled.</td></tr>
+							<tr><td>Local project checks</td><td>Available</td><td>Run the checks you configure and keep a local record of what happened.</td></tr>
+							<tr><td>Evidence graph</td><td>Available</td><td>Shows how events connect; the example on this page uses sample data.</td></tr>
+							<tr><td>Codex and Cursor adapters</td><td>Included</td><td>The adapters are shipped; we have not verified a live connection.</td></tr>
+							<tr><td>Information-flow reporting</td><td>Observer only</td><td>Reports data movement; it does not control what an agent can do.</td></tr>
+							<tr><td>Hosted ChatGPT connector</td><td>Not live</td><td>Only the connector contract is documented; there is no hosted service.</td></tr>
+							<tr><td>Automatic task routing</td><td>Research</td><td>HyoDo does not route tasks to a particular agent or workflow.</td></tr>
+							<tr><td>Shared rework reports</td><td>Not built</td><td>HyoDo does not collect or upload reports about rework.</td></tr>
 						</tbody>
 					</table>
 				</section>
 			</div>
 			<div class="wrap">
 				<section class="layer">
-					<h2>For people who build with AI but cannot read code</h2>
+					<h2>For people who use AI to build software</h2>
 					<p>
-						You cannot check the code yourself, so you need something that will
-						tell you honestly whether a check ran — not a green light that shows
-						up whenever nothing was measured.
+						A confident “done” is not proof. HyoDo shows which configured checks
+						ran, what they found, and what remains unknown—so you can decide what to trust.
 					</p>
 					<a class="docs-link" href="/docs/why-hyodo/">Why HyoDo →</a>
 				</section>
@@ -492,9 +488,8 @@ const canonicalUrl = 'https://hyodo.app/';
 				<section class="layer">
 					<h2>For developers</h2>
 					<p>
-						Reuse the pytest, Ruff, mypy, npm, Go, or Cargo checks you already
-						have. HyoDo absorbs them into a gate list instead of inventing a
-						second, competing toolchain.
+						Reuse the checks your project already has. HyoDo keeps their commands
+						in one gate list and reports what ran; it does not replace the tools themselves.
 					</p>
 					<a class="docs-link" href="/docs/quickstart/">Quickstart →</a>
 				</section>
@@ -502,9 +497,8 @@ const canonicalUrl = 'https://hyodo.app/';
 				<section class="layer">
 					<h2>For teams that must show evidence</h2>
 					<p>
-						An audit trail, a policy gate, and exit codes that distinguish
-						"passed," "failed," and "not measured" — so a review signal never
-						quietly stands in for a decision a human has to make.
+						See which checks ran, what passed or failed, and what was not measured.
+						HyoDo records those results but does not approve a merge or deployment.
 					</p>
 					<a class="docs-link" href="/docs/trust/">Trust →</a>
 				</section>
