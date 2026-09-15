@@ -63,8 +63,8 @@ authority or turn missing evidence into a pass. `hyodo safe` is an early-warning
 scan, not a full security audit, and callers must enforce DENY decisions. The
 package stores evidence digests and receipts, not captured payloads. See the
 [product boundary](./docs/PRODUCT_BOUNDARY.md), [measured state snapshot](./docs/CURRENT_STATE.md),
-and [security model](./SECURITY.md) for the authoritative details. The HyoDo
-Integrity Score is advisory only. The current score command retains an older
+and [security model](./SECURITY.md) for the authoritative details.
+The HyoDo Integrity Score is advisory only. The score command retains an older
 method that combines five inputs with a geometric mean; `HYOGOOK V5` is its
 internal name. That compatibility method is being replaced. Current source
 status may differ from the latest published package.
