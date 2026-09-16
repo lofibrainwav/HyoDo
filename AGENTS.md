@@ -6,7 +6,10 @@ Instructions for coding agents working in this repository.
 
 HyoDo is a public, host-neutral, model-agnostic trust, evidence, policy, and
 attestation layer. The integrating host or harness owns orchestration, memory,
-retrieval, runtime, execution, and final authority. HyoDo is not KINGDOM.
+retrieval, runtime, execution, and final authority. The host also owns and
+configures any virtue-weighted lens or profile built on HyoDo's six virtues and
+decides action authorization separately from any lens result. HyoDo is not
+KINGDOM. Canonical boundary: `docs/PRODUCT_BOUNDARY.md`.
 
 The canonical virtue set is exactly six: Truth / 眞, Goodness / 善, Beauty / 美,
 Benevolence / 仁, Hyo / 孝, and Eternity / 永. A virtue is not evidence;
@@ -57,3 +60,5 @@ report tests that were actually run.
 - [CONTRIBUTING.md](./CONTRIBUTING.md): contribution workflow
 - [SECURITY.md](./SECURITY.md): security policy
 - [docs/README.md](./docs/README.md): documentation index
+- [docs/PRODUCT_BOUNDARY.md](./docs/PRODUCT_BOUNDARY.md): HyoDo/host
+  product boundary contract
