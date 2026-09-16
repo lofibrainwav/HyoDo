@@ -43,6 +43,7 @@ def _evidence_item_state(item: Any, execution: dict[str, Any]) -> str:
 def evaluate_evidence_gate(
     *, case: dict[str, Any], execution: dict[str, Any], evidence: Any, receipt: Any
 ) -> dict[str, Any]:
+    """Check every required evidence key before any semantic verdict is formed."""
     if not _is_object(evidence):
         return {"status": "UNOBSERVED", "reason": "evidence_envelope_unobserved"}
     missing: list[str] = []
@@ -100,6 +101,7 @@ def evaluate_evidence_gate(
 
 
 def validate_case(case: Any) -> list[str]:
+    """Return contract violations for a Skill Eval v1 case, or an empty list."""
     if not _is_object(case):
         return ["case_not_object"]
     errors: list[str] = []
