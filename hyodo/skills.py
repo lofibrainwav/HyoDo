@@ -171,6 +171,17 @@ def compile_rule(base_text: str) -> CompiledCheck | None:
     return None
 
 
+def _rooted_path(root: Path, relative: str) -> Path | None:
+    """Resolve a skill path only when it remains inside *root*."""
+    root_resolved = root.resolve()
+    candidate = (root_resolved / relative).resolve()
+    try:
+        candidate.relative_to(root_resolved)
+    except ValueError:
+        return None
+    return candidate
+
+
 def skill_name_for(path: Path) -> str:
     """Parent directory name for ``SKILL.md``, else the file stem."""
     if path.name.lower() == "skill.md":
@@ -632,7 +643,13 @@ def evaluate_compiled_rule(rule: Rule, root: Path) -> RuleStatus:
         )
 
     if compiled.kind == "require_file":
-        target = root / compiled.arg
+        target = _rooted_path(root, compiled.arg)
+        if target is None:
+            return RuleStatus(
+                rule=rule,
+                status="UNOBSERVED",
+                reason="path_outside_root",
+            )
         exists = target.is_file()
         return RuleStatus(
             rule=rule,
@@ -738,7 +755,9 @@ def _rules_for_manifest_entry(entry: dict[str, Any], root: Path) -> list[Rule]:
     if not isinstance(source, str) or not source.startswith("path:"):
         return []
     rel = source[len("path:") :]
-    target = root / rel
+    target = _rooted_path(root, rel)
+    if target is None:
+        return []
     try:
         text = target.read_text(encoding="utf-8")
     except OSError:
@@ -746,6 +765,26 @@ def _rules_for_manifest_entry(entry: dict[str, Any], root: Path) -> list[Rule]:
     name = entry.get("name")
     skill_name = name if isinstance(name, str) and name else skill_name_for(target)
     return parse_skill_rules(skill_name, text)
+
+
+def _source_digest_mismatch(entry: dict[str, Any], root: Path) -> bool:
+    """Return whether a readable path source changed after ingest."""
+    source = entry.get("source")
+    expected = entry.get("content_digest")
+    if (
+        not isinstance(source, str)
+        or not source.startswith("path:")
+        or not isinstance(expected, str)
+    ):
+        return False
+    target = _rooted_path(root, source[len("path:") :])
+    if target is None:
+        return True
+    try:
+        current = target.read_text(encoding="utf-8")
+    except OSError:
+        return False
+    return content_digest(current) != expected
 
 
 def rules_for_manifest_entry(entry: dict[str, Any], root: Path) -> list[Rule]:
@@ -785,7 +824,7 @@ class LensResult:
     #: is visible in exactly one row: one of the six pillars, or this one.
     unclassified: PillarLens
     unobserved: list[dict[str, Any]]  # {"rule_id", "skill", "rule_text_digest"}
-    manifest_status: str  # "ok" | "missing" | "malformed"
+    manifest_status: str  # "ok" | "missing" | "malformed" | "mismatch"
 
 
 def compute_lens(root: Path) -> LensResult:
@@ -797,9 +836,13 @@ def compute_lens(root: Path) -> LensResult:
     unclassified_statuses: list[RuleStatus] = []
     unobserved: list[dict[str, Any]] = []
     seen_rule_ids: set[str] = set()
+    digest_mismatch = False
 
     for entry in entries if isinstance(entries, list) else []:
         if not isinstance(entry, dict):
+            continue
+        if _source_digest_mismatch(entry, root):
+            digest_mismatch = True
             continue
         for rule in _rules_for_manifest_entry(entry, root):
             if rule.rule_id in seen_rule_ids:
@@ -842,7 +885,7 @@ def compute_lens(root: Path) -> LensResult:
         pillars=pillars,
         unclassified=unclassified,
         unobserved=unobserved,
-        manifest_status=status,
+        manifest_status="mismatch" if status == "ok" and digest_mismatch else status,
     )
 
 
@@ -871,9 +914,13 @@ def render_proposal(root: Path, project_name: str) -> ProposeResult:
     retrieved_passed: list[Rule] = []
     provenance_lines: list[str] = []
     seen_rule_ids: set[str] = set()
+    digest_mismatch = False
 
     for entry in entries if isinstance(entries, list) else []:
         if not isinstance(entry, dict):
+            continue
+        if _source_digest_mismatch(entry, root):
+            digest_mismatch = True
             continue
         is_node_entry = isinstance(entry.get("source"), str) and entry["source"].startswith("node:")
         entry_rules = _rules_for_manifest_entry(entry, root)
@@ -915,7 +962,10 @@ def render_proposal(root: Path, project_name: str) -> ProposeResult:
     if provenance_lines:
         lines.extend(provenance_lines)
     markdown = "\n".join(lines).rstrip("\n") + "\n"
-    return ProposeResult(markdown=markdown, manifest_status=status)
+    return ProposeResult(
+        markdown=markdown,
+        manifest_status="mismatch" if status == "ok" and digest_mismatch else status,
+    )
 
 
 def save_proposal(root: Path, markdown: str) -> None:

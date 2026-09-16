@@ -62,7 +62,8 @@ check. Anything else is advisory: excluded from the pillar score and
 listed under `unobserved` with a `rule_text_digest` (a digest of the rule
 text, never the text itself in that list).
 
-- `require file: <relative path>` — PASS if the file exists under root.
+- `require file: <relative path>` — PASS if the file exists under root;
+  paths outside root are `UNOBSERVED`.
 - `forbid pattern: <python regex>` — PASS if no git-tracked text file
   matches (binary/undecodable tracked files are skipped, not scanned).
 - `require pattern: <python regex>` — PASS if at least one tracked text
@@ -87,15 +88,16 @@ domain); only trust level 3 (full delegation) does. See
 | --- | --- | --- | --- | --- |
 | `skills ingest` | 0 | 1 | 2 | 3 |
 | `skills ingest --from-node` | 0 | 1 (also: malformed file) | 2 | 3 |
-| `skills lens` | 0 (report only) | n/a | 2 (manifest malformed) | n/a |
-| `skills propose` | 0 | n/a | n/a | n/a |
+| `skills lens` | 0 (report only) | n/a | 2 (manifest missing, malformed, or source digest mismatch) | n/a |
+| `skills propose` | 0 | n/a | 2 (source digest mismatch) | n/a |
 
 An `ASK` from `ingest` writes nothing to the manifest; re-run with `--yes`
 (records a `human_response`-shaped approval event, then proceeds) or after
 granting trust level 3. `lens` treats a missing manifest (nothing ingested
-yet) as an honest `0/0` everywhere, not an error; only a malformed
-`manifest.json` is `UNOBSERVED` (exit 2), reported on stderr and as
-`"manifest_status": "malformed"` in `--json` output. `propose` never calls
+yet) as `0/0` everywhere with an explicit `UNOBSERVED` exit 2; a malformed
+`manifest.json` or changed path source is also `UNOBSERVED` (exit 2),
+reported on stderr and as `"manifest_status": "missing"`, `"malformed"`,
+or `"mismatch"` in `--json` output. `propose` never calls
 `evaluate_policy` — nothing external is contacted at proposal time, only
 sources already judged at ingest time — so a malformed manifest there is
 still exit 0, with empty `## Rules`/`## Unverified`/`## Provenance`
