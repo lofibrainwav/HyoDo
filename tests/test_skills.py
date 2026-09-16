@@ -211,6 +211,18 @@ def test_require_file_pass_and_fail(tmp_path):
     assert statuses["require-file-missing-md"].status == "FAIL"
 
 
+def test_require_file_outside_root_is_unobserved(tmp_path):
+    outside = tmp_path.parent / "outside-skill-target.txt"
+    outside.write_text("outside", encoding="utf-8")
+    try:
+        rule = parse_skill_rules("s", "## Rules\n- require file: ../outside-skill-target.txt\n")[0]
+        status = evaluate_compiled_rule(rule, tmp_path)
+        assert status.status == "UNOBSERVED"
+        assert status.reason == "path_outside_root"
+    finally:
+        outside.unlink(missing_ok=True)
+
+
 def test_forbid_pattern_pass_and_fail(tmp_path):
     (tmp_path / "clean.py").write_text("print('ok')\n", encoding="utf-8")
     _git_init(tmp_path)
@@ -540,13 +552,53 @@ def test_cli_lens_malformed_manifest_exit_2(tmp_path):
     assert payload["manifest_status"] == "malformed"
 
 
-def test_cli_lens_missing_manifest_is_zero_everywhere_not_an_error(tmp_path):
+def test_cli_lens_missing_manifest_is_unobserved(tmp_path):
     result = runner.invoke(app, ["skills", "lens", "--root", str(tmp_path), "--json"])
-    assert result.exit_code == 0
+    assert result.exit_code == 2
     payload = json.loads(result.stdout)
+    assert payload["manifest_status"] == "missing"
     for pillar in payload["pillars"]:
         assert pillar["expected"] == 0
         assert pillar["observed"] == 0
+
+
+def test_cli_lens_source_digest_mismatch_is_unobserved(tmp_path):
+    skill_dir = tmp_path / "skills" / "demo"
+    skill_dir.mkdir(parents=True)
+    source = skill_dir / "SKILL.md"
+    source.write_text("## Rules\n- require file: README.md\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("ok", encoding="utf-8")
+
+    ingest = runner.invoke(
+        app,
+        ["skills", "ingest", "skills/demo/SKILL.md", "--root", str(tmp_path), "--yes"],
+    )
+    assert ingest.exit_code == 0
+
+    source.write_text("## Rules\n- require file: MISSING.md\n", encoding="utf-8")
+    result = runner.invoke(app, ["skills", "lens", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 2
+    payload = json.loads(result.stdout)
+    assert payload["manifest_status"] == "mismatch"
+    assert payload["unobserved"] == []
+
+
+def test_cli_propose_source_digest_mismatch_does_not_accept(tmp_path):
+    skill_dir = tmp_path / "skills" / "demo"
+    skill_dir.mkdir(parents=True)
+    source = skill_dir / "SKILL.md"
+    source.write_text("## Rules\n- require file: README.md\n", encoding="utf-8")
+    (tmp_path / "README.md").write_text("ok", encoding="utf-8")
+    ingest = runner.invoke(
+        app,
+        ["skills", "ingest", "skills/demo/SKILL.md", "--root", str(tmp_path), "--yes"],
+    )
+    assert ingest.exit_code == 0
+
+    source.write_text("## Rules\n- require file: MISSING.md\n", encoding="utf-8")
+    result = runner.invoke(app, ["skills", "propose", "--root", str(tmp_path), "--accept"])
+    assert result.exit_code == 2
+    assert not (tmp_path / ".hyodo" / "skills" / "proposed.md").exists()
 
 
 # --- CLI: propose ------------------------------------------------------------

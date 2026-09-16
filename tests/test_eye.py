@@ -13,6 +13,7 @@ from types import SimpleNamespace
 
 from typer.testing import CliRunner
 
+import hyodo.cli.main as cli_main
 from hyodo import eye
 from hyodo.cli.main import app
 from hyodo.events import read_agent_events, validate_event
@@ -426,6 +427,7 @@ def test_unsupported_image_format_exits_2_but_still_destroys(monkeypatch, tmp_pa
 
 
 def test_verify_never_prints_percentage_or_probability(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_main, "DEFAULT_TTL_S", 0)
     _install_fake_capture(monkeypatch, _make_png(8, 8))
     policy = _bare_policy(trust=TrustPolicy(max_level=3))
     grant_policy_trust(tmp_path, 3, by="human:test")
@@ -482,6 +484,7 @@ def test_cli_capture_yes_at_trust_3_allows(monkeypatch, tmp_path):
 
 
 def test_cli_verify_same_screen(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_main, "DEFAULT_TTL_S", 0)
     fixed_png = _make_png(8, 8, fill=(1, 2, 3))
     _install_fake_capture(monkeypatch, fixed_png)
     (tmp_path / ".hyodo").mkdir()
@@ -516,6 +519,7 @@ def test_cli_verify_same_screen(monkeypatch, tmp_path):
 
 
 def test_cli_verify_different_screen(monkeypatch, tmp_path):
+    monkeypatch.setattr(cli_main, "DEFAULT_TTL_S", 0)
     _install_fake_capture(monkeypatch, _make_png(8, 8, fill=(1, 2, 3)))
     (tmp_path / ".hyodo").mkdir()
     (tmp_path / ".hyodo" / "policy.toml").write_text(

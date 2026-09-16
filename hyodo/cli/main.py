@@ -5621,9 +5621,10 @@ def skills_lens(
     Print per-pillar coverage/coherence from ingested skills, with provenance.
 
     Numbers are always integer ``observed/expected`` and ``passed/observed``
-    pairs — never a percentage or a probability. A malformed manifest is
-    reported and treated as empty (exit 2); an absent manifest (nothing
-    ingested yet) reports 0/0 everywhere and exits 0.
+    pairs — never a percentage or a probability. A missing or malformed
+    manifest is reported as unobserved (exit 2), while still rendering empty
+    coverage rows. A source digest mismatch is also unobserved (exit 2) and
+    its rules are not evaluated.
     """
     root_path = Path(root).resolve()
     result = compute_lens(root_path)
@@ -5675,7 +5676,7 @@ def skills_lens(
                 f"    {item['rule_id']} ({item['skill']}) digest={item['rule_text_digest']}"
             )
 
-    exit_code = 2 if result.manifest_status == "malformed" else 0
+    exit_code = 2 if result.manifest_status in {"missing", "malformed", "mismatch"} else 0
     raise typer.Exit(exit_code)
 
 
@@ -5701,10 +5702,15 @@ def skills_propose(
 
     if result.manifest_status == "malformed":
         typer.echo("manifest.json is malformed; proposal sections are empty", err=True)
+    elif result.manifest_status == "mismatch":
+        typer.echo(
+            "manifest source digest mismatch; proposal was not accepted",
+            err=True,
+        )
 
     console.print(result.markdown, end="")
 
-    if accept:
+    if accept and result.manifest_status != "mismatch":
         save_proposal(root_path, result.markdown)
         run_id = str(uuid.uuid4())
         raw_event = _new_agent_event(
@@ -5730,7 +5736,7 @@ def skills_propose(
             stamped = apply_decision_to_event(normalized, decision)
             append_agent_event(root_path, stamped)
 
-    raise typer.Exit(0)
+    raise typer.Exit(2 if result.manifest_status == "mismatch" else 0)
 
 
 _EYE_EXIT_CODES = {"ALLOW": 0, "DENY": 1, "UNOBSERVED": 2, "ASK": 3}
