@@ -72,12 +72,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: |
-            uv.lock
-            pyproject.toml
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -172,10 +167,9 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
         with:
-          enable-cache: true
-          cache-dependency-glob: |
+          cache_dependency_glob: |
             uv.lock
             pyproject.toml
             ci/mcp-v1/requirements.txt
@@ -211,12 +205,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: |
-            uv.lock
-            pyproject.toml
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -264,12 +253,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: |
-            uv.lock
-            pyproject.toml
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -307,12 +291,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: |
-            uv.lock
-            pyproject.toml
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -571,12 +550,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
-        with:
-          enable-cache: true
-          cache-dependency-glob: |
-            uv.lock
-            pyproject.toml
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies (including cyclonedx-bom)
         run: |
