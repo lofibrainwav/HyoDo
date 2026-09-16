@@ -7,6 +7,7 @@ SAST, dependency audit, tests, or human security review.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -172,6 +173,28 @@ def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def _iter_files_lexical(root: Path):
+    """Yield directory entries in sorted recursive-path order without materialising a tree."""
+    pending = [(root, True)]
+    while pending:
+        current, is_directory = pending.pop()
+        if is_directory:
+            try:
+                with os.scandir(current) as entries:
+                    children = sorted(entries, key=lambda entry: entry.name, reverse=True)
+            except OSError:
+                continue
+            for child in children:
+                if child.name.startswith(".git"):
+                    continue
+                child_is_directory = child.is_dir(follow_symlinks=False)
+                if child_is_directory and child.name in _SKIPPED_DIR_NAMES:
+                    continue
+                pending.append((Path(child.path), child_is_directory))
+            continue
+        yield current
+
+
 def collect_scan_corpus(
     path: str | None = None,
     cwd: Path | None = None,
@@ -199,7 +222,10 @@ def collect_scan_corpus(
         if target.is_dir():
             chunks: list[str] = []
             count = 0
-            for file_path in sorted(target.rglob("*")):
+            # Keep the old sorted recursive-path order while streaming it.
+            # Materialising sorted(target.rglob("*")) enumerates the whole
+            # tree before the cap can stop file reads.
+            for file_path in _iter_files_lexical(target):
                 if not is_scannable_file(file_path):
                     continue
                 try:
@@ -208,7 +234,7 @@ def collect_scan_corpus(
                     return "", f"error:read:{file_path}"
                 count += 1
                 if count >= _DEFAULT_SCAN_CAP:
-                    break
+                    return "\n".join(chunks), f"dir:{target} ({count} files)"
             return "\n".join(chunks), f"dir:{target} ({count} files)"
         return "", f"missing:{target}"
 
