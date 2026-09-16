@@ -86,6 +86,26 @@ def test_normalize_detects_real_component_difference():
     assert generate_sbom.normalize_for_comparison(a) != generate_sbom.normalize_for_comparison(b)
 
 
+def test_clean_venv_runtime_env_is_noop_off_macos(monkeypatch):
+    monkeypatch.setattr(generate_sbom.sys, "platform", "linux")
+    assert generate_sbom._clean_venv_runtime_env() is None
+
+
+def test_clean_venv_runtime_env_prepends_macos_libpython(monkeypatch, tmp_path):
+    libdir = tmp_path / "lib"
+    libdir.mkdir()
+    (libdir / "libpython3.12.dylib").touch()
+    values = {"LIBDIR": str(libdir), "LDLIBRARY": "libpython3.12.dylib"}
+    monkeypatch.setattr(generate_sbom.sys, "platform", "darwin")
+    monkeypatch.setattr(generate_sbom.sysconfig, "get_config_var", values.get)
+    monkeypatch.setenv("DYLD_LIBRARY_PATH", "/existing")
+
+    env = generate_sbom._clean_venv_runtime_env()
+
+    assert env is not None
+    assert env["DYLD_LIBRARY_PATH"] == f"{libdir}{generate_sbom.os.pathsep}/existing"
+
+
 # --- run_sbom_check (Eternity gate) -------------------------------------------
 #
 # These run the REAL subprocess path (a tiny stub generator with a fixed exit
