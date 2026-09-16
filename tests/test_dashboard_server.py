@@ -519,3 +519,11 @@ def test_card_headings_are_trilingual_hanja_korean_english():
         "永 영</span> Longevity",
     ):
         assert heading in html
+
+
+def test_dashboard_marks_missing_measurement_time_as_not_measured():
+    evidence = dict(EVIDENCE)
+    evidence["measured_at"] = None
+    html = render_dashboard_html(evidence)
+    assert 'data-measured="Not measured"' in html
+    assert 'data-measured="None"' not in html
