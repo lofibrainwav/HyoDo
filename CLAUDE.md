@@ -45,7 +45,7 @@ and the `public-language` CI job covers commit messages and PR title/body.
 - `hyodo score` - review signal (not auto-approval)
 - `hyodo safe` - safety early-warning scan
 - `hyodo trinity` - structured review checklist
-- `hyodo event` / `hyodo policy` - agent evidence and policy decisions
+- `hyodo event` / `hyodo policy` - agent evidence and policy decisions (`event validate` exits 0 valid / 1 invalid / 2 unreadable; policy results exit 0 ALLOW / 1 DENY / 2 UNOBSERVED / 3 ASK — see QUICK_START.md; `UNOBSERVED` means there is not enough evidence to say whether a check passed or failed)
 - `hyodo mcp` - optional MCP adapter (no slash commands ship in this repo)
 
 ### Development commands
@@ -67,6 +67,8 @@ The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`
 
 ### Optional HyoDo Integrity Score
 
+This table is an internal PR-review emphasis checklist for this repository. It is not a personal virtue-weighted aggregate: the percentages are illustrative review weights, they are not meant to sum to 100, and they do not define anyone's EROS-style profile. A host that builds a weighted lens on top of the six virtues owns and configures that lens itself.
+
 | Virtue | Review emphasis | Focus |
 |--------|--------|-------|
 | Benevolence | 25% | Developer experience |
@@ -74,16 +76,20 @@ The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`
 | Goodness | 18% | Security and stability |
 | Hyo | 15% | Project/context alignment |
 | Beauty | 15% | Clarity and UX |
-| Eternity | continuity evidence | Longitudinal evidence; V5 S is a separate derived harmony aggregate |
+| Eternity | narrative, not a percentage | Longitudinal continuity evidence; any harmony aggregate is a separate derived value |
 
 The score uses the Six-Virtue Model and Trinity Gates subset; HYOGOOK V5 is the
-formula lineage. Scores are decision support only and do not authorize
+formula lineage (internal lineage names recorded in CHANGELOG.md; there is no separate public spec). Scores are decision support only and do not authorize
 merge/deploy.
 
 HyoDo is public, host-neutral, and model-agnostic. It observes, validates,
 records, attests, and measures. The integrating host or harness owns
 orchestration, memory, retrieval, runtime, execution, and final authority.
+The host also owns and configures any virtue-weighted lens or profile it builds
+on top of HyoDo's six-virtue philosophy, and it decides action authorization
+separately from any lens result; HyoDo does not own or configure that lens.
 HyoDo is not KINGDOM; a HyoDo receipt or score is evidence, never authority.
+The canonical boundary contract is `docs/PRODUCT_BOUNDARY.md`.
 
 The canonical invariants are: Map is not Territory, Evidence is not a
 Decision, Capability is not Authority, Receipt is not Authority, Merged is not
