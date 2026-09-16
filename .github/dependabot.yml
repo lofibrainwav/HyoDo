@@ -28,6 +28,14 @@ updates:
     ignore:
       - dependency-name: "mcp"
         versions: [">=2"]
+    groups:
+      # pydantic pins pydantic-core to an exact version, so a lone bump of
+      # either half makes the hashed lock unresolvable (see PR #342).
+      pydantic:
+        patterns:
+          - "pydantic"
+          - "pydantic-core"
+          - "pydantic-settings"
     commit-message:
       prefix: "ci-deps"
       include: "scope"
