@@ -40,6 +40,7 @@ import shlex
 import shutil
 import subprocess
 import sys
+from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -633,9 +634,9 @@ def _find_subproject_dirs(
     """
     found: list[Path] = []
     scanned = 0
-    frontier: list[tuple[Path, int]] = [(root, 0)]
+    frontier: deque[tuple[Path, int]] = deque([(root, 0)])
     while frontier and len(found) < max_projects:
-        current, depth = frontier.pop(0)
+        current, depth = frontier.popleft()
         if depth >= max_depth:
             continue
         try:
