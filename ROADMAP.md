@@ -14,7 +14,7 @@ under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.19.6 is the current release target and source-tree release baseline;
+HyoDo 4.19.7 is the current release target and source-tree release baseline;
 it is also the latest published package. Its release chain receipt records the
 signed tag, GitHub Release evidence, PyPI provenance, and install readback.
 HyoDo 4.19.5 remains an immutable prior release whose receipt records the
@@ -179,10 +179,15 @@ evidence is not converted into a pass.
 - Closes the source-build to PyPI artifact hash/readback chain after the
   release workflow's provenance and install checks pass.
 
-### 4.19.6 (release preparation, 2026-09-15)
+### 4.19.6 (released 2026-09-15)
 
 - Includes the dashboard startup-readiness and test-gate reporting fix merged
-  in PR #343.
+  in PR #343. The measured release chain receipt is `docs/releases/4.19.6.md`.
+
+### 4.19.7 (release preparation, 2026-09-15)
+
+- Adds the evidence-only `hyodo skill-eval` oracle (PR #358) and the dashboard
+  `Not measured` fix (PR #357).
 - Version metadata and public docs are being prepared; no tag or package
   publication is claimed by this entry.
 

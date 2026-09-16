@@ -22,7 +22,7 @@ except ModuleNotFoundError:  # pragma: no cover - direct script execution path
 
 VERSION_RE = re.compile(r"^\d+\.\d+\.\d+$")
 ROADMAP_TARGET_RE = re.compile(
-    r"(?m)^HyoDo (?P<version>\d+\.\d+\.\d+) is the current release target\.$"
+    r"(?m)^HyoDo (?P<version>\d+\.\d+\.\d+) is the current release target\b"
 )
 CHANGELOG_HEADER_END = (
     "and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).\n\n"
