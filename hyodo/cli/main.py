@@ -192,6 +192,7 @@ from hyodo.score_derive import (
     derive_pillars,
     geometric_mean_observed,
 )
+from hyodo.skill_eval import evaluate_skill_case
 from hyodo.skills import (
     MANIFEST_RELATIVE_PATH as SKILLS_MANIFEST_RELATIVE_PATH,
 )
@@ -3741,6 +3742,38 @@ def eval_command(
     else:
         console.print(f"[red]UNOBSERVED[/red] eval: {summary['reason']}")
     raise typer.Exit(exit_code)
+
+
+@app.command("skill-eval")
+def skill_eval_command(
+    input_file: str = typer.Option(
+        ..., "--input", help="Path to a Skill Eval v1 evidence JSON file"
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable verdict"),
+):
+    """Evaluate one Skill Eval v1 case from observed evidence only."""
+    try:
+        payload = json.loads(Path(input_file).read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("input must be a JSON object")
+        verdict = evaluate_skill_case(
+            case=payload.get("case"),
+            execution=payload.get("execution"),
+            evidence=payload.get("evidence"),
+            effect_readback=payload.get("effect_readback"),
+            receipt=payload.get("receipt"),
+            authority=payload.get("authority"),
+        )
+    except (OSError, json.JSONDecodeError, ValueError) as exc:
+        verdict = {"status": "UNOBSERVED", "reason": f"input_invalid:{exc}"}
+
+    if json_output:
+        console.print_json(json.dumps(verdict))
+    elif verdict["status"] == "PASS":
+        console.print("[green]PASS[/green] skill eval")
+    else:
+        console.print(f"[red]{verdict['status']}[/red] skill eval: {verdict.get('reason')}")
+    raise typer.Exit(0 if verdict["status"] == "PASS" else 1 if verdict["status"] == "FAIL" else 2)
 
 
 @app.command("report")
