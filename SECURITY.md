@@ -90,8 +90,8 @@ Scores never automatically approve risky changes.
 
 - Inspect install scripts before running them in a sensitive environment.
 - Use low-cost or read-only workflows when possible.
-- Run `/preflight` before commits.
-- Pass `/check` quality gates before merge.
+- Run `hyodo safe` before commits.
+- Pass `hyodo check` quality gates before merge.
 - Keep secrets outside repository history.
 - Rotate exposed keys immediately if a credential is accidentally committed.
 

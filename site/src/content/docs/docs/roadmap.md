@@ -17,7 +17,7 @@ in the repository is the source of truth; this page summarizes it.
 | --- | --- | --- |
 | 0 | Launch surface | Live |
 | 1 | Judgment | In progress |
-| 2 | Mobilization | Planned |
+| 2 | Mobilization | Live (4.15.0) |
 | 3 | Reconciliation | Exploration |
 | 4 | Intent | Exploration |
 
