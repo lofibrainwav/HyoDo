@@ -14,7 +14,8 @@ under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.19.8 is the current published release and source-tree release baseline.
+HyoDo 4.19.8 is the current release target, current published release, and
+source-tree release baseline.
 Its release chain receipt records the signed tag, GitHub Release evidence, PyPI
 provenance, and install readback.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
