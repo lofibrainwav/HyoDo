@@ -185,6 +185,15 @@ the read-only receipt:
   different callers land in the one agent-event ledger — a per-caller call
   count next to the ledger's single digest, so "two callers, one file" is
   checkable rather than asserted.
+- **Optional second-device receipt.** The receipt includes a `second_device`
+  block when a paired device has a recent `last_seen_at`. It carries the
+  non-secret `device_id`/`workspace_id`, observation age, pairing-file digest,
+  workspace source commit, and root digest. Pairing configuration alone,
+  missing or malformed `last_seen_at`, revoked pairing, and observations
+  older than five minutes remain `status: "UNOBSERVED"`; only a fresh observed
+  `last_seen_at` is `status: "OBSERVED"`/`freshness: "FRESH"`. This block is
+  additive and does not change local-client requirements or the existing
+  `hosts` coverage calculation.
 - **`hosts observed: N/2 expected`.** Never a probability. `2` is the
   ceiling this slice measures — one stdio caller and one paired caller — not
   a claim about how many hosts a future deployment might pair.

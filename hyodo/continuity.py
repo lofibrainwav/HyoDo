@@ -25,6 +25,7 @@ from __future__ import annotations
 import hashlib
 import json
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -32,6 +33,7 @@ from hyodo.access_ledger import ACCESS_LEDGER_PATH
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH, read_agent_events
 from hyodo.pairing import PAIRING_RELATIVE_PATH, load_pairing
 from hyodo.policy import POLICY_RELATIVE_PATH, try_load_policy
+from hyodo.provenance import git_commit, path_digest
 
 CONTINUITY_SCHEMA_VERSION = "hyodo.continuity/v1"
 
@@ -51,6 +53,10 @@ EXPECTED_HOSTS = 2
 # ``caller_id`` whenever ``paired=True``), so those rows group by that id
 # instead. These are the only two shapes ``_record_access`` can produce.
 STDIO_IDENTITY = "stdio (no pairing)"
+
+# A second-device observation is deliberately short-lived. This is a
+# freshness boundary, not a claim that the device is reachable right now.
+SECOND_DEVICE_MAX_AGE_SECONDS = 300
 
 
 def _digest_file(path: Path) -> str | None:
@@ -114,6 +120,66 @@ def _caller_identity(caller_id: str | None) -> str:
 def _hook_identity(actor_id: str) -> str:
     """Return the distinct observed identity label for a hook-recorded actor."""
     return f"hook:{actor_id}"
+
+
+def _second_device_receipt(
+    root: Path,
+    pairing_record: Any,
+    pairing_digest: str | None,
+    *,
+    measured_at: datetime,
+) -> dict[str, Any]:
+    """Return an optional, freshness-bound receipt for the paired device.
+
+    Pairing configuration alone is not an observation. Only a non-revoked
+    pairing with a parseable ``last_seen_at`` no older than the freshness
+    window is ``OBSERVED``; every other state stays ``UNOBSERVED``.
+    """
+    receipt: dict[str, Any] = {
+        "status": "UNOBSERVED",
+        "freshness": "UNOBSERVED",
+        "reason": "pairing_absent",
+        "device_id": None,
+        "workspace_id": None,
+        "observed_at": None,
+        "age_seconds": None,
+        "provenance": {
+            "source_commit": git_commit(root),
+            "root_digest": path_digest(root),
+            "pairing_digest": pairing_digest,
+        },
+    }
+    if pairing_record is None:
+        return receipt
+    receipt["device_id"] = pairing_record.device_id
+    receipt["workspace_id"] = pairing_record.workspace_id
+    if pairing_record.revoked_at is not None:
+        receipt["reason"] = "pairing_revoked"
+        return receipt
+    if pairing_record.last_seen_at is None:
+        receipt["reason"] = "second_device_not_seen"
+        return receipt
+    try:
+        observed_at = datetime.fromisoformat(pairing_record.last_seen_at)
+        if observed_at.tzinfo is None:
+            observed_at = observed_at.replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        receipt["reason"] = "second_device_timestamp_invalid"
+        return receipt
+    age_seconds = (measured_at - observed_at).total_seconds()
+    receipt["observed_at"] = pairing_record.last_seen_at
+    receipt["age_seconds"] = round(age_seconds, 3)
+    if age_seconds < 0:
+        receipt["reason"] = "second_device_timestamp_in_future"
+        return receipt
+    if age_seconds > SECOND_DEVICE_MAX_AGE_SECONDS:
+        receipt["freshness"] = "STALE"
+        receipt["reason"] = "second_device_observation_stale"
+        return receipt
+    receipt["status"] = "OBSERVED"
+    receipt["freshness"] = "FRESH"
+    receipt["reason"] = None
+    return receipt
 
 
 def _hook_hosts(events: list[dict[str, Any]] | None) -> list[dict[str, Any]]:
@@ -188,7 +254,12 @@ class StoreFact:
         }
 
 
-def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> dict[str, Any]:
+def measure_continuity(
+    root: Path,
+    *,
+    expected_hosts: int = EXPECTED_HOSTS,
+    measured_at: datetime | None = None,
+) -> dict[str, Any]:
     """Measure the M5-D continuity receipt for one workspace. Never raises.
 
     Reads exactly four fixed-relative-path local stores
@@ -238,6 +309,7 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
     just because coverage was satisfied without it.
     """
     resolved = root.expanduser().resolve()
+    measurement_time = measured_at or datetime.now(timezone.utc)
     reasons: list[str] = []
 
     # --- agent-event ledger (required path, may not exist yet) ---
@@ -299,6 +371,13 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
     )
     if pairing_present_but_invalid:
         reasons.append("pairing_invalid")
+
+    second_device = _second_device_receipt(
+        resolved,
+        pairing_record,
+        pairing_store.digest,
+        measured_at=measurement_time,
+    )
 
     # --- distinct caller identities observed in the access ledger ---
     buckets: dict[str, dict[str, Any]] = {}
@@ -441,6 +520,7 @@ def measure_continuity(root: Path, *, expected_hosts: int = EXPECTED_HOSTS) -> d
             "agent_events_digest": agent_events_store.digest,
             "event_record_calls_per_caller": event_record_calls_per_caller,
         },
+        "second_device": second_device,
         "remote": {"status": "UNOBSERVED", "reason": "remote_not_probed"},
         "exit_code": exit_code,
     }

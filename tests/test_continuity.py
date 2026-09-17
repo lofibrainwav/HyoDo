@@ -19,6 +19,7 @@ import threading
 import time
 import uuid
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -26,7 +27,12 @@ from typer.testing import CliRunner
 
 from hyodo.access_ledger import ACCESS_LEDGER_PATH, read_access_log
 from hyodo.cli.main import app
-from hyodo.continuity import CONTINUITY_SCHEMA_VERSION, STDIO_IDENTITY, measure_continuity
+from hyodo.continuity import (
+    CONTINUITY_SCHEMA_VERSION,
+    SECOND_DEVICE_MAX_AGE_SECONDS,
+    STDIO_IDENTITY,
+    measure_continuity,
+)
 from hyodo.events import (
     AGENT_EVENTS_RELATIVE_PATH,
     append_agent_event,
@@ -34,7 +40,7 @@ from hyodo.events import (
     validate_event,
 )
 from hyodo.mcp_server import create_loopback_app, create_server
-from hyodo.pairing import create_pairing
+from hyodo.pairing import create_pairing, revoke_pairing
 
 try:  # HTTP bridge tests need extras the base test lane does not install.
     import httpx
@@ -347,6 +353,63 @@ def test_continuity_optional_stores_absent_does_not_corrupt_integrity(tmp_path) 
     assert receipt["integrity_status"] == "READY"
     assert receipt["stores"]["policy"]["exists"] is False
     assert receipt["stores"]["pairing"]["exists"] is False
+
+
+def test_continuity_second_device_missing_is_unobserved(tmp_path) -> None:
+    receipt = measure_continuity(tmp_path)
+
+    assert receipt["second_device"]["status"] == "UNOBSERVED"
+    assert receipt["second_device"]["freshness"] == "UNOBSERVED"
+    assert receipt["second_device"]["reason"] == "pairing_absent"
+    assert receipt["second_device"]["provenance"]["source_commit"] is None
+
+
+def _write_last_seen(root: Path, value: str) -> None:
+    path = root / ".hyodo" / "pairing.json"
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    payload["last_seen_at"] = value
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_continuity_second_device_fresh_receipt_is_observed(tmp_path) -> None:
+    pairing, _token = create_pairing(tmp_path)
+    measured_at = datetime(2026, 9, 17, 18, 0, tzinfo=timezone.utc)
+    observed_at = measured_at - timedelta(seconds=SECOND_DEVICE_MAX_AGE_SECONDS)
+    _write_last_seen(tmp_path, observed_at.isoformat())
+
+    receipt = measure_continuity(tmp_path, measured_at=measured_at)
+
+    second_device = receipt["second_device"]
+    assert second_device["status"] == "OBSERVED"
+    assert second_device["freshness"] == "FRESH"
+    assert second_device["reason"] is None
+    assert second_device["device_id"] == pairing.device_id
+    assert second_device["workspace_id"] == pairing.workspace_id
+    assert second_device["age_seconds"] == SECOND_DEVICE_MAX_AGE_SECONDS
+    assert second_device["provenance"]["pairing_digest"].startswith("sha256:")
+
+
+def test_continuity_second_device_stale_receipt_stays_unobserved(tmp_path) -> None:
+    create_pairing(tmp_path)
+    measured_at = datetime(2026, 9, 17, 18, 0, tzinfo=timezone.utc)
+    observed_at = measured_at - timedelta(seconds=SECOND_DEVICE_MAX_AGE_SECONDS + 1)
+    _write_last_seen(tmp_path, observed_at.isoformat())
+
+    second_device = measure_continuity(tmp_path, measured_at=measured_at)["second_device"]
+
+    assert second_device["status"] == "UNOBSERVED"
+    assert second_device["freshness"] == "STALE"
+    assert second_device["reason"] == "second_device_observation_stale"
+
+
+def test_continuity_revoked_second_device_is_not_observed(tmp_path) -> None:
+    create_pairing(tmp_path)
+    revoke_pairing(tmp_path)
+
+    second_device = measure_continuity(tmp_path)["second_device"]
+
+    assert second_device["status"] == "UNOBSERVED"
+    assert second_device["reason"] == "pairing_revoked"
 
 
 def test_continuity_empty_root_is_unobserved_not_ready(tmp_path) -> None:
