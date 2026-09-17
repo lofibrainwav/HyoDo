@@ -24,6 +24,11 @@ The canonical six-virtue contract is defined in
 [`hyodo/virtues.py`](./hyodo/virtues.py). The six virtues are independent
 measurement axes; a computed aggregate is not a virtue.
 
+The canonical continuous-improvement path, including Goal formation, six-axis
+observation, closure, and Lesson Candidate → Muscle Memory promotion, is
+defined in [`docs/CORE_LOOP.md`](./docs/CORE_LOOP.md). HyoDo is the whole loop;
+孝 is one of its six evidence lenses.
+
 ## Pillar map
 
 | Pillar | KO / Hanja | Technical meaning | Evidence |
