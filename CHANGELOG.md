@@ -5,6 +5,25 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.8] - 2026-09-17
+
+### Added
+
+- Adds a read-only KINGDOM/HyoDo runtime GC dry-run classifier that protects
+  active, pinned, and dirty-unique runtime slots and emits machine-readable
+  disposition records.
+
+### Changed
+
+- Converges the public package version, PATH-installed CLI, and runtime
+  identity contract on HyoDo 4.19.8 without claiming publication or host-owned
+  orchestration authority.
+
+### Evidence
+
+- Records the 4.19.8 source/runtime identity and release-preparation state;
+  publication evidence remains a separate gate.
+
 ## [4.19.7] - 2026-09-15
 
 ### Added
