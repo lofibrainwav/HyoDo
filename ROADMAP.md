@@ -5,19 +5,18 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.19.7 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.19.8 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.19.7.md`. The 4.18.0 signed tag, public wheel and sdist, SBOM
+`docs/releases/4.19.8.md`. The 4.18.0 signed tag, public wheel and sdist, SBOM
 receipt, PyPI provenance, clean-install readback, and Evidence Pack v1 remain
 sealed. Every release in the 4.19.x line carries its own measured chain receipt
 under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.19.8 is the current release target and source-tree release baseline;
-4.19.7 remains the latest published package until the 4.19.8 release chain is
-completed. Its release chain receipt records the signed tag, GitHub Release
-evidence, PyPI provenance, and install readback.
+HyoDo 4.19.8 is the current published release and source-tree release baseline.
+Its release chain receipt records the signed tag, GitHub Release evidence, PyPI
+provenance, and install readback.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
