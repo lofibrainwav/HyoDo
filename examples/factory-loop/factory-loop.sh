@@ -131,11 +131,22 @@ fi
 # 7. [HYODO] Record what happened as an audit event (digest-only by default)
 #    and render the SARIF 2.1.0 report from the local ledger.
 RESULT="$(mktemp)"
+#    uuidgen and shasum are absent from minimal images (alpine, *-slim). A
+#    pipeline reports its LAST command's status, so `uuidgen | tr || echo ...`
+#    never reaches its fallback: it yields an empty value, HyoDo rejects the
+#    event as invalid_field, and the case below would misreport that rejection
+#    as a policy DENY -- sending the morning operator to policy.toml instead of
+#    the missing tool. `|| true` keeps `set -o pipefail` from killing the run
+#    before the fallback is applied.
+EVENT_ID="$(uuidgen 2>/dev/null | tr 'A-Z' 'a-z' || true)"
+[ -n "$EVENT_ID" ] || EVENT_ID="00000000-0000-4000-8000-000000000002"
+ARGS_DIGEST="$(printf 'hyodo check --quiet' | { shasum -a 256 2>/dev/null || sha256sum 2>/dev/null; } | cut -c1-12 || true)"
+[ -n "$ARGS_DIGEST" ] || ARGS_DIGEST="000000000000"
 cat >"$RESULT" <<JSON
-{"schema_version":"hyodo.agent-event/v1","event_id":"$(uuidgen 2>/dev/null | tr 'A-Z' 'a-z' || echo 00000000-0000-4000-8000-000000000002)",
+{"schema_version":"hyodo.agent-event/v1","event_id":"$EVENT_ID",
  "run_id":"00000000-0000-4000-8000-0000000000aa","ts":"$(date -u +%Y-%m-%dT%H:%M:%S+00:00)",
  "kind":"tool_result","step_index":1,"actor":"agent",
- "tool":{"name":"Bash","args_digest":"$(printf 'hyodo check --quiet' | shasum -a 256 | cut -c1-12)","paths":[]},
+ "tool":{"name":"Bash","args_digest":"$ARGS_DIGEST","paths":[]},
  "io":{"input_digest":null,"output_digest":null,"bytes_in":0,"bytes_out":0},
  "policy":{"decision":null,"rule_id":null,"reason":null},
  "meta":{"model":"factory-loop","tags":["factory-loop","gate-result","$SLUG"]}}
