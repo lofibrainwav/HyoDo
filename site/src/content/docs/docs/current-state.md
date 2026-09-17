@@ -5,26 +5,26 @@ description: Public release, current main, and measured HyoDo state separated by
 
 # HyoDo current state
 
-Public release readback: **2026-09-15 PT**. Runtime capability matrix below
-was measured 2026-09-13 PT, before 4.19.6.
+Public release readback: **2026-09-17 PT**. Runtime capability matrix below
+was measured 2026-09-13 PT, before 4.19.6; it is a historical snapshot.
 
-HyoDo **4.19.6** is the current public package. Product capability and live
+HyoDo **4.19.8** is the current public package. Product capability and live
 host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Latest public package: **4.19.6**
+- Latest public package: **4.19.8**
 - Release chain: **CLOSED** — signed tag, GitHub Release + SBOM, PyPI provenance,
-  and install smoke verified in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.19.6.md).
+  and install smoke verified in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.19.8.md).
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
 
-HyoDo 4.19.6 adds explicit dashboard startup states and skip reasons in test
-gate output. It does not claim fresh Codex or Cursor host observations; those
-remain `UNOBSERVED`.
+HyoDo 4.19.8 converges the public package, installed CLI, and runtime identity
+contract on one version and adds a read-only runtime-slot GC classifier. It does
+not claim fresh Codex or Cursor host observations; those remain `UNOBSERVED`.
 
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for 4.19.6.
+2026-09-13. It is not a fresh runtime readback for 4.19.8.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |
@@ -55,4 +55,4 @@ HyoDo    observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 ACL/KINGDOM experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.19.6 public artifact released and verified.
+prerequisites for calling the HyoDo 4.19.8 public artifact released and verified.
