@@ -4,9 +4,13 @@ name: HyoDo Site Build
   push:
     branches: [main]
     paths: ["site/**", ".github/workflows/site.yml"]
+  # No path filter here on purpose. A required status check that only exists
+  # for some pull requests is not a gate: the consumer cannot tell "did not
+  # need to run" from "never reported". The job runs on every pull request and
+  # decides for itself whether there is anything to build. The push trigger
+  # keeps its filter — nothing requires that check by name.
   pull_request:
     branches: [main]
-    paths: ["site/**", ".github/workflows/site.yml"]
   workflow_dispatch:
 
 permissions:
@@ -26,8 +30,31 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
+          fetch-depth: 0
+
+      - name: Detect site changes
+        id: scope
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT_NAME" != "pull_request" ]; then
+            # push and workflow_dispatch already scope themselves.
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "$BASE_SHA...HEAD" -- site .github/workflows/site.yml | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: No site changes
+        if: steps.scope.outputs.changed != 'true'
+        run: echo "No site/ changes in this pull request; nothing to build."
 
       - name: Setup Node
+        if: steps.scope.outputs.changed == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version: "22"
@@ -35,18 +62,22 @@ jobs:
           cache-dependency-path: site/package-lock.json
 
       - name: Install dependencies
+        if: steps.scope.outputs.changed == 'true'
         working-directory: site
         run: npm ci
 
       - name: Audit locked npm dependencies
+        if: steps.scope.outputs.changed == 'true'
         working-directory: site
         run: npm audit --audit-level=low
 
       - name: Build
+        if: steps.scope.outputs.changed == 'true'
         working-directory: site
         run: npm run build
 
       - name: Preview and verify evidence graphs
+        if: steps.scope.outputs.changed == 'true'
         working-directory: site
         env:
           CHROME_BIN: google-chrome
@@ -66,7 +97,7 @@ jobs:
           npm run verify:evidence-graph -- http://localhost:4321 verify-output
 
       - name: Upload evidence graph screenshots
-        if: always()
+        if: always() && steps.scope.outputs.changed == 'true'
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: evidence-graph-verification
