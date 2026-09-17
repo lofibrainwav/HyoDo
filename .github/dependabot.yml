@@ -28,6 +28,11 @@ updates:
     ignore:
       - dependency-name: "mcp"
         versions: [">=2"]
+      # pydantic pins pydantic-core exactly, so the group below matches the
+      # name but cannot resolve a release of core alone: dependabot still
+      # opens a PR whenever only pydantic-core moves, and the hashed lock is
+      # then unsatisfiable (PR #342, PR #360). Let pydantic carry it.
+      - dependency-name: "pydantic-core"
     groups:
       # pydantic pins pydantic-core to an exact version, so a lone bump of
       # either half makes the hashed lock unresolvable (see PR #342).
