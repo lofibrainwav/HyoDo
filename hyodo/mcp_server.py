@@ -16,8 +16,10 @@ from pathlib import Path
 from secrets import compare_digest
 from typing import Any
 
+from hyodo import __version__
 from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
     constructor_accepts_transport_options,  # pyright: ignore[reportAttributeAccessIssue]
+    constructor_accepts_version,  # pyright: ignore[reportAttributeAccessIssue]
     get_mcp_server_class,  # pyright: ignore[reportAttributeAccessIssue]
     http_app_accepts_options,  # pyright: ignore[reportAttributeAccessIssue]
 )
@@ -190,6 +192,12 @@ def create_server(
             "port": port,
             "streamable_http_path": _MCP_PATH,
         }
+    if constructor_accepts_version():
+        # Without this the v2 SDK advertises an empty serverInfo.version, so a
+        # client cannot tell which HyoDo it is talking to. Under v1 the field
+        # carries the SDK's version, which is honest about the transport but
+        # says nothing about this adapter.
+        constructor_kwargs["version"] = __version__
     server = server_class(
         "HyoDo",
         instructions=(
