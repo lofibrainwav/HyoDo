@@ -1,13 +1,13 @@
 ---
 title: Product boundary
-description: The verified ownership boundary between HyoDo and Kingdom.
+description: The verified ownership boundary across HyoDo, Kingdom, and BB.
 ---
 
-# HyoDo and Kingdom product boundary
+# HyoDo, Kingdom, and BB product boundary
 
-This is the canonical boundary contract for describing HyoDo and Kingdom
-together. It prevents an external executor's state from being mistaken for
-HyoDo product state.
+This is the canonical boundary contract for describing HyoDo, Kingdom, and BB
+together. It prevents an external executor's state, or a continuity projection,
+from being mistaken for HyoDo product state.
 
 ## HyoDo owns
 
@@ -28,6 +28,22 @@ settle execution.
 Kingdom is an execution plane. Its processes, tests, worktrees, branches, and
 runtime state are not HyoDo state merely because HyoDo can observe or attest
 them.
+
+## BB owns
+
+- human-owned durable memory, provenance, decisions, and lessons; and
+- settled evidence that has been deliberately promoted for future reuse.
+
+BB is a continuity plane. It does not own live runtime truth, host execution
+authority, HyoDo's event ledger, or HyoDo product status. A BB projection is a
+record or memory surface, not proof of current Kingdom or HyoDo state.
+
+## Shared three-plane invariant
+
+`KINGDOM = Agency · HyoDo = Trust · BB = Continuity`. The canonical loop is
+`Human Intent → KINGDOM → HyoDo → BB → Skill/Eval/Memory → Better KINGDOM`.
+Evidence is not authority, memory is not runtime state, and each plane's current
+status must be read from its owning source/runtime.
 
 ## Non-equivalence rules
 
