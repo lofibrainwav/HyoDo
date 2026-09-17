@@ -1,0 +1,28 @@
+schema = "hyodo.policy/v1"
+
+# Night-shift fence for an unattended agent loop.
+#
+# This file limits what the *recorded* events may do. HyoDo evaluates each
+# event against it and stamps ALLOW / DENY / ASK / UNOBSERVED. HyoDo does not
+# stop the agent by itself: the host loop (factory-loop.sh, an MCP middleware,
+# a harness hook) must enforce a DENY. See docs/POLICY_TRUST.md.
+
+# Cap the steps one run may take before the loop must stop and hand back.
+max_steps = 200
+
+# Tools the unattended agent may call. Anything not listed is DENY.
+# Use the tool names your host actually emits (Claude Code names shown).
+allowed_tools = ["Read", "Grep", "Glob", "Edit", "Write", "Bash"]
+
+# Paths the agent must never touch while nobody is watching.
+blocked_path_globs = [
+  ".env",
+  ".env.*",
+  "*.pem",
+  "id_rsa*",
+  ".hyodo/**",
+  ".github/workflows/**",
+  "deploy/**",
+  "infra/**",
+  "**/migrations/**",
+]

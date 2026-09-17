@@ -124,7 +124,9 @@ Default event storage is digest-only. See
 [`examples/fde-evidence-spine/`](./examples/fde-evidence-spine/) for a demo
 event and [`examples/host-policies/`](./examples/host-policies/) for a
 dual-host `allowed_tools` list (not a Cursor hook). Policy trust:
-[docs/POLICY_TRUST.md](docs/POLICY_TRUST.md).
+[docs/POLICY_TRUST.md](docs/POLICY_TRUST.md). For an unattended feature queue
+that calls these gates from a host loop, see
+[`examples/factory-loop/`](./examples/factory-loop/).
 
 ## Optional MCP
 
