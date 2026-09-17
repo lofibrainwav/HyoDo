@@ -51,6 +51,11 @@ CASES: list[tuple[str, str, bool]] = [
     # generic_api_key_assignment: key/token/password = quoted value 8+ chars.
     ("generic_api_key_assignment", 'api_key = "supersecret123"', True),
     ("generic_api_key_assignment", 'password = "short"', False),  # value < 8 chars
+    ("generic_api_key_assignment", 'api_key = "example-api-key"', False),
+    ("generic_api_key_assignment", 'password = "changeme123"', False),
+    ("generic_api_key_assignment", 'secret_key = "your_secret_key_here"', False),
+    # Generic synthetic-looking values are not automatically safe.
+    ("generic_api_key_assignment", 'access_token = "test-token-1234"', True),
     # --- DANGEROUS_COMMAND_PATTERNS -------------------------------------
     # rm_rf_root: rm + optional force flags + /, /*, ~ or /home (word-boundary anchored).
     ("rm_rf_root", "rm -rf /home", True),

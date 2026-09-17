@@ -31,9 +31,21 @@ SECRET_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
     (
         "generic_api_key_assignment",
         re.compile(
-            r"(?i)\b(api[_-]?key|secret[_-]?key|access[_-]?token|password)\b\s*[:=]\s*['\"][^'\"]{8,}['\"]"
+            r"(?i)\b(api[_-]?key|secret[_-]?key|access[_-]?token|password)\b\s*[:=]\s*['\"](?P<value>[^'\"]{8,})['\"]"
         ),
     ),
+)
+
+# These values are conventional documentation placeholders, not a blanket
+# exemption for tests/examples. Values containing only a generic word such as
+# ``test`` remain findings because they may still be usable credentials.
+_OBVIOUS_PLACEHOLDER_VALUES: Sequence[re.Pattern[str]] = (
+    re.compile(
+        r"(?i)^(?:example|placeholder|dummy)(?:[_-](?:api[_-]?key|secret[_-]?key|access[_-]?token|password|value))?$"
+    ),
+    re.compile(r"(?i)^changeme\d*$"),
+    re.compile(r"(?i)^replace[_-]?me(?:[_-](?:api[_-]?key|secret))?$"),
+    re.compile(r"(?i)^your[_-][a-z0-9_-]+[_-](?:here|goes[_-]?here)$"),
 )
 
 DANGEROUS_COMMAND_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
@@ -165,6 +177,11 @@ class Finding:
 def _line_at(text: str, index: int) -> int:
     """1-based line number for a character offset into *text*."""
     return text.count("\n", 0, index) + 1
+
+
+def _is_obvious_placeholder(value: str) -> bool:
+    """Return whether *value* is a conventional, non-secret placeholder."""
+    return any(pattern.fullmatch(value) for pattern in _OBVIOUS_PLACEHOLDER_VALUES)
 
 
 def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
@@ -359,7 +376,9 @@ def scan_text(text: str, *, path: str | None = None) -> list[Finding]:
 
     for label, pattern in SECRET_PATTERNS:
         match = pattern.search(text)
-        if match:
+        if match and not (
+            label == "generic_api_key_assignment" and _is_obvious_placeholder(match.group("value"))
+        ):
             findings.append(
                 Finding(
                     category="secret",
