@@ -51,11 +51,15 @@ shell syntax, package build metadata, wheel installation, and CLI behavior.
 For a focused test loop:
 
 ```bash
-python -m ruff check hyodo tests
-python -m ruff format --check hyodo tests
-python -m pyright hyodo
-python -m pytest tests -q --tb=short
+.venv/bin/python -m ruff check hyodo tests
+.venv/bin/python -m ruff format --check hyodo tests
+.venv/bin/python -m pyright hyodo
+.venv/bin/python -m pytest tests -q --tb=short
 ```
+
+Use the project interpreter explicitly for focused checks. This prevents
+unrelated globally installed pytest plugins or packages from changing the
+result of a local verification run.
 
 ## Pull request checklist
 

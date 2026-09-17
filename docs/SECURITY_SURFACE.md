@@ -34,7 +34,7 @@ Verify locally:
 pip install -e ".[dev]"
 hyodo check
 hyodo safe
-python -m pytest tests -q
+.venv/bin/python -m pytest tests -q
 ```
 
 ## Package contents are scoped to the public surface
@@ -274,7 +274,7 @@ triaged and patched promptly, not deferred.
 pip install -e ".[dev]"
 hyodo check
 hyodo safe
-python -m pytest tests -q
+.venv/bin/python -m pytest tests -q
 ruff check hyodo/
 pyright hyodo
 python scripts/generate_sbom.py
