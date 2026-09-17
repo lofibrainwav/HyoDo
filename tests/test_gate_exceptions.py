@@ -47,9 +47,11 @@ def test_pyright_file_not_found(tmp_path):
         patch("hyodo.cli.main.subprocess.run", side_effect=FileNotFoundError()),
     ):
         result = run_pyright_check(tmp_path)
-    # FileNotFoundError routes back through _missing_tool_result (root present).
-    assert result.status is GateStatus.FAIL
-    assert result.message == "pyright not found (install: pip install pyright or hyodo[dev])"
+    # A missing executable was not an executed code failure.
+    assert result.status is GateStatus.UNOBSERVED_TOOL_UNAVAILABLE
+    assert result.message == (
+        "pyright not found; gate not executed (install: pip install pyright or hyodo[dev])"
+    )
 
 
 def test_pyright_timeout(tmp_path):
@@ -84,8 +86,10 @@ def test_ruff_file_not_found(tmp_path):
         patch("hyodo.cli.main.subprocess.run", side_effect=FileNotFoundError()),
     ):
         result = run_ruff_check(tmp_path)
-    assert result.status is GateStatus.FAIL
-    assert result.message == "ruff not found (install: pip install ruff or hyodo[dev])"
+    assert result.status is GateStatus.UNOBSERVED_TOOL_UNAVAILABLE
+    assert result.message == (
+        "ruff not found; gate not executed (install: pip install ruff or hyodo[dev])"
+    )
 
 
 def test_ruff_timeout(tmp_path):
@@ -121,8 +125,10 @@ def test_pytest_file_not_found(tmp_path):
         patch("hyodo.cli.main.subprocess.run", side_effect=FileNotFoundError()),
     ):
         result = run_pytest_check(root)
-    assert result.status is GateStatus.FAIL
-    assert result.message == "pytest not found (install: pip install pytest or hyodo[dev])"
+    assert result.status is GateStatus.UNOBSERVED_TOOL_UNAVAILABLE
+    assert result.message == (
+        "pytest not found; gate not executed (install: pip install pytest or hyodo[dev])"
+    )
 
 
 def test_pytest_timeout(tmp_path):

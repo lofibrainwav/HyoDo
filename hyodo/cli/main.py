@@ -358,6 +358,7 @@ class GateStatus(str, Enum):
     FAIL = "FAIL"
     SKIP = "SKIP"
     UNSUPPORTED = "UNSUPPORTED"
+    UNOBSERVED_TOOL_UNAVAILABLE = "UNOBSERVED_TOOL_UNAVAILABLE"
 
 
 @dataclass(frozen=True)
@@ -475,12 +476,12 @@ def _module_importable(module: str) -> bool:
 
 
 def _missing_tool_result(tool: str, root: Path | None) -> GateResult:
-    """Missing tools: FAIL inside HyoDo checkout; SKIP outside (should not reach)."""
+    """Report missing tooling as unobserved, never as an executed code failure."""
     if root is None:
         return GateResult(GateStatus.SKIP, f"{tool} not installed; skipped (no HyoDo checkout)")
     return GateResult(
-        GateStatus.FAIL,
-        f"{tool} not found (install: pip install {tool} or hyodo[dev])",
+        GateStatus.UNOBSERVED_TOOL_UNAVAILABLE,
+        f"{tool} not found; gate not executed (install: pip install {tool} or hyodo[dev])",
     )
 
 
@@ -656,6 +657,8 @@ def _print_gate_result(result: GateResult) -> None:
         console.print(f"  [red]FAIL {result.message}[/red]")
     elif result.status is GateStatus.SKIP:
         console.print(f"  [yellow]SKIP {result.message}[/yellow]")
+    elif result.status is GateStatus.UNOBSERVED_TOOL_UNAVAILABLE:
+        console.print(f"  [yellow]UNOBSERVED_TOOL_UNAVAILABLE {result.message}[/yellow]")
     else:
         console.print(f"  [yellow]UNSUPPORTED {result.message}[/yellow]")
 

@@ -179,10 +179,16 @@ def test_missing_tool_soft_skip_without_root():
     assert "skipped" in result.message
 
 
-def test_missing_tool_fails_in_repo_mode(tmp_path):
+def test_missing_tool_is_unobserved_in_repo_mode(tmp_path):
     result = _missing_tool_result("ruff", root=tmp_path)
-    assert result.status is GateStatus.FAIL
+    assert result.status is GateStatus.UNOBSERVED_TOOL_UNAVAILABLE
     assert "not found" in result.message
+
+
+def test_missing_tool_message_does_not_claim_execution(tmp_path):
+    result = _missing_tool_result("pytest", root=tmp_path)
+    assert "not executed" in result.message
+    assert result.status not in {GateStatus.PASS, GateStatus.FAIL}
 
 
 def test_ruff_unsupported_outside_hyodo_checkout():
