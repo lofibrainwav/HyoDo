@@ -404,6 +404,15 @@ def scan_text(text: str, *, path: str | None = None) -> list[Finding]:
 
 def assess_rollback_signal(text: str, *, path: str | None = None) -> Finding:
     """Return a finding that describes whether rollback wording is present."""
+    if not text:
+        return Finding(
+            category="rollback",
+            severity="info",
+            label="rollback_hint_not_applicable",
+            detail="No scan corpus observed; rollback wording is not applicable",
+            path=path,
+            line=None,
+        )
     if any(p.search(text) for p in ROLLBACK_HINT_PATTERNS):
         return Finding(
             category="rollback",

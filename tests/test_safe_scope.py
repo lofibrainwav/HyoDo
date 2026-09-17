@@ -42,6 +42,20 @@ def test_diff_scope_reports_diff_for_a_modified_tracked_file(tmp_path: Path):
     assert result["source"] == "git diff HEAD"
 
 
+def test_empty_status_corpus_does_not_claim_missing_rollback_hint(tmp_path: Path):
+    """No changed files means rollback wording has no applicable scan target."""
+    _git_repo(tmp_path)
+
+    result = run_safety_scan(path=None, cwd=tmp_path)
+    rollback = [finding for finding in result["findings"] if finding.category == "rollback"]
+
+    assert result["scope"] == "status"
+    assert result["coverage"] == "UNOBSERVED"
+    assert rollback[0].label == "rollback_hint_not_applicable"
+    assert rollback[0].severity == "info"
+    assert result["risk_score"] == 0
+
+
 def test_directory_scope_partial_when_max_files_caps_below_total(tmp_path: Path):
     """Three scannable files with --max-files 2 caps the read, so coverage is PARTIAL."""
     for i in range(3):
