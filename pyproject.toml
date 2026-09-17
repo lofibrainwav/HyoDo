@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "4.19.7"
+version = "4.19.8"
 description = "Open, model-agnostic evidence and verification for AI-assisted systems. Reuse your checks; missing evidence stays UNOBSERVED; scores never authorize."
 readme = "README.md"
 license = "MIT"
