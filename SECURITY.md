@@ -32,7 +32,7 @@ This keeps destructive actions, credential exposure, deployment risk, and unsafe
 
 ## Supported Versions
 
-The current public release is HyoDo **4.19.5**. Security fixes target the
+The current public release is HyoDo **4.19.8**. Security fixes target the
 current `4.19.x` release line. Older release lines must be upgraded before a
 security report can be reproduced against a supported artifact.
 
