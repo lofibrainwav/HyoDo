@@ -1271,12 +1271,13 @@ def dashboard(
         target=server.serve_forever, name="hyodo-dashboard-http", daemon=True
     )
     server_thread.start()
-    try:
-        initial_evidence = _refresh_evidence()
-        state.update(initial_evidence)
-    except Exception as exc:
-        state.fail_startup(str(exc))
-        console.print(f"[yellow]Initial evidence unavailable: {exc}[/yellow]")
+    # Publish the receipt as soon as the listener is up, before the first
+    # measurement. The receipt reports the checkout, the tool, and the
+    # endpoint — none of which wait on evidence — while collection can take
+    # minutes on a real checkout. Writing it afterwards left a window in which
+    # the file still named the runtime this one just replaced, and a consumer
+    # reading it during that window got a confident answer about a dead
+    # process.
     try:
         receipt_path = write_runtime_identity(
             root,
@@ -1287,6 +1288,12 @@ def dashboard(
         console.print(f"[yellow]Runtime identity receipt unavailable: {exc}[/yellow]")
     else:
         console.print(f"[dim]Runtime identity: {receipt_path}[/dim]")
+    try:
+        initial_evidence = _refresh_evidence()
+        state.update(initial_evidence)
+    except Exception as exc:
+        state.fail_startup(str(exc))
+        console.print(f"[yellow]Initial evidence unavailable: {exc}[/yellow]")
     console.print(f"[green]Dashboard: http://{LOOPBACK_HOST}:{port}[/green]")
     if interval:
         console.print(

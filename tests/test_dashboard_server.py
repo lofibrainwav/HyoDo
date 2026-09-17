@@ -9,6 +9,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import os
 from contextlib import contextmanager
 from http.client import HTTPConnection
 from http.server import ThreadingHTTPServer
@@ -527,3 +528,99 @@ def test_dashboard_marks_missing_measurement_time_as_not_measured():
     html = render_dashboard_html(evidence)
     assert 'data-measured="Not measured"' in html
     assert 'data-measured="None"' not in html
+
+
+def test_runtime_receipt_is_published_before_initial_measurement(tmp_path, monkeypatch):
+    """The receipt names this runtime before the first measurement finishes.
+
+    Observed 2026-09-16: the dashboard published its identity receipt only
+    after initial evidence collection, which takes a minute or more on a real
+    checkout. Until then the receipt on disk still described the *previous*
+    runtime, so a consumer reading it was told, confidently, about a process
+    that had already been replaced.
+
+    The receipt does not depend on measurement — it reports the checkout, the
+    tool, and the listening endpoint — so it is published as soon as the
+    server is serving. This test blocks collection and reads the file from
+    inside that window, which is exactly where the stale answer used to live.
+    """
+    import time
+    from threading import Thread
+
+    from typer.testing import CliRunner
+
+    import hyodo.cli.main as cli_main
+
+    (tmp_path / "pyproject.toml").write_text("[project]\nname='sample'\n", encoding="utf-8")
+    (tmp_path / "hyodo").mkdir()
+    receipt = tmp_path / "runtime-receipt.json"
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema_version": "hyodo.runtime-identity/v1",
+                "target": {"root_realpath": "/gone/previous-runtime"},
+                "runtime": {"pid": 1, "started_at": "2026-01-01T00:00:00+00:00"},
+            }
+        ),
+        encoding="utf-8",
+    )
+    with socket() as probe:
+        probe.bind(("127.0.0.1", 0))
+        port = probe.getsockname()[1]
+
+    entered = Event()
+    release = Event()
+    server_holder = []
+    seen: dict[str, object] = {}
+
+    def blocked_collection(_root):
+        # What a consumer reading the receipt would get right now.
+        seen["receipt"] = receipt.read_text(encoding="utf-8")
+        entered.set()
+        assert release.wait(timeout=5)
+        return dict(EVIDENCE)
+
+    def capture_server(*args, **kwargs):
+        server = ThreadingHTTPServer(*args, **kwargs)
+        server_holder.append(server)
+        return server
+
+    monkeypatch.setattr(cli_main, "collect_dashboard_evidence", blocked_collection)
+    monkeypatch.setattr(cli_main, "ThreadingHTTPServer", capture_server)
+    runner = CliRunner()
+    command = Thread(
+        target=lambda: runner.invoke(
+            app,
+            [
+                "dashboard",
+                str(tmp_path),
+                "--port",
+                str(port),
+                "--runtime-identity",
+                str(receipt),
+            ],
+        ),
+        daemon=True,
+    )
+    command.start()
+    try:
+        assert entered.wait(timeout=5)
+        payload = json.loads(str(seen["receipt"]))
+        assert payload["runtime"]["pid"] == os.getpid(), (
+            "receipt still described the previous runtime while this one was serving"
+        )
+        assert payload["target"]["root_realpath"] == str(tmp_path.resolve())
+        assert payload["service"]["endpoint"] == f"127.0.0.1:{port}"
+        release.set()
+        deadline = time.monotonic() + 5
+        while True:
+            _, _, status_body = _request(port, "GET", "/api/status")
+            if json.loads(status_body)["readiness"] == "ready":
+                break
+            assert time.monotonic() < deadline, "real evidence was not installed"
+            sleep(0.01)
+    finally:
+        release.set()
+        if server_holder:
+            server_holder[0].shutdown()
+        command.join(timeout=5)
