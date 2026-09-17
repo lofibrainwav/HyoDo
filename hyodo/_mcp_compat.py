@@ -44,6 +44,18 @@ def constructor_accepts_transport_options() -> bool:
     return "host" in params and "json_response" in params
 
 
+def constructor_accepts_version() -> bool:
+    """True when the server constructor takes an explicit version (SDK v2).
+
+    v2 (``MCPServer``) accepts ``version`` and defaults it to the empty string,
+    so a server that never passes one advertises ``serverInfo.version: ""``.
+    v1 (``FastMCP``) has no such parameter and reports the SDK's own version
+    instead. Neither major reports HyoDo's version unless the call site asks.
+    """
+    params = inspect.signature(get_mcp_server_class().__init__).parameters
+    return "version" in params
+
+
 def http_app_accepts_options() -> bool:
     """True when streamable_http_app() takes json_response/streamable_http_path (v2)."""
     params = inspect.signature(get_mcp_server_class().streamable_http_app).parameters
