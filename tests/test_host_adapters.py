@@ -237,6 +237,82 @@ def test_policy_check_can_emit_cursor_native_response(tmp_path: Path) -> None:
     assert json.loads(result.stdout) == {"permission": "allow"}
 
 
+def test_policy_check_can_emit_codex_native_response(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    policy_dir = tmp_path / ".hyodo"
+    policy_dir.mkdir()
+    (policy_dir / "policy.toml").write_text(
+        'schema = "hyodo.policy/v1"\nallowed_tools = ["Bash"]\n',
+        encoding="utf-8",
+    )
+    payload = _codex()
+    payload["cwd"] = str(tmp_path)
+    from hyodo.cli.main import app
+
+    result = CliRunner().invoke(
+        app,
+        [
+            "policy",
+            "check",
+            "--stdin",
+            "--hook",
+            "codex",
+            "--native-response",
+            "--json",
+            "--root",
+            str(tmp_path),
+        ],
+        input=json.dumps(payload),
+    )
+    assert result.exit_code == 0
+    response = json.loads(result.stdout)
+    assert response["hookSpecificOutput"]["permissionDecision"] == "allow"
+
+    (policy_dir / "policy.toml").write_text(
+        'schema = "hyodo.policy/v1"\nallowed_tools = ["Read"]\n',
+        encoding="utf-8",
+    )
+    result = CliRunner().invoke(
+        app,
+        [
+            "policy",
+            "check",
+            "--stdin",
+            "--hook",
+            "codex",
+            "--native-response",
+            "--json",
+            "--root",
+            str(tmp_path),
+        ],
+        input=json.dumps(payload),
+    )
+    assert result.exit_code == 1
+    response = json.loads(result.stdout)
+    assert response["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+    (policy_dir / "policy.toml").unlink()
+    result = CliRunner().invoke(
+        app,
+        [
+            "policy",
+            "check",
+            "--stdin",
+            "--hook",
+            "codex",
+            "--native-response",
+            "--json",
+            "--root",
+            str(tmp_path),
+        ],
+        input=json.dumps(payload),
+    )
+    assert result.exit_code == 2
+    response = json.loads(result.stdout)
+    assert response["hookSpecificOutput"]["permissionDecision"] == "deny"
+
+
 def _codex_ids(event: str) -> str:
     mapped, error = map_codex_hook_payload(_codex(event), Path("/tmp"))
     assert error is None

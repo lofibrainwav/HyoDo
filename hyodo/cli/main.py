@@ -1840,7 +1840,10 @@ def _verdict_output(
         if native_response:
             assert captured is not None
             console.print_json(captured.get())
-            return
+            # Native hooks consume the JSON envelope, but the host also uses
+            # the process status to enforce the decision.  Preserve the
+            # command's exit code after releasing the captured stdout.
+            raise typer.Exit(exit_code)
         # --json content stays byte-identical across profiles: the profile
         # is surfaced only as the added "audience" key, never by reflavoring
         # an existing field (including "verdict").
@@ -4549,7 +4552,7 @@ def policy_check(
     native_response: bool = typer.Option(
         False,
         "--native-response",
-        help="Emit the host-native response envelope (currently Cursor only).",
+        help="Emit the host-native response envelope for Cursor or Codex.",
     ),
     shadow: bool = typer.Option(
         False,
