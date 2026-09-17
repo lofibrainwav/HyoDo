@@ -15,7 +15,7 @@ does not check for it.
 | `github_token` | `gh[pousr]_...` (20+ chars) |
 | `slack_token` | `xox[baprs]-...` |
 | `private_key_block` | `-----BEGIN [RSA/EC/OPENSSH] PRIVATE KEY-----` |
-| `generic_api_key_assignment` | `api_key` / `secret_key` / `access_token` / `password` assigned a quoted string of 8+ chars (`key = "..."` or `key: "..."`) |
+| `generic_api_key_assignment` | `api_key` / `secret_key` / `access_token` / `password` assigned a quoted string of 8+ chars (`key = "..."` or `key: "..."`), except for a small set of conventional placeholders |
 
 ### Dangerous commands — `high` (`DANGEROUS_COMMAND_PATTERNS`, `hyodo/safety.py:29-41`)
 
@@ -64,9 +64,14 @@ Each `high` finding adds 40 to the risk score, each `medium` adds 15, each
   `rm -rf build/` is intentionally *not* flagged — only targets rooted at `/`
   or `~` match `rm_rf_root`, to limit false positives on ordinary build-clean
   commands.
-- **Generic assignment matching can false-positive on fixtures.** Any
-  `api_key = "........"`-shaped literal (8+ chars) trips
-  `generic_api_key_assignment`, including test fixtures, mocks, and
-  placeholder/example values — it is a pattern match, not a validity check.
+- **Generic assignment matching can false-positive on fixtures.** An
+  `api_key = "........"`-shaped literal (8+ chars) generally trips
+  `generic_api_key_assignment`, including test fixtures and mocks. The scanner
+  suppresses only conventional values that are unambiguously placeholders:
+  selected forms beginning with `example`, `placeholder`, or `dummy` and a
+  known field suffix, plus `changeme`, `replace_me`, and `your_<name>_here`.
+  Values such as `test-token-1234` remain findings because a synthetic-looking
+  value can still be usable in a real environment. This is still a pattern
+  match, not a validity check.
 - This is a lightweight, narrow-by-design pattern scan. It does not replace a
   secret scanner, SAST, dependency audit, or human security review.
