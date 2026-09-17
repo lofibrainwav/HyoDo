@@ -47,6 +47,11 @@ record or memory surface, not proof of current Kingdom or HyoDo state.
 Evidence is not authority, memory is not runtime state, and each plane's current
 status must be read from its owning source/runtime.
 
+HyoDo's internal improvement-loop and lesson-promotion contract is defined in
+[`CORE_LOOP.md`](./CORE_LOOP.md). That contract does not change the ownership
+boundary: KINGDOM still owns action and execution, BB owns durable continuity,
+and HyoDo owns evidence quality and trust in promotion.
+
 ## Non-equivalence rules
 
 1. A Kingdom process or test is not evidence that HyoDo is open, closed,
