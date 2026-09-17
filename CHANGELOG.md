@@ -5,6 +5,34 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.7] - 2026-09-15
+
+### Added
+
+- `hyodo skill-eval --input <file> [--json]`: an evidence-only Skill Eval v1
+  oracle (`hyodo.skill-eval/v1`). It never executes anything; it reads one case
+  plus the observed execution, evidence, effect readback, receipt, and
+  authority envelope and returns `PASS`, `FAIL`, `HOLD`, or `UNOBSERVED`. An
+  evidence gate enforces observation, freshness, producer, correlation, and
+  integrity for every required evidence key before the semantic verdict runs.
+  Exit codes: `0` PASS, `1` FAIL, `2` HOLD or UNOBSERVED. The contract is
+  documented in `docs/SKILL_EVAL_V1.md`.
+
+### Fixed
+
+- The dashboard renders an explicit null `measured_at` as `Not measured`
+  instead of the string `None`.
+
+### Changed
+
+- Dependabot groups `pydantic`, `pydantic-core`, and `pydantic-settings` in
+  the MCP SDK v1 compatibility lane so the hashed lock stays resolvable.
+- Release preparation accepts the current ROADMAP release-target sentence form.
+
+### Evidence
+
+- TODO: attach release receipt evidence.
+
 ## [4.19.6] - 2026-09-15
 
 ### Fixed

@@ -18,6 +18,7 @@ jobs:
   smoke:
     name: Install and CLI Smoke Test
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -31,7 +32,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Validate shell scripts
         run: |

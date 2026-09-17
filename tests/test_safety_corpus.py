@@ -43,6 +43,17 @@ def test_collect_scan_corpus_dir_scan_cap_git_and_binary(tmp_path):
     assert "text file 00 content" in corpus
 
 
+def test_collect_scan_corpus_preserves_recursive_path_order(tmp_path):
+    (tmp_path / "a-dir").mkdir()
+    (tmp_path / "a-dir" / "nested.txt").write_text("nested\n", encoding="utf-8")
+    (tmp_path / "b.txt").write_text("root\n", encoding="utf-8")
+
+    corpus, source = collect_scan_corpus(path=str(tmp_path))
+
+    assert corpus == "nested\n\nroot\n"
+    assert source.endswith(" (2 files)")
+
+
 def test_collect_scan_corpus_default_git_diff(tmp_path):
     """path=None with a non-empty git diff HEAD uses the diff as the corpus."""
     diff_output = "diff --git a/x.py b/x.py\n+API_KEY = 'changed'\n"

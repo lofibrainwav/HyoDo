@@ -24,6 +24,7 @@ jobs:
   actionlint:
     name: "Actionlint - Workflows"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -56,6 +57,7 @@ jobs:
   truth-gate:
     name: "Truth Gate - Python ${{ matrix.python-version }}"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     strategy:
       matrix:
         python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
@@ -72,7 +74,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -154,6 +156,7 @@ jobs:
   truth-gate-mcp-v1:
     name: "Truth Gate - Python 3.12, MCP SDK v1"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -167,7 +170,12 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
+        with:
+          cache_dependency_glob: |
+            uv.lock
+            pyproject.toml
+            ci/mcp-v1/requirements.txt
 
       - name: Install locked dependencies and exercise MCP SDK v1
         run: |
@@ -200,7 +208,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -248,7 +256,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -273,6 +281,7 @@ jobs:
   goodness-safety-fixtures:
     name: "Goodness - Safety Fixtures"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -286,7 +295,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies
         run: |
@@ -320,6 +329,7 @@ jobs:
   goodness-gate:
     name: "Goodness Gate - Safety"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [goodness-public-tests, goodness-orchestration, goodness-safety-fixtures]
     if: ${{ always() }}
 
@@ -356,6 +366,7 @@ jobs:
   public-language:
     name: "Public language - commit and PR text"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     if: github.event_name == 'pull_request' || github.event_name == 'push'
 
     steps:
@@ -431,6 +442,7 @@ jobs:
   beauty-gate:
     name: "Beauty Gate - Docs"
     runs-on: ubuntu-latest
+    timeout-minutes: 10
 
     steps:
       - name: Checkout
@@ -530,6 +542,7 @@ jobs:
   sbom:
     name: "Eternity - Public SBOM"
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Advisory-first: generating the SBOM must not block the release gate yet.
     continue-on-error: true
 
@@ -545,7 +558,7 @@ jobs:
           python-version: "3.12"
 
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
 
       - name: Install locked Python dependencies (including cyclonedx-bom)
         run: |
@@ -578,6 +591,7 @@ jobs:
   trinity-score:
     name: "HyoDo Integrity Score"
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [truth-gate, truth-gate-mcp-v1, goodness-gate, beauty-gate, public-language]
     if: ${{ always() }}
 

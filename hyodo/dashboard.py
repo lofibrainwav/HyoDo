@@ -635,7 +635,8 @@ def render_dashboard_html(
     safety_source = str(safety.get("source", "Not recorded"))
     findings = safety.get("findings", [])
     high = sum(1 for finding in findings if finding.get("severity") == "high")
-    measured_at = str(evidence.get("measured_at", "Not recorded"))
+    measured_value = evidence.get("measured_at")
+    measured_at = str(measured_value) if measured_value is not None else "Not measured"
     target = str(evidence.get("target", "Not recorded"))
     gate_values = (typecheck, tests, lint)
     measured_gate_count = sum(

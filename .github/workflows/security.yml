@@ -9,10 +9,16 @@ on:
 permissions:
   contents: read
 
+# Keep only the newest security run for an active PR; never cancel main evidence.
+concurrency:
+  group: security-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   secrets:
     name: Historical and working-tree secret scan
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - name: Checkout full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
@@ -27,13 +33,14 @@ jobs:
   dependencies:
     name: Runtime dependency audit
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
       - name: Set up uv
-        uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+        uses: ./.github/actions/setup-uv-cached
       - name: Verify locked runtime export
         run: |
           uv export --frozen --no-dev --no-editable --no-emit-project \
@@ -63,6 +70,7 @@ jobs:
     name: Pull request dependency review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read

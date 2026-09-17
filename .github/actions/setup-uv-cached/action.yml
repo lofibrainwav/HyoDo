@@ -1,0 +1,19 @@
+name: Set up uv with cache
+description: Install the pinned uv action and enable lockfile-keyed artifact caching.
+
+inputs:
+  cache_dependency_glob:
+    description: Newline-separated dependency files used to key the uv cache.
+    required: false
+    default: |
+      uv.lock
+      pyproject.toml
+
+runs:
+  using: composite
+  steps:
+    - name: Set up uv
+      uses: astral-sh/setup-uv@bec219d24cd3e171d82865faccec33120bb574f4 # v10.1.0
+      with:
+        enable-cache: true
+        cache-dependency-glob: ${{ inputs.cache_dependency_glob }}

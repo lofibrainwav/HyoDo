@@ -22,8 +22,10 @@ from __future__ import annotations
 import argparse
 import contextlib
 import json
+import os
 import subprocess
 import sys
+import sysconfig
 import tempfile
 import venv
 from pathlib import Path
@@ -95,8 +97,38 @@ def normalize_for_comparison(sbom: dict) -> tuple:
     return components, dependencies
 
 
-def _run(cmd: list[str]) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(cmd, check=True, capture_output=True, text=True)
+def _run(cmd: list[str], *, env: dict[str, str] | None = None) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(cmd, check=True, capture_output=True, text=True, env=env)
+
+
+def _clean_venv_runtime_env() -> dict[str, str] | None:
+    """Return a local loader environment for portable macOS Python builds.
+
+    uv's macOS Python distributions use an ``@executable_path`` reference for
+    ``libpython``.  A venv relocates the interpreter but not that sibling
+    library, so Python launched from the clean venv can fail before pip or
+    CycloneDX gets a chance to run.  Only add the loader path when the ambient
+    interpreter explicitly advertises an existing library; other platforms and
+    incomplete installations keep the normal subprocess environment.
+    """
+    if sys.platform != "darwin":
+        return None
+
+    libdir = sysconfig.get_config_var("LIBDIR")
+    ldlib = sysconfig.get_config_var("LDLIBRARY")
+    if not libdir or not ldlib:
+        return None
+
+    library = Path(libdir) / ldlib
+    if not library.is_file():
+        return None
+
+    env = os.environ.copy()
+    existing = env.get("DYLD_LIBRARY_PATH")
+    env["DYLD_LIBRARY_PATH"] = (
+        f"{library.parent}{os.pathsep}{existing}" if existing else str(library.parent)
+    )
+    return env
 
 
 def build_clean_env(workdir: Path) -> Path:
@@ -129,6 +161,7 @@ def build_clean_env(workdir: Path) -> Path:
     py = clean / "bin" / "python"
     if not py.exists():  # pragma: no cover - windows layout
         py = clean / "Scripts" / "python.exe"
+    clean_env = _clean_venv_runtime_env()
     _run(
         [
             sys.executable,
@@ -140,7 +173,8 @@ def build_clean_env(workdir: Path) -> Path:
             "--disable-pip-version-check",
             "-q",
             str(wheels[0]),
-        ]
+        ],
+        env=clean_env,
     )
     return py
 
@@ -170,7 +204,8 @@ def generate(output: Path = DEFAULT_OUTPUT) -> dict:
                 "JSON",
                 "-o",
                 str(output),
-            ]
+            ],
+            env=_clean_venv_runtime_env(),
         )
         sbom = json.loads(output.read_text(encoding="utf-8"))
         try:
