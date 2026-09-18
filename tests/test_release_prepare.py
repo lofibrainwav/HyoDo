@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -108,6 +109,19 @@ def test_prepare_release_updates_all_version_sources(tmp_path: Path) -> None:
     assert server["packages"][0]["version"] == "4.12.0"
     marketplace = json.loads((tmp_path / ".claude-plugin" / "marketplace.json").read_text())
     assert marketplace["plugins"][0]["version"] == "4.12.0"
+
+
+def test_prepare_release_refuses_main_checkout(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "init", "-b", "main"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    with pytest.raises(ReleasePrepError, match=r"release/\* branch"):
+        prepare_release(tmp_path, "4.12.0", today="2026-09-05")
 
 
 def test_prepare_release_updates_target_but_preserves_public_baseline(tmp_path: Path) -> None:

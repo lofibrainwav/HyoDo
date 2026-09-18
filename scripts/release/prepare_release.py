@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 from datetime import date
 from pathlib import Path
 
@@ -31,6 +32,28 @@ CHANGELOG_HEADER_END = (
 
 class ReleasePrepError(RuntimeError):
     """Raised when release preparation would be unsafe or ambiguous."""
+
+
+def _require_release_branch(root: Path) -> None:
+    """Refuse release preparation on canonical or detached checkouts."""
+    if not (root / ".git").exists():
+        return
+
+    result = subprocess.run(
+        ["git", "-C", str(root), "symbolic-ref", "--quiet", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    branch = result.stdout.strip()
+    if result.returncode != 0 or not branch:
+        raise ReleasePrepError(
+            "release preparation requires a named release/* branch, not detached HEAD"
+        )
+    if not branch.startswith("release/"):
+        raise ReleasePrepError(
+            f"release preparation must run from a release/* branch, not {branch!r}"
+        )
 
 
 def _release_section(version: str, today: str) -> str:
@@ -105,6 +128,7 @@ def prepare_release(root: Path, version: str, *, today: str | None = None) -> No
         raise ReleasePrepError("version must be plain semver like 4.12.1, without a v prefix")
 
     root = root.resolve()
+    _require_release_branch(root)
     changelog = root / "CHANGELOG.md"
     release_note = root / "docs" / "releases" / f"{version}.md"
     release_date = today or date.today().isoformat()
