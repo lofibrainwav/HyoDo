@@ -38,23 +38,33 @@ python scripts/release/pipeline.py 4.19.9 \
 
 The pipeline binds `candidate_sha == remote_branch_sha == pr_head_sha` before
 CI, rechecks the PR and remote branch after CI, and blocks with
-`RECONCILIATION_REQUIRED` if either moved. It stops at `WAITING_APPROVAL` and
-never infers approval from green CI. After an independent approved review and
-an explicit authority reference, the same receipt can continue through one
-squash merge and fresh `origin/main` readback:
+`RECONCILIATION_REQUIRED` if either moved. Green CI and independent review are
+evidence, not merge authority. A human may authorize the exact candidate
+directly:
 
 ```bash
 python scripts/release/pipeline.py 4.19.9 \
-  --verify --execute --wait-ci --merge --authorize-ref <human-approval-ref>
+  --verify --execute --wait-ci --merge \
+  --authorize-ref <human-approval-ref> \
+  --authorize-sha <exact-head-sha>
 ```
 
-The authority reference is an audit pointer, not a secret. The pipeline does
-not accept a score, test result, or its own plan as merge authority.
+The authority reference is an audit pointer, not a secret. The SHA is the
+artifact binding for that human decision. Merge requires:
 
-Approval is bound to the exact head too: an approved review is accepted only
-when its GitHub `commit_id` equals the current PR head SHA. The merge adapter
-passes that expected SHA to GitHub, so a changed head cannot be merged under an
-old CI or review result.
+```text
+authorized_sha == current_pr_head == remote_candidate_sha == ci_verified_sha
+```
+
+If an independent verifier or GitHub review is absent, the receipt records
+`UNVERIFIED` with a `verifier_missing` residual; it does not replace or
+override Human Authority. A changed PR head invalidates the prior human
+authorization and returns `RECONCILIATION_REQUIRED`.
+
+Optional verifier evidence is also bound to the exact head when present, but
+it is not a merge authority. The merge adapter passes the current expected SHA
+to GitHub, so a changed head cannot be merged under an old CI or human
+authorization.
 
 ## Pipeline contract
 

@@ -79,8 +79,20 @@ def _five_w_one_h(root: Path, receipt: dict[str, Any]) -> dict[str, Any]:
         repo = _repo_slug(root)
     except PipelineExternalError:
         repo = UNOBSERVED
+    runtime_identity = _runtime_identity()
+    verifier = receipt.get("verifier", {})
+    approval = receipt.get("approval", {})
     return {
-        "who": _runtime_identity(),
+        "who": {
+            **runtime_identity,
+            "builder_agent": {
+                "agent": runtime_identity["agent"],
+                "model": runtime_identity["model"],
+                "mode": runtime_identity["mode"],
+            },
+            "verifier_agent": verifier.get("reviewer", UNOBSERVED),
+            "human_authority": approval.get("authorization_ref", UNOBSERVED),
+        },
         "when": {
             "observed_at": receipt.get("observed_at", UNOBSERVED),
             "approved_at": receipt.get("approval", {}).get("observed_at", UNOBSERVED),
@@ -96,6 +108,9 @@ def _five_w_one_h(root: Path, receipt: dict[str, Any]) -> dict[str, Any]:
         "what": {
             "pr": receipt.get("pr", {}).get("number", UNOBSERVED),
             "candidate_sha": receipt.get("candidate_sha", UNOBSERVED),
+            "authorized_sha": approval.get("authorized_sha", UNOBSERVED),
+            "ci_verified_sha": receipt.get("checks", {}).get("sha", UNOBSERVED),
+            "merge_sha": receipt.get("merge", {}).get("sha", UNOBSERVED),
             "result": receipt.get("result", UNOBSERVED),
         },
         "how": {
@@ -216,6 +231,7 @@ def _check_snapshot(root: Path, *, slug: str, sha: str) -> dict[str, Any]:
         and item.get("conclusion") not in {"success", "skipped"}
     ]
     return {
+        "sha": sha,
         "total": len(checks),
         "pending": pending,
         "failed": failed,
@@ -266,6 +282,64 @@ def _approved_review(root: Path, *, slug: str, number: int, author: str) -> dict
     }
 
 
+def _human_authority_gate(
+    *,
+    authorize_ref: str | None,
+    authorize_sha: str | None,
+    current_pr_head: str,
+    remote_candidate_sha: str,
+    ci_verified_sha: str,
+    verifier: dict[str, Any],
+) -> dict[str, Any]:
+    """Evaluate human authority separately from optional verifier evidence."""
+    verifier_status = "VERIFIED" if verifier.get("approved") else "UNVERIFIED"
+    verifier_residual = None if verifier.get("approved") else "verifier_missing"
+    result: dict[str, Any] = {
+        "human_authority": {
+            "authorization_ref": authorize_ref or UNOBSERVED,
+            "authorized_sha": authorize_sha or UNOBSERVED,
+        },
+        "verifier": {
+            "status": verifier_status,
+            "reviewer": verifier.get("reviewer") or UNOBSERVED,
+            "review_id": verifier.get("review_id") or UNOBSERVED,
+            "review_commit_sha": verifier.get("review_commit_sha") or UNOBSERVED,
+            "residual": verifier_residual,
+        },
+    }
+    if not authorize_ref or not authorize_sha:
+        result.update(
+            {
+                "stage": "WAITING_APPROVAL",
+                "result": "WAIT",
+                "residuals": ["human exact-head authorization is required"],
+            }
+        )
+        return result
+
+    observed = {
+        "authorized_sha": authorize_sha,
+        "current_pr_head": current_pr_head,
+        "remote_candidate_sha": remote_candidate_sha,
+        "ci_verified_sha": ci_verified_sha,
+    }
+    if len(set(observed.values())) != 1:
+        result.update(
+            {
+                "stage": "RECONCILIATION_REQUIRED",
+                "result": "BLOCK",
+                "residuals": [
+                    "human authorization or verified artifact is bound to a different head"
+                ],
+                "head_binding": observed,
+            }
+        )
+        return result
+
+    result.update({"stage": "AUTHORIZED", "result": "PASS", "head_binding": observed})
+    return result
+
+
 def readback_main(root: Path, *, expected_sha: str) -> dict[str, Any]:
     remote = _git_text(root, "ls-remote", "origin", "refs/heads/main")
     observed_sha = remote.split()[0] if remote else ""
@@ -308,6 +382,7 @@ def run_pipeline(
     wait_for_ci: bool = False,
     merge: bool = False,
     authorize_ref: str | None = None,
+    authorize_sha: str | None = None,
     pr_title: str | None = None,
     pr_body: str = "",
 ) -> dict[str, Any]:
@@ -446,7 +521,7 @@ def run_pipeline(
 
     if not wait_for_ci and not merge:
         receipt["stage"] = "PR_OPEN"
-        receipt["next_action"] = "rerun with --wait-ci; approval and merge remain blocked"
+        receipt["next_action"] = "rerun with --wait-ci; human exact-head authority is required"
         return receipt
 
     try:
@@ -490,40 +565,47 @@ def run_pipeline(
 
     if not merge:
         receipt["result"] = "PASS"
-        receipt["next_action"] = "human approval and --merge --authorize-ref are required"
-        return receipt
-
-    if not authorize_ref:
-        receipt.update(
-            {
-                "stage": "WAITING_APPROVAL",
-                "result": "WAIT",
-                "residuals": ["explicit authorize_ref is required"],
-                "next_action": "provide --authorize-ref only after human approval",
-            }
+        receipt["next_action"] = (
+            "human exact-head approval and --merge --authorize-ref --authorize-sha are required"
         )
         return receipt
 
     try:
         pr_data = _gh_json(root, f"repos/{slug}/pulls/{receipt['pr']['number']}")
+        current_head = pr_data.get("head", {}).get("sha")
+        remote_head = _remote_branch_sha(root, _branch(root))
+        ci_verified_sha = receipt.get("checks", {}).get("sha", UNOBSERVED)
         approval = _approved_review(
             root,
             slug=slug,
             number=receipt["pr"]["number"],
             author=pr_data.get("user", {}).get("login", ""),
         )
-        receipt["approval"] = {
-            "authorization_ref": authorize_ref,
-            "observed_at": _now(),
-            **approval,
-        }
-        if not approval["approved"] or approval["review_commit_sha"] != receipt["pr"]["head_sha"]:
+        if approval["approved"] and approval["review_commit_sha"] != current_head:
+            approval["approved"] = False
+            approval["review_stale"] = True
+        gate = _human_authority_gate(
+            authorize_ref=authorize_ref,
+            authorize_sha=authorize_sha,
+            current_pr_head=current_head,
+            remote_candidate_sha=remote_head,
+            ci_verified_sha=ci_verified_sha,
+            verifier=approval,
+        )
+        receipt["approval"] = {"observed_at": _now(), **gate["human_authority"]}
+        receipt["verifier"] = gate["verifier"]
+        if gate["result"] != "PASS":
             receipt.update(
                 {
-                    "stage": "WAITING_APPROVAL",
-                    "result": "WAIT",
-                    "residuals": ["approval is absent or bound to a different head"],
-                    "next_action": "obtain independent approval on the exact head; no merge occurred",
+                    "stage": gate["stage"],
+                    "result": gate["result"],
+                    "residuals": gate["residuals"],
+                    "head_binding": gate.get("head_binding"),
+                    "next_action": (
+                        "provide human exact-head authorization; no merge occurred"
+                        if gate["stage"] == "WAITING_APPROVAL"
+                        else "reconcile remote state and re-authorize the exact head"
+                    ),
                 }
             )
             return receipt
@@ -591,6 +673,9 @@ def main(argv: list[str] | None = None) -> int:
         "--merge", action="store_true", help="Merge only after approval and authorization"
     )
     parser.add_argument("--authorize-ref", help="Human authorization reference required for merge")
+    parser.add_argument(
+        "--authorize-sha", help="Exact candidate SHA covered by the human authorization"
+    )
     parser.add_argument("--pr-title", help="PR title when creating a candidate PR")
     parser.add_argument("--pr-body", default="", help="PR body when creating a candidate PR")
     args = parser.parse_args(argv)
@@ -604,6 +689,7 @@ def main(argv: list[str] | None = None) -> int:
         wait_for_ci=args.wait_ci,
         merge=args.merge,
         authorize_ref=args.authorize_ref,
+        authorize_sha=args.authorize_sha,
         pr_title=args.pr_title,
         pr_body=args.pr_body,
     )
