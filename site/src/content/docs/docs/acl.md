@@ -3,7 +3,7 @@ title: ACL — Adaptive Collaboration Layer
 description: A working field note on evidence-grounded support profiles, human wisdom as a metacognitive prior, and measurable collaboration friction.
 ---
 
-> **Status — working research field note, reviewed 2026-09-08.** ACL here means **Adaptive Collaboration Layer**, not the Association for Computational Linguistics. This page is not a claim of peer review, venue submission, first-in-field novelty, or measured effectiveness.
+> **Status — research-only field note, reviewed 2026-09-08.** ACL here means **Adaptive Collaboration Layer**, not the Association for Computational Linguistics. It is not a shipped HyoDo capability, runtime, or authority layer. This page is not a claim of peer review, venue submission, first-in-field novelty, or measured effectiveness.
 
 # Adaptive Collaboration Layer
 
@@ -22,7 +22,7 @@ The public product boundary is fixed below. The [Measured Run #1 receipt](https:
 | Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
 | IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
-| ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Research-only hypothesis; no shipped runtime or automatic router. |
 | friction collector | NOT BUILT | No collector/uploader; transport disabled. |
 
 HyoDo measures what happened. ACL asks a different question:

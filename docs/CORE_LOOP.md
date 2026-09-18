@@ -12,12 +12,13 @@ Every HyoDo improvement cycle follows this ordered path:
 Human Intent
 → Goal
 → Observe Reality
-→ 眞 Truth
-→ 善 Good
-→ 美 Beauty
-→ 仁 Humanity
-→ 孝 Hyo
-→ 永 Longevity
+→ Six independent lens measurements
+   ├─ 眞 Truth
+   ├─ 善 Goodness
+   ├─ 美 Beauty
+   ├─ 仁 Benevolence
+   ├─ 孝 Hyo
+   └─ 永 Eternity
 → Gap / Friction / Unknown
 → Smallest Useful Improvement
 → Verify
@@ -30,9 +31,12 @@ Human Intent
 → Repeat
 ```
 
-The six virtues are independent evidence lenses. HyoDo is the whole loop; 孝
-is one lens within it. A score, receipt, or lens result is not authority and
-must not silently authorize an action in an integrating host.
+The six virtues are independent evidence lenses measured as a fan-out after
+reality is observed, then brought together for gap and friction analysis.
+They are not a serial checklist and do not imply that one lens depends on the
+previous lens. HyoDo is the whole loop; 孝 is one lens within it. A score,
+receipt, or lens result is not authority and must not silently authorize an
+action in an integrating host.
 
 ### Required records
 

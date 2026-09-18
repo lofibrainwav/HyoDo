@@ -39,7 +39,7 @@ The matrix below compares the 4.19.5 public package with main as measured on
 | orchestration observation ingest | SHIPPED | SHIPPED |
 | Graph v2 multi-parent runtime | SHIPPED | SHIPPED; deterministic multi-parent graph with v1 compatibility |
 | Information Flow Attestation v0 | SHIPPED | SHIPPED observer-only; non-authoritative |
-| ACL / Wisdom Reflex automatic routing | RESEARCH | RESEARCH / shadow only |
+| Adaptive support-allocation experiments | RESEARCH | Downstream research / shadow only |
 | public remote MCP | CONTRACT ONLY | CONTRACT ONLY / UNOBSERVED |
 | friction collector/uploader | NOT BUILT | NOT BUILT |
 
@@ -49,10 +49,10 @@ The matrix below compares the 4.19.5 public package with main as measured on
 KINGDOM  executes / orchestrates
 EROS / host policy owns execution authority
 Evidence Gate      judges completion evidence
-ACL      makes shadow recommendations
+Downstream research makes non-authoritative shadow recommendations
 HyoDo    observes / records / validates / attests / measures
 ```
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
-ACL/KINGDOM experiments are downstream integration/research work. They are not
+Support-allocation/KINGDOM experiments are downstream integration/research work. They are not
 prerequisites for calling the HyoDo 4.19.8 public artifact released and verified.

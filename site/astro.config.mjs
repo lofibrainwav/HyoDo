@@ -49,7 +49,6 @@ export default defineConfig({
 				{ label: 'Eye', slug: 'docs/eye' },
 				{ label: 'Connect', slug: 'docs/connect' },
 				{ label: 'Friction Contribution', slug: 'docs/friction-contribution' },
-				{ label: 'ACL — Adaptive Collaboration Layer', slug: 'docs/acl' },
 				{ label: 'Research', slug: 'docs/research' },
 				{ label: 'Roadmap', slug: 'docs/roadmap' },
 				{ label: 'Trust', slug: 'docs/trust' },
