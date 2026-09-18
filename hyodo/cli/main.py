@@ -4565,8 +4565,8 @@ def policy_check(
     """
     Evaluate one event against a local policy.toml.
 
-    Exit: 0 ALLOW · 1 DENY · 2 unobserved (missing/invalid policy or event) ·
-    3 ASK (operator decision required). ``--shadow`` forces exit 0 regardless
+    Exit codes: 0 ALLOW · 1 DENY · 2 UNOBSERVED · 3 ASK.
+    ASK requires an operator decision. ``--shadow`` forces exit 0 regardless
     of the decision (the decision itself is still printed/returned, never
     hidden). Does not write the ledger (use ``hyodo event record --policy``
     for that).
