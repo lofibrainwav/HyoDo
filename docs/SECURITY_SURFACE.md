@@ -10,6 +10,14 @@ repository today.
 - Public tests: `tests/` — release gate: Yes (`pytest`)
 - Release/verify scripts: `scripts/` — release gate: Yes
 
+## Static analysis
+
+The repository has a dedicated CodeQL workflow at
+`.github/workflows/codeql.yml`. It analyzes Python on pull requests, pushes to
+`main`, and the scheduled workflow. This establishes a SAST evidence producer;
+the result of each run remains a separate observation and is not an approval
+authority. OpenSSF Scorecard remains a separate supply-chain posture signal.
+
 ## Thin runtime dependency surface
 
 `pyproject.toml` declares three runtime dependencies for the `hyodo` package
