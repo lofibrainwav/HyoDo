@@ -5,7 +5,6 @@ from __future__ import annotations
 import re
 from pathlib import Path
 
-
 WORKFLOW = Path(__file__).parents[1] / ".github" / "workflows" / "codeql.yml"
 PINNED_ACTION = re.compile(r"uses:\s+[^\s@]+@[0-9a-f]{40}(?:\s+#.*)?$")
 
