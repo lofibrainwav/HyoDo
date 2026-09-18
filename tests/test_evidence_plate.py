@@ -28,6 +28,7 @@ def test_plate_is_observed_without_becoming_a_decision() -> None:
             "exact_artifact_sha": "b" * 64,
             "observed_at": "2026-09-18T00:00:00Z",
             "provenance": "fixture",
+            "freshness": "fresh",
         },
         "truth",
     )
@@ -40,6 +41,22 @@ def test_missing_artifact_is_unobserved() -> None:
     plate = make_evidence_plate({"freshness": "fresh"}, "truth")
     assert plate["state"] == "UNOBSERVED"
     assert "artifact_sha_unobserved" in plate["residuals"]
+
+
+def test_unrelated_atoms_do_not_leak_between_lenses() -> None:
+    plate = make_evidence_plate(
+        {
+            "exact_artifact_sha": "c" * 40,
+            "freshness": "fresh",
+            "safety": "observed",
+            "clarity": "observed",
+        },
+        "truth",
+    )
+    assert {atom["key"] for atom in plate["evidence_atoms"]} == {"freshness"}
+    assert "unrelated_evidence:safety" in plate["residuals"]
+    assert "unrelated_evidence:clarity" in plate["residuals"]
+    assert plate["legitimate_dependencies"] == ["exact_artifact_sha"]
 
 
 def test_schema_pin_matches_public_plate_schema() -> None:

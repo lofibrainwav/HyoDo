@@ -4,7 +4,7 @@
   "title": "HyoDo Evidence Plate v1",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "lens", "state", "exact_artifact_sha", "observed_at", "evidence_atoms", "authority", "residuals"],
+  "required": ["schema_version", "lens", "state", "exact_artifact_sha", "observed_at", "evidence_atoms", "authority", "legitimate_dependencies", "residuals"],
   "properties": {
     "schema_version": {"const": "hyodo.evidence-plate/v1"},
     "lens": {"enum": ["truth", "goodness", "beauty", "benevolence", "hyo", "eternity"]},
@@ -13,6 +13,7 @@
     "observed_at": {"type": "string", "minLength": 1},
     "evidence_atoms": {"type": "array"},
     "authority": {"const": "UNOBSERVED"},
+    "legitimate_dependencies": {"type": "array", "items": {"type": "string"}},
     "residuals": {"type": "array", "items": {"type": "string"}}
   }
 }

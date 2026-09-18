@@ -14,6 +14,18 @@ LENSES = ("truth", "goodness", "beauty", "benevolence", "hyo", "eternity")
 _FORBIDDEN = frozenset({"authority", "approval", "merge", "route", "score", "decision"})
 _SHA_LENGTHS = {40, 64}
 
+# Public v1 extraction contract.  Keys absent from a lens are not silently
+# reused: the plate records them as residuals instead.
+LENS_ALLOWED_EVIDENCE = {
+    "truth": frozenset({"freshness", "provenance", "reproducibility"}),
+    "goodness": frozenset({"safety"}),
+    "beauty": frozenset({"clarity"}),
+    "benevolence": frozenset({"impact"}),
+    "hyo": frozenset({"consent"}),
+    "eternity": frozenset({"continuity"}),
+}
+LEGITIMATE_DEPENDENCIES = {"exact_artifact_sha"}
+
 
 def _valid_artifact_sha(value: Any) -> bool:
     return (
@@ -42,11 +54,17 @@ def extract_evidence_atoms(envelope: dict[str, Any]) -> list[dict[str, Any]]:
 def extract_lens_evidence(
     atoms: list[dict[str, Any]], lens: str
 ) -> tuple[list[dict[str, Any]], list[str]]:
-    """Project shared atoms to a lens without inventing missing observations."""
+    """Project only contract-allowed atoms and expose leakage as residuals."""
     if lens not in LENSES:
         return [], ["unknown_lens"]
-    selected = [atom for atom in atoms if atom.get("key") not in _FORBIDDEN]
-    return selected, []
+    allowed = LENS_ALLOWED_EVIDENCE[lens]
+    selected = [atom for atom in atoms if atom.get("key") in allowed]
+    residuals = [
+        f"unrelated_evidence:{atom.get('key')}"
+        for atom in atoms
+        if atom.get("key") not in allowed and atom.get("key") not in _FORBIDDEN
+    ]
+    return selected, residuals
 
 
 def make_evidence_plate(
@@ -58,7 +76,10 @@ def make_evidence_plate(
     selected, residuals = extract_lens_evidence(atoms, lens)
     if not _valid_artifact_sha(artifact_sha):
         residuals = [*residuals, "artifact_sha_unobserved"]
-    state = "OBSERVED" if selected and not residuals else "UNOBSERVED"
+    # An observed plate may still carry residuals.  Residuals describe
+    # excluded or unresolved inputs; they must not be silently promoted, but
+    # they also must not erase an independently observed allowed signal.
+    state = "OBSERVED" if selected and _valid_artifact_sha(artifact_sha) else "UNOBSERVED"
     return {
         "schema_version": "hyodo.evidence-plate/v1",
         "lens": lens,
@@ -67,5 +88,6 @@ def make_evidence_plate(
         "observed_at": observed_at or envelope.get("observed_at", "UNOBSERVED"),
         "evidence_atoms": selected,
         "authority": "UNOBSERVED",
+        "legitimate_dependencies": sorted(LEGITIMATE_DEPENDENCIES),
         "residuals": residuals,
     }
