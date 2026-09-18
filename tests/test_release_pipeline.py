@@ -3,10 +3,11 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 from test_release_plan import init_checkout
 from test_release_prepare import write_minimal_repo
 
-from scripts.release.pipeline import run_pipeline
+from scripts.release.pipeline import PipelineExternalError, push_candidate, run_pipeline
 
 
 def test_pipeline_is_zero_write_and_stops_at_plan(tmp_path: Path) -> None:
@@ -72,3 +73,20 @@ def test_external_stages_require_local_verification(tmp_path: Path) -> None:
     assert receipt["stage"] == "BLOCKED"
     assert receipt["external_mutation"] is False
     assert receipt["residuals"] == ["external stages require --verify"]
+
+
+def test_push_candidate_refuses_remote_head_mismatch(tmp_path: Path, monkeypatch) -> None:
+    write_minimal_repo(tmp_path)
+    init_checkout(tmp_path, "feat/candidate")
+
+    class Pushed:
+        returncode = 0
+        stdout = ""
+        stderr = ""
+
+    monkeypatch.setattr("scripts.release.pipeline.subprocess.run", lambda *args, **kwargs: Pushed())
+    monkeypatch.setattr("scripts.release.pipeline._branch", lambda root: "feat/candidate")
+    monkeypatch.setattr("scripts.release.pipeline._remote_branch_sha", lambda root, branch: "wrong")
+
+    with pytest.raises(PipelineExternalError, match="RECONCILIATION_REQUIRED"):
+        push_candidate(tmp_path, candidate_sha="planned")

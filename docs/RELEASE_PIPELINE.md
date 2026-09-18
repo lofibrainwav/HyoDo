@@ -26,11 +26,22 @@ available only as explicit, fail-closed adapters:
 python scripts/release/pipeline.py 4.19.9 --verify --execute --wait-ci
 ```
 
-This creates or reuses one PR, waits for checks on the exact head SHA, and
-stops at `WAITING_APPROVAL`. It never infers approval from green CI. After an
-independent approved review and an explicit authority reference, the same
-receipt can continue through one squash merge and fresh `origin/main`
-readback:
+By default, `--execute` requires that the current branch already exists on the
+remote at exactly the planned candidate SHA. To make the pipeline own the
+candidate push, add `--push-candidate`; it pushes once and immediately reads
+the remote branch back before creating the PR:
+
+```bash
+python scripts/release/pipeline.py 4.19.9 \
+  --verify --execute --push-candidate --wait-ci
+```
+
+The pipeline binds `candidate_sha == remote_branch_sha == pr_head_sha` before
+CI, rechecks the PR and remote branch after CI, and blocks with
+`RECONCILIATION_REQUIRED` if either moved. It stops at `WAITING_APPROVAL` and
+never infers approval from green CI. After an independent approved review and
+an explicit authority reference, the same receipt can continue through one
+squash merge and fresh `origin/main` readback:
 
 ```bash
 python scripts/release/pipeline.py 4.19.9 \
@@ -39,6 +50,11 @@ python scripts/release/pipeline.py 4.19.9 \
 
 The authority reference is an audit pointer, not a secret. The pipeline does
 not accept a score, test result, or its own plan as merge authority.
+
+Approval is bound to the exact head too: an approved review is accepted only
+when its GitHub `commit_id` equals the current PR head SHA. The merge adapter
+passes that expected SHA to GitHub, so a changed head cannot be merged under an
+old CI or review result.
 
 ## Pipeline contract
 

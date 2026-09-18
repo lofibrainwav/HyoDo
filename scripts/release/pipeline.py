@@ -76,6 +76,38 @@ def _repo_slug(root: Path) -> str:
     return f"{match.group(1)}/{match.group(2)}"
 
 
+def _branch(root: Path) -> str:
+    return _git_text(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+
+
+def _remote_branch_sha(root: Path, branch: str) -> str:
+    remote = _git_text(root, "ls-remote", "origin", f"refs/heads/{branch}")
+    return remote.split()[0] if remote else ""
+
+
+def push_candidate(root: Path, *, candidate_sha: str) -> dict[str, str]:
+    """Push the named candidate once, then bind the remote branch to its SHA."""
+    branch = _branch(root)
+    if not branch or branch in {"main", "master"}:
+        raise PipelineExternalError("candidate push requires a named non-main branch")
+    result = subprocess.run(
+        ["git", "-C", str(root), "push", "origin", f"HEAD:{branch}"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        raise PipelineExternalError(
+            result.stderr.strip() or result.stdout.strip() or "git push failed"
+        )
+    remote_sha = _remote_branch_sha(root, branch)
+    if remote_sha != candidate_sha:
+        raise PipelineExternalError(
+            f"RECONCILIATION_REQUIRED: candidate {candidate_sha} != remote {remote_sha}"
+        )
+    return {"branch": branch, "candidate_sha": candidate_sha, "remote_sha": remote_sha}
+
+
 def _gh_json(
     root: Path, *args: str, method: str = "GET", fields: dict[str, str] | None = None
 ) -> Any:
@@ -105,7 +137,7 @@ def _open_pr(root: Path, *, base: str, branch: str, slug: str) -> dict[str, Any]
 
 def create_one_pr(root: Path, *, base: str = "main", title: str, body: str) -> dict[str, Any]:
     """Create or reuse exactly one open PR for the current candidate branch."""
-    branch = _git_text(root, "symbolic-ref", "--quiet", "--short", "HEAD")
+    branch = _branch(root)
     if not branch or branch in {"main", "master"}:
         raise PipelineExternalError("one-PR stage requires a named non-main candidate branch")
     slug = _repo_slug(root)
@@ -172,7 +204,14 @@ def _approved_review(root: Path, *, slug: str, number: int, author: str) -> dict
         for review in reviews
         if review.get("state") == "APPROVED" and review.get("user", {}).get("login") != author
     ]
-    return {"approved": bool(approved), "count": len(approved)}
+    latest = approved[-1] if approved else None
+    return {
+        "approved": bool(approved),
+        "count": len(approved),
+        "review_id": latest.get("id") if latest else None,
+        "reviewer": latest.get("user", {}).get("login") if latest else None,
+        "review_commit_sha": latest.get("commit_id") if latest else None,
+    }
 
 
 def readback_main(root: Path, *, expected_sha: str) -> dict[str, Any]:
@@ -209,6 +248,7 @@ def run_pipeline(
     base_ref: str = "origin/main",
     verify: bool = False,
     execute: bool = False,
+    push_candidate_stage: bool = False,
     wait_for_ci: bool = False,
     merge: bool = False,
     authorize_ref: str | None = None,
@@ -217,8 +257,12 @@ def run_pipeline(
 ) -> dict[str, Any]:
     """Run the release line, with external mutation opt-in and fail-closed gates."""
     root = root.resolve()
-    if (execute or merge or wait_for_ci) and not verify:
+    if (execute or merge or wait_for_ci or push_candidate_stage) and not verify:
         return _blocked(root, version, "external stages require --verify")
+    if push_candidate_stage and not execute:
+        return _blocked(root, version, "push stage requires --execute")
+    if merge and not (execute and wait_for_ci):
+        return _blocked(root, version, "merge stage requires --execute --wait-ci")
     try:
         plan = plan_release(root, version, base_ref=base_ref)
     except ReleasePlanError as exc:
@@ -287,6 +331,22 @@ def run_pipeline(
 
     try:
         slug = _repo_slug(root)
+        if push_candidate_stage:
+            receipt["push"] = push_candidate(root, candidate_sha=receipt["candidate_sha"])
+            receipt["stages"]["push_candidate"] = "PASS"
+            receipt["external_mutation"] = True
+        else:
+            remote_sha = _remote_branch_sha(root, _branch(root))
+            receipt["push"] = {
+                "branch": _branch(root),
+                "candidate_sha": receipt["candidate_sha"],
+                "remote_sha": remote_sha,
+                "result": "PASS" if remote_sha == receipt["candidate_sha"] else "BLOCK",
+            }
+            if remote_sha != receipt["candidate_sha"]:
+                raise PipelineExternalError(
+                    "RECONCILIATION_REQUIRED: remote branch is not the planned candidate"
+                )
         pr_result = create_one_pr(
             root,
             title=pr_title or f"release: {version}",
@@ -301,6 +361,10 @@ def run_pipeline(
             "base_sha": pr["base"]["sha"],
         }
         receipt["external_mutation"] = pr_result["created"]
+        if receipt["pr"]["head_sha"] != receipt["candidate_sha"]:
+            raise PipelineExternalError(
+                "RECONCILIATION_REQUIRED: PR head is not the planned candidate"
+            )
         receipt["stages"]["create_one_pr"] = "PASS"
         receipt["stage"] = "PR_OPEN"
     except PipelineExternalError as exc:
@@ -334,6 +398,19 @@ def run_pipeline(
             )
             return receipt
         receipt["stage"] = "REMOTE_GATED"
+        current_pr = _gh_json(root, f"repos/{slug}/pulls/{receipt['pr']['number']}")
+        current_head = current_pr.get("head", {}).get("sha")
+        remote_head = _remote_branch_sha(root, _branch(root))
+        if current_head != receipt["pr"]["head_sha"] or remote_head != receipt["pr"]["head_sha"]:
+            receipt.update(
+                {
+                    "stage": "RECONCILIATION_REQUIRED",
+                    "result": "BLOCK",
+                    "residuals": ["PR or remote branch moved after CI"],
+                    "next_action": "replan and rerun CI for the new exact head",
+                }
+            )
+            return receipt
     except PipelineExternalError as exc:
         receipt.update(
             {
@@ -370,13 +447,13 @@ def run_pipeline(
             author=pr_data.get("user", {}).get("login", ""),
         )
         receipt["approval"] = {"authorization_ref": authorize_ref, **approval}
-        if not approval["approved"]:
+        if not approval["approved"] or approval["review_commit_sha"] != receipt["pr"]["head_sha"]:
             receipt.update(
                 {
                     "stage": "WAITING_APPROVAL",
                     "result": "WAIT",
-                    "residuals": ["no independent approved review observed"],
-                    "next_action": "obtain independent review; no merge occurred",
+                    "residuals": ["approval is absent or bound to a different head"],
+                    "next_action": "obtain independent approval on the exact head; no merge occurred",
                 }
             )
             return receipt
@@ -386,6 +463,7 @@ def run_pipeline(
             method="PUT",
             fields={
                 "merge_method": "squash",
+                "sha": receipt["pr"]["head_sha"],
                 "commit_title": f"{pr_data['title']} (#{receipt['pr']['number']})",
             },
         )
@@ -427,6 +505,11 @@ def main(argv: list[str] | None = None) -> int:
         help="Run scripts/verify-public.sh after a passing plan; still no push or merge",
     )
     parser.add_argument("--execute", action="store_true", help="Create or reuse one GitHub PR")
+    parser.add_argument(
+        "--push-candidate",
+        action="store_true",
+        help="Push and bind the candidate before creating a PR",
+    )
     parser.add_argument("--wait-ci", action="store_true", help="Wait for exact-head CI")
     parser.add_argument(
         "--merge", action="store_true", help="Merge only after approval and authorization"
@@ -441,6 +524,7 @@ def main(argv: list[str] | None = None) -> int:
         base_ref=args.base_ref,
         verify=args.verify,
         execute=args.execute,
+        push_candidate_stage=args.push_candidate,
         wait_for_ci=args.wait_ci,
         merge=args.merge,
         authorize_ref=args.authorize_ref,
