@@ -1,0 +1,10 @@
+{
+  "candidate": "M1",
+  "status": "IMPLEMENTED",
+  "success": ["100 deterministic cases", "positive and negative controls", "authority excluded from decisions"],
+  "failure": [],
+  "surprising": ["cross-lens signal is preserved as a dimension without becoming authority"],
+  "useful_oddity": ["ten scenarios repeated ten times makes drift visible without nondeterminism"],
+  "reusable_component": ["deterministic factorial case generator"],
+  "conflict": ["synthetic controls do not establish real-world validity"]
+}
