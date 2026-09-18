@@ -9,6 +9,8 @@ from typing import Any
 
 @dataclass(frozen=True)
 class FactorialCase:
+    """One deterministic cell in the controlled measurement fixture."""
+
     case_id: str
     replicate: int
     artifact_present: bool
