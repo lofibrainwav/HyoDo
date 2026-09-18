@@ -123,7 +123,9 @@ def run_benchmark() -> dict[str, Any]:
     """Run all 100 cases and return an authority-free measurement report."""
     cases = build_cases()
     results = [evaluate_case(case) for case in cases]
-    response_matrix = {source: dict.fromkeys(LENSES, 0) for source in LENSES}
+    response_matrix: dict[str, dict[str, int]] = {
+        source: dict.fromkeys(LENSES, 0) for source in LENSES
+    }
     for case, result in zip(cases, results, strict=True):
         if case.category == "single_factor" and result["observed"] == "OBSERVED":
             response_matrix[case.target_lens or LENSES[0]][case.target_lens or LENSES[0]] += 1
