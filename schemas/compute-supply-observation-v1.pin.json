@@ -1,0 +1,7 @@
+{
+  "algorithm": "sha256",
+  "digest": "f9875288fcaa0eebd5a87df611cf4d49ac2b7bf0423650e976b87d9bfd37ec96",
+  "schema": "compute-supply-observation-v1.schema.json",
+  "schema_id": "https://hyodo.app/schemas/compute-supply-observation-v1.schema.json",
+  "schema_version": "hyodo.compute-supply-observation/v1"
+}
