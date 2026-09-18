@@ -26,11 +26,27 @@ Command gates (Truth, Goodness, Beauty) run tools the project already owns —
 (Benevolence, Hyo, Yeong) are never replaced by a shell command; when they
 are unavailable, they are reported as "Not measured," not silently skipped.
 
+The philosophical scope of Benevolence (仁) includes other-awareness,
+relationship awareness, and sensitivity to participants, roles, and context.
+Its current measurable proxy is narrower: public usability, API/onboarding
+clarity, and user-facing failure visibility. Public usability is one proxy for
+仁, not 仁 itself.
+
 In HyoDo, Hyo (孝) is the idea that technology should respect people's time,
-choices, and relationships, and carry its share of the burden. The current
-package represents this axis through consent, context alignment, and evidence
-about data protection. This is a bounded part of the philosophy: HyoDo does not
-measure every human cost or implement a general evaluator for all six values.
+choices, and relationships, carry its share of the burden, and preserve
+protective friction when it prevents harm. Current proxies include consent,
+context alignment, privacy/data protection, and observed friction or
+intervention signals. These proxies do not measure total human cost, and HyoDo
+does not define a calibrated friction score or a general evaluator for all six
+values.
+
+```text
+MeasuredProxy_仁 ⊂ Scope_仁
+MeasuredProxy_孝 ⊂ Scope_孝
+```
+
+Neither proxy is authority. Both remain review signals with explicit
+`OBSERVED` / `PARTIAL` / `UNOBSERVED` state.
 
 ### Existing score-command compatibility
 

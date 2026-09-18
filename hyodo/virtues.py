@@ -20,8 +20,12 @@ class VirtueContract:
     korean: str
     hanja: str
     technical_meaning: str
+    philosophical_scope: str
+    measurable_proxy: str
     admissible_evidence: str
     measurement_status: str
+    coverage_limitation: str
+    authority_boundary: str
     score_role: str
     graph_representation: str
 
@@ -33,8 +37,12 @@ VIRTUE_CONTRACT: tuple[VirtueContract, ...] = (
         "진",
         "眞",
         "technical correctness",
+        "Truthful technical claims and correct representation of system behavior",
+        "Tests, typing, and static checks",
         "tests, typing, and static checks",
         "OBSERVED/PARTIAL/UNOBSERVED",
+        "Checks cover selected implementation properties, not truth in every context",
+        "Review signal only; never execution authority",
         "independent measured axis",
         "pillar column",
     ),
@@ -44,8 +52,12 @@ VIRTUE_CONTRACT: tuple[VirtueContract, ...] = (
         "선",
         "善",
         "safety and stability",
+        "Reduce preventable harm while preserving necessary safeguards",
+        "Safety findings and coverage",
         "safety findings and coverage",
         "OBSERVED/PARTIAL/UNOBSERVED",
+        "Safety checks do not measure all downstream harm or risk",
+        "Review signal only; never execution authority",
         "independent measured axis",
         "pillar column",
     ),
@@ -55,8 +67,12 @@ VIRTUE_CONTRACT: tuple[VirtueContract, ...] = (
         "미",
         "美",
         "clarity and maintainability",
+        "Coherence, clarity, and form that make work easier to understand and maintain",
+        "Lint, format, and clarity evidence",
         "lint, format, and clarity evidence",
         "OBSERVED/PARTIAL/UNOBSERVED",
+        "Style and clarity signals do not establish usability for every audience",
+        "Review signal only; never execution authority",
         "independent measured axis",
         "pillar column",
     ),
@@ -66,8 +82,12 @@ VIRTUE_CONTRACT: tuple[VirtueContract, ...] = (
         "인",
         "仁",
         "public and developer usability",
+        "Other-awareness, relationship awareness, and sensitivity to participant, role, and context",
+        "Public usability, API/onboarding clarity, and user-facing failure visibility",
         "public-surface and onboarding evidence",
         "OBSERVED/PARTIAL/UNOBSERVED",
+        "These human-facing signals do not fully measure relationships, other-awareness, or participant experience",
+        "Review signal only; never execution authority",
         "independent measured axis",
         "pillar column",
     ),
@@ -77,8 +97,12 @@ VIRTUE_CONTRACT: tuple[VirtueContract, ...] = (
         "효",
         "孝",
         "consent, context alignment, and data protection",
+        "Technology carries its share of the burden; respect choice, consent, context, and protective friction",
+        "Consent, context alignment, privacy/data protection, and observed friction or intervention signals",
         "policy, host-binding, and access-ledger evidence",
         "OBSERVED/PARTIAL/UNOBSERVED",
+        "Current proxies do not measure total human cost; no calibrated friction score is defined",
+        "Review signal only; never execution authority",
         "independent measured axis",
         "pillar column",
     ),
@@ -88,8 +112,12 @@ VIRTUE_CONTRACT: tuple[VirtueContract, ...] = (
         "영",
         "永",
         "continuity, persistence, and longitudinal evidence",
+        "Preserve continuity and learn responsibly across time",
+        "Append-only history and continuity evidence",
         "append-only history and continuity evidence",
         "OBSERVED/PARTIAL/UNOBSERVED",
+        "History and continuity records do not prove long-term value by themselves",
+        "Review signal only; never execution authority",
         "independent measured axis",
         "continuity indicator",
     ),

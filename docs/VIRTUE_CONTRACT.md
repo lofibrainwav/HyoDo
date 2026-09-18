@@ -13,6 +13,41 @@ contract without creating a second list.
 | Hyo | Hyo | `hyo` / Hyo | 孝 / 효; policy, host-binding, access-ledger evidence | Independent measured axis | Pillar column |
 | Eternity / Yeong | Longevity | `eternity` / Eternity | 永 / 영; append-only history and continuity evidence | Independent measured axis | Continuity indicator |
 
+## Scope, proxy, and authority contract
+
+Each axis keeps its philosophical scope separate from the evidence HyoDo can
+currently measure. A proxy is a bounded observation surface, not the virtue
+itself. Every axis also carries an explicit coverage limitation and the same
+authority boundary: review signal only; never execution authority.
+
+| Canonical virtue | Philosophical scope | Current measurable proxy | Coverage limitation |
+|---|---|---|---|
+| Truth | Truthful technical claims and correct representation of system behavior | Tests, typing, and static checks | Selected implementation properties only; not truth in every context |
+| Goodness | Reduce preventable harm while preserving necessary safeguards | Safety findings and coverage | Does not measure all downstream harm or risk |
+| Beauty | Coherence, clarity, and form that make work easier to understand and maintain | Lint, format, and clarity evidence | Does not establish usability for every audience |
+| Benevolence / 仁 | Other-awareness, relationship awareness, and sensitivity to participant, role, and context | Public usability, API/onboarding clarity, and user-facing failure visibility | Does not fully measure relationships, other-awareness, or participant experience |
+| Hyo / 孝 | Technology carries its share of the burden; respect choice, consent, context, and protective friction | Consent, context alignment, privacy/data protection, and observed friction or intervention signals | Does not measure total human cost; no calibrated friction score is defined |
+| Eternity / 永 | Preserve continuity and learn responsibly across time | Append-only history and continuity evidence | Records do not prove long-term value by themselves |
+
+The 仁 relationship/participant scope is therefore larger than the current
+public-surface proxy:
+
+```text
+MeasuredProxy_仁 ⊂ Scope_仁
+```
+
+Likewise, consent, context alignment, privacy, and friction observations are
+current Hyo proxies, not a complete measurement of human burden:
+
+```text
+MeasuredProxy_孝 ⊂ Scope_孝
+```
+
+Observation state remains separate from both scope and proxy: each measured
+axis reports `OBSERVED`, `PARTIAL`, or `UNOBSERVED`. HyoDo does not convert a
+proxy into a virtue judgment, merge it into authority, or use it to authorize
+an action in an integrating host.
+
 The philosophy-to-engineering definition uses the document labels `Truth`,
 `Good`, `Beauty`, `Humanity`, `Hyo`, and `Longevity`. These are presentation
 labels, not new axes. Existing machine keys and compatibility labels remain

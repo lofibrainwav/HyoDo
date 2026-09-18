@@ -55,6 +55,26 @@ def test_document_labels_follow_philosophy_definition_without_renaming_keys() ->
     assert tuple(DOCUMENT_VIRTUE_NAMES) == CANONICAL_VIRTUE_KEYS
 
 
+def test_benevolence_and_hyo_keep_scope_separate_from_current_proxy() -> None:
+    by_key = {virtue.key: virtue for virtue in VIRTUE_CONTRACT}
+    benevolence = by_key["benevolence"]
+    hyo = by_key["hyo"]
+
+    assert "relationship awareness" in benevolence.philosophical_scope
+    assert "Public usability" in benevolence.measurable_proxy
+    assert "do not fully measure" in benevolence.coverage_limitation.lower()
+    assert benevolence.authority_boundary == "Review signal only; never execution authority"
+
+    assert "carries its share of the burden" in hyo.philosophical_scope
+    assert "Consent" in hyo.measurable_proxy
+    assert "friction score" in hyo.coverage_limitation
+    assert hyo.authority_boundary == "Review signal only; never execution authority"
+
+    contract = (REPO_ROOT / "docs" / "VIRTUE_CONTRACT.md").read_text(encoding="utf-8")
+    assert "MeasuredProxy_仁 ⊂ Scope_仁" in contract
+    assert "MeasuredProxy_孝 ⊂ Scope_孝" in contract
+
+
 def test_aggregate_namespace_is_not_the_eternity_virtue() -> None:
     assert HARMONY_AGGREGATE_KEY == "harmony_aggregate"
     assert LEGACY_V5_AGGREGATE_KEY == "s_eternity"

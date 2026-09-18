@@ -40,10 +40,26 @@ defined in [`docs/CORE_LOOP.md`](./docs/CORE_LOOP.md). HyoDo is the whole loop;
 | Hyo | 효 / 孝 | Consent + context + privacy | Policy + host/access ledger |
 | Eternity / Yeong | 영 / 永 | Continuity and persistence | History ledger |
 
+The philosophical scope of Benevolence (仁) includes other-awareness,
+relationship awareness, and sensitivity to participants, roles, and context.
+Its current measurable proxy is narrower: public usability, API/onboarding
+clarity, and user-facing failure visibility. Public usability is one proxy for
+仁, not 仁 itself.
+
 Hyo (孝) expresses a practical human-centered principle: technology should
-carry its share of the burden, not shift it onto people. The current public
-contract represents this axis through consent, context alignment, and data
-protection; it does not claim to measure every form of human cost.
+carry its share of the burden, respect choice and consent, and preserve
+protective friction when it prevents harm. Current proxies include consent,
+context alignment, privacy/data protection, and observed friction or
+intervention signals. These proxies do not measure total human cost, and HyoDo
+does not define a calibrated friction score.
+
+```text
+MeasuredProxy_仁 ⊂ Scope_仁
+MeasuredProxy_孝 ⊂ Scope_孝
+```
+
+Neither proxy is authority. Both remain review signals with explicit
+`OBSERVED` / `PARTIAL` / `UNOBSERVED` state.
 
 ### Two measurement kinds
 
