@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/independent-verifier-v1.schema.json",
+  "title": "HyoDo Independent Verifier v1",
+  "description": "Read-only evidence about one exact artifact; never authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "verdict", "isolation_scope", "target", "observed", "verifier_nameplate", "evidence", "residuals", "observed_at"],
+  "properties": {
+    "schema_version": {"const": "hyodo.independent-verifier/v1"},
+    "verdict": {"enum": ["PASS", "BLOCK", "UNOBSERVED"]},
+    "isolation_scope": {"const": "CONTRACT_LEVEL"},
+    "target": {
+      "type": "object", "additionalProperties": false, "required": ["exact_artifact_sha"],
+      "properties": {"exact_artifact_sha": {"type": "string", "pattern": "^[0-9a-f]{40,64}$"}}
+    },
+    "observed": {
+      "type": "object", "additionalProperties": false, "required": ["head_sha", "worktree"],
+      "properties": {
+        "head_sha": {"type": "string", "minLength": 1},
+        "worktree": {"enum": ["CLEAN", "DIRTY", "UNOBSERVED"]}
+      }
+    },
+    "verifier_nameplate": {"$ref": "agent-nameplate-v1.schema.json"},
+    "evidence": {"type": "object"},
+    "residuals": {"type": "array", "items": {"type": "string"}},
+    "observed_at": {"type": "string", "format": "date-time"}
+  }
+}
