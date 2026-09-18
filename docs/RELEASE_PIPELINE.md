@@ -67,6 +67,10 @@ Every stage is represented in one receipt. A failed stage is `BLOCKED`, a
 not-yet-satisfied human gate is `WAIT`, and neither is reported as `PASS`. The
 pipeline must not invent authority from a passing test.
 
+Receipts use a common 5W1H envelope: `who`, `when`, `where`, `what`, `how`, and
+`why`. Runtime agent/model labels are observed from the environment; absent
+labels remain `UNOBSERVED`. This is provenance, not merge authority.
+
 The design follows the factory rule: one intake, one candidate, one receipt,
 one integration path. If a later stage needs a different branch, repository,
 or external authority, it must be represented as an explicit adapter rather

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import subprocess
 import time
@@ -57,6 +58,57 @@ def _run_verification(root: Path) -> subprocess.CompletedProcess[str]:
 
 class PipelineExternalError(RuntimeError):
     """Raised when an external pipeline adapter cannot observe or mutate safely."""
+
+
+UNOBSERVED = "UNOBSERVED"
+
+
+def _runtime_identity() -> dict[str, str]:
+    """Read agent labels from the runtime; never invent a model or authority."""
+    return {
+        "agent": os.environ.get("HYODO_AGENT", UNOBSERVED),
+        "model": os.environ.get("HYODO_MODEL", UNOBSERVED),
+        "mode": os.environ.get("HYODO_MODE", UNOBSERVED),
+        "github_actor": os.environ.get("GITHUB_ACTOR", UNOBSERVED),
+        "authority": "human approval required",
+    }
+
+
+def _five_w_one_h(root: Path, receipt: dict[str, Any]) -> dict[str, Any]:
+    try:
+        repo = _repo_slug(root)
+    except PipelineExternalError:
+        repo = UNOBSERVED
+    return {
+        "who": _runtime_identity(),
+        "when": {
+            "observed_at": receipt.get("observed_at", UNOBSERVED),
+            "approved_at": receipt.get("approval", {}).get("observed_at", UNOBSERVED),
+            "merged_at": receipt.get("merge", {}).get("observed_at", UNOBSERVED),
+            "readback_at": receipt.get("main_readback", {}).get("observed_at", UNOBSERVED),
+        },
+        "where": {
+            "repo": repo,
+            "branch": receipt.get("branch", UNOBSERVED),
+            "worktree": receipt.get("root", UNOBSERVED),
+            "target": receipt.get("base_ref", UNOBSERVED),
+        },
+        "what": {
+            "pr": receipt.get("pr", {}).get("number", UNOBSERVED),
+            "candidate_sha": receipt.get("candidate_sha", UNOBSERVED),
+            "result": receipt.get("result", UNOBSERVED),
+        },
+        "how": {
+            "pipeline": receipt.get("schema", UNOBSERVED),
+            "stages": list(receipt.get("stages", {}).keys()),
+            "mutations": receipt.get("mutations", []),
+        },
+        "why": {
+            "intent": f"close one exact verified candidate: {receipt.get('release_id', UNOBSERVED)}",
+            "authority_ref": receipt.get("approval", {}).get("authorization_ref", UNOBSERVED),
+            "evidence_refs": receipt.get("evidence_refs", []),
+        },
+    }
 
 
 def _git_text(root: Path, *args: str) -> str:
@@ -220,6 +272,7 @@ def readback_main(root: Path, *, expected_sha: str) -> dict[str, Any]:
     return {
         "expected_sha": expected_sha,
         "observed_sha": observed_sha,
+        "observed_at": _now(),
         "result": "PASS" if observed_sha == expected_sha else "BLOCK",
     }
 
@@ -227,6 +280,8 @@ def readback_main(root: Path, *, expected_sha: str) -> dict[str, Any]:
 def closeout_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     """Add a compact human/agent handoff without inventing missing evidence."""
     return {
+        "schema": "hyodo.closeout/v1",
+        "five_w_one_h": _five_w_one_h(Path(receipt["root"]), receipt),
         "goal": receipt.get("release_id"),
         "observed": receipt.get("candidate_sha"),
         "verified": receipt.get("stages", {}),
@@ -287,6 +342,7 @@ def run_pipeline(
         "external_mutation": False,
         "mutations": [],
     }
+    receipt["five_w_one_h"] = _five_w_one_h(root, receipt)
 
     if plan["result"] != "PASS":
         receipt.update(
@@ -456,7 +512,11 @@ def run_pipeline(
             number=receipt["pr"]["number"],
             author=pr_data.get("user", {}).get("login", ""),
         )
-        receipt["approval"] = {"authorization_ref": authorize_ref, **approval}
+        receipt["approval"] = {
+            "authorization_ref": authorize_ref,
+            "observed_at": _now(),
+            **approval,
+        }
         if not approval["approved"] or approval["review_commit_sha"] != receipt["pr"]["head_sha"]:
             receipt.update(
                 {
@@ -479,7 +539,11 @@ def run_pipeline(
         )
         if not merged.get("merged"):
             raise PipelineExternalError(merged.get("message", "merge was not confirmed"))
-        receipt["merge"] = {"sha": merged["sha"], "message": merged.get("message")}
+        receipt["merge"] = {
+            "sha": merged["sha"],
+            "message": merged.get("message"),
+            "observed_at": _now(),
+        }
         receipt["external_mutation"] = True
         receipt["mutations"].append({"kind": "MERGE", "sha": merged["sha"]})
         receipt["stages"]["merge_once"] = "PASS"
