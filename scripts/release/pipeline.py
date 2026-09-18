@@ -76,14 +76,18 @@ def _repo_slug(root: Path) -> str:
     return f"{match.group(1)}/{match.group(2)}"
 
 
-def _gh_json(root: Path, *args: str, method: str = "GET", fields: dict[str, str] | None = None) -> Any:
+def _gh_json(
+    root: Path, *args: str, method: str = "GET", fields: dict[str, str] | None = None
+) -> Any:
     command = ["gh", "api", "--method", method]
     command.extend(args)
     for key, value in (fields or {}).items():
         command.extend(["-f", f"{key}={value}"])
     result = subprocess.run(command, cwd=root, capture_output=True, text=True, check=False)
     if result.returncode != 0:
-        raise PipelineExternalError(result.stderr.strip() or result.stdout.strip() or "gh api failed")
+        raise PipelineExternalError(
+            result.stderr.strip() or result.stdout.strip() or "gh api failed"
+        )
     try:
         return json.loads(result.stdout)
     except json.JSONDecodeError as exc:
@@ -124,14 +128,19 @@ def _check_snapshot(root: Path, *, slug: str, sha: str) -> dict[str, Any]:
     failed = [
         item["name"]
         for item in checks
-        if item.get("status") == "completed" and item.get("conclusion") not in {"success", "skipped"}
+        if item.get("status") == "completed"
+        and item.get("conclusion") not in {"success", "skipped"}
     ]
     return {
         "total": len(checks),
         "pending": pending,
         "failed": failed,
         "passed": len(checks) - len(pending) - len(failed),
-        "result": "PASS" if checks and not pending and not failed else "WAIT" if pending else "BLOCK",
+        "result": "PASS"
+        if checks and not pending and not failed
+        else "WAIT"
+        if pending
+        else "BLOCK",
     }
 
 
@@ -392,7 +401,9 @@ def run_pipeline(
         receipt["result"] = readback["result"]
         receipt["residuals"] = [] if readback["result"] == "PASS" else ["main SHA mismatch"]
         receipt["closeout"] = closeout_receipt(receipt)
-        receipt["next_action"] = "closed" if receipt["result"] == "PASS" else "reconcile main readback"
+        receipt["next_action"] = (
+            "closed" if receipt["result"] == "PASS" else "reconcile main readback"
+        )
     except PipelineExternalError as exc:
         receipt.update(
             {
@@ -417,7 +428,9 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--execute", action="store_true", help="Create or reuse one GitHub PR")
     parser.add_argument("--wait-ci", action="store_true", help="Wait for exact-head CI")
-    parser.add_argument("--merge", action="store_true", help="Merge only after approval and authorization")
+    parser.add_argument(
+        "--merge", action="store_true", help="Merge only after approval and authorization"
+    )
     parser.add_argument("--authorize-ref", help="Human authorization reference required for merge")
     parser.add_argument("--pr-title", help="PR title when creating a candidate PR")
     parser.add_argument("--pr-body", default="", help="PR body when creating a candidate PR")
@@ -430,7 +443,9 @@ def main(argv: list[str] | None = None) -> int:
         execute=args.execute,
         wait_for_ci=args.wait_ci,
         merge=args.merge,
-        authorize_ref=args.authorize_ref, pr_title=args.pr_title, pr_body=args.pr_body
+        authorize_ref=args.authorize_ref,
+        pr_title=args.pr_title,
+        pr_body=args.pr_body,
     )
     print(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True))
     return 0 if receipt["result"] == "PASS" else 1
