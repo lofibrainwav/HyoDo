@@ -42,7 +42,7 @@ remain `UNOBSERVED` as described in the measured matrix below.
 | orchestration observation ingest | SHIPPED | SHIPPED |
 | Graph v2 multi-parent runtime | SHIPPED | SHIPPED; deterministic multi-parent read/normalize/export/viewer + Tarjan SCC with v1 compatibility |
 | Information Flow Attestation v0 | SHIPPED | SHIPPED observer-only; privacy lineage stays separate and non-authoritative |
-| ACL / Wisdom Reflex automatic routing | RESEARCH | RESEARCH / shadow only |
+| Adaptive support-allocation experiments | RESEARCH | Downstream research / shadow only |
 | public remote MCP | CONTRACT ONLY | CONTRACT ONLY / UNOBSERVED |
 | friction collector/uploader | NOT BUILT | NOT BUILT |
 
@@ -51,7 +51,7 @@ remain `UNOBSERVED` as described in the measured matrix below.
 - KINGDOM executes and orchestrates.
 - EROS / host policy owns execution authority.
 - Evidence Gate judges completion evidence.
-- ACL makes shadow recommendations.
+- Downstream research may make non-authoritative shadow recommendations.
 - HyoDo observes, records, validates, attests and measures.
 
 Capability existence is not run usage. Missing evidence is not green. Research is not shipped capability evidence.
@@ -64,6 +64,6 @@ on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
 identity from this page alone; use the signed release, CI receipt, or runtime
 identity receipt. Fresh
 Codex/Cursor host observations,
-QMD/Neo4j closed-loop memory, and matched ACL/KINGDOM shadow experiments are
+QMD/Neo4j closed-loop memory, and matched support-allocation/KINGDOM shadow experiments are
 downstream integration/research work and must not silently reopen HyoDo product
 authority or rewrite sealed release evidence.

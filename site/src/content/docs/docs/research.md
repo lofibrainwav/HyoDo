@@ -3,7 +3,7 @@ title: Research
 description: Working research notes behind HyoDo's evidence-grounded human–AI collaboration model.
 ---
 
-> **Status — working research program, updated 2026-09-08.** This page describes research in progress. It is not a claim of peer review, submission, or acceptance by the Association for Computational Linguistics (ACL) or any other venue.
+> **Status — research-only program, updated 2026-09-08.** This page describes research in progress, not a shipped HyoDo capability or runtime. It is not a claim of peer review, submission, or acceptance by the Association for Computational Linguistics (ACL) or any other venue.
 
 # Adaptive Collaboration Layer research program
 
@@ -75,7 +75,7 @@ The public product boundary is fixed below. The [Measured Run #1 receipt](https:
 | Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
 | IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
-| ACL runtime / Wisdom Reflex | RESEARCH | Hypothesis; no automatic router. |
+| ACL runtime / Wisdom Reflex | RESEARCH | Research-only hypothesis; no shipped runtime or automatic router. |
 | friction collector | NOT BUILT | No collector/uploader; transport disabled. |
 
 ## Instrument version boundary

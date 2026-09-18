@@ -105,3 +105,11 @@ def test_current_facing_surfaces_use_published_version_and_boundary() -> None:
     assert "first organ of an open-source Agent OS" not in (
         REPO_ROOT / "site" / "src" / "content" / "docs" / "docs" / "roadmap.md"
     ).read_text(encoding="utf-8")
+
+
+def test_core_loop_measures_six_axes_as_independent_fanout() -> None:
+    core_loop = (REPO_ROOT / "docs" / "CORE_LOOP.md").read_text(encoding="utf-8")
+    assert "Six independent lens measurements" in core_loop
+    assert "They are not a serial checklist" in core_loop
+    assert "├─ 眞 Truth" in core_loop
+    assert "└─ 永 Eternity" in core_loop
