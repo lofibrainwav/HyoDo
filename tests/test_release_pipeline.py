@@ -30,6 +30,7 @@ def test_pipeline_is_zero_write_and_stops_at_plan(tmp_path: Path) -> None:
     assert receipt["stage"] == "PLANNED"
     assert receipt["zero_write"] is True
     assert receipt["external_mutation"] is False
+    assert receipt["mutations"] == []
     assert before == after
     json.dumps(receipt)
 

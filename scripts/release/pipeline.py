@@ -237,6 +237,7 @@ def closeout_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
             "merge_sha": receipt.get("merge", {}).get("sha"),
             "main_readback": receipt.get("main_readback"),
         },
+        "mutations": receipt.get("mutations", []),
         "observed_at": _now(),
     }
 
@@ -284,6 +285,7 @@ def run_pipeline(
         "zero_write": not verify,
         "local_side_effects": verify,
         "external_mutation": False,
+        "mutations": [],
     }
 
     if plan["result"] != "PASS":
@@ -335,6 +337,7 @@ def run_pipeline(
             receipt["push"] = push_candidate(root, candidate_sha=receipt["candidate_sha"])
             receipt["stages"]["push_candidate"] = "PASS"
             receipt["external_mutation"] = True
+            receipt["mutations"].append({"kind": "PUSH_CANDIDATE", "sha": receipt["candidate_sha"]})
         else:
             remote_sha = _remote_branch_sha(root, _branch(root))
             receipt["push"] = {
@@ -361,6 +364,13 @@ def run_pipeline(
             "base_sha": pr["base"]["sha"],
         }
         receipt["external_mutation"] = pr_result["created"]
+        receipt["mutations"].append(
+            {
+                "kind": "CREATE_PR" if pr_result["created"] else "REUSE_PR",
+                "number": pr["number"],
+                "head_sha": pr["head"]["sha"],
+            }
+        )
         if receipt["pr"]["head_sha"] != receipt["candidate_sha"]:
             raise PipelineExternalError(
                 "RECONCILIATION_REQUIRED: PR head is not the planned candidate"
@@ -470,6 +480,8 @@ def run_pipeline(
         if not merged.get("merged"):
             raise PipelineExternalError(merged.get("message", "merge was not confirmed"))
         receipt["merge"] = {"sha": merged["sha"], "message": merged.get("message")}
+        receipt["external_mutation"] = True
+        receipt["mutations"].append({"kind": "MERGE", "sha": merged["sha"]})
         receipt["stages"]["merge_once"] = "PASS"
         receipt["stage"] = "MERGED"
         readback = readback_main(root, expected_sha=merged["sha"])
