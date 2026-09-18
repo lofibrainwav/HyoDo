@@ -11,26 +11,41 @@ WHEN = "2026-09-18T06:00:00+00:00"
 
 def _plate(**overrides: object) -> dict[str, object]:
     values: dict[str, object] = {
-        "actor_id": "verifier-seat-01", "role": "verifier", "repo": "example/HyoDo",
-        "exact_artifact_sha": SHA, "observed_at": WHEN,
-        "runtime": {"host": "isolated", "provider": "observed", "model": "observed",
-                     "mode": "read-only", "session_id": "fresh-01", "github_actor": "UNOBSERVED",
-                     "actor_id": "verifier-seat-01"},
+        "actor_id": "verifier-seat-01",
+        "role": "verifier",
+        "repo": "example/HyoDo",
+        "exact_artifact_sha": SHA,
+        "observed_at": WHEN,
+        "runtime": {
+            "host": "isolated",
+            "provider": "observed",
+            "model": "observed",
+            "mode": "read-only",
+            "session_id": "fresh-01",
+            "github_actor": "UNOBSERVED",
+            "actor_id": "verifier-seat-01",
+        },
     }
     values.update(overrides)
     runtime = dict(values["runtime"])
     runtime["actor_id"] = values["actor_id"]
     return build_nameplate(
-        actor_id=values["actor_id"], role=values["role"], repo=values["repo"],
-        exact_artifact_sha=values["exact_artifact_sha"], observed_at=values["observed_at"],
+        actor_id=values["actor_id"],
+        role=values["role"],
+        repo=values["repo"],
+        exact_artifact_sha=values["exact_artifact_sha"],
+        observed_at=values["observed_at"],
         runtime=runtime,
     )
 
 
 def _repo(tmp_path: Path) -> None:
     import subprocess
+
     subprocess.run(["git", "init", "-q", str(tmp_path)], check=True)
-    subprocess.run(["git", "-C", str(tmp_path), "config", "user.email", "test@example.invalid"], check=True)
+    subprocess.run(
+        ["git", "-C", str(tmp_path), "config", "user.email", "test@example.invalid"], check=True
+    )
     subprocess.run(["git", "-C", str(tmp_path), "config", "user.name", "test"], check=True)
     (tmp_path / "x").write_text("x", encoding="utf-8")
     subprocess.run(["git", "-C", str(tmp_path), "add", "x"], check=True)
@@ -40,15 +55,28 @@ def _repo(tmp_path: Path) -> None:
 def test_exact_candidate_pass_is_read_only(tmp_path: Path) -> None:
     _repo(tmp_path)
     import subprocess
-    actual = subprocess.check_output(["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True).strip()
-    result = verify_exact_candidate(root=tmp_path, expected_artifact_sha=actual, verifier_nameplate=_plate(exact_artifact_sha=actual), evidence={"diff": "observed"})
+
+    actual = subprocess.check_output(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True
+    ).strip()
+    result = verify_exact_candidate(
+        root=tmp_path,
+        expected_artifact_sha=actual,
+        verifier_nameplate=_plate(exact_artifact_sha=actual),
+        evidence={"diff": "observed"},
+    )
     assert result["verdict"] == "PASS"
     assert not (tmp_path / ".hyodo").exists()
 
 
 def test_sha_mismatch_blocks(tmp_path: Path) -> None:
     _repo(tmp_path)
-    result = verify_exact_candidate(root=tmp_path, expected_artifact_sha=SHA, verifier_nameplate=_plate(), evidence={"diff": "observed"})
+    result = verify_exact_candidate(
+        root=tmp_path,
+        expected_artifact_sha=SHA,
+        verifier_nameplate=_plate(),
+        evidence={"diff": "observed"},
+    )
     assert result["verdict"] == "BLOCK"
     assert "exact_artifact_sha_mismatch" in result["residuals"]
 
@@ -56,13 +84,23 @@ def test_sha_mismatch_blocks(tmp_path: Path) -> None:
 def test_missing_identity_is_unobserved(tmp_path: Path) -> None:
     _repo(tmp_path)
     plate = _plate(actor_id="UNOBSERVED", session_id="UNOBSERVED")
-    result = verify_exact_candidate(root=tmp_path, expected_artifact_sha=SHA, verifier_nameplate=plate, evidence={"diff": "observed"})
+    result = verify_exact_candidate(
+        root=tmp_path,
+        expected_artifact_sha=SHA,
+        verifier_nameplate=plate,
+        evidence={"diff": "observed"},
+    )
     assert result["verdict"] == "UNOBSERVED"
 
 
 def test_builder_or_authority_input_is_forbidden(tmp_path: Path) -> None:
     _repo(tmp_path)
-    result = verify_exact_candidate(root=tmp_path, expected_artifact_sha=SHA, verifier_nameplate=_plate(), evidence={"builder_verdict": "PASS"})
+    result = verify_exact_candidate(
+        root=tmp_path,
+        expected_artifact_sha=SHA,
+        verifier_nameplate=_plate(),
+        evidence={"builder_verdict": "PASS"},
+    )
     assert result["verdict"] == "BLOCK"
     assert "authority_or_builder_input_forbidden" in result["residuals"]
 

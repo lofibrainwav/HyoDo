@@ -35,7 +35,9 @@ def _git(root: Path, *args: str) -> str | None:
 def _contains_forbidden_input(value: Any) -> bool:
     if isinstance(value, Mapping):
         forbidden = {"builder_verdict", "authority", "approval", "merge"}
-        return any(key in forbidden or _contains_forbidden_input(item) for key, item in value.items())
+        return any(
+            key in forbidden or _contains_forbidden_input(item) for key, item in value.items()
+        )
     if isinstance(value, list):
         return any(_contains_forbidden_input(item) for item in value)
     return False
