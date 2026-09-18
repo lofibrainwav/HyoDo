@@ -386,7 +386,9 @@ def derive_pillars(
         benevolence=_derive_benevolence(check),
         truth=_derive_truth(test_integrity, check),
         goodness=_derive_goodness(safe),
-        hyo=_derive_hyo(root) if runtime_evidence else _make_pillar(
+        hyo=_derive_hyo(root)
+        if runtime_evidence
+        else _make_pillar(
             "hyo", [], ("hyo.config_present", "hyo.connect_wired", "hyo.ledger_present")
         ),
         beauty=_derive_beauty(check),
