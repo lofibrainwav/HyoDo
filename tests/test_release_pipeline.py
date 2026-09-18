@@ -60,3 +60,15 @@ def test_pipeline_verification_failure_is_fail_closed(tmp_path: Path, monkeypatc
     assert receipt["stage"] == "BLOCKED"
     assert receipt["stages"]["verify"] == "BLOCK"
     assert receipt["external_mutation"] is False
+
+
+def test_external_stages_require_local_verification(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+    init_checkout(tmp_path, "release/4.12.0")
+
+    receipt = run_pipeline(tmp_path, "4.12.0", execute=True)
+
+    assert receipt["result"] == "BLOCK"
+    assert receipt["stage"] == "BLOCKED"
+    assert receipt["external_mutation"] is False
+    assert receipt["residuals"] == ["external stages require --verify"]
