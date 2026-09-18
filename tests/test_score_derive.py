@@ -60,6 +60,18 @@ def test_unobserved_pillar_is_none_not_zero_or_hundred(tmp_path: Path) -> None:
     assert derived.benevolence.provenance == ()
 
 
+def test_source_bound_pillars_ignore_irrelevant_runtime_residue(tmp_path: Path) -> None:
+    baseline = derive_pillars(tmp_path, check=None, safe=None, test_integrity=None).as_dict()
+    hyodo = tmp_path / ".hyodo"
+    hyodo.mkdir()
+    (hyodo / "mcp-access.jsonl").write_text('{"runtime":"residue"}\n', encoding="utf-8")
+    (hyodo / "gates.toml").write_text("[gates]\n", encoding="utf-8")
+    with_runtime_residue = derive_pillars(
+        tmp_path, check=None, safe=None, test_integrity=None
+    ).as_dict()
+    assert with_runtime_residue == baseline
+
+
 def test_unobserved_pillar_excluded_from_eternity_and_surfaced(tmp_path: Path) -> None:
     derived = derive_pillars(
         tmp_path,
