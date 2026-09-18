@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/evidence-plate-v1.schema.json",
+  "title": "HyoDo Evidence Plate v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "lens", "state", "exact_artifact_sha", "observed_at", "evidence_atoms", "authority", "residuals"],
+  "properties": {
+    "schema_version": {"const": "hyodo.evidence-plate/v1"},
+    "lens": {"enum": ["truth", "goodness", "beauty", "benevolence", "hyo", "eternity"]},
+    "state": {"enum": ["OBSERVED", "UNOBSERVED"]},
+    "exact_artifact_sha": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "minLength": 1},
+    "evidence_atoms": {"type": "array"},
+    "authority": {"const": "UNOBSERVED"},
+    "residuals": {"type": "array", "items": {"type": "string"}}
+  }
+}

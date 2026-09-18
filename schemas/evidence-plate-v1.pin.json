@@ -1,0 +1,7 @@
+{
+  "algorithm": "sha256",
+  "digest": "774ec615e2dd38a8eaab6991ccb66ceecf1437a019f1f8a11ff79cde1f66fc06",
+  "schema": "evidence-plate-v1.schema.json",
+  "schema_id": "https://hyodo.app/schemas/evidence-plate-v1.schema.json",
+  "schema_version": "hyodo.evidence-plate/v1"
+}
