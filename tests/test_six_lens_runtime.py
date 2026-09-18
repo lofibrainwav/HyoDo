@@ -18,6 +18,13 @@ def test_candidate_recombines_six_lenses_and_preserves_artifact_binding() -> Non
     assert [plate["lens"] for plate in result["plates"]] == list(LENSES)
     assert all(plate["exact_artifact_sha"] == "a" * 40 for plate in result["plates"])
     assert result["authority"] == "UNOBSERVED"
+    assert result["projection_status"] == "EXPERIMENTAL"
+    assert result["experimental_dimensions"]["impact"] == "UNOBSERVED"
+    assert result["experimental_projection"]["truth"] == [
+        "freshness",
+        "provenance",
+        "reproducibility",
+    ]
     assert {"C1:isolated-judges", "C2:shared-atoms", "C3:dimension-projection"}.issubset(
         result["components"]
     )
@@ -36,3 +43,12 @@ def test_forbidden_authority_and_score_are_not_atoms() -> None:
     keys = {atom["key"] for plate in result["plates"] for atom in plate["evidence_atoms"]}
     assert "authority" not in keys
     assert "score" not in keys
+
+
+def test_unrelated_evidence_is_residual_not_cross_lens_atom() -> None:
+    result = measure_six_lenses(
+        {"exact_artifact_sha": "c" * 40, "freshness": "fresh", "safety": "observed"}
+    )
+    truth = next(plate for plate in result["plates"] if plate["lens"] == "truth")
+    assert {atom["key"] for atom in truth["evidence_atoms"]} == {"freshness"}
+    assert "unrelated_evidence:safety" in truth["residuals"]

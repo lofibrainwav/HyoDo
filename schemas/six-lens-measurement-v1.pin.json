@@ -1,6 +1,6 @@
 {
   "algorithm": "sha256",
-  "digest": "a7f722d42d729b6c90c1e6f5009e724d786c86c9407384d5c5dfd76ae0beefde",
+  "digest": "09ef4cfa3a34edef055fe7fb074b0135bc3fe1ba617a3a46116e5b54b57de54d",
   "schema": "six-lens-measurement-v1.schema.json",
   "schema_id": "https://hyodo.app/schemas/six-lens-measurement-v1.schema.json",
   "schema_version": "hyodo.six-lens-measurement/v1"

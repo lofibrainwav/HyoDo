@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
-import hashlib
-import json
 from typing import Any
 
-LENSES = ("truth", "goodness", "beauty", "benevolence", "hyo", "eternity")
+from hyodo.evidence_plate import (
+    LENSES,
+    extract_evidence_atoms,
+    extract_lens_evidence,
+    make_evidence_plate,
+)
+
 DIMENSIONS = (
     "freshness",
     "provenance",
@@ -17,7 +21,7 @@ DIMENSIONS = (
     "continuity",
     "reproducibility",
 )
-PROJECTION = {
+EXPERIMENTAL_PROJECTION = {
     "truth": ("freshness", "provenance", "reproducibility"),
     "goodness": ("safety",),
     "beauty": ("clarity",),
@@ -28,6 +32,7 @@ PROJECTION = {
 
 
 def _artifact(value: Any) -> bool:
+    """Validate the output binding without reimplementing atom extraction."""
     return (
         isinstance(value, str)
         and len(value) in {40, 64}
@@ -35,51 +40,29 @@ def _artifact(value: Any) -> bool:
     )
 
 
-def _atoms(evidence: dict[str, Any]) -> list[dict[str, Any]]:
-    artifact = evidence.get("exact_artifact_sha")
-    if not _artifact(artifact):
-        return []
-    result = []
-    for key in sorted(evidence):
-        if key in {"exact_artifact_sha", "authority", "approval", "decision", "score", "route"}:
-            continue
-        encoded = json.dumps(evidence[key], sort_keys=True, default=str)
-        result.append(
-            {
-                "atom_id": hashlib.sha256(f"{artifact}:{key}:{encoded}".encode()).hexdigest(),
-                "key": key,
-                "value": evidence[key],
-            }
-        )
-    return result
-
-
 def measure_six_lenses(evidence: dict[str, Any]) -> dict[str, Any]:
     """Produce six independent evidence projections with explicit residuals."""
     artifact = evidence.get("exact_artifact_sha")
-    atoms = _atoms(evidence)
+    atoms = extract_evidence_atoms(evidence)
     dimensions = {name: evidence.get(name, "UNOBSERVED") for name in DIMENSIONS}
     plates = []
     for lens in LENSES:
-        selected = [atom for atom in atoms if atom["key"] in set(PROJECTION[lens])]
-        residuals = [] if _artifact(artifact) else ["artifact_sha_unobserved"]
+        selected, extraction_residuals = extract_lens_evidence(atoms, lens)
+        plate = make_evidence_plate(evidence, lens)
+        plate["residuals"] = [*plate["residuals"], *extraction_residuals]
         if not selected:
-            residuals.append("evidence_unobserved")
-        plates.append(
-            {
-                "lens": lens,
-                "state": "OBSERVED" if not residuals else "UNOBSERVED",
-                "exact_artifact_sha": artifact if _artifact(artifact) else "UNOBSERVED",
-                "dimensions": {key: dimensions[key] for key in PROJECTION[lens]},
-                "evidence_atoms": selected,
-                "authority": "UNOBSERVED",
-                "residuals": residuals,
-            }
-        )
+            plate["residuals"].append("evidence_unobserved")
+            plate["state"] = "UNOBSERVED"
+        plates.append(plate)
     return {
         "schema_version": "hyodo.six-lens-measurement/v1",
         "exact_artifact_sha": artifact if _artifact(artifact) else "UNOBSERVED",
         "plates": plates,
+        "projection_status": "EXPERIMENTAL",
+        "experimental_dimensions": dimensions,
+        "experimental_projection": {
+            lens: list(keys) for lens, keys in EXPERIMENTAL_PROJECTION.items()
+        },
         "components": [
             "C1:isolated-judges",
             "C2:shared-atoms",
