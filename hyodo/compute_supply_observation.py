@@ -1,4 +1,5 @@
 """Provider-neutral observation receipt for external compute supply."""
+
 from __future__ import annotations
 
 from collections.abc import Mapping
@@ -56,7 +57,14 @@ def validate_observation_receipt(receipt: Any) -> tuple[bool, list[str]]:
     reasons: list[str] = []
     if receipt.get("schema_version") != SCHEMA_VERSION:
         reasons.append("unsupported_schema")
-    for field in ("observed_at", "fresh_until", "evidence_source", "catalog", "user_availability", "live_access"):
+    for field in (
+        "observed_at",
+        "fresh_until",
+        "evidence_source",
+        "catalog",
+        "user_availability",
+        "live_access",
+    ):
         if field not in receipt:
             reasons.append(f"missing:{field}")
     if not isinstance(receipt.get("catalog"), dict):

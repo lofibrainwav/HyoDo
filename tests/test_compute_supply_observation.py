@@ -13,8 +13,13 @@ def test_observation_receipt_has_three_layers_and_no_routing() -> None:
     )
     assert receipt["schema_version"] == SCHEMA_VERSION
     assert set(receipt) == {
-        "schema_version", "observed_at", "fresh_until", "evidence_source",
-        "catalog", "user_availability", "live_access",
+        "schema_version",
+        "observed_at",
+        "fresh_until",
+        "evidence_source",
+        "catalog",
+        "user_availability",
+        "live_access",
     }
     assert validate_observation_receipt(receipt) == (True, [])
 
