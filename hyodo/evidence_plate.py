@@ -16,8 +16,10 @@ _SHA_LENGTHS = {40, 64}
 
 
 def _valid_artifact_sha(value: Any) -> bool:
-    return isinstance(value, str) and len(value) in _SHA_LENGTHS and all(
-        char in "0123456789abcdef" for char in value.lower()
+    return (
+        isinstance(value, str)
+        and len(value) in _SHA_LENGTHS
+        and all(char in "0123456789abcdef" for char in value.lower())
     )
 
 
