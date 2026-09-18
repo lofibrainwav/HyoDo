@@ -50,6 +50,7 @@ def build_observation_receipt(
 
 
 def validate_observation_receipt(receipt: Any) -> tuple[bool, list[str]]:
+    """Validate structure and freshness metadata without granting authority."""
     if not isinstance(receipt, dict):
         return False, ["not_object"]
     reasons: list[str] = []
