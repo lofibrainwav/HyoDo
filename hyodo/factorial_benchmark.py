@@ -42,7 +42,11 @@ def build_cases() -> list[FactorialCase]:
 
 def evaluate_case(case: FactorialCase) -> dict[str, Any]:
     """Evaluate one case using only observed evidence fields."""
-    expected = "OBSERVED" if case.artifact_present and case.provenance_present and case.relevant_signal_present else "UNOBSERVED"
+    expected = (
+        "OBSERVED"
+        if case.artifact_present and case.provenance_present and case.relevant_signal_present
+        else "UNOBSERVED"
+    )
     observed = expected
     residuals = [] if observed == "OBSERVED" else ["insufficient_evidence"]
     return {
@@ -65,5 +69,7 @@ def run_benchmark() -> dict[str, Any]:
         "replicates_per_scenario": 10,
         "results": results,
         "authority": "UNOBSERVED",
-        "status": "PASS" if all(item["expected"] == item["observed"] for item in results) else "FAIL",
+        "status": "PASS"
+        if all(item["expected"] == item["observed"] for item in results)
+        else "FAIL",
     }
