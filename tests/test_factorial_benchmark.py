@@ -22,3 +22,25 @@ def test_authority_and_cross_lens_fields_are_not_decision_inputs() -> None:
     report = run_benchmark()
     assert all("decision" not in item for item in report["results"])
     assert all("score" not in item for item in report["results"])
+
+
+def test_m1_uses_approved_strata_and_separate_metrics() -> None:
+    report = run_benchmark()
+    assert report["strata"] == {
+        "single_factor": 60,
+        "null_invariance": 20,
+        "legitimate_dependency": 10,
+        "residual_coverage": 10,
+    }
+    assert set(report["response_matrix"]) == {
+        "truth",
+        "goodness",
+        "beauty",
+        "benevolence",
+        "hyo",
+        "eternity",
+    }
+    assert report["metrics"]["legitimate_dependency"] == 10
+    assert report["metrics"]["cross_lens_influence"] == "UNOBSERVED"
+    assert report["metrics"]["taxonomy_incompleteness"] == 10
+    assert all(item["contamination"] == "UNOBSERVED" for item in report["results"])
