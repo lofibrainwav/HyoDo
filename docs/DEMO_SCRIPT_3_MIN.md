@@ -16,8 +16,9 @@ HyoDo in 3 minutes: model-agnostic quality gates for AI-assisted code
   tag if demoing a published version.
 - Run `bash scripts/verify-public.sh` (must exit 0) before recording.
 - Run `bash scripts/demo-dry-run.sh`; its receipt is a pre-commit worktree
-  record, so use the live terminal output—not the receipt header—as the
-  recording source of truth.
+  verification record with local side effects, not a zero-write release plan.
+  Its receipt metadata is explicit; use the live terminal output—not the
+  receipt header—as the recording source of truth.
 - Keep `README.md`, terminal, and optionally `docs/PROVIDER_PROOF.md` visible.
 - Prefer CLI so the demo is not locked to one agent vendor.
 - Do **not** show real `.env` contents or private production paths.

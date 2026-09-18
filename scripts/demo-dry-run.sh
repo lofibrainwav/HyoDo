@@ -22,6 +22,12 @@ $PYTHON -m pip install -e ".[dev]" -q
 {
   echo "# HyoDo demo dry-run"
   echo
+  echo "run_kind: demo-verification-run"
+  echo "zero_write: false"
+  echo "local_side_effects: true"
+  echo "receipt_write: true"
+  echo "release_mutation: false"
+  echo
   echo "Generated: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "Source branch: $(git rev-parse --abbrev-ref HEAD)"
   echo "Source commit: $(git rev-parse --short HEAD) (pre-commit worktree)"
