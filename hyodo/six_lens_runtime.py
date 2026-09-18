@@ -28,8 +28,10 @@ PROJECTION = {
 
 
 def _artifact(value: Any) -> bool:
-    return isinstance(value, str) and len(value) in {40, 64} and all(
-        char in "0123456789abcdef" for char in value.lower()
+    return (
+        isinstance(value, str)
+        and len(value) in {40, 64}
+        and all(char in "0123456789abcdef" for char in value.lower())
     )
 
 
@@ -78,6 +80,11 @@ def measure_six_lenses(evidence: dict[str, Any]) -> dict[str, Any]:
         "schema_version": "hyodo.six-lens-measurement/v1",
         "exact_artifact_sha": artifact if _artifact(artifact) else "UNOBSERVED",
         "plates": plates,
-        "components": ["C1:isolated-judges", "C2:shared-atoms", "C3:dimension-projection", "CX:unknown-preserved"],
+        "components": [
+            "C1:isolated-judges",
+            "C2:shared-atoms",
+            "C3:dimension-projection",
+            "CX:unknown-preserved",
+        ],
         "authority": "UNOBSERVED",
     }
