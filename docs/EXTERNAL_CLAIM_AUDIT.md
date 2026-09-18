@@ -209,8 +209,8 @@ Metric (2026-07-19), value, and source:
     3.10 with conditional `tomli`
   - Source: `pyproject.toml`
 - Code scanning (CodeQL)
-  - Value: not configured
-  - Source: no workflow present in `.github/workflows/`
+  - Value: configured; each run is separate evidence
+  - Source: `.github/workflows/codeql.yml`
 
 A live Dependabot readback is required before any "N alerts" figure is
 cited elsewhere in the repo; this count is a point-in-time measurement
