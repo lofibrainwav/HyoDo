@@ -94,6 +94,24 @@ connector (`mcp.hyodo.app`) are not live — they are contract-only,
 `hyodo mcp config chatgpt` reports `UNOBSERVED` honestly instead of
 guessing at a config format.
 
+### First-use trust journey
+
+For a new Claude Code connection, observe before enforcing when possible:
+
+```text
+orientation -> shadow observation -> policy review -> enforcement
+```
+
+`hyodo connect claude-code --shadow --write` records the policy decision it
+would make without blocking the host. Re-run without `--shadow` only after the
+starter policy has been reviewed. A connected hook is not the same as a
+hardened policy; MCP configuration is not hook coverage.
+
+The lifecycle boundaries are separate: hooks govern tool actions, pre-commit
+checks govern commits, CI checks reproducibility, and release readback verifies
+the served artifact. HyoDo skill commands are verification lenses over skill
+rules, not an executable skill broker or end-user menu.
+
 ## Exit contracts
 
 | Command | Contract |

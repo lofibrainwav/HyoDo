@@ -3,7 +3,7 @@
 HyoDo is an open trust framework, delivered today as a Python package and CLI
 for local quality gates, policy checks, and inspectable evidence.
 
-Built with the Six-Virtue Model (HyoDo Integrity Score, philosophy V6):
+The reference philosophy has six independent virtues (philosophy V6):
 - Benevolence: Developer experience and user serenity
 - Truth: Technical accuracy
 - Goodness: Security and stability
@@ -12,9 +12,9 @@ Built with the Six-Virtue Model (HyoDo Integrity Score, philosophy V6):
 - Beauty: Code clarity and UX
 - Eternity: Continuity, persistence, and longitudinal evidence (measured)
 
-The reference philosophy has six values; it does not define one canonical
-score. The older score command is retained for compatibility (five-input
-geometric mean; internal name HYOGOOK V5):
+The older score command is retained as a compatibility surface (five-input
+geometric mean; public display name HyoDo Integrity Score; internal name
+HYOGOOK V5). It is not the canonical six-virtue evaluator:
   F = sum(five pillars on 1–10 scale) + geometric_mean
   S = legacy harmony aggregate
 Review-emphasis percentages are philosophical labels only — not F weights.
@@ -26,9 +26,9 @@ __version__ = "4.19.8"
 __philosophy_version__ = "V6"
 __author__ = "HyoDo contributors"
 __license__ = "MIT"
-SCORE_PUBLIC_NAME = "HyoDo Integrity Score"
-SCORE_MODEL_NAME = "Six-Virtue Model"
-SCORE_SUBSET_NAME = "Trinity Gates"
+SCORE_PUBLIC_NAME = "HyoDo Integrity Score"  # legacy display name
+SCORE_MODEL_NAME = "Six-Virtue Model"  # legacy compatibility label
+SCORE_SUBSET_NAME = "Trinity Gates"  # legacy compatibility label
 # Kept as a public compatibility constant; this is the legacy method's internal
 # identifier, not the current HyoDo evaluation model.
 SCORE_FORMULA_LINEAGE = "HYOGOOK V5"

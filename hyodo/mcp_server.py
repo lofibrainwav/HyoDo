@@ -201,8 +201,8 @@ def create_server(
     server = server_class(
         "HyoDo",
         instructions=(
-            "Local HyoDo CLI adapter. Tools act only on the configured host workspace; "
-            "review signals never authorize approval."
+            "Local HyoDo CLI adapter. Tools act only on the configured host workspace; observe before change; evidence, scores, and receipts never grant authority. "
+            "The six virtues are independent lenses; UNOBSERVED is not GREEN; the host still owns execution and approval."
         ),
         **constructor_kwargs,
     )
