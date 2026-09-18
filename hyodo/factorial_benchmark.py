@@ -41,6 +41,7 @@ def build_cases() -> list[FactorialCase]:
 
 
 def evaluate_case(case: FactorialCase) -> dict[str, Any]:
+    """Evaluate one case using only observed evidence fields."""
     expected = "OBSERVED" if case.artifact_present and case.provenance_present and case.relevant_signal_present else "UNOBSERVED"
     observed = expected
     residuals = [] if observed == "OBSERVED" else ["insufficient_evidence"]
@@ -55,6 +56,7 @@ def evaluate_case(case: FactorialCase) -> dict[str, Any]:
 
 
 def run_benchmark() -> dict[str, Any]:
+    """Run all 100 cases and return an authority-free measurement report."""
     cases = build_cases()
     results = [evaluate_case(case) for case in cases]
     return {
