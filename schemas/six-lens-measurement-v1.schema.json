@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/six-lens-measurement-v1.schema.json",
+  "title": "HyoDo Six Lens Measurement v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "exact_artifact_sha", "plates", "components", "authority", "projection_status", "experimental_dimensions", "experimental_projection"],
+  "properties": {
+    "schema_version": {"const": "hyodo.six-lens-measurement/v1"},
+    "exact_artifact_sha": {"type": "string", "minLength": 1},
+    "plates": {"type": "array", "minItems": 6, "maxItems": 6},
+    "components": {"type": "array", "items": {"type": "string"}},
+    "authority": {"const": "UNOBSERVED"},
+    "projection_status": {"const": "EXPERIMENTAL"},
+    "experimental_dimensions": {"type": "object"},
+    "experimental_projection": {"type": "object"}
+  }
+}
