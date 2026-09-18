@@ -2490,7 +2490,8 @@ def score(
         safe_obs = _collect_safe_observation(root)
         test_integrity_obs = _collect_test_integrity_observation(root)
         derived = derive_pillars(
-            root, check=check_obs, safe=safe_obs, test_integrity=test_integrity_obs
+            root, check=check_obs, safe=safe_obs, test_integrity=test_integrity_obs,
+            runtime_evidence=True,
         )
 
         overrides = {

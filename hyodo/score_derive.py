@@ -355,6 +355,7 @@ def derive_pillars(
     check: dict | None = None,
     safe: dict | None = None,
     test_integrity: dict | None = None,
+    runtime_evidence: bool = False,
 ) -> DerivedPillars:
     """Derive the five HyoDo Integrity Score pillar inputs from observations.
 
@@ -372,6 +373,9 @@ def derive_pillars(
             ``total_scannable`` (int file coverage).
         test_integrity: Optional dict describing a test-integrity scan.
             Recognized keys: ``total_tests`` / ``vacuous_tests`` (int).
+        runtime_evidence: Include local ``.hyodo`` runtime stores in the Hyo
+            pillar. Source-bound measurements leave this false so unrelated
+            runtime residue cannot change the source measurement.
 
     Returns:
         A :class:`DerivedPillars` with one :class:`PillarResult` per pillar,
@@ -382,7 +386,9 @@ def derive_pillars(
         benevolence=_derive_benevolence(check),
         truth=_derive_truth(test_integrity, check),
         goodness=_derive_goodness(safe),
-        hyo=_derive_hyo(root),
+        hyo=_derive_hyo(root) if runtime_evidence else _make_pillar(
+            "hyo", [], ("hyo.config_present", "hyo.connect_wired", "hyo.ledger_present")
+        ),
         beauty=_derive_beauty(check),
     )
 
