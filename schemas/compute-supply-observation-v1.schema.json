@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/compute-supply-observation-v1.schema.json",
+  "title": "HyoDo Compute Supply Observation v1",
+  "description": "Provider-neutral observed supply evidence. It does not route or authorize.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "observed_at", "fresh_until", "evidence_source", "catalog", "user_availability", "live_access"],
+  "properties": {
+    "schema_version": {"const": "hyodo.compute-supply-observation/v1"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "fresh_until": {"type": "string", "minLength": 1},
+    "evidence_source": {"type": "string", "minLength": 1},
+    "catalog": {"type": "object"},
+    "user_availability": {"type": "object"},
+    "live_access": {"type": "object"}
+  }
+}
