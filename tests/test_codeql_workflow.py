@@ -14,7 +14,7 @@ def test_codeql_workflow_is_pinned_python_sast() -> None:
 
     assert "pull_request:" in text
     assert "branches: [main]" in text
-    assert 'languages: python' in text
+    assert "languages: python" in text
     assert "security-events: write" in text
     assert "contents: read" in text
     assert "github/codeql-action/init@" in text
