@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/agent-nameplate-v1.schema.json",
+  "title": "HyoDo Agent Nameplate v1",
+  "description": "Provenance-only identity for one harness-assigned agent activity.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "actor_id",
+    "role",
+    "host",
+    "provider",
+    "model",
+    "mode",
+    "session_id",
+    "github_actor",
+    "observed_at",
+    "repo",
+    "exact_artifact_sha"
+  ],
+  "properties": {
+    "schema_version": {"const": "hyodo.agent-nameplate/v1"},
+    "actor_id": {
+      "type": "string",
+      "pattern": "^(UNOBSERVED|[A-Za-z0-9._:@-]{1,64})$",
+      "description": "Opaque event actor label; not an authentication identity."
+    },
+    "role": {
+      "enum": ["builder", "verifier", "observer", "UNOBSERVED"],
+      "description": "Harness-assigned function, never inferred from model output."
+    },
+    "host": {"type": "string", "minLength": 1},
+    "provider": {"type": "string", "minLength": 1},
+    "model": {"type": "string", "minLength": 1},
+    "mode": {"type": "string", "minLength": 1},
+    "session_id": {"type": "string", "minLength": 1},
+    "github_actor": {"type": "string", "minLength": 1},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "repo": {"type": "string", "minLength": 1},
+    "exact_artifact_sha": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{40,64}$",
+      "description": "Exact artifact commit/content SHA bound to this nameplate."
+    }
+  }
+}

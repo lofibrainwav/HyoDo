@@ -1,0 +1,7 @@
+{
+  "algorithm": "sha256",
+  "digest": "f8a92e0ed5dd6c4b1bbff53994453dde11cc98e52896c56e16ee2201d2d654e3",
+  "schema": "agent-nameplate-v1.schema.json",
+  "schema_id": "https://hyodo.app/schemas/agent-nameplate-v1.schema.json",
+  "schema_version": "hyodo.agent-nameplate/v1"
+}
