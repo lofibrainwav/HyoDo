@@ -34,6 +34,29 @@ Nothing is asked and nothing is written.
 At most three questions in the whole interactive flow, and nothing is ever
 written without an explicit yes.
 
+## Trust journey
+
+The first connection should usually be observed before it is enforced:
+
+```text
+orientation -> shadow observation -> policy review -> enforcement
+```
+
+`hyodo connect claude-code --shadow --write` installs the same hook wiring but
+records the decision it would have made without blocking the host. A later
+`hyodo connect claude-code --write` leaves shadow mode and enforces the policy
+through the host hook contract. Shadow mode is not a security boundary, and a
+connected hook does not mean that the starter policy is hardened.
+
+The lifecycle remains separate at every host:
+
+```text
+hook       = before/after tool-action policy and observation
+pre-commit = commit-time quality checks
+CI         = clean-environment reproducibility
+release    = artifact and served-readback verification
+```
+
 ## Host table
 
 | Host | Config file | Key | Verified? |
@@ -61,6 +84,10 @@ A dual-host `allowed_tools` copy file is at
 `chatgpt` always reports `UNOBSERVED`: the remote connector
 (`https://mcp.hyodo.app/mcp`) is not live. See
 `docs/M5_REMOTE_CONNECTOR_CONTRACT.md`.
+
+MCP instructions are an agent-facing orientation projection of the HyoDo
+constitution. They do not replace the host policy gate, do not grant execution
+authority, and do not turn a review signal into approval.
 
 Every generated entry is the same underlying command:
 

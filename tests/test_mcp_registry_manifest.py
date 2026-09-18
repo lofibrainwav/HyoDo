@@ -67,3 +67,17 @@ def test_server_json_description_fits_registry_limit_and_matches_server_intent()
     assert description.startswith("Local HyoDo CLI adapter")
     assert "approval" in description
     assert "approv" in live
+
+
+def test_live_instructions_project_the_agent_constitution() -> None:
+    """MCP orientation carries the same non-authority invariants as the repo docs."""
+    live = _read_server_instructions()
+    for claim in (
+        "observe before change",
+        "evidence",
+        "never grant authority",
+        "six virtues are independent lenses",
+        "UNOBSERVED is not GREEN",
+        "host still owns execution",
+    ):
+        assert claim in live

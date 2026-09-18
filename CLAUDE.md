@@ -1,11 +1,19 @@
 # CLAUDE.md
 
-Guidance for AI coding agents working in this repository.
+@AGENTS.md
+
+## Claude Code-specific guidance
+
+Follow the repository constitution above. Claude-specific behavior must remain
+additive and must not redefine HyoDo's product boundary, six independent
+virtues, evidence states, or authority rules.
 
 ## Project Overview
 
-HyoDo is a model-agnostic quality-gate kit for AI-assisted development. Primary
-surface is the public `hyodo` CLI and CI gates.
+HyoDo is a public, host-neutral, model-agnostic trust, evidence, policy, and
+attestation layer. The primary release surface is the public `hyodo` package
+and CLI; the integrating host owns orchestration, memory, retrieval, runtime,
+execution, and final authority.
 
 **Version**: see `VERSION`
 **Python**: 3.10+  
@@ -26,12 +34,12 @@ hanja/Hangul/English together (`("jin", "眞", "진", "Truth", ...)`) because th
 trilingual form *is* the label. Do not extend that exception to prose.
 
 Agents arriving from the Kingdom repos carry a Korean-first convention. It does
-not apply here, and this line is the SSOT — if another doc in this repo says
-otherwise, that doc is wrong and should be corrected.
+not apply here. Contradictions with this policy should be reported as drift;
+agents should edit the conflicting document only when the task scope permits.
 
-**Attribution**: state the model in `Co-Authored-By`. That is truthful and it is
-English. Do not add a Korean authorship line — the Kingdom seat name is internal
-and carries no meaning for a reader of this repository.
+**Attribution**: state the model in `Co-Authored-By`. That is truthful and it
+is English. Do not add a Korean authorship line — the Kingdom seat name is
+internal and carries no meaning for a reader of this repository.
 
 Both halves are enforced: `tests/test_public_language.py` covers tracked files,
 and the `public-language` CI job covers commit messages and PR title/body.
@@ -45,7 +53,11 @@ and the `public-language` CI job covers commit messages and PR title/body.
 - `hyodo score` - review signal (not auto-approval)
 - `hyodo safe` - safety early-warning scan
 - `hyodo trinity` - structured review checklist
-- `hyodo event` / `hyodo policy` - agent evidence and policy decisions (`event validate` exits 0 valid / 1 invalid / 2 unreadable; policy results exit 0 ALLOW / 1 DENY / 2 UNOBSERVED / 3 ASK — see QUICK_START.md; `UNOBSERVED` means there is not enough evidence to say whether a check passed or failed)
+- `hyodo event` / `hyodo policy` - agent evidence and policy decisions
+  (`event validate` exits 0 valid / 1 invalid / 2 unreadable; policy results
+  exit 0 ALLOW / 1 DENY / 2 UNOBSERVED / 3 ASK — see QUICK_START.md;
+  `UNOBSERVED` means there is not enough evidence to say whether a check passed
+  or failed)
 - `hyodo mcp` - optional MCP adapter (no slash commands ship in this repo)
 
 ### Development commands
@@ -65,22 +77,14 @@ hyodo safe
 
 The public product is `hyodo/` (Python package + CLI) with root `pyproject.toml`.
 
-### Optional HyoDo Integrity Score
+### Legacy score compatibility
 
-This table is an internal PR-review emphasis checklist for this repository. It is not a personal virtue-weighted aggregate: the percentages are illustrative review weights, they are not meant to sum to 100, and they do not define anyone's EROS-style profile. A host that builds a weighted lens on top of the six virtues owns and configures that lens itself.
-
-| Virtue | Review emphasis | Focus |
-|--------|--------|-------|
-| Benevolence | 25% | Developer experience |
-| Truth | 22% | Technical accuracy |
-| Goodness | 18% | Security and stability |
-| Hyo | 15% | Project/context alignment |
-| Beauty | 15% | Clarity and UX |
-| Eternity | narrative, not a percentage | Longitudinal continuity evidence; any harmony aggregate is a separate derived value |
-
-The score uses the Six-Virtue Model and Trinity Gates subset; HYOGOOK V5 is the
-formula lineage (internal lineage names recorded in CHANGELOG.md; there is no separate public spec). Scores are decision support only and do not authorize
-merge/deploy.
+`hyodo score` and its Integrity Score display name are historical compatibility
+surfaces. They use the older five-input calculation and must not be described as
+the canonical six-virtue evaluator. The six virtues remain independent lenses;
+HyoDo does not define one canonical virtue aggregate. Scores are review signals
+only and never authorize merge or deployment. See `PHILOSOPHY.md` and
+`docs/SCORE_DERIVATION.md` for the compatibility contract.
 
 HyoDo is public, host-neutral, and model-agnostic. It observes, validates,
 records, attests, and measures. The integrating host or harness owns
