@@ -111,11 +111,12 @@ def verify_exact_candidate(
     return {
         "schema_version": INDEPENDENT_VERIFIER_SCHEMA_VERSION,
         "verdict": verdict,
+        "isolation_scope": "CONTRACT_LEVEL",
         "target": {"exact_artifact_sha": expected_artifact_sha},
         "observed": observed,
         "verifier_nameplate": dict(normalized or verifier_nameplate),
         "evidence": dict(evidence) if isinstance(evidence, Mapping) else {},
-        "residuals": reasons,
+        "residuals": [*reasons, "process_credential_isolation_unproven"],
         "observed_at": observed_at or datetime.now(timezone.utc).isoformat(),
     }
 

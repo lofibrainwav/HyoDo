@@ -3,5 +3,5 @@
   "schema_id": "https://hyodo.app/schemas/independent-verifier-v1.schema.json",
   "schema_version": "hyodo.independent-verifier/v1",
   "algorithm": "sha256",
-  "digest": "869553ad7055f259842e8e49d1b4d70026062fe4873fa47d2b5590039d908c26"
+  "digest": "da2fab32bf3b920d1cb725153097950b8f65b1530062818770b5bc77901a2a14"
 }

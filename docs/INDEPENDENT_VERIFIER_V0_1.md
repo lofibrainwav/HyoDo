@@ -19,3 +19,8 @@ Verdicts are `PASS`, `BLOCK`, and `UNOBSERVED`:
 
 The implementation only invokes read-only Git queries. Human authority remains
 outside this contract and must be recorded separately by the host.
+
+`isolation_scope` is currently `CONTRACT_LEVEL`. The contract rejects builder
+verdicts and authority-shaped input, but it does not prove separate operating
+system processes, sessions, or credentials. That gap is retained as the
+`process_credential_isolation_unproven` residual for a later enforcement lane.

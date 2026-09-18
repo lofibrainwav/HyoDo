@@ -66,6 +66,8 @@ def test_exact_candidate_pass_is_read_only(tmp_path: Path) -> None:
         evidence={"diff": "observed"},
     )
     assert result["verdict"] == "PASS"
+    assert result["isolation_scope"] == "CONTRACT_LEVEL"
+    assert "process_credential_isolation_unproven" in result["residuals"]
     assert not (tmp_path / ".hyodo").exists()
 
 
