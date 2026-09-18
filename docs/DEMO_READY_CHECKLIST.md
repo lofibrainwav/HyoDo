@@ -46,6 +46,11 @@ hyodo safe --strict /tmp/hyodo-demo-safe.txt   # expect exit 1
 
 ## Dry-run receipt
 
+`scripts/demo-dry-run.sh` is a demo verification run, not a zero-write release
+plan. Its receipt declares `zero_write: false`, `local_side_effects: true`, and
+`release_mutation: false`. Use `scripts/release/plan_release.py` for the
+zero-write release planning contract.
+
 After local dry-run, refresh:
 
 ```bash
