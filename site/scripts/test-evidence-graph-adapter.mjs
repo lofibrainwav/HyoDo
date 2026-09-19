@@ -4,6 +4,10 @@ import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import { EVENTS } from '../src/graph/evidence-graph.ts';
 import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../src/graph/from-v1.ts';
+import {
+	fromVerificationView,
+	inspectVerificationView,
+} from '../src/graph/from-verification-view.ts';
 
 const FIXTURE_IDS = [
 	'evt-h0',
@@ -90,7 +94,12 @@ describe('fromEvidenceGraphV1', () => {
 		assert.equal(events[1].parentEventId, 'evt-prompt');
 		assert.deepEqual(events[1].parentEventIds, ['evt-prompt']);
 		assert.equal(events[1].tool?.name, 'read_file');
-		assert.equal(events[1].row, 'planner');
+		// This graph reports no `rows`, and `actor` alone says only "agent".
+		// Which kind of agent it was is exactly what went unreported, so the
+		// event lands in the explicit unobserved lane. The adapter used to
+		// answer `planner` here because the actor id contained "plan", which
+		// is a claim the producer never made.
+		assert.equal(events[1].row, 'unobserved');
 		assert.equal(
 			events.some((event) => event.policy?.decision === 'ALLOW'),
 			false,
@@ -177,5 +186,155 @@ describe('fromEvidenceGraphV1', () => {
 			[],
 		);
 		assert.equal(inspectEvidenceGraphV1(null).ok, false);
+	});
+});
+
+describe('from-v1 reads canonical facts instead of guessing', () => {
+	const graphWithRows = (role) => ({
+		schema_version: 'hyodo.evidence-graph/v1',
+		status: 'UNOBSERVED',
+		reason: 'edge_validation_failed',
+		nodes: [
+			{
+				id: 'evt-1',
+				kind: 'decision',
+				actor: 'agent',
+				actor_id: 'plan-and-review-worker',
+				step_index: 0,
+				run_id: 'run-1',
+				ts: '1',
+				decision: 'ALLOW',
+				policy: { decision: 'ALLOW', rule_id: 'r1', reason: 'recorded' },
+				tool: { name: 'write_and_test_scanner', paths: [], urls: [] },
+			},
+		],
+		edges: [],
+		rows: { order: ['a'], rows: { a: { role, events: ['evt-1'] } } },
+	});
+
+	it('takes the lane from the role the producer already computed', () => {
+		assert.equal(fromEvidenceGraphV1(graphWithRows('orchestrator'))[0].row, 'planner');
+		assert.equal(fromEvidenceGraphV1(graphWithRows('worker'))[0].row, 'executor');
+		assert.equal(fromEvidenceGraphV1(graphWithRows('reviewer'))[0].row, 'reviewer');
+	});
+
+	it('does not read the actor id, even when it contains a role word', () => {
+		// The actor id is "plan-and-review-worker". Three substrings that the
+		// old heuristic would have matched, and the producer's answer wins.
+		assert.equal(fromEvidenceGraphV1(graphWithRows('worker'))[0].row, 'executor');
+	});
+
+	it('lands in the unobserved lane when no role was reported', () => {
+		const graph = graphWithRows('worker');
+		delete graph.rows;
+		assert.equal(fromEvidenceGraphV1(graph)[0].row, 'unobserved');
+	});
+
+	it('never shows a decision it was not handed a presentable value for', () => {
+		// A raw graph carries the recorded decision but not the value a viewer
+		// may show. Reporting ALLOW here is exactly the false green this
+		// adapter must not produce.
+		const events = fromEvidenceGraphV1(graphWithRows('worker'));
+		assert.equal(events[0].policy?.decision, 'UNOBSERVED');
+		assert.equal(events[0].displayKind, 'unobserved');
+	});
+
+	it('does not classify an event by its tool name', () => {
+		const graph = graphWithRows('worker');
+		graph.nodes[0].kind = 'tool_call';
+		graph.nodes[0].decision = null;
+		graph.nodes[0].policy = {};
+		// The tool is called "write_and_test_scanner". The old heuristic would
+		// have called this a scan, a test run, and a file write at once.
+		const [event] = fromEvidenceGraphV1(graph);
+		assert.equal(event.displayKind, 'decision');
+		assert.equal(event.tool?.name, 'write_and_test_scanner');
+	});
+});
+
+describe('fromVerificationView', () => {
+	const view = (overrides = {}) => ({
+		schema_version: 'hyodo.verification-view/v0',
+		status: 'READY',
+		reason: null,
+		authority: 'UNOBSERVED',
+		presentation: { allow_withheld: false, reason: null },
+		lanes: [
+			{ lane_id: 'h', role: 'human', events: ['m1'] },
+			{ lane_id: 'a', role: 'orchestrator', events: ['d1'] },
+		],
+		event_order: ['m1', 'd1'],
+		events: {
+			m1: {
+				who: { actor: 'human', actor_id: null },
+				what: { kind: 'prompt', tool_name: null, decision: null, decision_presentable: null },
+				when: { ts: '1', step_index: 0 },
+				where: { paths: [], urls: [], method: null },
+				why: { reason: null, run_id: 'run-1' },
+				how: { rule_id: null, evaluated_by: null, output_digest: null },
+				causal_parents: [],
+			},
+			d1: {
+				who: { actor: 'hyodo', actor_id: null },
+				what: {
+					kind: 'decision',
+					tool_name: null,
+					decision: 'ALLOW',
+					decision_presentable: 'ALLOW',
+				},
+				when: { ts: '2', step_index: 1 },
+				where: { paths: [], urls: [], method: null },
+				why: { reason: 'tests passed', run_id: 'run-1' },
+				how: { rule_id: 'r1', evaluated_by: 'hyodo', output_digest: null },
+				causal_parents: ['m1'],
+			},
+		},
+		edges_causal: [{ source: 'm1', target: 'd1' }],
+		edges_evidence: [],
+		...overrides,
+	});
+
+	it('takes lanes from the roles the producer computed', () => {
+		const events = fromVerificationView(view());
+		assert.deepEqual(
+			events.map((event) => event.row),
+			['human', 'planner'],
+		);
+	});
+
+	it('shows the presentable decision, not the recorded one', () => {
+		const withheld = view({
+			presentation: { allow_withheld: true, reason: 'graph_status:UNOBSERVED' },
+			status: 'UNOBSERVED',
+		});
+		withheld.events.d1.what.decision_presentable = 'UNOBSERVED';
+		const [, decision] = fromVerificationView(withheld);
+		assert.equal(decision.policy?.decision, 'UNOBSERVED');
+		assert.equal(decision.displayKind, 'unobserved');
+	});
+
+	it('never draws an edge for a citation that resolved to nothing', () => {
+		const withBrokenRef = view({
+			edges_evidence: [
+				{ source: 'nowhere', target: 'd1', target_kind: 'event', source_resolved: false },
+				{ source: 'm1', target: 'd1', target_kind: 'event', source_resolved: true },
+			],
+		});
+		const [, decision] = fromVerificationView(withBrokenRef);
+		assert.deepEqual(decision.evidenceRefs, ['m1']);
+	});
+
+	it('treats a view with no presentation block as withholding', () => {
+		const noBlock = view();
+		delete noBlock.presentation;
+		// Absence of the flag is not permission to light green.
+		assert.equal(inspectVerificationView(noBlock).allowWithheld, true);
+	});
+
+	it('returns empty and does not throw on unknown or malformed input', () => {
+		assert.deepEqual(fromVerificationView(null), []);
+		assert.deepEqual(fromVerificationView({ schema_version: 'other' }), []);
+		assert.deepEqual(fromVerificationView({ schema_version: 'hyodo.verification-view/v0' }), []);
+		assert.equal(inspectVerificationView({}).ok, false);
 	});
 });
