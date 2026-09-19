@@ -9,6 +9,10 @@ work. "Open" does not mean the repository is public; it means a first-time
 visitor can reproduce a result in their own project using the version the
 documentation points them at. Source merged is not that state.
 
+That priority orders the work in *this* register. It does not rank another
+owner's queue and does not make their work wait on HyoDo — see "KINGDOM handoff
+boundary" for why ordering and ownership are separate questions here.
+
 The storefront repairs in PR #420, #421 and #422 are merged and verified in
 source, and the website half is already served. The published package still
 carries the pre-repair description, so the package half stays open until the
@@ -57,6 +61,8 @@ Source, verified on merged `main` `0ae0040`:
 
 ### Status
 
+<!-- markdownlint-disable MD013 -->
+
 | Item | Website | Package | Evidence / residual |
 | --- | --- | --- | --- |
 | A1 published links | n/a | **open** | Source merged in #420 and a readback check added to `verify-pypi-release.py`. The live 4.19.8 description still 404s. Closes when the next published release is read back. |
@@ -65,6 +71,8 @@ Source, verified on merged `main` `0ae0040`:
 | A4 representative result | open | — | The homepage shows an evidence-graph prototype labelled "sample data only" and the install command, but no worked result tied to a stated version, input and command. Not started. |
 | A5 doc entry path | open | — | The docs sidebar lists 15 flat entries. The sidebar label reads "Philosophy → Math → Code" while the page title reads "From values to evidence". Not started. |
 | A6 contact and data boundary | open | — | The homepage footer links GitHub, PyPI, Docs and Research only; there is no contact, maintenance or data-handling link, and no `og:image`. `project_urls` points at GitHub rather than the site. Not started. |
+
+<!-- markdownlint-enable MD013 -->
 
 A4–A6 are presentation work. They must not add claims that have not been
 observed, and they are not prerequisites for the package release that closes A1
@@ -155,7 +163,11 @@ maintainer decision, not automatic release or execution authority.
 
 ## KINGDOM handoff boundary
 
-KINGDOM work may start now without reopening the closed HyoDo PRs.
+KINGDOM work may start now without reopening the closed HyoDo PRs. That is a
+statement about dependency, not about priority: KINGDOM has its own owner and
+its own register, so nothing in it is blocked by the HyoDo items above, and
+nothing in it reorders them. Neither side's progress is evidence about the
+other.
 
 <!-- markdownlint-disable MD013 -->
 
