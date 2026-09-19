@@ -124,4 +124,42 @@ if (heroMissing.length > 0) {
 	throw new Error(`Hero layout contract failed: ${heroMissing.join('; ')}`);
 }
 
+// Sidebar label contract. A visitor who clicks a sidebar entry and lands on a
+// page with a different heading cannot tell whether they arrived in the right
+// place. The audit of 2026-09-19 found exactly one such pair — "Philosophy →
+// Math → Code" pointing at a page titled "From values to evidence" — so the
+// agreement is asserted here rather than left to review.
+const configSource = readFileSync(new URL('../astro.config.mjs', import.meta.url), 'utf8');
+const sidebarEntries = [...configSource.matchAll(/label:\s*'((?:[^'\\]|\\.)*)'\s*,\s*slug:\s*'([^']+)'/g)]
+	.map(([, label, slug]) => ({ label: label.replace(/\\'/g, "'"), slug }));
+
+const labelMismatches = [];
+if (sidebarEntries.length === 0) {
+	labelMismatches.push('no sidebar entries with a slug were found; the label contract did not run');
+}
+for (const { label, slug } of sidebarEntries) {
+	const pagePath = new URL(`../src/content/${slug.startsWith('docs/') ? 'docs/' : ''}${slug}.md`, import.meta.url);
+	let source;
+	try {
+		source = readFileSync(pagePath, 'utf8');
+	} catch {
+		labelMismatches.push(`${slug}: sidebar points at a page that does not exist`);
+		continue;
+	}
+	const title = source.match(/^title:\s*(.+)$/m);
+	if (!title) {
+		labelMismatches.push(`${slug}: page has no frontmatter title to compare the sidebar label against`);
+		continue;
+	}
+	const pageTitle = title[1].trim().replace(/^['"]|['"]$/g, '');
+	if (pageTitle !== label) {
+		labelMismatches.push(`${slug}: sidebar says "${label}" but the page is titled "${pageTitle}"`);
+	}
+}
+
+if (labelMismatches.length > 0) {
+	throw new Error(`Sidebar label contract failed: ${labelMismatches.join('; ')}`);
+}
+
+console.log(`Sidebar label contract: PASS (${sidebarEntries.length} entries agree with their page titles)`);
 console.log('Static 404 and homepage output contracts: PASS');

@@ -108,8 +108,12 @@ ci = [
 hyodo = "hyodo.cli.dispatch:app"
 
 [project.urls]
-Homepage = "https://github.com/lofibrainwav/HyoDo"
-Documentation = "https://github.com/lofibrainwav/HyoDo#readme"
+# Homepage and Documentation point at the site a reader can actually start from.
+# The audit of 2026-09-19 found both pointing back at the repository, so the
+# PyPI sidebar sent a first-time reader to a README instead of the quickstart.
+# Repository stays below for anyone who wants the source.
+Homepage = "https://hyodo.app"
+Documentation = "https://hyodo.app/docs/quickstart/"
 Repository = "https://github.com/lofibrainwav/HyoDo"
 Issues = "https://github.com/lofibrainwav/HyoDo/issues"
 Changelog = "https://github.com/lofibrainwav/HyoDo/blob/main/CHANGELOG.md"

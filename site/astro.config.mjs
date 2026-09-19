@@ -38,22 +38,47 @@ export default defineConfig({
 			// not Starlight's default splash. Docs content is nested one level
 			// under src/content/docs/docs/ so generated routes land at /docs/*
 			// (see site/README.md for the full explanation).
+			// Sidebar labels must match each page's frontmatter `title`. A visitor
+			// who clicks "Philosophy → Math → Code" and lands on a page headed
+			// "From values to evidence" cannot tell whether they arrived in the
+			// right place; site/scripts/check-site-output.mjs asserts the match.
 			sidebar: [
-				{ label: 'Quickstart', slug: 'docs/quickstart' },
-				{ label: 'Why HyoDo', slug: 'docs/why-hyodo' },
-				{ label: 'Philosophy → Math → Code', slug: 'docs/philosophy' },
-				{ label: 'Evidence Graph', slug: 'docs/evidence-graph' },
-				{ label: 'Skills', slug: 'docs/skills' },
-				{ label: 'Inspect', slug: 'docs/inspect' },
-				{ label: 'Graph Export', slug: 'docs/graph-export' },
-				{ label: 'Eye', slug: 'docs/eye' },
-				{ label: 'Connect', slug: 'docs/connect' },
-				{ label: 'Friction Contribution', slug: 'docs/friction-contribution' },
-				{ label: 'Research', slug: 'docs/research' },
-				{ label: 'Roadmap', slug: 'docs/roadmap' },
-				{ label: 'Trust', slug: 'docs/trust' },
-				{ label: 'Runtime identity', slug: 'docs/runtime-identity' },
-				{ label: 'Product boundary', slug: 'docs/product-boundary' },
+				{
+					label: 'Start here',
+					items: [
+						{ label: 'Quickstart', slug: 'docs/quickstart' },
+						{ label: 'A worked result', slug: 'docs/worked-example' },
+						{ label: 'Why HyoDo', slug: 'docs/why-hyodo' },
+					],
+				},
+				{
+					label: 'Scope and boundaries',
+					items: [
+						{ label: 'Product boundary', slug: 'docs/product-boundary' },
+						{ label: 'From values to evidence', slug: 'docs/philosophy' },
+						{ label: 'Trust', slug: 'docs/trust' },
+					],
+				},
+				{
+					label: 'Using HyoDo',
+					items: [
+						{ label: 'Connect', slug: 'docs/connect' },
+						{ label: 'Inspect', slug: 'docs/inspect' },
+						{ label: 'Evidence Graph', slug: 'docs/evidence-graph' },
+						{ label: 'Graph Export', slug: 'docs/graph-export' },
+						{ label: 'Eye', slug: 'docs/eye' },
+						{ label: 'Skills', slug: 'docs/skills' },
+						{ label: 'Runtime identity v1', slug: 'docs/runtime-identity' },
+					],
+				},
+				{
+					label: 'Project',
+					items: [
+						{ label: 'Roadmap', slug: 'docs/roadmap' },
+						{ label: 'Research', slug: 'docs/research' },
+						{ label: 'Friction Contribution', slug: 'docs/friction-contribution' },
+					],
+				},
 			],
 		}),
 	],
