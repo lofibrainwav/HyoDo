@@ -1263,22 +1263,74 @@ def _render_grid_rows(
     )
 
 
-def _daw_track(node: dict[str, Any]) -> tuple[str, str]:
-    """Choose a display-only DAW lane from observed event identity.
+#: The graph already decides an actor lineage's role. This maps that decided
+#: role onto the four display lanes the timeline draws, and it is the only
+#: place the two vocabularies are allowed to meet. `orchestrator` lands in the
+#: `planner` lane because that lane means "spawned other work", which is
+#: exactly what `build_actor_rows` observes to call a row an orchestrator.
+_DAW_LANE_BY_ROLE: dict[str, str] = {
+    "human": "human",
+    "orchestrator": "planner",
+    "reviewer": "reviewer",
+    "worker": "agent",
+}
 
-    This is intentionally not added to the event schema. A graph viewer needs
-    a readable arrangement even when the producer only supplies the coarse
-    ``actor`` field; the event id/tool name are already recorded evidence and
-    are sufficient for a stable local presentation lane.
+
+def _role_by_event(graph: dict[str, Any]) -> dict[str, str]:
+    """Index the graph's own per-lineage ``role`` by event id.
+
+    ``build_actor_rows`` already derives each actor lineage's role from the
+    graph, and ``build_report_graph`` already attaches the result as ``rows``
+    on every payload. Reading it here keeps one decision in one place. An older
+    payload without ``rows`` yields an empty index, and the caller falls back
+    to the coarse ``actor`` reading rather than inventing a role locally.
     """
+    rows = graph.get("rows")
+    if not isinstance(rows, dict):
+        return {}
+    table = rows.get("rows")
+    if not isinstance(table, dict):
+        return {}
+    index: dict[str, str] = {}
+    for row in table.values():
+        if not isinstance(row, dict):
+            continue
+        role = row.get("role")
+        if not isinstance(role, str):
+            continue
+        for event_id in row.get("events") or []:
+            if isinstance(event_id, str):
+                index[event_id] = role
+    return index
+
+
+def _daw_track(node: dict[str, Any], role_by_event: dict[str, str] | None = None) -> str:
+    """Choose a display-only DAW lane for one event.
+
+    Prefers the role the graph already decided for this event's actor
+    lineage (`build_actor_rows`, surfaced as `graph["rows"]`). That decision
+    reads causal lineage and evidence citation; re-deriving it here from the
+    coarse ``actor`` field alone would be a second, weaker answer to a question
+    already answered, and two answers is how a viewer starts disagreeing with
+    its own producer.
+
+    The fallback below runs only when no role was observed for this event —
+    an older payload, or a graph assembled without rows. It is deliberately
+    coarse: it reports what ``actor`` says and nothing more. It does not read
+    the event id or the tool name, because a name is what something is called,
+    not what it did.
+    """
+    role = (role_by_event or {}).get(str(node.get("id") or ""))
+    if role is not None:
+        return _DAW_LANE_BY_ROLE.get(role, "agent")
     actor = str(node.get("actor") or "").lower()
     if actor == "human":
-        return "human", "Human"
+        return "human"
     if actor == "hyodo":
-        return "reviewer", "Reviewer"
+        return "reviewer"
     if actor == "agent":
-        return "agent", "Agent / role unobserved"
-    return "planner", "Planner"
+        return "agent"
+    return "planner"
 
 
 def _daw_event_label(node: dict[str, Any]) -> str:
@@ -1307,9 +1359,17 @@ def _daw_event_label(node: dict[str, Any]) -> str:
 
 
 def _render_daw_timeline(
-    nodes: list[dict[str, Any]], edges: list[dict[str, Any]], edge_overlay: str = ""
+    nodes: list[dict[str, Any]],
+    edges: list[dict[str, Any]],
+    edge_overlay: str = "",
+    role_by_event: dict[str, str] | None = None,
 ) -> tuple[str, dict[str, tuple[int, int, int]]]:
-    """Render the user-facing DAW timeline and return edge anchor membership."""
+    """Render the user-facing DAW timeline and return edge anchor membership.
+
+    *role_by_event* is `_role_by_event(graph)`: the role the graph already
+    decided for each event's actor lineage. Passing it makes the lanes agree
+    with `graph["rows"]` instead of re-deriving a weaker answer here.
+    """
     valid_nodes = [node for node in nodes if isinstance(node.get("id"), str)]
 
     step_indices = [
@@ -1321,10 +1381,14 @@ def _render_daw_timeline(
         (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
     )
     track_order = ["human", "planner", "agent", "reviewer"]
+    # The agent lane no longer claims the role is unobserved when the graph
+    # observed one. Saying "unobserved" about something already measured is
+    # the same error in the other direction.
+    roles_observed = bool(role_by_event)
     track_labels = {
         "human": "Human",
         "planner": "Planner",
-        "agent": "Agent / role unobserved",
+        "agent": "Agent / worker" if roles_observed else "Agent / role unobserved",
         "reviewer": "Reviewer",
     }
     buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
@@ -1336,7 +1400,7 @@ def _render_daw_timeline(
             str(item.get("ts", "")),
         ),
     ):
-        track, _label = _daw_track(node)
+        track = _daw_track(node, role_by_event)
         raw_step = node.get("step_index")
         step: int = raw_step if isinstance(raw_step, int) else 0
         buckets.setdefault((track, step), []).append(node)
@@ -1467,9 +1531,10 @@ def render_graph_html(
         else ""
     )
 
-    _daw_preview, daw_anchors = _render_daw_timeline(nodes, edges)
+    daw_roles = _role_by_event(graph)
+    _daw_preview, daw_anchors = _render_daw_timeline(nodes, edges, role_by_event=daw_roles)
     daw_edge_overlay = _render_edge_overlay(graph, daw_anchors, overlay_id="daw-edge-overlay")
-    daw_html, _ = _render_daw_timeline(nodes, edges, daw_edge_overlay)
+    daw_html, _ = _render_daw_timeline(nodes, edges, daw_edge_overlay, daw_roles)
 
     # Brief finding 1: one grid, columns x actor rows, each event a tile at
     # (its column, its row) — replaces the old two-separate-lists layout
