@@ -1058,7 +1058,10 @@ def test_dashboard_withheld_allow_stays_withheld_in_header_and_rail(tmp_path: Pa
     assert 'data-presentable-decision="UNOBSERVED"' in html
     assert 'data-stage="decision" data-state="UNOBSERVED"' in html
     assert "recordedDecision" in html
-    assert "detail-lenses" in html
+    assert "FIVE-LENS APERTURE" in html
+    assert "data-run-lens-state" in html
+    assert "runCoverage" in html
+    assert "prefers-reduced-motion:reduce" in html
     assert "WHAT IS MISSING" in html
 
 
