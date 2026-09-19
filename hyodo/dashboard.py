@@ -92,6 +92,7 @@ const FIELDS = [
   ["How", "how"],
 ];
 const LENS_LABELS = { jin: "眞", seon: "善", mi: "美", in: "仁", hyo: "孝" };
+const LENS_ENGLISH = { jin: "Truth", seon: "Goodness", mi: "Beauty", in: "Benevolence", hyo: "Hyo" };
 function addText(parent, tag, text, className) {
   const element = document.createElement(tag);
   if (className) element.className = className;
@@ -104,6 +105,70 @@ function addSection(title, className) {
   section.className = className;
   addText(section, "h3", title);
   return section;
+}
+function coverageState(entry) {
+  if (!entry || typeof entry !== "object") return "UNOBSERVED";
+  const observed = Number(entry.observed);
+  const expected = Number(entry.expected);
+  if (!Number.isFinite(observed) || !Number.isFinite(expected) || expected <= 0 || observed <= 0) {
+    return "UNOBSERVED";
+  }
+  return observed >= expected ? "OBSERVED" : "PARTIAL";
+}
+function lensMark(state) {
+  return state === "OBSERVED" ? "●" : state === "PARTIAL" ? "◐" : "○";
+}
+function addLensAperture(panel, data) {
+  const section = addSection("FIVE-LENS APERTURE", "lens-aperture");
+  const intro = document.createElement("p");
+  intro.className = "lens-aperture-intro";
+  intro.textContent = "永 / selected moment · event evidence and run coverage";
+  section.appendChild(intro);
+  const diagram = document.createElement("div");
+  diagram.className = "lens-aperture-diagram";
+  diagram.setAttribute("role", "group");
+  diagram.setAttribute("aria-label", "Five independent lens coverage indicators");
+  const columns = Array.isArray(data.columns) ? data.columns : [];
+  const runCoverage = data.runCoverage && typeof data.runCoverage === "object" ? data.runCoverage : {};
+  for (const key of Object.keys(LENS_LABELS)) {
+    const eventState = columns.includes(key) ? "OBSERVED" : "UNOBSERVED";
+    const runState = coverageState(runCoverage[key]);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "lens-segment";
+    button.dataset.lensKey = key;
+    button.dataset.lensState = eventState;
+    button.dataset.runLensState = runState;
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-label", `${LENS_ENGLISH[key]}, selected event ${eventState.toLowerCase()}, run coverage ${runState.toLowerCase()}`);
+    addText(button, "span", lensMark(eventState), "lens-glyph lens-event-glyph");
+    addText(button, "strong", LENS_LABELS[key], "lens-hanja");
+    addText(button, "small", lensMark(runState) + " " + runState, "lens-run-state");
+    const detail = document.createElement("span");
+    detail.className = "lens-segment-detail";
+    detail.hidden = true;
+    addText(detail, "span", `Selected event: ${eventState}`);
+    const coverage = runCoverage[key];
+    const coverageText = coverage && typeof coverage === "object"
+      ? `${String(coverage.observed ?? 0)} / ${String(coverage.expected ?? 0)}`
+      : "UNOBSERVED";
+    addText(detail, "span", `Run coverage: ${runState} · ${coverageText}`);
+    button.appendChild(detail);
+    button.addEventListener("click", () => {
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded));
+      detail.hidden = expanded;
+    });
+    diagram.appendChild(button);
+  }
+  section.appendChild(diagram);
+  const axis = document.createElement("div");
+  axis.className = "lens-aperture-axis";
+  addText(axis, "span", "永", "lens-axis-symbol");
+  addText(axis, "span", `step ${String(data.stepIndex ?? "UNOBSERVED")}`, "lens-axis-step");
+  addText(axis, "span", "selected moment →", "lens-axis-arrow");
+  section.appendChild(axis);
+  panel.appendChild(section);
 }
 const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event], .daw-cell button[data-event]");
 let lastFocusedCell = null;
@@ -207,13 +272,7 @@ cells.forEach((button) => {
       p.appendChild(document.createTextNode(String(data[key] ?? "not recorded")));
       panel.appendChild(p);
     }
-    const lenses = addSection("LENS COVERAGE", "detail-lenses");
-    const columns = Array.isArray(data.columns) ? data.columns : [];
-    for (const key of Object.keys(LENS_LABELS)) {
-      const mark = columns.includes(key) ? "●" : "○";
-      addText(lenses, "span", mark + " " + LENS_LABELS[key], columns.includes(key) ? "lens-observed" : "lens-unobserved");
-    }
-    panel.appendChild(lenses);
+    addLensAperture(panel, data);
     const proof = addSection("PROOF", "detail-proof");
     addText(proof, "p", "Causal parents: " + String(data.causalParentCount ?? 0));
     addText(proof, "p", "Evidence refs: " + String(data.evidenceRefCount ?? 0));
@@ -845,6 +904,10 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, Any]:
         "recordedDecision": what.get("decision") or node.get("decision") or "UNOBSERVED",
         "presentableDecision": what.get("decision_presentable") or "UNOBSERVED",
         "columns": list(verification.get("columns") or []),
+        "runCoverage": dict(verification.get("run_coverage") or {}),
+        "stepIndex": verification.get("when", {}).get("step_index")
+        if isinstance(verification.get("when"), dict)
+        else node.get("step_index"),
         "causalParentCount": len(verification.get("causal_parents") or []),
         "evidenceRefCount": len(verification.get("evidence_refs") or []),
         "outputDigest": how_view.get("output_digest") or "UNOBSERVED",
@@ -1822,6 +1885,7 @@ def render_graph_html(
             verification = dict(verification)
             verification["evidence_refs"] = evidence_refs_by_target.get(str(node_id), [])
             verification["missing"] = missing_by_event.get(str(node_id), [])
+            verification["run_coverage"] = verification_view.get("coverage", {})
         nodes.append({**node, "verification": verification or {}})
     node_by_id: dict[str, dict[str, Any]] = {
         node["id"]: node for node in nodes if isinstance(node.get("id"), str)
@@ -2109,15 +2173,28 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .detail h3 {{ margin:.75rem 0 .35rem; color:#aaa9ab; font:600 .62rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.14em }}
 .detail-status-strip {{ display:flex; gap:14px; flex-wrap:wrap; padding-bottom:8px; border-bottom:1px solid #3a393d; color:#f5f5f5; font:600 .66rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.08em }}
 .detail-status-strip span:nth-child(2) {{ color:#aaa9ab }}
-.detail-lenses {{ display:flex; gap:12px; flex-wrap:wrap }}
-.detail-lenses h3 {{ width:100% }}
-.detail-lenses span {{ font:600 .72rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace }}
-.lens-observed {{ color:#7fc86a }} .lens-unobserved {{ color:#747378 }}
+.lens-aperture {{ margin-top:.78rem; padding-top:.72rem; border-top:1px solid #3a393d }}
+.lens-aperture h3 {{ margin-top:0 }}
+.lens-aperture-intro {{ margin:.1rem 0 .65rem; color:#8b929a; font-size:.66rem; letter-spacing:.04em }}
+.lens-aperture-diagram {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; align-items:stretch }}
+.lens-segment {{ display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:5px; align-items:center; min-width:0; padding:7px 6px; border:1px solid #3a393d; border-radius:0; background:#121116; color:#f5f5f5; text-align:left; transition:background 200ms ease,border-color 200ms ease }}
+.lens-segment:hover,.lens-segment:focus-visible,.lens-segment[aria-expanded="true"] {{ border-color:#f05a24; background:#1d1a1d }}
+.lens-glyph {{ grid-row:1 / span 2; font-size:1.15rem; line-height:1 }}
+.lens-event-glyph {{ color:#747378 }}
+.lens-segment[data-lens-state="OBSERVED"] .lens-event-glyph {{ color:#7fc86a }}
+.lens-hanja {{ font-size:.86rem; font-weight:400 }}
+.lens-run-state {{ color:#8b929a; font:600 .54rem/1.2 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.04em }}
+.lens-segment[data-run-lens-state="OBSERVED"] .lens-run-state {{ color:#7fc86a }}
+.lens-segment[data-run-lens-state="PARTIAL"] .lens-run-state {{ color:#fab413 }}
+.lens-segment-detail {{ grid-column:1 / -1; display:grid; gap:3px; margin-top:5px; padding-top:5px; border-top:1px solid #3a393d; color:#b9c0c7; font:500 .58rem/1.35 ui-monospace,SFMono-Regular,Consolas,monospace }}
+.lens-aperture-axis {{ display:flex; align-items:center; gap:7px; margin-top:8px; color:#8b929a; font:600 .58rem/1.3 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.08em }}
+.lens-axis-symbol {{ color:#fab413; font-size:.9rem }}
+.lens-axis-arrow {{ flex:1; border-bottom:1px solid #57565a; padding-bottom:3px; text-align:right }}
 .detail-proof, .detail-missing {{ color:#aaa9ab }}
 .detail-proof p, .detail-missing p {{ margin:.18rem 0 }}
 .detail-missing p {{ color:#fab413 }}
-@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} }}
-@media (prefers-reduced-motion:reduce) {{ .daw-cell button {{ transition:none }} }}
+@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} .lens-aperture-diagram {{ grid-template-columns:repeat(5, minmax(82px,1fr)); overflow-x:auto; padding-bottom:4px }} .lens-segment {{ min-width:82px }} }}
+@media (prefers-reduced-motion:reduce) {{ .daw-cell button,.lens-segment {{ transition:none }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
 {notice_html}
 {_render_verification_header(verification_view)}
