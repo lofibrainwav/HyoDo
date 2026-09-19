@@ -36,6 +36,8 @@ limits are in [Current State](./CURRENT_STATE.md).
   receipt contract.
 - [Test integrity](./TEST_INTEGRITY.md) — strict test-integrity checks.
 - [Score derivation](./SCORE_DERIVATION.md) — score inputs and coverage semantics.
+- [Verification view](./VERIFICATION_VIEW_V0.md) — read-only investigation
+  projection of one evidence graph; carries no score and no authority.
 
 ## Project status and contributor workflow
 

@@ -15,6 +15,9 @@ Current public version: the root `VERSION` file. Start from
 - Local MCP: `hyodo mcp stdio`, `serve --bind loopback|tailscale`, `pair`,
   `doctor`, `continuity`
 - Local graph: `hyodo dashboard` `GET /graph` from `.hyodo/agent-events.jsonl`
+- Investigation projection: `GET /api/verification-view`
+  ([`VERIFICATION_VIEW_V0.md`](./VERIFICATION_VIEW_V0.md)); a view, not a
+  verdict, and it carries no score
 - Claude Code hooks: `hyodo connect claude-code`
 
 ## Not shipped / not equivalent

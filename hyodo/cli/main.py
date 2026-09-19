@@ -218,6 +218,7 @@ from hyodo.skills import (
 )
 from hyodo.test_integrity import TestIntegrityReport, scan_test_integrity
 from hyodo.verdict import explain_decision, render_verdict_line
+from hyodo.verification_view import build_verification_view
 
 app = typer.Typer(
     name="hyodo",
@@ -985,7 +986,14 @@ def _dashboard_starting_evidence(root: Path) -> dict[str, object]:
 # only read response bodies from these JSON endpoints when the browser
 # lets it).
 _CORS_ELIGIBLE_PATHS = frozenset(
-    {"/api/evidence", "/api/status", "/api/graph", "/api/actor", "/api/identity"}
+    {
+        "/api/evidence",
+        "/api/status",
+        "/api/graph",
+        "/api/actor",
+        "/api/identity",
+        "/api/verification-view",
+    }
 )
 
 
@@ -1036,6 +1044,21 @@ def make_dashboard_handler(
                         200,
                     )
                 return render_event_graph_json(graph).encode("utf-8"), "application/json", 200
+            if path == "/api/verification-view":
+                # A sibling route, not a query parameter on /api/graph: two
+                # payload shapes under one path would make this path's CORS
+                # eligibility and cache meaning ambiguous. Reads the ledger
+                # live, like /api/graph, so it never serves a stale case file.
+                if root is None:
+                    return None
+                return (
+                    json.dumps(
+                        build_verification_view(build_report_graph(root), root=root),
+                        sort_keys=True,
+                    ).encode("utf-8"),
+                    "application/json",
+                    200,
+                )
             if path == "/api/actor":
                 # Package 2-C: actor rings (spec section 5), keyed the same way
                 # `build_actor_rows` keys its own `rows` dict (Ruling 3).
