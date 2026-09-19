@@ -4,9 +4,101 @@ Handoff snapshot: 2026-09-19. This is a bounded work register, not a live
 status feed or a claim that every possible defect has been discovered.
 Refresh linked evidence before starting or closing an item.
 
-**Disposition:** the repairs in PR #417 and the observation documentation in
-PR #414 are merged and verified. HyoDo work can be parked while KINGDOM work
-proceeds independently. This does not declare every public surface complete.
+**Disposition:** HyoDo public readiness is the current priority, ahead of other
+work. "Open" does not mean the repository is public; it means a first-time
+visitor can reproduce a result in their own project using the version the
+documentation points them at. Source merged is not that state.
+
+That priority orders the work in *this* register. It does not rank another
+owner's queue and does not make their work wait on HyoDo — see "KINGDOM handoff
+boundary" for why ordering and ownership are separate questions here.
+
+The storefront repairs in PR #420, #421 and #422 are merged and verified in
+source, and the website half is already served. The published package still
+carries the pre-repair description, so the package half stays open until the
+next approved release is read back. See "Public readiness" below for what is
+closed, what is open, and on what evidence.
+
+## Public readiness
+
+Audit of 2026-09-19 raised six storefront items. "Closed" here means the state a
+first-time visitor actually meets, not that a pull request merged.
+
+The website and the package deploy on different schedules. The site redeploys on
+merge to `main`; the package only changes when a release is published. Holding
+both to "wait for the next release" was wrong, and the two halves are tracked
+separately below.
+
+### Observed on 2026-09-19
+
+Website, verified against the deployed site:
+
+- `https://hyodo.app/` and `https://hyodo.app/docs/quickstart/` both HTTP 200.
+- Served stylesheet `/_astro/index.rIW0wefB.css` is byte-identical
+  (SHA-256 `c7645a4e…1eee`) to the local build of merged `main` `0ae0040`, and
+  carries `.hero-content{…position:relative}` with no `position:absolute`, plus
+  `.hero{…padding-top:var(--navbar-height)}` and `--navbar-height:3.5rem`.
+- Deployment identity at read time: `x-vercel-id: sfo1::5mbt4-1789849846551-…`,
+  `last-modified: Sat, 19 Sep 2026 20:25:26 GMT`.
+
+Published package, verified against `https://pypi.org/pypi/hyodo/json`:
+
+- Latest version is still `4.19.8`, whose description carries **18** relative
+  links, including `./QUICK_START.md`, `./docs/GATES_SYNTAX.md` and `./LICENSE`.
+- `project_urls` Homepage and Documentation both point at GitHub, not at
+  `hyodo.app`.
+
+Source, verified on merged `main` `0ae0040`:
+
+- `ruff check` / `ruff format --check` over `hyodo tests scripts`: clean.
+- `pyright hyodo`: 0 errors.
+- `pytest tests`: 1716 passed, 2 skipped. The skips are the opt-in SBOM
+  integration lane (`HYODO_SBOM_INTEGRATION=1`) and the built-artifact metadata
+  check, which reports UNOBSERVED rather than passing when no build is present.
+- Rebuild of merged `main`: `twine check` passed for sdist and wheel,
+  `verify_sdist_scope.py` PASS (92 members), and the built `PKG-INFO` and
+  `METADATA` carry zero relative links.
+
+### Status
+
+<!-- markdownlint-disable MD013 -->
+
+| Item | Website | Package | Evidence / residual |
+| --- | --- | --- | --- |
+| A1 published links | n/a | **open** | Source merged in #420 and a readback check added to `verify-pypi-release.py`. The live 4.19.8 description still 404s. Closes when the next published release is read back. |
+| A2 small screens | **closed** | n/a | Measured on the deployed site at 1440×900, 390×844, 375×667, 360×640, 320×568 and 844×390: content above the hero is 0px everywhere, the heading never starts above the fixed navbar, both hero controls are fully visible, and the page scrolls. |
+| A3 first install | **closed** (guidance) | **open** (package) | The deployed quickstart carries the prerequisites, `cd your-project`, and the per-installer extra step. The clean install itself is still only verified against a locally built wheel; it closes against the published package after the next release. |
+| A4 representative result | open | — | The homepage shows an evidence-graph prototype labelled "sample data only" and the install command, but no worked result tied to a stated version, input and command. Not started. |
+| A5 doc entry path | open | — | The docs sidebar lists 15 flat entries. The sidebar label reads "Philosophy → Math → Code" while the page title reads "From values to evidence". Not started. |
+| A6 contact and data boundary | open | — | The homepage footer links GitHub, PyPI, Docs and Research only; there is no contact, maintenance or data-handling link, and no `og:image`. `project_urls` points at GitHub rather than the site. Not started. |
+
+<!-- markdownlint-enable MD013 -->
+
+A4–A6 are presentation work. They must not add claims that have not been
+observed, and they are not prerequisites for the package release that closes A1
+and A3.
+
+### How A2 was measured, and what that does not cover
+
+Chrome 153.0.8010.48 driven over the DevTools Protocol against the live site,
+using real viewport emulation (`Emulation.setDeviceMetricsOverride`) rather than
+an iframe, and real `Tab` key events. Enlarged text was applied through the
+browser's own default font size (`Page.setFontSizes`, 16px → 32px), because the
+site's `style-src 'self'` policy correctly blocks an injected stylesheet — an
+earlier attempt to inject `html{font-size:200%}` silently did nothing and its
+results were discarded.
+
+At 32px base the hero grows to 3209px on a 320×568 screen and the heading, at
+484px tall, no longer fits beside the navbar in one screen; it stays reachable
+and readable by scrolling and both controls remain fully visible. Scrolling the
+heading to the top of the viewport places its first line under the fixed navbar,
+which a `scroll-margin-top` would address; recorded as an observation, not fixed
+here.
+
+Not covered: real handsets, screen readers, and any browser other than the one
+above. A separate profile was used because the extension bridge to the everyday
+browser was unavailable at the time; fonts and user settings therefore differ
+from a real visitor's.
 
 ## What is already closed
 
@@ -71,7 +163,11 @@ maintainer decision, not automatic release or execution authority.
 
 ## KINGDOM handoff boundary
 
-KINGDOM work may start now without reopening the closed HyoDo PRs.
+KINGDOM work may start now without reopening the closed HyoDo PRs. That is a
+statement about dependency, not about priority: KINGDOM has its own owner and
+its own register, so nothing in it is blocked by the HyoDo items above, and
+nothing in it reorders them. Neither side's progress is evidence about the
+other.
 
 <!-- markdownlint-disable MD013 -->
 

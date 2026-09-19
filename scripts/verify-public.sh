@@ -63,8 +63,11 @@ $PYTHON scripts/release/check_version_sync.py
 EXPECTED_VERSION="$(tr -d '[:space:]' < VERSION)"
 
 echo "-- ruff --"
-$PYTHON -m ruff check hyodo/ tests/ --output-format=concise
-$PYTHON -m ruff format --check hyodo/ tests/
+# Same scope as the CI lane (.github/workflows/ci.yml): release scripts are
+# linted too. A narrower scope here made this script report success on a tree
+# that CI then rejected.
+$PYTHON -m ruff check hyodo tests scripts --output-format=concise
+$PYTHON -m ruff format --check hyodo tests scripts
 
 echo "-- pyright --"
 $PYTHON -m pyright --pythonpath "$PYTHON" hyodo
