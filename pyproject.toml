@@ -6,7 +6,10 @@ build-backend = "hatchling.build"
 name = "hyodo"
 version = "4.19.8"
 description = "Open, model-agnostic evidence and verification for AI-assisted systems. Reuse your checks; missing evidence stays UNOBSERVED; scores never authorize."
-readme = "README.md"
+# The published description is built by hatch_build.py so its links are absolute:
+# PyPI has no repository around the text, so relative links 404 there while
+# README.md must stay relative for GitHub readers.
+dynamic = ["readme"]
 license = "MIT"
 authors = [
     { name = "AFO Kingdom" }
@@ -112,6 +115,9 @@ Issues = "https://github.com/lofibrainwav/HyoDo/issues"
 Changelog = "https://github.com/lofibrainwav/HyoDo/blob/main/CHANGELOG.md"
 Security = "https://github.com/lofibrainwav/HyoDo/blob/main/SECURITY.md"
 
+[tool.hatch.metadata.hooks.custom]
+path = "hatch_build.py"
+
 [tool.hatch.build.targets.wheel]
 packages = ["hyodo"]
 
@@ -131,6 +137,8 @@ only-include = [
   "CHANGELOG.md",
   "VERSION",
   "pyproject.toml",
+  # Building from the sdist must reproduce the same published description.
+  "hatch_build.py",
   "schemas",
   "SECURITY.md",
   "CONTRIBUTING.md",

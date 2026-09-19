@@ -34,9 +34,29 @@ def verify() -> ModuleType:
     return _load_verify()
 
 
+def _description(version: str = "4.0.1") -> str:
+    """A published description shaped like the one hatch_build.py produces."""
+    base = f"https://github.com/lofibrainwav/HyoDo/blob/v{version}"
+    tree = f"https://github.com/lofibrainwav/HyoDo/tree/v{version}"
+    return (
+        "# HyoDo\n\n"
+        f"See the [quick start]({base}/QUICK_START.md) and "
+        f"[gate syntax]({base}/docs/GATES_SYNTAX.md#gates).\n"
+        f"Examples live in [examples/factory-loop/]({tree}/examples/factory-loop/).\n"
+        "Issues: [GitHub Issues](https://github.com/lofibrainwav/HyoDo/issues)\n"
+    )
+
+
 def _meta(version: str = "4.0.1") -> dict[str, Any]:
     return {
-        "info": {"version": version, "yanked": False},
+        # Real PyPI metadata always carries a description; leaving it out here
+        # would hide the published-link readback from every test that builds on
+        # this fixture.
+        "info": {
+            "version": version,
+            "yanked": False,
+            "description": _description(version),
+        },
         "urls": [
             {
                 "filename": f"hyodo-{version}-py3-none-any.whl",
@@ -234,3 +254,46 @@ def test_install_smoke_never_imports_from_the_callers_cwd(
     for cwd in seen_cwds:
         assert cwd is not None, "verification subprocess inherited the caller's cwd"
         assert not (Path(cwd) / "hyodo").exists(), "verification cwd can shadow the wheel"
+
+
+def test_description_links_accepts_a_pinned_published_description(
+    verify: ModuleType,
+) -> None:
+    """Absolute links pinned to the published version are the intended state."""
+    verify.verify_description_links(_meta("4.0.1"), "4.0.1")
+
+
+def test_description_links_rejects_relative_links(verify: ModuleType) -> None:
+    """A relative link resolves under pypi.org/project/hyodo/ and 404s."""
+    meta = _meta("4.0.1")
+    meta["info"]["description"] = "See the [quick start](./QUICK_START.md).\n"
+    with pytest.raises(SystemExit) as excinfo:
+        verify.verify_description_links(meta, "4.0.1")
+    assert "relative link" in str(excinfo.value)
+
+
+def test_description_links_rejects_a_ref_other_than_the_published_version(
+    verify: ModuleType,
+) -> None:
+    """Pinning to main would show a reader documents for a version they lack."""
+    meta = _meta("4.0.1")
+    meta["info"]["description"] = (
+        "See the [quick start](https://github.com/lofibrainwav/HyoDo/blob/main/QUICK_START.md).\n"
+    )
+    with pytest.raises(SystemExit) as excinfo:
+        verify.verify_description_links(meta, "4.0.1")
+    assert "other than v4.0.1" in str(excinfo.value)
+
+
+def test_description_links_rejects_an_empty_description(verify: ModuleType) -> None:
+    meta = _meta("4.0.1")
+    meta["info"]["description"] = ""
+    with pytest.raises(SystemExit):
+        verify.verify_description_links(meta, "4.0.1")
+
+
+def test_description_links_ignores_fenced_examples(verify: ModuleType) -> None:
+    """A fenced example may show a path-like string that is not a live link."""
+    meta = _meta("4.0.1")
+    meta["info"]["description"] = "```yaml\nrev: [x](./vX.Y.Z)\n```\n"
+    verify.verify_description_links(meta, "4.0.1")
