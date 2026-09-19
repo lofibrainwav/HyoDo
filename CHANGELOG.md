@@ -5,6 +5,42 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.19.9] - 2026-09-19
+
+Storefront repairs from the 2026-09-19 first-visit audit. No runtime behaviour
+changes; the CLI contracts, exit codes, and evidence semantics are unchanged.
+
+### Fixed
+
+- The published project description now carries links a reader can open. Every
+  relative link in `README.md` resolved under `https://pypi.org/project/hyodo/`
+  and returned 404, including Quick Start, the gate syntax reference, and the
+  licence. An in-tree build hook rewrites them for the published metadata only,
+  pinned to this version's tag, so `README.md` stays relative for GitHub readers
+  and a reader of this version sees this version's documents.
+- The optional MCP extra is now installable by the reader who is told to install
+  it. Six CLI call sites advised `pip install 'hyodo[mcp]'` while the documented
+  install command is `pipx install hyodo`, which is isolated: the pip install
+  succeeded in another environment and the SDK stayed missing. The advice now
+  names the path for each installer.
+- The homepage hero keeps its copy in normal flow. It was absolutely positioned
+  inside a clipped full-viewport section, so the section could not grow and the
+  heading was pushed off the top of small and short screens.
+
+### Changed
+
+- The web quickstart states its prerequisites and the working directory before
+  the first command, and installs the optional extra into the environment that
+  runs `hyodo`.
+- `scripts/verify-public.sh` lints the same paths as the CI lane.
+
+### Evidence
+
+- Release chain receipt: `docs/releases/4.19.9.md`.
+- Published-description readback is enforced by
+  `scripts/release/verify-pypi-release.py` in the post-publish job; a relative
+  link or a link pinned to another ref fails the release.
+
 ## [4.19.8] - 2026-09-17
 
 ### Added

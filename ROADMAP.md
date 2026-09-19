@@ -14,10 +14,11 @@ under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.19.8 is the current release target, current published release, and
-source-tree release baseline.
-Its release chain receipt records the signed tag, GitHub Release evidence, PyPI
-provenance, and install readback.
+HyoDo 4.19.9 is the current release target and source-tree release baseline.
+HyoDo 4.19.8 is the latest published release; 4.19.9 is prepared but not
+published, so its release chain receipt is still `UNOBSERVED` and will record the
+signed tag, GitHub Release evidence, PyPI provenance, and install readback once
+the release runs. Prepared is not published.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
@@ -190,6 +191,18 @@ evidence is not converted into a pass.
 - Adds the evidence-only `hyodo skill-eval` oracle (PR #358) and the dashboard
   `Not measured` fix (PR #357). The measured release chain receipt is
   `docs/releases/4.19.7.md`.
+
+### 4.19.9 (release preparation)
+
+- Publishes the storefront repairs from the 2026-09-19 first-visit audit: the
+  project description's links resolve off GitHub, the optional MCP extra names
+  an install path for each installer, and the homepage hero keeps its copy in
+  normal flow.
+- Changes no runtime behaviour; CLI contracts, exit codes, and evidence
+  semantics are unchanged from 4.19.8.
+- The website half of the audit repairs is already served; the published
+  package half stays `UNOBSERVED` until the post-publish description readback
+  runs.
 
 ### 4.19.8 (release preparation)
 
