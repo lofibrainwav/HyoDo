@@ -344,7 +344,9 @@ def verify_description_links(meta: dict[str, Any], version: str) -> None:
     if not description:
         raise SystemExit("published metadata has no description to verify")
 
-    relative = [t for t in description_link_targets(description) if not t.startswith(_ABSOLUTE_PREFIXES)]
+    relative = [
+        t for t in description_link_targets(description) if not t.startswith(_ABSOLUTE_PREFIXES)
+    ]
     if relative:
         raise SystemExit(
             f"published description carries {len(relative)} relative link(s) that 404 on "
@@ -364,9 +366,7 @@ def verify_description_links(meta: dict[str, Any], version: str) -> None:
         raise SystemExit(
             f"published description links to a ref other than v{version}: {mismatched[:5]}"
         )
-    print(
-        f"description links: {len(repository_links)} pinned to v{version}, 0 relative"
-    )
+    print(f"description links: {len(repository_links)} pinned to v{version}, 0 relative")
 
 
 def main() -> int:
