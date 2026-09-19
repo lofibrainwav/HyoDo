@@ -3137,6 +3137,30 @@ def mcp_pairing_show(
     raise typer.Exit(payload["exit_code"])
 
 
+# The MCP SDK is an optional extra, and it has to land in the *same* environment
+# that runs `hyodo`. A pipx install is isolated, so a bare `pip install
+# 'hyodo[mcp]'` typed into a shell installs into some other interpreter and the
+# SDK stays missing here no matter how many times it is run. Name both paths
+# instead of guessing which one the reader used -- HyoDo does not have evidence
+# of how it was installed, and a confident wrong answer costs more than two
+# lines.
+MCP_EXTRA_PIP = "pip install 'hyodo[mcp]'"
+MCP_EXTRA_PIPX = "pipx install --force 'hyodo[mcp]'"
+MCP_EXTRA_INLINE = f"install with: {MCP_EXTRA_PIP} (pipx: {MCP_EXTRA_PIPX})"
+
+
+def _print_mcp_missing() -> None:
+    """Report the missing optional extra with an install path for each case."""
+    console.print("[red]MCP support is not installed.[/red]")
+    console.print(
+        "Install it in the same environment that runs hyodo:",
+        style="yellow",
+        markup=False,
+    )
+    console.print(f"  pip:  {MCP_EXTRA_PIP}", style="yellow", markup=False)
+    console.print(f"  pipx: {MCP_EXTRA_PIPX}", style="yellow", markup=False)
+
+
 @mcp_app.command("stdio")
 def mcp_stdio(
     root: str = typer.Option(".", "--root", help="Workspace root locked for this MCP process"),
@@ -3159,8 +3183,7 @@ def mcp_stdio(
         get_mcp_server_class()
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("mcp"):
-            console.print("[red]MCP support is not installed.[/red]")
-            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            _print_mcp_missing()
             raise typer.Exit(2) from exc
         raise
 
@@ -3244,8 +3267,7 @@ def mcp_serve(
         get_mcp_server_class()
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("mcp"):
-            console.print("[red]MCP support is not installed.[/red]")
-            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            _print_mcp_missing()
             raise typer.Exit(2) from exc
         raise
 
@@ -3371,7 +3393,7 @@ def mcp_doctor(
         if mcp_sdk_available:
             label = f"[green]available[/green] ({mcp_sdk_version or 'version unknown'})"
         else:
-            label = "[red]missing[/red] — install with: pip install 'hyodo[mcp]'"
+            label = f"[red]missing[/red] — {MCP_EXTRA_INLINE}"
         console.print(f"mcp-sdk:    {label}")
 
         # Workspace
@@ -3521,8 +3543,7 @@ def rules_list(
         get_mcp_server_class()
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("mcp"):
-            console.print("[red]MCP support is not installed.[/red]")
-            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            _print_mcp_missing()
             raise typer.Exit(2) from exc
         raise
 
@@ -3557,8 +3578,7 @@ def rules_init(
         get_mcp_server_class()
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("mcp"):
-            console.print("[red]MCP support is not installed.[/red]")
-            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            _print_mcp_missing()
             raise typer.Exit(2) from exc
         raise
 
@@ -3592,8 +3612,7 @@ def mcp_access_log(
         get_mcp_server_class()
     except ModuleNotFoundError as exc:
         if exc.name and exc.name.startswith("mcp"):
-            console.print("[red]MCP support is not installed.[/red]")
-            console.print("Install it with: pip install 'hyodo[mcp]'", style="yellow", markup=False)
+            _print_mcp_missing()
             raise typer.Exit(2) from exc
         raise
 

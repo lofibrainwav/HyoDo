@@ -131,11 +131,15 @@ that calls these gates from a host loop, see
 ## Optional MCP
 
 ```bash
-pip install 'hyodo[mcp]'
+pip install 'hyodo[mcp]'                       # pipx: pipx install --force 'hyodo[mcp]'
 hyodo mcp stdio --root .                       # local stdio
 hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
   --token "$HYODO_MCP_TOKEN" --root .          # private-network connector
 ```
+
+The extra has to land in the same environment that runs `hyodo`; a pipx
+install is isolated, so `pip install 'hyodo[mcp]'` after `pipx install hyodo`
+installs into a different interpreter and the SDK stays missing.
 
 The MCP adapter uses the same CLI contracts rather than a second engine.
 `mcp.hyodo.app` is contract-only, not this path.
