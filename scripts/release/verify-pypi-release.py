@@ -6,6 +6,8 @@ Success criteria (supply-chain seal):
   - wheel + sdist present
   - optional: both files have non-null provenance (Trusted Publishing attestations)
   - optional: cold pip install + hyodo --version smoke
+  - the published description carries no relative links (they 404 on PyPI, which
+    renders the text without the repository around it)
 
 Provenance and simple-index lag are common right after publish. This script
 polls the version JSON first, then **separately retries** provenance (JSON
@@ -18,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 import tempfile
@@ -306,6 +309,66 @@ def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) 
     raise SystemExit(f"install smoke failed after {retries} attempts: {last_err}")
 
 
+_LINK = re.compile(r"\]\((?P<target>[^)]*)\)")
+_ABSOLUTE_PREFIXES = ("http://", "https://", "#", "mailto:")
+_FENCE = re.compile(r"^\s*(?:```|~~~)")
+
+
+def description_link_targets(description: str) -> list[str]:
+    """Return inline-link targets outside fenced code blocks, in document order.
+
+    Fenced blocks are skipped because a published example may legitimately show
+    a path-like string that is not a link the reader can click.
+    """
+    targets: list[str] = []
+    in_fence = False
+    for line in description.split("\n"):
+        if _FENCE.match(line):
+            in_fence = not in_fence
+            continue
+        if in_fence:
+            continue
+        targets.extend(match.group("target") for match in _LINK.finditer(line))
+    return targets
+
+
+def verify_description_links(meta: dict[str, Any], version: str) -> None:
+    """Fail when the live description still carries repository-relative links.
+
+    PyPI resolves a relative link under ``https://pypi.org/project/hyodo/``, so
+    ``](./QUICK_START.md)`` becomes a 404 for every reader. This is a readback of
+    what is actually served: editing the repository does not change a description
+    that is already published.
+    """
+    description = (meta.get("info") or {}).get("description") or ""
+    if not description:
+        raise SystemExit("published metadata has no description to verify")
+
+    relative = [
+        t for t in description_link_targets(description) if not t.startswith(_ABSOLUTE_PREFIXES)
+    ]
+    if relative:
+        raise SystemExit(
+            f"published description carries {len(relative)} relative link(s) that 404 on "
+            f"PyPI: {relative[:5]}"
+        )
+
+    pinned = f"/blob/v{version}/"
+    pinned_dir = f"/tree/v{version}/"
+    repository_links = [
+        t
+        for t in description_link_targets(description)
+        if t.startswith("https://github.com/lofibrainwav/HyoDo/")
+        and ("/blob/" in t or "/tree/" in t)
+    ]
+    mismatched = [t for t in repository_links if pinned not in t and pinned_dir not in t]
+    if mismatched:
+        raise SystemExit(
+            f"published description links to a ref other than v{version}: {mismatched[:5]}"
+        )
+    print(f"description links: {len(repository_links)} pinned to v{version}, 0 relative")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--version", required=True, help="Expected PyPI version, e.g. 4.0.1")
@@ -334,6 +397,8 @@ def main() -> int:
             f"  {u.get('packagetype')}: {u.get('filename')} "
             f"size={u.get('size')} sha256={u.get('digests', {}).get('sha256', '')[:16]}..."
         )
+
+    verify_description_links(meta, args.version)
 
     if args.require_provenance:
         prov_retries = (
