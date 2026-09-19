@@ -1,7 +1,19 @@
-// Pure adapter: hyodo.evidence-graph/v1 JSON -> the page's EvidenceEvent[].
+// Legacy adapter: hyodo.evidence-graph/v1 JSON -> the page's EvidenceEvent[].
 //
 // No DOM, no fetch, no storage. Unknown or malformed input must not throw
 // and must not invent an ALLOW (unobserved is never green).
+//
+// A raw evidence graph is a record of what happened, not a decided view of
+// it. This adapter therefore reads the lane roles the producer already
+// attached as `rows` and reports every decision as UNOBSERVED, because the
+// value a viewer may show is computed by `hyodo/verification_view.py` and
+// shipped as `decision_presentable` in `hyodo.verification-view/v0`. Load
+// that file (`GET /api/verification-view`) to see decisions.
+//
+// What this adapter must never do is decide for itself. It previously guessed
+// a lane from substrings of `actor_id` and a chip class from substrings of a
+// tool name, which is how a viewer starts disagreeing with its own producer
+// about facts the producer had already measured.
 
 import type {
 	Decision,
@@ -22,8 +34,6 @@ const SCHEMA_KINDS = new Set<string>([
 	'decision',
 ]);
 
-const DECISIONS = new Set<string>(['ALLOW', 'ASK', 'DENY', 'UNOBSERVED']);
-
 export interface EvidenceGraphV1Info {
 	/** True when the payload is a v1 object with a nodes array. Not READY. */
 	ok: boolean;
@@ -43,10 +53,6 @@ function asSchemaKind(value: unknown): SchemaEventKind | null {
 	return typeof value === 'string' && SCHEMA_KINDS.has(value)
 		? (value as SchemaEventKind)
 		: null;
-}
-
-function asDecision(value: unknown): Decision | null {
-	return typeof value === 'string' && DECISIONS.has(value) ? (value as Decision) : null;
 }
 
 function asStepIndex(value: unknown): number | null {
@@ -79,13 +85,6 @@ export function inspectEvidenceGraphV1(graph: unknown): EvidenceGraphV1Info {
 	return { ok: true, status, reason };
 }
 
-function mapDecision(raw: unknown, graphStatus: string | null): Decision | null {
-	const decision = asDecision(raw);
-	// Fail-closed: an UNOBSERVED graph must not light ALLOW (fake-green).
-	if (graphStatus === 'UNOBSERVED' && decision === 'ALLOW') return 'UNOBSERVED';
-	return decision;
-}
-
 function mapTool(raw: unknown): EvidenceEvent['tool'] {
 	if (!isRecord(raw)) return null;
 	const name = asNonEmptyString(raw.name);
@@ -107,34 +106,62 @@ function mapTool(raw: unknown): EvidenceEvent['tool'] {
 	return { name: name ?? 'tool', paths, urls };
 }
 
-function deriveRow(actor: string, actorId: string | null): Row {
+/**
+ * The one place the canonical role vocabulary meets this page's lane
+ * vocabulary. Mirrors `_DAW_LANE_BY_ROLE` in `hyodo/dashboard.py`.
+ */
+const LANE_BY_ROLE: Record<string, Row> = {
+	human: 'human',
+	orchestrator: 'planner',
+	reviewer: 'reviewer',
+	worker: 'executor',
+};
+
+/**
+ * Lane from the `actor` schema field alone, used only when the producer
+ * reported no role. `actor` is a closed vocabulary (`human`, `hyodo`,
+ * `agent`), so reading it is reading a recorded fact, not guessing — this
+ * mirrors the fallback in `_daw_track` in `hyodo/dashboard.py`.
+ *
+ * A bare `agent` stays unobserved on purpose. Which kind of agent it was is
+ * precisely what went unreported, and calling it an executor would answer a
+ * question nobody measured.
+ */
+function laneFromActor(actor: string): Row {
 	if (actor === 'human') return 'human';
-	const id = (actorId ?? '').toLowerCase();
-	if (id.includes('plan')) return 'planner';
-	if (id.includes('review')) return 'reviewer';
-	if (id.includes('exec') || id.includes('work')) return 'executor';
 	if (actor === 'hyodo') return 'reviewer';
-	return 'executor';
+	return 'unobserved';
 }
 
-function deriveDisplayKind(
-	schemaKind: SchemaEventKind,
-	toolName: string | null,
-	decision: Decision | null,
-	row: Row,
-	hasParent: boolean,
-): DisplayKind {
-	if (schemaKind === 'decision') {
-		return decision === 'UNOBSERVED' ? 'unobserved' : 'decision';
+/**
+ * Index `event_id -> Row` from the `rows` the producer already computed.
+ * `build_report_graph` attaches it to every payload it serves. A payload
+ * without it yields an empty index and every event lands in the explicit
+ * unobserved lane, which is the honest answer when no role was reported.
+ */
+function rowIndex(graph: Record<string, unknown>): Map<string, Row> {
+	const rowOf = new Map<string, Row>();
+	const rows = isRecord(graph.rows) ? graph.rows : null;
+	const table = rows && isRecord(rows.rows) ? rows.rows : null;
+	if (!table) return rowOf;
+	for (const entry of Object.values(table)) {
+		if (!isRecord(entry)) continue;
+		const role = asNonEmptyString(entry.role);
+		const lane: Row = (role && LANE_BY_ROLE[role]) || 'unobserved';
+		if (!Array.isArray(entry.events)) continue;
+		for (const eventId of entry.events) {
+			if (typeof eventId === 'string' && eventId.trim()) rowOf.set(eventId, lane);
+		}
 	}
-	const name = (toolName ?? '').toLowerCase();
-	if (name.includes('scan') || name.includes('notify')) return 'scan';
-	if (name.includes('test')) return 'run_tests';
-	if (name.includes('write') || name.includes('edit')) return 'write_file';
-	if (name.includes('read')) return 'read_file';
-	if (schemaKind === 'prompt') {
-		return row === 'human' && hasParent ? 'approve' : 'mission';
-	}
+	return rowOf;
+}
+
+function displayKindOf(schemaKind: SchemaEventKind, decision: Decision | null): DisplayKind {
+	// Derived only from schema fields. The tool's name is deliberately not
+	// read: a name is what something is called, not what it did, which is the
+	// same reason `graph_view.carries_measured_evidence` refuses to count it.
+	if (schemaKind === 'decision') return decision === 'UNOBSERVED' ? 'unobserved' : 'decision';
+	if (schemaKind === 'prompt') return 'mission';
 	if (schemaKind === 'error') return 'unobserved';
 	return 'decision';
 }
@@ -209,6 +236,7 @@ export function fromEvidenceGraphV1(graph: unknown): EvidenceEvent[] {
 	if (!info.ok || !isRecord(graph) || !Array.isArray(graph.nodes)) return [];
 
 	const { parentsOf, evidenceOf } = linkMaps(graph);
+	const rowOf = rowIndex(graph);
 	const seen = new Set<string>();
 	const events: EvidenceEvent[] = [];
 
@@ -223,15 +251,15 @@ export function fromEvidenceGraphV1(graph: unknown): EvidenceEvent[] {
 
 		const actor = asNonEmptyString(raw.actor) ?? 'agent';
 		const actorId = asNonEmptyString(raw.actor_id);
-		const row = deriveRow(actor, actorId);
+		const row = rowOf.get(eventId) ?? laneFromActor(actor);
 		const tool = mapTool(raw.tool);
 		const policyBlock = isRecord(raw.policy) ? raw.policy : null;
-		const decision = mapDecision(
-			raw.decision !== undefined && raw.decision !== null
-				? raw.decision
-				: policyBlock?.decision,
-			info.status,
-		);
+		// A raw graph carries the recorded decision but not the value a viewer
+		// may show. That value is `decision_presentable` in
+		// `hyodo.verification-view/v0`. Rather than re-derive it here and drift
+		// from the producer, this adapter reports UNOBSERVED for every decision
+		// and leaves the recorded value to the canonical view.
+		const decision: Decision | null = schemaKind === 'decision' ? 'UNOBSERVED' : null;
 		const ruleId = policyBlock ? asNonEmptyString(policyBlock.rule_id) : null;
 		const reason = policyBlock ? asNonEmptyString(policyBlock.reason) : null;
 		const parentEventIds = nodeParentIds(raw, parentsOf);
@@ -244,13 +272,7 @@ export function fromEvidenceGraphV1(graph: unknown): EvidenceEvent[] {
 			runId: asNonEmptyString(raw.run_id) ?? '',
 			ts: asNonEmptyString(raw.ts) ?? '',
 			schemaKind,
-			displayKind: deriveDisplayKind(
-				schemaKind,
-				tool?.name ?? null,
-				decision,
-				row,
-				parentEventIds.length > 0,
-			),
+			displayKind: displayKindOf(schemaKind, decision),
 			actor: actorId ? `${actor}:${actorId}` : actor,
 			row,
 			stepIndex,

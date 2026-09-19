@@ -1,5 +1,9 @@
 import { EVENTS, mountEvidenceGraph } from '../graph/evidence-graph';
 import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../graph/from-v1';
+import {
+	fromVerificationView,
+	inspectVerificationView,
+} from '../graph/from-verification-view';
 
 const root = document.getElementById('eg-root');
 const banner = document.getElementById('eg-banner');
@@ -56,12 +60,32 @@ fileInput?.addEventListener('change', async () => {
 		return;
 	}
 
+	// A verification view is the canonical input: lanes, roles, and the
+	// decision a viewer may show all arrive already decided. A raw evidence
+	// graph still loads, but this page will not decide for it — see the
+	// banner text below and the note in `from-v1.ts`.
+	const viewInfo = inspectVerificationView(parsed);
+	if (viewInfo.ok) {
+		remount(fromVerificationView(parsed));
+		const status = escapeHtml(viewInfo.status ?? 'unknown');
+		const withheld = viewInfo.allowWithheld
+			? ' An ALLOW recorded under this graph is withheld as <code>UNOBSERVED</code>.'
+			: '';
+		if (consoleSession) consoleSession.textContent = 'SESSION / LOCAL VERIFICATION VIEW';
+		if (consoleView) consoleView.textContent = 'STATIC VIEW';
+		if (consoleBoundary) consoleBoundary.textContent = 'LOCAL DATA / NOT SEALED';
+		banner.innerHTML =
+			`<strong>Local file.</strong> Showing a <code>hyodo.verification-view/v0</code> payload selected in this browser — not a remote ledger. Status: <code>${status}</code>.${withheld} Nothing was uploaded, stored, or fetched.`;
+		banner.dataset.source = 'local';
+		return;
+	}
+
 	const info = inspectEvidenceGraphV1(parsed);
 	if (!info.ok) {
 		showFixture();
 		const why = info.reason ? ` (${escapeHtml(info.reason)})` : '';
 		banner.innerHTML =
-			`<strong>Load failed.</strong> Not a <code>hyodo.evidence-graph/v1</code> graph${why}. Still showing the demo fixture. Nothing was uploaded, stored, or fetched from a network.`;
+			`<strong>Load failed.</strong> Not a <code>hyodo.verification-view/v0</code> view or a <code>hyodo.evidence-graph/v1</code> graph${why}. Still showing the demo fixture. Nothing was uploaded, stored, or fetched from a network.`;
 		banner.dataset.source = 'fixture';
 		return;
 	}
@@ -82,7 +106,7 @@ fileInput?.addEventListener('change', async () => {
 	const reason = info.reason ? ` (${escapeHtml(info.reason)})` : '';
 	const unobserved = info.status === 'UNOBSERVED' ? ' Unobserved is never a pass.' : '';
 	banner.innerHTML =
-		`<strong>Local file.</strong> Showing a <code>hyodo.evidence-graph/v1</code> payload selected in this browser — not a remote ledger. Graph status: <code>${status}</code>${reason}.${unobserved} Nothing was uploaded, stored, or fetched. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>.`;
+		`<strong>Local file.</strong> Showing a <code>hyodo.evidence-graph/v1</code> payload selected in this browser — not a remote ledger. Graph status: <code>${status}</code>${reason}.${unobserved} A raw graph carries no decided view, so every decision reads <code>UNOBSERVED</code> here; load <code>hyodo.verification-view/v0</code> from <code>/api/verification-view</code> to see decisions and roles. Nothing was uploaded, stored, or fetched. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>.`;
 	banner.dataset.source = 'local';
 });
 
