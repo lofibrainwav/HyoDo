@@ -1539,7 +1539,7 @@ def _render_verification_header(view: dict[str, Any]) -> str:
         "</div>"
         '<div class="verification-facts">'
         f'<span>Recorded: <b data-recorded-decision="{escape(_unique_text(recorded))}">{escape(_unique_text(recorded))}</b></span>'
-        f'<span>Presentable: <b data-presentable-decision="{escape(_unique_text(presentable, empty=status))}">{escape(_unique_text(presentable, empty=status))}</b></span>'
+        f'<span>Presentable: <b data-presentable-decision="{escape(_unique_text(presentable))}">{escape(_unique_text(presentable))}</b></span>'
         f"<span>Authority: <b>{escape(authority)}</b></span>"
         "</div></section>"
     )

@@ -1,0 +1,38 @@
+[
+  {
+    "name": "normal_close",
+    "recorded": "ALLOW",
+    "presentable": "ALLOW",
+    "rail": {"intent": "OBSERVED", "action": "OBSERVED", "result": "OBSERVED", "evidence": "OBSERVED", "decision": "ALLOW"}
+  },
+  {
+    "name": "withheld_allow",
+    "recorded": "ALLOW",
+    "presentable": "UNOBSERVED",
+    "rail": {"intent": "OBSERVED", "action": "OBSERVED", "result": "OBSERVED", "evidence": "UNOBSERVED", "decision": "UNOBSERVED"}
+  },
+  {
+    "name": "multi_parent_join",
+    "recorded": "ASK",
+    "presentable": "ASK",
+    "rail": {"intent": "OBSERVED", "action": "OBSERVED", "result": "OBSERVED", "evidence": "UNOBSERVED", "decision": "ASK"}
+  },
+  {
+    "name": "missing_result",
+    "recorded": "UNOBSERVED",
+    "presentable": "UNOBSERVED",
+    "rail": {"intent": "OBSERVED", "action": "OBSERVED", "result": "UNOBSERVED", "evidence": "UNOBSERVED", "decision": "UNOBSERVED"}
+  },
+  {
+    "name": "missing_intent",
+    "recorded": "UNOBSERVED",
+    "presentable": "UNOBSERVED",
+    "rail": {"intent": "UNOBSERVED", "action": "OBSERVED", "result": "OBSERVED", "evidence": "UNOBSERVED", "decision": "UNOBSERVED"}
+  },
+  {
+    "name": "broken_evidence",
+    "recorded": "DENY",
+    "presentable": "DENY",
+    "rail": {"intent": "OBSERVED", "action": "OBSERVED", "result": "OBSERVED", "evidence": "UNOBSERVED", "decision": "DENY"}
+  }
+]

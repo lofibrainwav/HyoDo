@@ -19,6 +19,8 @@ from http.server import ThreadingHTTPServer
 from pathlib import Path
 from threading import Thread
 
+import pytest
+
 from hyodo.cli.main import DASHBOARD_CSP, DashboardState, make_dashboard_handler
 from hyodo.dashboard import GRAPH_SCRIPT, GRAPH_SCRIPT_SHA256
 from hyodo.event_graph import GRAPH_SCHEMA_VERSION
@@ -54,6 +56,122 @@ def _event(**overrides: object) -> str:
     }
     base.update(overrides)
     return json.dumps(base)
+
+
+TRUTH_FIXTURES = json.loads(
+    (Path(__file__).parent / "fixtures" / "dashboard-truth-cases.json").read_text()
+)
+
+
+def _truth_fixture_events(name: str) -> list[str]:
+    common = [
+        _event(event_id="intent", kind="prompt", actor="human", step_index=0),
+        _event(
+            event_id="call",
+            kind="tool_call",
+            actor="agent",
+            step_index=1,
+            parent_event_id="intent",
+            tool={"name": "pytest"},
+        ),
+        _event(
+            event_id="result",
+            kind="tool_result",
+            actor="agent",
+            step_index=2,
+            parent_event_id="call",
+            io={"output_digest": "digest-1"},
+        ),
+    ]
+    if name == "normal_close":
+        return [
+            *common,
+            _event(
+                event_id="verdict",
+                kind="decision",
+                actor="hyodo",
+                step_index=3,
+                parent_event_id="result",
+                evidence_refs=["result"],
+                policy={"decision": "ALLOW", "evaluated_by": "hyodo"},
+            ),
+        ]
+    if name == "withheld_allow":
+        return [
+            *common,
+            _event(
+                event_id="verdict",
+                kind="decision",
+                actor="hyodo",
+                step_index=3,
+                parent_event_id="result",
+                evidence_refs=["effect-readback"],
+                policy={"decision": "ALLOW", "evaluated_by": "hyodo"},
+            ),
+        ]
+    if name == "multi_parent_join":
+        return [
+            _event(event_id="intent", kind="prompt", actor="human", step_index=0),
+            _event(
+                event_id="call-a",
+                kind="tool_call",
+                actor="agent",
+                step_index=1,
+                parent_event_id="intent",
+            ),
+            _event(
+                event_id="call-b",
+                kind="tool_call",
+                actor="agent",
+                step_index=2,
+                parent_event_id="intent",
+            ),
+            _event(
+                event_id="result",
+                schema_version="hyodo.agent-event/v2",
+                kind="tool_result",
+                actor="agent",
+                step_index=3,
+                parent_event_ids=["call-a", "call-b"],
+                io={"output_digest": "digest-join"},
+            ),
+            _event(
+                event_id="verdict",
+                kind="decision",
+                actor="hyodo",
+                step_index=4,
+                parent_event_id="result",
+                policy={"decision": "ASK", "evaluated_by": "hyodo"},
+            ),
+        ]
+    if name == "missing_result":
+        return common[:2]
+    if name == "missing_intent":
+        return [
+            _event(event_id="call", kind="tool_call", actor="agent", step_index=0),
+            _event(
+                event_id="result",
+                kind="tool_result",
+                actor="agent",
+                step_index=1,
+                parent_event_id="call",
+                io={"output_digest": "digest-no-intent"},
+            ),
+        ]
+    if name == "broken_evidence":
+        return [
+            *common,
+            _event(
+                event_id="verdict",
+                kind="decision",
+                actor="hyodo",
+                step_index=3,
+                parent_event_id="result",
+                evidence_refs=["missing-receipt"],
+                policy={"decision": "DENY", "evaluated_by": "hyodo"},
+            ),
+        ]
+    raise AssertionError(f"unknown truth fixture: {name}")
 
 
 @contextmanager
@@ -1047,3 +1165,21 @@ def test_missing_panel_counts_agree_with_the_verification_view(tmp_path: Path) -
     expected = len(view["missing"]["unresolved_refs"])
     assert expected == 1
     assert f'data-missing-bucket="unresolved_refs" data-missing-count="{expected}"' in html
+
+
+@pytest.mark.parametrize("case", TRUTH_FIXTURES, ids=lambda case: case["name"])
+def test_dashboard_truth_fixture_registry(tmp_path: Path, case: dict[str, object]) -> None:
+    """The six dashboard truth cases stay visible through the real HTTP route."""
+    _write_ledger(tmp_path, _truth_fixture_events(str(case["name"])))
+
+    with _running_server(tmp_path) as port:
+        status, _headers, body = _request(port, "GET", "/graph")
+    assert status == 200
+    html = body.decode("utf-8")
+
+    assert f'data-recorded-decision="{case["recorded"]}"' in html
+    assert f'data-presentable-decision="{case["presentable"]}"' in html
+    rail = case["rail"]
+    assert isinstance(rail, dict)
+    for stage, state in rail.items():
+        assert f'data-stage="{stage}" data-state="{state}"' in html
