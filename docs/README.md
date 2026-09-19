@@ -27,6 +27,8 @@ limits are in [Current State](./CURRENT_STATE.md).
 
 - [Connect](./CONNECT.md) — hooks, pre-commit, GitHub Actions, and shadow mode.
 - [Host adapters](./HOST_ADAPTERS.md) — native adapter and live-canary boundary.
+- [Host observation contract](./HOST_OBSERVATION_CONTRACT.md) — what the
+  adapters record, what they leave unrecorded, and which gaps are closable.
 - [MCP design](./HYODO_MCP_CONNECTOR_DESIGN.md) — local connector and remote contract.
 - [Remote MCP contract](./M5_REMOTE_CONNECTOR_CONTRACT.md) — hosted endpoint is
   contract-only; it is not `hyodo mcp stdio`.
