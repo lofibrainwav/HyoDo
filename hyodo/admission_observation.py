@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import math
 import os
 from collections.abc import Mapping
 from pathlib import Path
@@ -30,7 +31,8 @@ def validate_admission_observation(raw: Any) -> tuple[bool, list[str], dict[str,
         elif not _non_empty(raw.get(field)):
             reasons.append(f"invalid_field:{field}")
 
-    if raw.get("decision") not in DECISIONS:
+    decision = raw.get("decision")
+    if not isinstance(decision, str) or decision not in DECISIONS:
         reasons.append("invalid_field:decision")
     for field in ("observed", "admitted", "execution_attempted", "execution_observed"):
         if not isinstance(raw.get(field), bool):
@@ -38,7 +40,11 @@ def validate_admission_observation(raw: Any) -> tuple[bool, list[str], dict[str,
     if raw.get("execution_attempted") is True or raw.get("execution_observed") is True:
         reasons.append("admission_cannot_claim_execution")
     score = raw.get("s_score")
-    if score is not None and (isinstance(score, bool) or not isinstance(score, (int, float))):
+    if score is not None and (
+        isinstance(score, bool)
+        or not isinstance(score, (int, float))
+        or (isinstance(score, float) and not math.isfinite(score))
+    ):
         reasons.append("invalid_field:s_score")
 
     if reasons:
@@ -68,10 +74,18 @@ def append_admission_observation(root: Path, raw: Any) -> dict[str, Any]:
     if not ok or normalized is None:
         raise ValueError(";".join(reasons) or "invalid_admission_observation")
 
+    # Check JSON compatibility before creating or opening the ledger. In
+    # particular, opaque observation identity data must not inject NaN or
+    # leave a partial write when a caller supplies a non-JSON object.
+    try:
+        serialized = json.dumps(normalized, sort_keys=True, separators=(",", ":"), allow_nan=False)
+    except (TypeError, ValueError) as error:
+        raise ValueError("invalid_json_observation") from error
+
     path = root / ADMISSION_OBSERVATIONS_RELATIVE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(normalized, sort_keys=True, separators=(",", ":")) + "\n")
+        handle.write(serialized + "\n")
     os.chmod(path, 0o600)
     return normalized
 

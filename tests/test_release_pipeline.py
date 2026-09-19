@@ -9,6 +9,7 @@ from test_release_prepare import write_minimal_repo
 
 from scripts.release.pipeline import (
     PipelineExternalError,
+    _check_snapshot,
     _human_authority_gate,
     push_candidate,
     run_pipeline,
@@ -162,3 +163,59 @@ def test_verifier_evidence_does_not_replace_human_authority() -> None:
     assert result["result"] == "WAIT"
     assert result["stage"] == "WAITING_APPROVAL"
     assert result["verifier"]["status"] == "VERIFIED"
+
+
+@pytest.mark.parametrize("reference", [" ", "\n", "UNOBSERVED", "UNKNOWN"])
+def test_placeholder_reference_cannot_authorize(reference: str) -> None:
+    result = _human_authority_gate(
+        authorize_ref=reference,
+        authorize_sha="abc123",
+        current_pr_head="abc123",
+        remote_candidate_sha="abc123",
+        ci_verified_sha="abc123",
+        verifier={"approved": True},
+    )
+    assert result["result"] != "PASS"
+
+
+@pytest.mark.parametrize("head", ["", " ", "UNOBSERVED", "UNKNOWN"])
+def test_equal_missing_heads_are_not_verified_identity(head: str) -> None:
+    result = _human_authority_gate(
+        authorize_ref="human:test:explicit-grant",
+        authorize_sha=head,
+        current_pr_head=head,
+        remote_candidate_sha=head,
+        ci_verified_sha=head,
+        verifier={"approved": True},
+    )
+    assert result["result"] != "PASS"
+
+
+@pytest.mark.parametrize(
+    ("conclusions", "expected", "passed", "skipped"),
+    [
+        ([], "BLOCK", 0, 0),
+        (["skipped"], "BLOCK", 0, 1),
+        (["skipped", "skipped"], "BLOCK", 0, 2),
+        (["success", "skipped"], "BLOCK", 1, 1),
+        (["failure", "skipped"], "BLOCK", 0, 1),
+        (["success"], "PASS", 1, 0),
+        (["success", "success"], "PASS", 2, 0),
+    ],
+)
+def test_ci_skips_are_counted_separately(
+    tmp_path: Path, monkeypatch, conclusions, expected, passed, skipped
+) -> None:
+    monkeypatch.setattr(
+        "scripts.release.pipeline._gh_json",
+        lambda *args: {
+            "check_runs": [
+                {"name": f"check-{index}", "status": "completed", "conclusion": conclusion}
+                for index, conclusion in enumerate(conclusions)
+            ]
+        },
+    )
+    result = _check_snapshot(tmp_path, slug="fixture/repo", sha="abc123")
+    assert result["result"] == expected
+    assert result["passed"] == passed
+    assert len(result["skipped"]) == skipped
