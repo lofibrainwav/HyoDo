@@ -4,8 +4,20 @@ What HyoDo's host adapters actually record, what they leave unrecorded, and
 which of those gaps are closable with evidence the host already supplies.
 
 This document reports measurements. Where a shape was not observed it says so
-rather than describing what it probably is. Every count below comes from one
-real local ledger of 3,845 events written by the Codex adapter.
+rather than describing what it probably is. The counts below were reported
+from one local ledger of 3,845 events written by the Codex adapter. They
+describe that sample, not all installations or current host behavior.
+The ledger, capture
+window, host binary version, and reproducible measurement receipt are not
+published here, so external reproduction of those counts is **UNOBSERVED**.
+Source inspection can verify the adapter behavior described below; it cannot
+independently verify the private sample counts.
+
+This is an observation report under [the product
+boundary](./PRODUCT_BOUNDARY.md).
+HyoDo records and validates supplied evidence; the integrating host owns
+execution, callback delivery, recovery, and authorization. No host repair or
+KINGDOM runtime completion is implied by this report.
 
 ## Why this exists
 
@@ -47,18 +59,18 @@ Measured: 0 of 3,845 events carry any `evidence_refs`, and the total ref count
 is 0. **The graph is correct.** Nothing is being ignored; nothing was
 recorded. The adapters have no code path that writes an `evidence_refs` entry.
 
-## Finding 2 — the 185 unanswered calls are unanswered, not unlinked
+## Finding 2 — 185 calls have no matching result in the sampled ledger
 
 185 `tool_call` events have no `tool_result` citing them as a causal parent.
 
-Pairing provenance: `host_adapters/_common.py` builds an event id as
+Pairing provenance: `hyodo/host_adapters/_common.py` builds an event id as
 `{host}:{event_name}:{tool_use_id}` when the host supplies `tool_use_id`, and
 falls back to a payload digest when it does not. It sets `parent_event_id` to
 `{host}:{pre_event_name}:{tool_use_id}` only in the first case, and
 deliberately invents no parent in the second.
 
-Every id in this ledger has the `codex:PreToolUse:exec-…` form, so every event
-came through the `tool_use_id` path. The adapter therefore had the material to
+The reported call ids have the `codex:PreToolUse:exec-…` form, consistent
+with the `tool_use_id` path. The adapter therefore had the material to
 link and did not drop it. Measured: for all 185, no `PostToolUse` event exists
 anywhere in the ledger with the same exec id.
 
@@ -69,22 +81,23 @@ anywhere in the ledger with the same exec id.
 | orphan shares an `args_digest` with another orphan | 61 of 185 |
 | tools | 171 `Bash`, 14 `apply_patch` |
 
-The run-position distribution is flat from 0% to 100% of run progress, so
-truncation at process exit does not explain it. The honest state of these
-events is `CALL OBSERVED` with `RESULT UNOBSERVED`. Which host condition drops
-the callback is **UNOBSERVED**: no hook-level failure record exists to read.
+The reported orphans occur throughout run progress, rather than only at the
+end of a run. This does not establish why the results are missing. The state
+is `CALL OBSERVED` with `RESULT UNOBSERVED`. Whether callback delivery, adapter
+processing, persistence, or another condition caused the gap is **UNOBSERVED**:
+no hook-level failure record is available in this report.
 
-## Finding 3 — intent is recordable and no adapter records it
+## Finding 3 — intent exists in the schema, but not the inspected hooks
 
 `hyodo/events.py` `EVENT_KINDS` already includes `prompt`, so the ledger
 schema carries intent today. `hyodo/connect.py` installs hooks for
 `PreToolUse` and `PostToolUse` only and rejects every other hook event name.
-`host_adapters/codex.py` likewise maps only those two.
+`hyodo/host_adapters/codex.py` likewise maps only those two.
 
 Codex exposes more. Its `HookEventName` vocabulary, read from the installed
 binary, includes `user_prompt_submit` alongside `pre_tool_use` and
-`post_tool_use`. The capability exists on both sides and nothing connects
-them.
+`post_tool_use`. That vocabulary alone does not establish a supported, enabled
+hook or a working end-to-end intent path.
 
 Two of two runs in this ledger therefore have no recorded intent. Reported as
 `missing.runs_without_intent`, that reads as a count of 2; as coverage it is
@@ -96,12 +109,13 @@ event. The name is measured, the contents are not.
 
 ## Finding 4 — `apply_patch` input shape is unobserved, so the work is held
 
-Recording a path for an `apply_patch` call would move 14 orphaned calls and
-128 unclassified results out of the gutters, if the host supplies a path as
-structured data.
+An explicit structured path could provide additional classification evidence
+for `apply_patch` events, subject to the classifier contract. The sample
+reports 14 orphaned calls and 128 unclassified results for this tool. Recording
+a path does not restore a missing result or resolve an orphan by itself.
 
-`host_adapters/_common.py` reads `tool_input.file_path` and nothing else, so a
-call shaped any other way records no path.
+`hyodo/host_adapters/_common.py` reads `tool_input.file_path` and nothing else,
+so a call shaped any other way records no path.
 
 What was searched and what it showed:
 
@@ -147,8 +161,8 @@ In dependency order, each gated on an observation rather than an assumption.
 1. One captured `PreToolUse` payload per tool kind, which settles Finding 4
    and shows what else the host offers that the adapter drops.
 2. An intent path, once a real `user_prompt_submit` payload is observed.
-3. A recorded reason for the dropped `PostToolUse` callbacks, which today have
-   no failure record to read.
+3. Delivery and persistence evidence explaining the missing `PostToolUse`
+   records; the sample alone does not establish dropped callbacks.
 
 `evidence_refs` stay absent until something in the loop has a reason to cite
 evidence. That is a product question, not an adapter gap.
