@@ -246,7 +246,7 @@ def _check_snapshot(root: Path, *, slug: str, sha: str) -> dict[str, Any]:
         "skipped": skipped,
         "passed": passed,
         "result": "PASS"
-        if passed and not pending and not failed
+        if passed and not pending and not failed and not skipped
         else "WAIT"
         if pending
         else "BLOCK",

@@ -21,9 +21,16 @@ cases passed. The separate CLI pytest run had one opt-in SBOM skip; that case
 passed in the full integration-enabled run. This draft is not permission to
 merge, and no remote PR or deployment is claimed.
 
+Follow-up independent review found the remaining mixed success/skipped bypass.
+The approved correction blocks that completed snapshot; the refreshed focused
+suite passed 166 tests and independent re-review reported no blocking findings.
+The full 1,748-test run above belongs to the earlier candidate; current-head
+remote checks are reported by the PR itself.
+
 Compatibility: valid existing observation shapes remain accepted. Non-finite
 numbers, malformed enum types and absence markers are rejected. The release
 CI snapshot gains a `skipped` list; `passed` counts actual successes only.
-All-skipped snapshots block; mixed success/skipped snapshots still require the
-host's independent required-check policy. Host grant owner, scope, expiry and
+Completed snapshots containing any skipped check block, including mixed
+success/skipped results; this pipeline has no policy for exempting optional
+checks. Host grant owner, scope, expiry and
 revocation authentication remain external responsibilities.

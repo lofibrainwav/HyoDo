@@ -197,8 +197,10 @@ def test_equal_missing_heads_are_not_verified_identity(head: str) -> None:
         ([], "BLOCK", 0, 0),
         (["skipped"], "BLOCK", 0, 1),
         (["skipped", "skipped"], "BLOCK", 0, 2),
-        (["success", "skipped"], "PASS", 1, 1),
+        (["success", "skipped"], "BLOCK", 1, 1),
         (["failure", "skipped"], "BLOCK", 0, 1),
+        (["success"], "PASS", 1, 0),
+        (["success", "success"], "PASS", 2, 0),
     ],
 )
 def test_ci_skips_are_counted_separately(

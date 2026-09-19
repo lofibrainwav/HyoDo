@@ -17,7 +17,7 @@ The tests were first run against the existing code, then rerun after fixes.
 | Admission numeric/opaque payload | NaN/infinity accepted; non-JSON identity failed during append | Reject non-finite scores and serialize with strict JSON before opening a file; existing ledger bytes remain unchanged. |
 | Orchestration enum types | Array/object in execution/state/join policy raised TypeError | Validate type before membership; invalid observations return false without writes. |
 | Placeholder authorization | Whitespace/UNKNOWN/UNOBSERVED could authorize; identical missing heads looked matched | Reject absence markers independently of verifier approval and head equality. Host grant authentication remains outside this gate. |
-| Skipped CI promotion | All-skipped CI returned PASS; skipped counted as passed | Count skipped separately; require an observed successful check. This does not substitute for the host's required-check policy. |
+| Skipped CI promotion | All-skipped CI returned PASS; skipped counted as passed | Count skipped separately; require actual successes with no pending, failed or skipped checks. Completed mixed success/skipped snapshots also block; no optional-check exemption policy is implemented. |
 | Campaign dependency ambiguity | Diagram suggested fix and verification could run together | Serialize dependent L5 → L6; scope-required checks cannot be skipped. |
 
 Red controls: admission tests reproduced **7 failures**, orchestration enum
@@ -103,3 +103,28 @@ prepared locally; no GitHub PR, push, merge or deployment was performed.
 Contract adoption, remote PR/CI, deployment and general delegated-host behavior
 are separate from this local repair. Do not infer SSOT_GREEN, published package
 state or research validation from this review.
+
+## Independent-review correction
+
+Independent review of `07fdc0f8826048b76eaa2ad16ed60d8cbabb91ab` found one
+remaining blocker: mixed success/skipped CI still returned PASS, and the merge
+path applied no separate required-check classification. This behavior predated
+the PR; the initial hardening fixed all-skipped promotion but left the mixed
+case open. The PR stayed draft while the finding was addressed.
+
+The approved minimal correction adds `not skipped` to the PASS condition and
+changes the mixed fixture to expect BLOCK. Single-success and multiple-success
+positive controls preserve the valid path. The revised test first reproduced
+one failure on the prior implementation. The original full-verification counts
+above describe the earlier candidate, not a rerun after this correction.
+
+Correction validation: the nine-file focused suite passed **166 tests**;
+Ruff, formatting and diff checks passed. The independent reviewer reran the
+release suite (**24 passed**) and five-file boundary suite (**130 passed**),
+confirmed completed mixed skips BLOCK, successful-only snapshots PASS and
+pending snapshots WAIT, and reported the previous finding resolved with no
+new blocking finding in this correction. A separate isolated pipeline exercise
+with mocked external adapters supplied mixed success/skipped checks and an
+explicit fixture authorization: it returned BLOCK before any merge call.
+These are local checks, not live merge or deployment evidence. The correction
+stays within four of the original thirteen changed files.
