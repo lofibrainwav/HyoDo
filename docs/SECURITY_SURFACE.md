@@ -20,11 +20,12 @@ authority. OpenSSF Scorecard remains a separate supply-chain posture signal.
 
 ## Thin runtime dependency surface
 
-`pyproject.toml` declares three runtime dependencies for the `hyodo` package
-on Python 3.11+, plus the `tomli` backport on Python 3.10:
+`pyproject.toml` declares four direct runtime dependencies for the `hyodo`
+package on Python 3.11+, plus the `tomli` backport on Python 3.10:
 
 ```text
 jsonschema>=4.18,<5
+referencing>=0.28.4
 typer>=0.9.0
 rich>=13.0.0
 tomli>=1.2.0; python_version < "3.11"
@@ -76,8 +77,9 @@ surface via `scripts/generate_sbom.py`.
 - **Scope.** The generator builds the public wheel and installs it into a
   clean throwaway virtualenv created **without pip** (so the venv bootstrap
   seeds `pip`/`setuptools`/`wheel` are never inventoried), then inventories
-  *that* environment — so the SBOM contains `jsonschema`, `typer`, `rich`,
-  their transitive closure, and Python 3.10's conditional `tomli`; it never
+  *that* environment — so the SBOM contains `jsonschema`, `referencing`,
+  `typer`, `rich`, their transitive closure, and Python 3.10's conditional
+  `tomli`; it never
   contains the generator (`cyclonedx-bom`) or dev/test/lint tooling. This
   scope is enforced in-process (`assert_public_scope`, which fails the run)
   and by tests. Inventorying the dev environment directly would be wrong —
