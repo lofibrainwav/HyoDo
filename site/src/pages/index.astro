@@ -38,6 +38,14 @@ const canonicalUrl = 'https://hyodo.app/';
 				--text-dim: #9aa1ac;
 				--accent: #6ee7b7;
 				--accent-dim: #1f3d33;
+				/*
+				 * The navbar is fixed, so it covers whatever sits under the top
+				 * of the viewport. Hero reserves exactly this much space instead
+				 * of estimating it. This is the desktop height; tokens.css makes
+				 * the bar shorter below 560px, so the reservation is a floor and
+				 * never leaves the copy underneath the bar.
+				 */
+				--navbar-height: 3.5rem;
 				font-synthesis: none;
 			}
 
@@ -278,14 +286,19 @@ const canonicalUrl = 'https://hyodo.app/';
 			/*
 			 * Full-viewport hero: min-height is a fixed CSS value (100svh),
 			 * known before any content or script runs, so this reserves its
-			 * layout box with zero CLS. The canvas/poster layer is an
-			 * absolutely positioned full-bleed background; the copy overlays
-			 * it, anchored to the bottom of the section.
+			 * layout box with zero CLS. min-height, not height: the copy stays
+			 * in normal flow, so when it needs more room than the viewport has
+			 * -- a 320px-wide screen, a short landscape window, enlarged text --
+			 * the section grows instead of pushing the heading out of view.
+			 * The canvas/poster layer is the only absolutely positioned part.
 			 */
 			.hero {
 				position: relative;
+				display: flex;
+				flex-direction: column;
+				justify-content: flex-end;
 				min-height: 100svh;
-				overflow: hidden;
+				padding-top: var(--navbar-height);
 				border-bottom: 1px solid var(--border);
 			}
 
@@ -293,6 +306,11 @@ const canonicalUrl = 'https://hyodo.app/';
 				position: absolute;
 				inset: 0;
 				z-index: 0;
+				/*
+				 * Clipping belongs to the background layer. On .hero it would
+				 * cut off copy that legitimately overflows a short viewport.
+				 */
+				overflow: hidden;
 				background: var(--bg);
 			}
 
@@ -345,10 +363,16 @@ const canonicalUrl = 'https://hyodo.app/';
 			}
 
 			.hero-content {
-				position: absolute;
-				left: 0;
-				right: 0;
-				bottom: 4rem;
+				/*
+				 * In normal flow. `position: absolute` here took the copy out of
+				 * flow, so .hero could not grow to fit it and the heading was
+				 * pushed above the top of the viewport on small screens.
+				 * Relative positioning is still needed for z-index to apply over
+				 * the canvas and scrim.
+				 */
+				position: relative;
+				width: 100%;
+				padding-bottom: 4rem;
 				z-index: 4;
 			}
 

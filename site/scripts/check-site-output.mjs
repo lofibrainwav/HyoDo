@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -65,6 +65,63 @@ if (!/<h1\b[^>]*id="hero-heading"/.test(homepage) || !/<canvas\b[^>]*aria-hidden
 }
 if (homepageMissing.length > 0) {
 	throw new Error(`Generated homepage is missing required output: ${homepageMissing.join('; ')}`);
+}
+
+/*
+ * Hero layout contract.
+ *
+ * The hero copy used to be `position: absolute; bottom: 4rem`, which took it out
+ * of flow: the section could not grow to fit it, so on a 320px-wide screen or a
+ * short landscape window the heading was pushed above the top of the viewport
+ * entirely, and the fixed navbar covered whatever was left. Keeping the copy in
+ * flow is the fix, so assert the shape that makes it true rather than trusting a
+ * comment to survive the next edit.
+ *
+ * This reads the built stylesheet, not the source, because the built stylesheet
+ * is what a visitor actually receives. It is a structural check: it does not
+ * measure pixels. Geometry is verified against a served build.
+ */
+const astroDir = join(root, '..', 'dist', '_astro');
+const homepageCss = readdirSync(astroDir)
+	.filter((name) => /^index\..*\.css$/.test(name))
+	.map((name) => readFileSync(join(astroDir, name), 'utf8'))
+	.join('\n');
+const heroMissing = [];
+
+if (!homepageCss) heroMissing.push('no built homepage stylesheet found');
+
+// The homepage hero is the one that reserves a full viewport; other pages
+// define their own .hero with a different scope hash.
+const heroRule = homepageCss.match(/\.hero:where\([^)]*\)\{([^}]*min-height:100svh[^}]*)\}/);
+const contentRules = [...homepageCss.matchAll(/\.hero-content:where\([^)]*\)\{([^}]*)\}/g)];
+
+if (!heroRule) {
+	heroMissing.push('no .hero rule reserving min-height:100svh');
+} else {
+	const declarations = heroRule[1];
+	if (!/padding-top:var\(--navbar-height\)/.test(declarations)) {
+		heroMissing.push('.hero must reserve --navbar-height so the fixed navbar cannot cover the copy');
+	}
+	if (/(^|;)overflow:hidden/.test(declarations)) {
+		heroMissing.push('.hero must not clip; copy that outgrows a short viewport would be cut off');
+	}
+}
+
+if (contentRules.length === 0) {
+	heroMissing.push('no .hero-content rule found');
+}
+for (const [, declarations] of contentRules) {
+	if (/position:absolute/.test(declarations)) {
+		heroMissing.push('.hero-content must stay in flow; position:absolute stops .hero growing to fit it');
+	}
+}
+
+if (!/--navbar-height:/.test(homepageCss)) {
+	heroMissing.push('--navbar-height must be declared, not estimated at each use');
+}
+
+if (heroMissing.length > 0) {
+	throw new Error(`Hero layout contract failed: ${heroMissing.join('; ')}`);
 }
 
 console.log('Static 404 and homepage output contracts: PASS');
