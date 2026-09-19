@@ -1,0 +1,100 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/verification-view-v0.schema.json",
+  "title": "HyoDo Verification View v0",
+  "description": "Read-only presentation projection of one hyodo.evidence-graph/v1 payload. Carries no score, confidence, or aggregate, and grants no authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "status", "reason", "root", "authority", "time_axis", "lanes", "event_order", "events", "edges_causal", "edges_evidence", "decisions_by_run", "missing", "coverage", "topology"],
+  "properties": {
+    "schema_version": {"const": "hyodo.verification-view/v0"},
+    "status": {"type": ["string", "null"]},
+    "reason": {"type": ["string", "null"]},
+    "root": {"type": ["string", "null"]},
+    "authority": {"const": "UNOBSERVED"},
+    "time_axis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["direction", "continuity_lens", "order_fields"],
+      "properties": {
+        "direction": {"const": "left_to_right"},
+        "continuity_lens": {"const": "eternity"},
+        "order_fields": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "lanes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["lane_id", "label", "actor", "role", "depth", "parent_lane", "events", "hyo_hierarchy"],
+        "properties": {
+          "lane_id": {"type": "string"},
+          "label": {"type": ["string", "null"]},
+          "actor": {"type": ["string", "null"]},
+          "role": {"enum": ["human", "orchestrator", "reviewer", "worker", null]},
+          "depth": {"type": ["integer", "null"]},
+          "parent_lane": {"type": ["string", "null"]},
+          "events": {"type": "array", "items": {"type": "string"}},
+          "hyo_hierarchy": {"type": ["object", "null"]}
+        }
+      }
+    },
+    "event_order": {"type": "array", "items": {"type": "string"}},
+    "events": {"type": "object"},
+    "edges_causal": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "target"],
+        "properties": {
+          "source": {"type": ["string", "null"]},
+          "target": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "edges_evidence": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["source", "target", "target_kind", "source_resolved", "source_after_target"],
+        "properties": {
+          "source": {"type": ["string", "null"]},
+          "target": {"type": ["string", "null"]},
+          "target_kind": {"type": ["string", "null"]},
+          "source_resolved": {"type": "boolean"},
+          "source_after_target": {"type": ["boolean", "null"]}
+        }
+      }
+    },
+    "decisions_by_run": {"type": "object"},
+    "missing": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["unresolved_refs", "cross_run_refs", "unclassified_events", "unmeasured_events", "calls_without_result", "runs_without_intent"],
+      "properties": {
+        "unresolved_refs": {"type": "array"},
+        "cross_run_refs": {"type": "array"},
+        "unclassified_events": {"type": "array", "items": {"type": "string"}},
+        "unmeasured_events": {"type": "array", "items": {"type": "string"}},
+        "calls_without_result": {"type": "array", "items": {"type": "string"}},
+        "runs_without_intent": {"type": "array", "items": {"type": "string"}}
+      }
+    },
+    "coverage": {"type": "object"},
+    "topology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["acyclic", "references_resolved", "structurally_valid", "components", "cycles"],
+      "properties": {
+        "acyclic": {"type": ["boolean", "null"]},
+        "references_resolved": {"type": ["boolean", "null"]},
+        "structurally_valid": {"type": ["boolean", "null"]},
+        "components": {"type": "array"},
+        "cycles": {"type": "array"}
+      }
+    }
+  }
+}
