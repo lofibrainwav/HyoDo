@@ -850,6 +850,97 @@ def test_daw_lanes_follow_the_role_the_graph_already_decided(tmp_path: Path) -> 
     assert "Agent / role unobserved" not in html
 
 
+def test_dashboard_header_and_rail_read_verification_view_facts(tmp_path: Path) -> None:
+    """The operator surface exposes recorded and presentable facts together."""
+    _write_ledger(
+        tmp_path,
+        [
+            _event(
+                event_id="intent",
+                kind="prompt",
+                actor="human",
+                step_index=0,
+                ts="2026-09-18T18:40:00+00:00",
+            ),
+            _event(
+                event_id="call",
+                kind="tool_call",
+                actor="agent",
+                step_index=1,
+                ts="2026-09-18T18:41:00+00:00",
+                parent_event_id="intent",
+                tool={"name": "pytest"},
+            ),
+            _event(
+                event_id="result",
+                kind="tool_result",
+                actor="agent",
+                step_index=2,
+                ts="2026-09-18T18:42:04+00:00",
+                parent_event_id="call",
+                io={"output_digest": "digest-1"},
+            ),
+            _event(
+                event_id="verdict",
+                kind="decision",
+                actor="hyodo",
+                step_index=3,
+                ts="2026-09-18T18:42:37+00:00",
+                parent_event_id="result",
+                policy={"decision": "ALLOW", "evaluated_by": "hyodo", "reason": "tests passed"},
+            ),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode("utf-8")
+
+    assert 'aria-label="verification status"' in html
+    assert 'data-recorded-decision="ALLOW"' in html
+    assert 'data-presentable-decision="ALLOW"' in html
+    assert 'aria-label="verification rail"' in html
+    assert 'data-stage="intent" data-state="OBSERVED"' in html
+    assert 'data-stage="action" data-state="OBSERVED"' in html
+    assert 'data-stage="result" data-state="OBSERVED"' in html
+    assert 'data-stage="evidence" data-state="UNOBSERVED"' in html
+    assert 'data-stage="decision" data-state="ALLOW"' in html
+    assert "18:42:37" in html
+
+
+def test_dashboard_withheld_allow_stays_withheld_in_header_and_rail(tmp_path: Path) -> None:
+    """An unresolved graph must never turn its recorded ALLOW green."""
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="intent", kind="prompt", actor="human", step_index=0),
+            _event(
+                event_id="call",
+                kind="tool_call",
+                actor="agent",
+                step_index=1,
+                parent_event_id="intent",
+                tool={"name": "deploy"},
+            ),
+            _event(
+                event_id="verdict",
+                kind="decision",
+                actor="hyodo",
+                step_index=2,
+                parent_event_id="call",
+                policy={"decision": "ALLOW", "evaluated_by": "hyodo"},
+                evidence_refs=["effect-readback"],
+            ),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode("utf-8")
+
+    assert 'data-recorded-decision="ALLOW"' in html
+    assert 'data-presentable-decision="UNOBSERVED"' in html
+    assert 'data-stage="decision" data-state="UNOBSERVED"' in html
+
+
 def test_the_lane_still_says_unobserved_when_no_role_was_measured() -> None:
     """A payload without `rows` must fall back, not invent a role."""
     from hyodo.dashboard import render_graph_html
