@@ -11,7 +11,10 @@ receipt rather than in this self-referential page.
 - Latest public package: HyoDo `4.19.8`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC provenance, and install smoke verified in [`releases/4.19.8.md`](./releases/4.19.8.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: release closure complete; remaining live-host and orchestration experiments are downstream integration/research work.
+- HyoDo product status: the recorded 4.19.8 release is closed. Later source
+  changes and public-surface verification have separate completion criteria
+  in [Remaining work and handoff](./REMAINING_WORK.md). Live-host and
+  orchestration experiments remain downstream integration/research work.
 
 The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
