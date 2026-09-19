@@ -1,0 +1,32 @@
+{
+  "base": {"evidence_coverage": "UNOBSERVED", "claim_origin": null, "resolution_state": "UNRESOLVED", "decision_need": "NONE", "lane_state": "HOLD", "public_surface_state": null, "disposition": "BLOCKED", "authority_ref": null, "surface_evidence_ref": null, "exception_ref": null, "evidence_refs": []},
+  "cases": [
+    {"name": "unobserved_is_representable", "valid": true, "overrides": {}},
+    {"name": "partial_is_not_authority", "valid": true, "overrides": {"evidence_coverage": "PARTIAL", "claim_origin": "OBSERVED", "evidence_refs": ["fixture:partial"]}},
+    {"name": "conflict_preserves_both_observations", "valid": true, "overrides": {"evidence_coverage": "CONFLICTING", "evidence_refs": ["fixture:a", "fixture:b"]}},
+    {"name": "derived_is_not_live", "valid": true, "overrides": {"claim_origin": "DERIVED"}},
+    {"name": "human_required_is_blocked", "valid": true, "overrides": {"decision_need": "HUMAN_REQUIRED"}},
+    {"name": "scoped_host_authority_is_separate", "valid": true, "overrides": {"resolution_state": "RESOLVED", "lane_state": "READY", "disposition": "WITHIN_AUTHORITY", "authority_ref": "fixture:host-grant"}},
+    {"name": "exception_preserves_unresolved", "valid": true, "overrides": {"disposition": "AUTHORIZED_EXCEPTION", "authority_ref": "fixture:host-exception", "exception_ref": "fixture:accepted-risk"}},
+    {"name": "derived_claim_with_independent_surface_observation", "valid": true, "overrides": {"claim_origin": "DERIVED", "public_surface_state": "LIVE", "surface_evidence_ref": "fixture:direct-target-readback"}},
+    {"name": "verified_check_does_not_clear_unresolved", "valid": true, "overrides": {"lane_state": "VERIFIED"}},
+    {"name": "conflicting_without_two_refs", "valid": false, "overrides": {"evidence_coverage": "CONFLICTING", "evidence_refs": ["fixture:a"]}},
+    {"name": "duplicate_refs_are_not_two_observations", "valid": false, "overrides": {"evidence_coverage": "CONFLICTING", "evidence_refs": ["fixture:a", "fixture:a"]}},
+    {"name": "observed_without_evidence", "valid": false, "overrides": {"evidence_coverage": "OBSERVED"}},
+    {"name": "partial_without_evidence", "valid": false, "overrides": {"evidence_coverage": "PARTIAL"}},
+    {"name": "live_without_readback", "valid": false, "overrides": {"public_surface_state": "LIVE"}},
+    {"name": "absence_is_not_missing_observation", "valid": false, "overrides": {"public_surface_state": "ABSENT"}},
+    {"name": "intentional_unavailability_requires_record", "valid": false, "overrides": {"public_surface_state": "INTENTIONALLY_UNAVAILABLE"}},
+    {"name": "derived_cannot_be_evidence_coverage", "valid": false, "overrides": {"evidence_coverage": "DERIVED"}},
+    {"name": "unobserved_cannot_be_lane_state", "valid": false, "overrides": {"lane_state": "UNOBSERVED"}},
+    {"name": "approved_cannot_be_lane_state", "valid": false, "overrides": {"lane_state": "APPROVED"}},
+    {"name": "shared_status_forbidden", "valid": false, "overrides": {"status": "VERIFIED"}},
+    {"name": "unknown_cannot_be_silently_mapped", "valid": false, "overrides": {"evidence_coverage": "UNKNOWN"}},
+    {"name": "unresolved_cannot_be_ordinary_authority", "valid": false, "overrides": {"lane_state": "READY", "disposition": "WITHIN_AUTHORITY", "authority_ref": "fixture:grant"}},
+    {"name": "hold_cannot_be_ordinary_authority", "valid": false, "overrides": {"resolution_state": "RESOLVED", "disposition": "WITHIN_AUTHORITY", "authority_ref": "fixture:grant"}},
+    {"name": "exception_requires_authority", "valid": false, "overrides": {"disposition": "AUTHORIZED_EXCEPTION", "exception_ref": "fixture:risk"}},
+    {"name": "exception_requires_risk_record", "valid": false, "overrides": {"disposition": "AUTHORIZED_EXCEPTION", "authority_ref": "fixture:grant"}},
+    {"name": "human_need_cannot_be_bypassed", "valid": false, "overrides": {"decision_need": "HUMAN_REQUIRED", "disposition": "AUTHORIZED_EXCEPTION", "authority_ref": "fixture:grant", "exception_ref": "fixture:risk"}},
+    {"name": "whitespace_is_not_authority", "valid": false, "overrides": {"resolution_state": "RESOLVED", "lane_state": "READY", "disposition": "WITHIN_AUTHORITY", "authority_ref": "  "}}
+  ]
+}
