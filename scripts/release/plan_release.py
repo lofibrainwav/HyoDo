@@ -47,6 +47,10 @@ EXPECTED_WRITE_SET = (
     ".claude-plugin/marketplace.json",
     "CHANGELOG.md",
     "docs/releases/<version>.md",
+    # uv.lock records the project's own version. CI installs with `--locked`, so
+    # a bump that leaves the lock behind fails every job before a single test
+    # runs. Refresh it with `uv lock` after preparing the candidate.
+    "uv.lock",
 )
 
 
