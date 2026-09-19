@@ -939,6 +939,9 @@ def test_dashboard_withheld_allow_stays_withheld_in_header_and_rail(tmp_path: Pa
     assert 'data-recorded-decision="ALLOW"' in html
     assert 'data-presentable-decision="UNOBSERVED"' in html
     assert 'data-stage="decision" data-state="UNOBSERVED"' in html
+    assert "recordedDecision" in html
+    assert "detail-lenses" in html
+    assert "WHAT IS MISSING" in html
 
 
 def test_the_lane_still_says_unobserved_when_no_role_was_measured() -> None:

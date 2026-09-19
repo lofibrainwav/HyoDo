@@ -91,6 +91,20 @@ const FIELDS = [
   ["Why", "why"],
   ["How", "how"],
 ];
+const LENS_LABELS = { jin: "眞", seon: "善", mi: "美", in: "仁", hyo: "孝" };
+function addText(parent, tag, text, className) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  element.textContent = text;
+  parent.appendChild(element);
+  return element;
+}
+function addSection(title, className) {
+  const section = document.createElement("section");
+  section.className = className;
+  addText(section, "h3", title);
+  return section;
+}
 const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event], .daw-cell button[data-event]");
 let lastFocusedCell = null;
 function highlightEdges(eventId) {
@@ -180,6 +194,11 @@ cells.forEach((button) => {
       return;
     }
     panel.textContent = "";
+    const status = document.createElement("div");
+    status.className = "detail-status-strip";
+    addText(status, "span", "RECORDED " + String(data.recordedDecision || "UNOBSERVED"));
+    addText(status, "span", "PRESENTABLE " + String(data.presentableDecision || "UNOBSERVED"));
+    panel.appendChild(status);
     for (const [label, key] of FIELDS) {
       const p = document.createElement("p");
       const strong = document.createElement("strong");
@@ -188,6 +207,22 @@ cells.forEach((button) => {
       p.appendChild(document.createTextNode(String(data[key] ?? "not recorded")));
       panel.appendChild(p);
     }
+    const lenses = addSection("LENS COVERAGE", "detail-lenses");
+    const columns = Array.isArray(data.columns) ? data.columns : [];
+    for (const key of Object.keys(LENS_LABELS)) {
+      const mark = columns.includes(key) ? "●" : "○";
+      addText(lenses, "span", mark + " " + LENS_LABELS[key], columns.includes(key) ? "lens-observed" : "lens-unobserved");
+    }
+    panel.appendChild(lenses);
+    const proof = addSection("PROOF", "detail-proof");
+    addText(proof, "p", "Causal parents: " + String(data.causalParentCount ?? 0));
+    addText(proof, "p", "Evidence refs: " + String(data.evidenceRefCount ?? 0));
+    addText(proof, "p", "Output digest: " + String(data.outputDigest || "UNOBSERVED"));
+    panel.appendChild(proof);
+    const missing = addSection("WHAT IS MISSING", "detail-missing");
+    const missingItems = Array.isArray(data.missing) ? data.missing : [];
+    addText(missing, "p", missingItems.length ? missingItems.join(", ") : "None recorded");
+    panel.appendChild(missing);
   };
   button.addEventListener("focus", show);
   button.addEventListener("click", show);
@@ -771,8 +806,8 @@ def _event_title(node: dict[str, Any]) -> str:
     return f"{kind}: {name}" if isinstance(name, str) and name else kind
 
 
-def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
-    """5W1H fields for the detail panel (spec section 3's event fields only)."""
+def _event_detail_payload(node: dict[str, Any]) -> dict[str, Any]:
+    """5W1H plus canonical proof fields for the detail panel."""
     raw_tool = node.get("tool")
     tool: dict[str, Any] = raw_tool if isinstance(raw_tool, dict) else {}
     raw_policy = node.get("policy")
@@ -792,6 +827,12 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
     how = str(decision) if decision else "not recorded"
     if rule_id:
         how = f"{how} ({rule_id})"
+    raw_verification = node.get("verification")
+    verification: dict[str, Any] = raw_verification if isinstance(raw_verification, dict) else {}
+    raw_what = verification.get("what")
+    what: dict[str, Any] = raw_what if isinstance(raw_what, dict) else {}
+    raw_how_view = verification.get("how")
+    how_view: dict[str, Any] = raw_how_view if isinstance(raw_how_view, dict) else {}
     return {
         "who": str(node.get("actor") or "not recorded"),
         "what": _event_title(node),
@@ -801,6 +842,13 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
         if isinstance(policy, dict) and policy.get("reason")
         else "not recorded",
         "how": how,
+        "recordedDecision": what.get("decision") or node.get("decision") or "UNOBSERVED",
+        "presentableDecision": what.get("decision_presentable") or "UNOBSERVED",
+        "columns": list(verification.get("columns") or []),
+        "causalParentCount": len(verification.get("causal_parents") or []),
+        "evidenceRefCount": len(verification.get("evidence_refs") or []),
+        "outputDigest": how_view.get("output_digest") or "UNOBSERVED",
+        "missing": list(verification.get("missing") or []),
     }
 
 
@@ -1437,7 +1485,8 @@ def _verification_stage_state(view: dict[str, Any], stage: str) -> str:
     kinds = [
         event.get("what", {}).get("kind") for event in events if isinstance(event.get("what"), dict)
     ]
-    missing = view.get("missing") if isinstance(view.get("missing"), dict) else {}
+    raw_missing = view.get("missing")
+    missing: dict[str, Any] = raw_missing if isinstance(raw_missing, dict) else {}
     if stage == "intent":
         if "prompt" not in kinds:
             return "UNOBSERVED"
@@ -1476,7 +1525,8 @@ def _render_verification_header(view: dict[str, Any]) -> str:
         if isinstance(event.get("what"), dict)
         and event.get("what", {}).get("decision_presentable") is not None
     ]
-    missing = view.get("missing") if isinstance(view.get("missing"), dict) else {}
+    raw_missing = view.get("missing")
+    missing: dict[str, Any] = raw_missing if isinstance(raw_missing, dict) else {}
     gap_count = sum(len(entries) for entries in missing.values() if isinstance(entries, list))
     status = str(view.get("status") or "UNOBSERVED")
     authority = str(view.get("authority") or "UNOBSERVED")
@@ -1607,14 +1657,12 @@ def _render_daw_timeline(
     columns = max_step + 1
     step_timestamps: dict[int, str] = {}
     for node in sorted(valid_nodes, key=lambda item: str(item.get("ts") or "")):
-        step = node.get("step_index")
+        raw_step = node.get("step_index")
+        if not isinstance(raw_step, int):
+            continue
+        step = raw_step
         timestamp = node.get("ts")
-        if (
-            isinstance(step, int)
-            and isinstance(timestamp, str)
-            and timestamp
-            and step not in step_timestamps
-        ):
+        if isinstance(timestamp, str) and timestamp and step not in step_timestamps:
             step_timestamps[step] = timestamp[11:19] if len(timestamp) >= 19 else timestamp
     run_id = next(
         (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
@@ -1734,18 +1782,50 @@ def render_graph_html(
     reason = graph.get("reason")
     raw_nodes = graph.get("nodes")
     raw_edges = graph.get("edges")
-    nodes: list[dict[str, Any]] = raw_nodes if isinstance(raw_nodes, list) else []
+    raw_node_list: list[dict[str, Any]] = raw_nodes if isinstance(raw_nodes, list) else []
     edges: list[dict[str, Any]] = raw_edges if isinstance(raw_edges, list) else []
     missions = graph.get("missions") if isinstance(graph.get("missions"), dict) else {}
-    node_by_id: dict[str, dict[str, Any]] = {
-        node["id"]: node for node in nodes if isinstance(node.get("id"), str)
-    }
-
     effective_root = root
     if effective_root is None:
         graph_root = graph.get("root")
         effective_root = Path(graph_root) if isinstance(graph_root, str) and graph_root else None
     verification_view = build_verification_view(graph, root=effective_root)
+    evidence_refs_by_target: dict[str, list[str]] = {}
+    for edge in verification_view.get("edges_evidence") or []:
+        if isinstance(edge, dict) and isinstance(edge.get("target"), str):
+            source = edge.get("source")
+            if isinstance(source, str):
+                evidence_refs_by_target.setdefault(edge["target"], []).append(source)
+    missing_by_event: dict[str, list[str]] = {}
+    missing_view = verification_view.get("missing")
+    if isinstance(missing_view, dict):
+        for bucket, entries in missing_view.items():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                event_id = (
+                    entry
+                    if isinstance(entry, str)
+                    else entry.get("event_id")
+                    if isinstance(entry, dict)
+                    else None
+                )
+                if isinstance(event_id, str):
+                    missing_by_event.setdefault(event_id, []).append(str(bucket))
+    nodes = []
+    for node in raw_node_list:
+        node_id = node.get("id")
+        verification = (
+            verification_view.get("events", {}).get(node_id) if isinstance(node_id, str) else None
+        )
+        if isinstance(verification, dict):
+            verification = dict(verification)
+            verification["evidence_refs"] = evidence_refs_by_target.get(str(node_id), [])
+            verification["missing"] = missing_by_event.get(str(node_id), [])
+        nodes.append({**node, "verification": verification or {}})
+    node_by_id: dict[str, dict[str, Any]] = {
+        node["id"]: node for node in nodes if isinstance(node.get("id"), str)
+    }
     assignments = {
         node_id: assign_columns(node, effective_root) for node_id, node in node_by_id.items()
     }
@@ -2026,6 +2106,16 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-rows .edge-broken {{ stroke:#f05a24 }}
 .daw-rows .edge.edge-active {{ stroke-width:3; opacity:1 }}
 .detail {{ border-radius:0; background:#17161a; border-color:#57565a; color:#f5f5f5; font-size:.75rem; min-height:86px }}
+.detail h3 {{ margin:.75rem 0 .35rem; color:#aaa9ab; font:600 .62rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.14em }}
+.detail-status-strip {{ display:flex; gap:14px; flex-wrap:wrap; padding-bottom:8px; border-bottom:1px solid #3a393d; color:#f5f5f5; font:600 .66rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.08em }}
+.detail-status-strip span:nth-child(2) {{ color:#aaa9ab }}
+.detail-lenses {{ display:flex; gap:12px; flex-wrap:wrap }}
+.detail-lenses h3 {{ width:100% }}
+.detail-lenses span {{ font:600 .72rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace }}
+.lens-observed {{ color:#7fc86a }} .lens-unobserved {{ color:#747378 }}
+.detail-proof, .detail-missing {{ color:#aaa9ab }}
+.detail-proof p, .detail-missing p {{ margin:.18rem 0 }}
+.detail-missing p {{ color:#fab413 }}
 @media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} }}
 @media (prefers-reduced-motion:reduce) {{ .daw-cell button {{ transition:none }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
