@@ -7,8 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.19.9] - 2026-09-19
 
-Storefront repairs from the 2026-09-19 first-visit audit. No runtime behaviour
-changes; the CLI contracts, exit codes, and evidence semantics are unchanged.
+Storefront repairs from the 2026-09-19 first-visit audit. The version bump itself
+carries no runtime change, but the release ships the whole delta since 4.19.8 —
+see "Scope of the delta since 4.19.8" in `docs/releases/4.19.9.md` for the
+measurement and for the three compatibility facts that were checked. This entry
+previously claimed that the CLI contracts, exit codes and evidence semantics were
+unchanged, which described the bump rather than the release; the tagged tree
+still carries that sentence because release tags are not re-cut.
 
 ### Fixed
 
