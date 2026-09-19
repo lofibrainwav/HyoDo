@@ -793,3 +793,74 @@ def test_each_gutter_states_how_many_events_it_holds() -> None:
     )
     assert 'data-gutter-count="2"' in html
     assert 'data-gutter-count="1"' in html
+
+
+def test_daw_lanes_follow_the_role_the_graph_already_decided(tmp_path: Path) -> None:
+    """Two `actor="agent"` events with different roles must not share a lane.
+
+    `build_actor_rows` already reads causal lineage to call one row an
+    orchestrator and another a worker, and `build_report_graph` already ships
+    that as `graph["rows"]`. Before this, the timeline pooled both into one
+    "role unobserved" lane by reading `actor` alone — a viewer disagreeing
+    with its own producer about something the producer had measured.
+    """
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="m1", kind="prompt", actor="human", step_index=0),
+            _event(
+                event_id="lead-call",
+                kind="tool_call",
+                actor="agent",
+                actor_id="lead",
+                step_index=1,
+                parent_event_id="m1",
+                tool={"name": "Task", "paths": [], "urls": []},
+            ),
+            _event(
+                event_id="sub-call",
+                kind="tool_call",
+                actor="agent",
+                actor_id="sub",
+                step_index=2,
+                parent_event_id="lead-call",
+                tool={"name": "Bash", "paths": [], "urls": []},
+            ),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode("utf-8")
+
+    from hyodo.dashboard import _daw_track, _role_by_event
+    from hyodo.report import build_report_graph
+
+    graph = build_report_graph(tmp_path)
+    roles = _role_by_event(graph)
+    by_id = {node["id"]: node for node in graph["nodes"]}
+
+    assert roles["lead-call"] == "orchestrator"
+    assert roles["sub-call"] == "worker"
+    assert _daw_track(by_id["lead-call"], roles) == "planner"
+    assert _daw_track(by_id["sub-call"], roles) == "agent"
+    # Both are actor="agent", so the old actor-only reading pooled them.
+    assert _daw_track(by_id["lead-call"]) == _daw_track(by_id["sub-call"]) == "agent"
+    # Once a role is observed, the lane stops claiming it is unobserved.
+    assert "Agent / worker" in html
+    assert "Agent / role unobserved" not in html
+
+
+def test_the_lane_still_says_unobserved_when_no_role_was_measured() -> None:
+    """A payload without `rows` must fall back, not invent a role."""
+    from hyodo.dashboard import render_graph_html
+
+    html = render_graph_html(
+        {
+            "status": "READY",
+            "nodes": [_bare_event("e1", "ssh-keygen")],
+            "edges": [],
+            "root": "/tmp",
+        }
+    )
+    assert "Agent / role unobserved" in html
+    assert "Agent / worker" not in html
