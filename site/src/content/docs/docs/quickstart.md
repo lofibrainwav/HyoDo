@@ -6,13 +6,31 @@ description: Install HyoDo and run its first checks against an existing reposito
 HyoDo adds local guardrails to a repository you already own. It does not
 replace your tests, linters, or CI — it reports on what actually ran.
 
+## Before you start
+
+- **Python 3.10 or newer.**
+- **A project you already work in**, checked out locally. HyoDo reports on
+  checks that already exist, so the more your project has — pytest, Ruff, mypy,
+  npm scripts, Go, Cargo, Makefile targets — the more `hyodo init` finds. A
+  project with no checks is not a failure; `init` writes a commented starter
+  file instead of inventing a passing gate.
+- **A terminal in that project's directory.** Every command below reads and
+  writes relative to the current directory, so run them from the project root:
+
+  ```bash
+  cd your-project
+  ```
+
 ## 1. Install
 
 ```bash
 pipx install hyodo
 ```
 
-`pip install -U hyodo` also works. Python 3.10+ is required.
+`pip install -U hyodo` also works.
+
+Whichever you choose, remember it: the optional MCP step below has to install
+into the *same* environment, and pipx keeps HyoDo in an isolated one.
 
 ## 2. Run an early-warning scan
 
@@ -62,6 +80,25 @@ connect a detected host; it previews the changes and asks before writing.
 ```bash
 hyodo start
 ```
+
+The MCP adapter is an optional extra, not part of the base install, and it
+must land in the same environment that runs `hyodo`. Install it the way you
+installed HyoDo:
+
+```bash
+# if you used pipx
+pipx install --force 'hyodo[mcp]'
+```
+
+```bash
+# if you used pip
+pip install 'hyodo[mcp]'
+```
+
+Running `pip install 'hyodo[mcp]'` after a pipx install is the common mistake:
+it installs into a different environment, and `hyodo mcp` keeps reporting the
+SDK as missing. If that happens, `hyodo mcp stdio` exits `2` and prints both
+paths.
 
 Claude Code gets hook wiring plus MCP. Cursor, VS Code, Claude Desktop, and
 Codex get MCP config only. Direct `hyodo connect cursor` and

@@ -48,7 +48,9 @@ hyodo policy check --file step.json --config .hyodo/policy.toml
 
 Events are digest-only by default. A DENY result is evidence; the caller must
 stop the agent. For an evidence panel, run `hyodo dashboard --open`. To connect
-an MCP host, install `pip install 'hyodo[mcp]'` and follow the
+an MCP host, install the optional extra **into the same environment that runs
+`hyodo`** — `pipx install --force 'hyodo[mcp]'` if you installed with pipx,
+`pip install 'hyodo[mcp]'` if you installed with pip — and follow the
 [host onboarding guide](./docs/ONBOARDING.md). Host support and remote connector
 status are documented there; remote ChatGPT MCP remains contract-only.
 
