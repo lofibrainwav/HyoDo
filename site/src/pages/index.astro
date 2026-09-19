@@ -22,9 +22,14 @@ const canonicalUrl = 'https://hyodo.app/';
 		<meta property="og:title" content="HyoDo — Evidence before done" />
 		<meta property="og:description" content={siteDescription} />
 		<meta property="og:url" content={canonicalUrl} />
-		<meta name="twitter:card" content="summary" />
+		<meta property="og:image" content={new URL('/og-image.png', canonicalUrl).href} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content="HyoDo — When AI says done, ask what proves it." />
+		<meta name="twitter:card" content="summary_large_image" />
 		<meta name="twitter:title" content="HyoDo — Evidence before done" />
 		<meta name="twitter:description" content={siteDescription} />
+		<meta name="twitter:image" content={new URL('/og-image.png', canonicalUrl).href} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<link rel="icon" href="/favicon.ico" sizes="32x32" />
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
@@ -233,6 +238,17 @@ const canonicalUrl = 'https://hyodo.app/';
 				flex-wrap: wrap;
 			}
 
+			footer .boundary {
+				margin: 1.25rem 0 0;
+				max-width: 60ch;
+				line-height: 1.6;
+			}
+
+			footer .boundary strong {
+				color: var(--text);
+				font-weight: 600;
+			}
+
 			footer a {
 				color: var(--text-dim);
 			}
@@ -425,6 +441,7 @@ const canonicalUrl = 'https://hyodo.app/';
 				</div>
 				<p class="copy-status" id="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
 				<a class="quickstart-link" href="/docs/quickstart/">New to HyoDo? Read the quickstart →</a>
+				<a class="quickstart-link" href="/docs/worked-example/">Or see one finished run first — real output, exit codes, 4.19.9 →</a>
 			</div>
 		</header>
 
@@ -536,7 +553,24 @@ const canonicalUrl = 'https://hyodo.app/';
 					<a href={pypiUrl}>PyPI</a>
 					<a href="/docs/quickstart/">Docs</a>
 					<a href="/docs/research/">Research</a>
+					<a href={`${githubUrl}/issues`}>Questions &amp; bug reports</a>
+					<a href={`${githubUrl}/blob/main/SECURITY.md`}>Security reporting</a>
+					<a href={`${githubUrl}/blob/main/docs/PRODUCT_BOUNDARY.md`}>Maintenance &amp; scope</a>
 				</div>
+				<p class="boundary">
+					<strong>This site stores nothing about you.</strong> No accounts, no
+					analytics, no tracking cookies. That is enforced rather than promised:
+					the page is served under a Content-Security-Policy of
+					<code>script-src 'self'</code> and <code>connect-src 'self'</code>, so
+					it cannot load a third-party script or call out to another origin. The
+					evidence graph above runs in your browser on bundled sample data.
+					<br /><br />
+					<strong>The HyoDo tool is a separate thing, and equally local.</strong>
+					It reads your checkout, writes under <code>.hyodo/</code> in that same
+					checkout, and has no server to report to. Installing or running it
+					sends nothing to this site or to its maintainers — the only way your
+					code or results reach us is if you paste them into an issue yourself.
+				</p>
 			</div>
 		</footer>
 

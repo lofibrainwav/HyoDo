@@ -6,6 +6,25 @@ description: Install HyoDo and run its first checks against an existing reposito
 HyoDo adds local guardrails to a repository you already own. It does not
 replace your tests, linters, or CI — it reports on what actually ran.
 
+If you would rather see one finished run before installing anything, read
+[A worked result](/docs/worked-example/) first: a three-file project, the exact
+command, and the verbatim output with its exit code.
+
+## What HyoDo covers, and what it does not
+
+| | |
+| --- | --- |
+| **Runs on** | macOS, Linux, Windows. Python 3.10 or newer. |
+| **Reads** | your checkout, and the commands you register in `.hyodo/gates.toml`. |
+| **Reports** | which gates ran, what they returned, and `UNOBSERVED` when nothing ran. |
+| **Does not** | run your CI, gate your merges, approve or deploy anything. |
+| **Does not** | send your code or results anywhere. Everything below is local. |
+| **Optional** | an MCP adapter, so a host such as Claude or Cursor can read the same evidence. Step 5. |
+
+A HyoDo result is evidence for a decision, never the decision. The exit codes
+carry that meaning literally: `0` the gates you registered passed, `1` one
+failed, `2` nothing was measured.
+
 ## Before you start
 
 - **Python 3.10 or newer.**

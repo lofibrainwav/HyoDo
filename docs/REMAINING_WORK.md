@@ -68,15 +68,50 @@ Source, verified on merged `main` `0ae0040`:
 | A1 published links | n/a | **open** | Source merged in #420 and a readback check added to `verify-pypi-release.py`. The live 4.19.8 description still 404s. Closes when the next published release is read back. |
 | A2 small screens | **closed** | n/a | Measured on the deployed site at 1440×900, 390×844, 375×667, 360×640, 320×568 and 844×390: content above the hero is 0px everywhere, the heading never starts above the fixed navbar, both hero controls are fully visible, and the page scrolls. |
 | A3 first install | **closed** (guidance) | **open** (package) | The deployed quickstart carries the prerequisites, `cd your-project`, and the per-installer extra step. The clean install itself is still only verified against a locally built wheel; it closes against the published package after the next release. |
-| A4 representative result | open | — | The homepage shows an evidence-graph prototype labelled "sample data only" and the install command, but no worked result tied to a stated version, input and command. Not started. |
-| A5 doc entry path | open | — | The docs sidebar lists 15 flat entries. The sidebar label reads "Philosophy → Math → Code" while the page title reads "From values to evidence". Not started. |
-| A6 contact and data boundary | open | — | The homepage footer links GitHub, PyPI, Docs and Research only; there is no contact, maintenance or data-handling link, and no `og:image`. `project_urls` points at GitHub rather than the site. Not started. |
+| A4 representative result | **source complete**, serves on merge | n/a | `/docs/worked-example/` carries one run of the published 4.19.9 wheel on a three-file project: the input files, the command, verbatim output, and exit codes `0` / `1` / `2` asserted against that wheel. Closes on the deployed page. |
+| A5 doc entry path | **source complete**, serves on merge | n/a | Sidebar regrouped into Start here / Scope and boundaries / Using HyoDo / Project, and every label now equals its page's frontmatter title. Quickstart gained a support-scope table. A regression gate asserts the label match. Closes on the deployed page. |
+| A6 contact and data boundary | **partly source complete** | **open** | Footer gained questions, security-reporting and maintenance links plus a web-vs-local data-boundary statement, and `og:image` now ships — all serve on merge. `project_urls` Homepage and Documentation are repointed at `hyodo.app` in source, but the **published 4.19.9 metadata still points at GitHub**; that half closes only on the next release. |
 
 <!-- markdownlint-enable MD013 -->
 
-A4–A6 are presentation work. They must not add claims that have not been
-observed, and they are not prerequisites for the package release that closes A1
-and A3.
+A4–A6 were presentation work and are no longer prerequisites for anything: the
+4.19.9 release that closed A1 and A3 shipped before them.
+
+### What A4–A6 closed on, and what stays UNOBSERVED
+
+Measured on 2026-09-19 against the published 4.19.9 wheel and the live site:
+
+- **A4 is a real result, not a mock.** Every output block on
+  `/docs/worked-example/` was pasted from a terminal running
+  `hyodo` 4.19.9 installed from PyPI into an empty pipx home. The three exit
+  codes were asserted, not described: `0` gates passed, `1` a gate failed, `2`
+  nothing measured. The `2` case includes a malformed `.hyodo/gates.toml`, which
+  the tool reports as `UNOBSERVED` rather than as a pass.
+- **A5's label agreement is now a gate, not a promise.**
+  `site/scripts/check-site-output.mjs` compares every sidebar label to the target
+  page's frontmatter `title` and fails the build on a mismatch or a dangling
+  slug. Adding it immediately caught two mismatches beyond the audited one
+  (`docs/connect`, `docs/runtime-identity`), which were fixed.
+- **A6 is deliberately split.** The site half — contact, security reporting,
+  maintenance scope, the data-boundary statement, `og:image` — serves on merge.
+  The package half does not: PyPI keeps 4.19.9's metadata until a new release, so
+  `project_urls` Homepage and Documentation still point at GitHub for anyone
+  reading the published page today.
+- **The data-boundary claim was verified, not asserted.** The live site sends no
+  `Set-Cookie`, loads no third-party `src`, and is served under
+  `script-src 'self'; connect-src 'self'`, which makes third-party scripts and
+  cross-origin calls impossible rather than merely absent. The local claim was
+  checked too: after a full `hyodo check` run the tool had written only
+  `.hyodo/gates-trust.json` inside the project, and nothing under `$HOME`.
+
+Still `UNOBSERVED`:
+
+- All three closures are measured on source and on a local build. The deployed
+  page is a separate readback, taken after merge.
+- `og:image` is verified to ship in `dist/index.html` with the correct absolute
+  URL and to exist at `dist/og-image.png`. How any particular social platform
+  renders or caches it is not observed.
+- The published `project_urls` fix is source-only until the next release.
 
 ### How A2 was measured, and what that does not cover
 
