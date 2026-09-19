@@ -864,3 +864,92 @@ def test_the_lane_still_says_unobserved_when_no_role_was_measured() -> None:
     )
     assert "Agent / role unobserved" in html
     assert "Agent / worker" not in html
+
+
+def test_missing_panel_names_each_gap_and_what_to_fix(tmp_path: Path) -> None:
+    """The panel is the point: a reader must not page the ledger to find gaps."""
+    _write_ledger(
+        tmp_path,
+        [
+            _event(
+                event_id="c1",
+                kind="tool_call",
+                actor="agent",
+                actor_id="a1",
+                step_index=0,
+                tool={"name": "deploy", "paths": [], "urls": []},
+            ),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode("utf-8")
+
+    assert 'aria-label="what is missing"' in html
+    # A call nothing ever cited as a parent, and a run with no stated intent.
+    assert 'data-missing-bucket="calls_without_result" data-missing-count="1"' in html
+    assert 'data-missing-bucket="runs_without_intent" data-missing-count="1"' in html
+    assert "c1" in html
+    # A gap is reported, never scored or ranked.
+    assert "A gap is not a failure, and closing one authorizes nothing." in html
+
+
+def test_missing_panel_separates_a_recording_gap_from_a_mapping_gap() -> None:
+    """Merging the two counts would erase the only useful difference."""
+    from hyodo.dashboard import render_graph_html
+
+    html = render_graph_html(
+        {
+            "status": "READY",
+            "nodes": [
+                _bare_event("e1", "ssh-keygen"),
+                _bare_event("e2", "git.status", output_digest="dcb01359d6b9"),
+            ],
+            "edges": [],
+            "root": "/tmp",
+        }
+    )
+    assert 'data-missing-bucket="unmeasured_events" data-missing-count="1"' in html
+    assert 'data-missing-bucket="unclassified_events" data-missing-count="1"' in html
+    assert "Fix the recording." in html
+    assert "Fix the table, never by tool name." in html
+
+
+def test_missing_panel_never_calls_an_empty_ledger_clean() -> None:
+    """No events means nothing is missing and nothing is proven."""
+    from hyodo.dashboard import render_graph_html
+
+    html = render_graph_html({"status": "READY", "nodes": [], "edges": [], "root": "/tmp"})
+    assert 'data-missing-total="0"' in html
+    assert "nothing is missing and nothing is proven" in html
+    assert "Every recorded event resolved" not in html
+
+
+def test_missing_panel_counts_agree_with_the_verification_view(tmp_path: Path) -> None:
+    """One count, one source. The panel and the JSON route cannot disagree."""
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="m1", kind="prompt", actor="human", step_index=0),
+            _event(
+                event_id="d1",
+                kind="decision",
+                actor="hyodo",
+                step_index=1,
+                parent_event_id="m1",
+                evidence_refs=["nowhere"],
+                policy={"decision": "ALLOW", "rule_id": "r1", "reason": "cited"},
+            ),
+        ],
+    )
+    from hyodo.dashboard import render_graph_html
+    from hyodo.report import build_report_graph
+    from hyodo.verification_view import build_verification_view
+
+    graph = build_report_graph(tmp_path)
+    view = build_verification_view(graph, root=tmp_path)
+    html = render_graph_html(graph, root=tmp_path)
+
+    expected = len(view["missing"]["unresolved_refs"])
+    assert expected == 1
+    assert f'data-missing-bucket="unresolved_refs" data-missing-count="{expected}"' in html

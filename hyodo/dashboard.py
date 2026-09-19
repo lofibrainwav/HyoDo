@@ -22,6 +22,7 @@ from hyodo.graph_view import (
     column_coverage,
     orb_state,
 )
+from hyodo.verification_view import build_verification_view
 from hyodo.virtues import DOCUMENT_VIRTUE_NAMES, VIRTUE_CONTRACT
 
 # Inline auto-refresh poller. The text must stay byte-identical to the sha256
@@ -1358,6 +1359,123 @@ def _daw_event_label(node: dict[str, Any]) -> str:
     return _event_label(node)
 
 
+#: What each `missing` bucket means, in one line, for a reader who has not
+#: read the schema. The wording says what to fix, because a gap nobody knows
+#: how to close is just a number.
+_MISSING_BUCKET_MEANING: tuple[tuple[str, str, str], ...] = (
+    (
+        "unresolved_refs",
+        "Citations pointing at no recorded event",
+        "Something was cited as evidence and the ledger has no such event.",
+    ),
+    (
+        "cross_run_refs",
+        "Parents recorded under a different run",
+        "A causal parent exists, but in another run, so the chain is not local.",
+    ),
+    (
+        "calls_without_result",
+        "Tool calls with no recorded effect",
+        "The call was recorded. Nothing downstream ever cited it as a parent.",
+    ),
+    (
+        "runs_without_intent",
+        "Runs with no recorded human intent",
+        "Work was recorded without the request it answers. Fix the recording.",
+    ),
+    (
+        "unmeasured_events",
+        "Events that recorded nothing readable",
+        "No paths, urls, method, rule, or digest. Fix the recording.",
+    ),
+    (
+        "unclassified_events",
+        "Evidence the mapping table has no row for",
+        "The event did record evidence. Fix the table, never by tool name.",
+    ),
+)
+
+#: How many example ids to name per bucket. Enough to start looking, few
+#: enough that the panel stays readable when a bucket holds thousands.
+_MISSING_SAMPLE_LIMIT = 3
+
+
+def _missing_sample(entries: list[Any]) -> list[str]:
+    """Return up to `_MISSING_SAMPLE_LIMIT` readable ids from one bucket."""
+    sample: list[str] = []
+    for entry in entries[:_MISSING_SAMPLE_LIMIT]:
+        if isinstance(entry, str):
+            sample.append(entry)
+        elif isinstance(entry, dict):
+            label = entry.get("ref") or entry.get("event_id") or entry.get("parent_event_id")
+            if isinstance(label, str):
+                sample.append(label)
+    return sample
+
+
+def _render_missing_panel(graph: dict[str, Any], root: Path | None = None) -> str:
+    """Render "what is missing" from the verification view's own counts.
+
+    Every number here is already in the graph; this reads
+    `build_verification_view(...)["missing"]` rather than recounting, so the
+    panel and the JSON route can never disagree about the same ledger.
+
+    The panel states gaps. It does not rank them, score them, or say what they
+    block, because the graph records none of that. Naming an unread gap is the
+    whole point: a reader should not have to page through the ledger to learn
+    that nothing downstream ever cited a call.
+    """
+    view = build_verification_view(graph, root=root)
+    missing = view["missing"]
+    rows: list[str] = []
+    total = 0
+    for key, title, meaning in _MISSING_BUCKET_MEANING:
+        entries = missing.get(key) or []
+        count = len(entries)
+        if not count:
+            continue
+        total += count
+        sample = _missing_sample(entries)
+        sample_html = (
+            f'<p class="missing-sample">{escape(", ".join(sample))}'
+            + (f" and {count - len(sample)} more" if count > len(sample) else "")
+            + "</p>"
+            if sample
+            else ""
+        )
+        rows.append(
+            f'<li class="missing-item" data-missing-bucket="{escape(key)}" '
+            f'data-missing-count="{count}">'
+            f'<p class="missing-title"><b>{escape(title)}</b> '
+            f'<span class="missing-count">{count}</span></p>'
+            f'<p class="missing-meaning">{escape(meaning)}</p>{sample_html}</li>'
+        )
+
+    if not rows:
+        # An empty ledger has no gaps and no evidence either. Saying "nothing
+        # is missing" about nothing observed would be the false green this
+        # whole surface exists to prevent.
+        body = (
+            '<p class="missing-none">No recorded events, so nothing is missing '
+            "and nothing is proven.</p>"
+            if not view["events"]
+            else '<p class="missing-none">Every recorded event resolved. This is '
+            "not a pass; it is the absence of these particular gaps.</p>"
+        )
+    else:
+        body = f'<ol class="missing-list">{"".join(rows)}</ol>'
+
+    return (
+        '<section class="missing-wrap" aria-label="what is missing" '
+        f'data-missing-total="{total}">'
+        '<div class="missing-head"><p class="missing-kicker">EVIDENCE GAPS</p>'
+        "<h2>What is missing</h2></div>"
+        f"{body}"
+        '<p class="missing-boundary">Observation only. A gap is not a failure, '
+        "and closing one authorizes nothing.</p></section>"
+    )
+
+
 def _render_daw_timeline(
     nodes: list[dict[str, Any]],
     edges: list[dict[str, Any]],
@@ -1531,6 +1649,7 @@ def render_graph_html(
         else ""
     )
 
+    missing_html = _render_missing_panel(graph, effective_root)
     daw_roles = _role_by_event(graph)
     _daw_preview, daw_anchors = _render_daw_timeline(nodes, edges, role_by_event=daw_roles)
     daw_edge_overlay = _render_edge_overlay(graph, daw_anchors, overlay_id="daw-edge-overlay")
@@ -1711,6 +1830,18 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-legend i {{ display:inline-block; width:7px; height:7px; margin-right:5px; background:#7fc86a }}
 .daw-legend .legend-result {{ background:#fab413 }}
 .daw-legend .legend-human {{ background:#f05a24 }}
+.missing-wrap {{ margin:28px 0 0; padding:18px 20px; border:1px solid #2b3238; border-radius:10px; background:#12161b }}
+.missing-head {{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap }}
+.missing-kicker {{ margin:0; font:600 11px/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.14em; color:#8b929a }}
+.missing-head h2 {{ margin:0; font-size:18px }}
+.missing-list {{ margin:14px 0 0; padding-left:22px }}
+.missing-item {{ margin:0 0 14px }}
+.missing-title {{ margin:0; font-size:14px }}
+.missing-count {{ display:inline-block; min-width:2.2em; margin-left:8px; padding:1px 7px; border-radius:999px; background:#1f262d; font:600 12px/1.6 ui-monospace,SFMono-Regular,Consolas,monospace; text-align:center }}
+.missing-meaning {{ margin:3px 0 0; color:#b9c0c7; font-size:13px }}
+.missing-sample {{ margin:3px 0 0; color:#8b929a; font:12px/1.5 ui-monospace,SFMono-Regular,Consolas,monospace; overflow-wrap:anywhere }}
+.missing-none {{ margin:12px 0 0; color:#b9c0c7; font-size:13px }}
+.missing-boundary {{ margin:14px 0 0; padding-top:12px; border-top:1px solid #232a31; color:#8b929a; font-size:12px }}
 .daw-rows {{ position:relative; min-width:1060px; padding-top:14px }}
 .daw-ruler, .daw-row {{ display:grid; grid-template-columns:190px repeat(var(--daw-columns), minmax(104px,1fr)); min-width:1060px }}
 .daw-ruler {{ color:#aaa9ab; font-size:.68rem; letter-spacing:.1em; border-bottom:1px solid #57565a }}
@@ -1765,5 +1896,6 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 {time_ruler_html}
 </div>
 <div class="legacy-proof-gutter">{gutter_html}</div>
+{missing_html}
 <section id="event-detail" class="detail" aria-live="polite"><p class="detail-kicker">RUN #3 / READING GUIDE</p><p>Select a timeline pad to inspect its recorded 5W1H evidence.</p><p><strong>SOLID</strong> execution route · <strong>DASHED</strong> evidence relation · <strong>ORANGE</strong> human or unresolved signal.</p></section>
 </main><script>{GRAPH_SCRIPT}</script></body></html>"""
