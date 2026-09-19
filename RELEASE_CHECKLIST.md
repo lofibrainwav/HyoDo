@@ -13,6 +13,7 @@ This checklist blocks a public release until the package, CLI, and workflow path
 ## Pre-release gates (local)
 
 ```bash
+uv lock                 # the lock records the project version; CI installs --locked
 bash scripts/verify-public.sh
 python scripts/release/check_version_sync.py
 ```
