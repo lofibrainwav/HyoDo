@@ -5,13 +5,22 @@
   "description": "Read-only presentation projection of one hyodo.evidence-graph/v1 payload. Carries no score, confidence, or aggregate, and grants no authority.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "status", "reason", "root", "authority", "time_axis", "lanes", "event_order", "events", "edges_causal", "edges_evidence", "decisions_by_run", "missing", "coverage", "topology"],
+  "required": ["schema_version", "status", "reason", "root", "authority", "presentation", "time_axis", "lanes", "event_order", "events", "edges_causal", "edges_evidence", "decisions_by_run", "missing", "coverage", "topology"],
   "properties": {
     "schema_version": {"const": "hyodo.verification-view/v0"},
     "status": {"type": ["string", "null"]},
     "reason": {"type": ["string", "null"]},
     "root": {"type": ["string", "null"]},
     "authority": {"const": "UNOBSERVED"},
+    "presentation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["allow_withheld", "reason"],
+      "properties": {
+        "allow_withheld": {"type": "boolean"},
+        "reason": {"type": ["string", "null"]}
+      }
+    },
     "time_axis": {
       "type": "object",
       "additionalProperties": false,

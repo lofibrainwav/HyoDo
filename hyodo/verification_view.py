@@ -53,6 +53,13 @@ TIME_DIRECTION = "left_to_right"
 #: columns in the viewer; it is the axis the other five are read along.
 CONTINUITY_LENS = "eternity"
 
+#: A graph that could not resolve its own references has not earned an ALLOW.
+#: Only ALLOW is withheld: withholding a DENY or an ASK would hide a problem
+#: rather than avoid a false one. The recorded decision is never erased, so a
+#: reader can always see what the ledger actually holds.
+_READY_STATUS = "READY"
+_WITHHELD_DECISION = "UNOBSERVED"
+
 #: Field ordering for a node's causal position. ``step_index`` is the producer's
 #: own ordinal; ``ts`` breaks ties without becoming a second time axis.
 _ORDER_FIELDS = ("step_index", "ts")
@@ -84,17 +91,25 @@ def _edges_of_type(edges: list[dict[str, Any]], edge_type: str) -> list[dict[str
     return [edge for edge in edges if isinstance(edge, dict) and edge.get("type") == edge_type]
 
 
-def _five_w_one_h(node: dict[str, Any]) -> dict[str, Any]:
+def _five_w_one_h(node: dict[str, Any], *, allow_withheld: bool) -> dict[str, Any]:
     """Regroup one node's already-recorded fields under investigation headings.
 
     Nothing is derived here. Each heading names where an existing field is
     read from, so a reader can trace any cell back to the ledger. A heading
     with no recorded evidence stays ``None`` rather than being filled with a
     plausible-looking label.
+
+    ``what.decision`` is always the recorded value.
+    ``what.decision_presentable`` is what a viewer may show: the same value,
+    except that an ``ALLOW`` recorded under a graph that did not resolve its
+    own references is withheld as ``UNOBSERVED``. Presentation may compress
+    toward unknown; it may not erase what the ledger recorded, so both fields
+    are emitted side by side.
     """
     tool = _field(node, "tool")
     policy = _field(node, "policy")
     io = _field(node, "io")
+    recorded_decision = _text(node.get("decision"))
     return {
         "who": {
             "actor": _text(node.get("actor")),
@@ -103,7 +118,12 @@ def _five_w_one_h(node: dict[str, Any]) -> dict[str, Any]:
         "what": {
             "kind": _text(node.get("kind")),
             "tool_name": _text(tool.get("name")),
-            "decision": _text(node.get("decision")),
+            "decision": recorded_decision,
+            "decision_presentable": (
+                _WITHHELD_DECISION
+                if allow_withheld and recorded_decision == "ALLOW"
+                else recorded_decision
+            ),
         },
         "when": {
             "ts": _text(node.get("ts")),
@@ -162,7 +182,9 @@ def _build_lanes(graph: dict[str, Any]) -> list[dict[str, Any]]:
     return lanes
 
 
-def _decisions_by_run(nodes: list[dict[str, Any]]) -> dict[str, list[dict[str, Any]]]:
+def _decisions_by_run(
+    nodes: list[dict[str, Any]], *, allow_withheld: bool
+) -> dict[str, list[dict[str, Any]]]:
     """Group every recorded decision by run, without judging the group.
 
     Two decisions that disagree inside one run are both reported, in recorded
@@ -177,10 +199,14 @@ def _decisions_by_run(nodes: list[dict[str, Any]]) -> dict[str, list[dict[str, A
         run_id = _text(node.get("run_id"))
         if run_id is None:
             continue
+        recorded = _text(node.get("decision"))
         grouped.setdefault(run_id, []).append(
             {
                 "event_id": node.get("id"),
-                "decision": _text(node.get("decision")),
+                "decision": recorded,
+                "decision_presentable": (
+                    _WITHHELD_DECISION if allow_withheld and recorded == "ALLOW" else recorded
+                ),
                 "ts": _text(node.get("ts")),
                 "step_index": node.get("step_index"),
             }
@@ -271,6 +297,12 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
     chained = hyo_chain(ordered_nodes, edges)
     parents = parent_sets(edges)
 
+    status = _text(graph.get("status"))
+    # A graph that could not resolve its own references has not earned an
+    # ALLOW. The flag is computed once, here, so every consumer reads the same
+    # answer instead of each re-deciding it in its own language.
+    allow_withheld = status != _READY_STATUS
+
     events: dict[str, Any] = {}
     unclassified: list[str] = []
     unmeasured: list[str] = []
@@ -280,7 +312,7 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
             unclassified.append(node_id)
         elif columns == [UNMEASURED]:
             unmeasured.append(node_id)
-        entry = _five_w_one_h(node)
+        entry = _five_w_one_h(node, allow_withheld=allow_withheld)
         entry["columns"] = [
             column for column in columns if column not in {UNCLASSIFIED, UNMEASURED}
         ]
@@ -297,6 +329,10 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
     return {
         "schema_version": VERIFICATION_VIEW_SCHEMA_VERSION,
         "status": graph.get("status"),
+        "presentation": {
+            "allow_withheld": allow_withheld,
+            "reason": None if not allow_withheld else f"graph_status:{status or 'UNOBSERVED'}",
+        },
         "reason": graph.get("reason"),
         "root": graph.get("root"),
         "authority": "UNOBSERVED",
@@ -314,7 +350,7 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
             {"source": edge.get("source"), "target": edge.get("target")} for edge in causal_edges
         ],
         "edges_evidence": _evidence_edges(evidence_edges, node_by_id),
-        "decisions_by_run": _decisions_by_run(ordered_nodes),
+        "decisions_by_run": _decisions_by_run(ordered_nodes, allow_withheld=allow_withheld),
         "missing": {
             "unresolved_refs": list(graph.get("unresolved_refs") or []),
             "cross_run_refs": list(topology.get("cross_run_refs") or []),

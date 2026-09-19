@@ -368,3 +368,59 @@ def test_the_schema_actually_rejects_an_invented_field(tmp_path: Path) -> None:
 def test_the_payload_is_json_serializable_for_an_http_route(tmp_path: Path) -> None:
     payload = _view(tmp_path, _normal_close())
     assert json.loads(json.dumps(payload, sort_keys=True)) == payload
+
+
+def _decision_run(decision: str, *, cite_nothing: bool) -> list[str]:
+    """One run whose single decision optionally cites an event that is absent."""
+    return [
+        _event(event_id="m1", kind="prompt", actor="human", step_index=0),
+        _event(
+            event_id="d1",
+            kind="decision",
+            actor="hyodo",
+            step_index=1,
+            parent_event_id="m1",
+            evidence_refs=["nowhere"] if cite_nothing else [],
+            policy={
+                "decision": decision,
+                "rule_id": "r1",
+                "reason": "recorded",
+                "evaluated_by": "hyodo",
+            },
+        ),
+    ]
+
+
+def test_a_resolved_graph_presents_its_allow(tmp_path: Path) -> None:
+    view = _view(tmp_path, _decision_run("ALLOW", cite_nothing=False))
+    assert view["status"] == "READY"
+    assert view["presentation"] == {"allow_withheld": False, "reason": None}
+    assert view["events"]["d1"]["what"]["decision_presentable"] == "ALLOW"
+
+
+def test_an_unresolved_graph_withholds_allow_without_erasing_it(tmp_path: Path) -> None:
+    """A graph that cannot resolve its own citations has not earned an ALLOW.
+
+    The recorded value stays visible. Presentation may compress toward unknown;
+    it may not erase what the ledger holds.
+    """
+    view = _view(tmp_path, _decision_run("ALLOW", cite_nothing=True))
+    assert view["status"] == "UNOBSERVED"
+    assert view["presentation"]["allow_withheld"] is True
+    assert view["presentation"]["reason"] == "graph_status:UNOBSERVED"
+
+    what = view["events"]["d1"]["what"]
+    assert what["decision"] == "ALLOW"
+    assert what["decision_presentable"] == "UNOBSERVED"
+
+    recorded = view["decisions_by_run"]["run-1"][0]
+    assert recorded["decision"] == "ALLOW"
+    assert recorded["decision_presentable"] == "UNOBSERVED"
+
+
+def test_a_deny_is_never_withheld(tmp_path: Path) -> None:
+    """Withholding a DENY would hide a problem rather than avoid a false one."""
+    view = _view(tmp_path, _decision_run("DENY", cite_nothing=True))
+    assert view["presentation"]["allow_withheld"] is True
+    assert view["events"]["d1"]["what"]["decision_presentable"] == "DENY"
+    assert view["decisions_by_run"]["run-1"][0]["decision_presentable"] == "DENY"

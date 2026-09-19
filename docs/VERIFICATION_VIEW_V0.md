@@ -59,9 +59,29 @@ continuity indicator rather than a sixth column. See
 | `edges_causal` | edges of type `parent_event_id` |
 | `edges_evidence` | edges of type `evidence_ref` |
 | `decisions_by_run` | decision nodes, grouped, not judged |
+| `presentation.allow_withheld` | true when the graph status is not `READY` |
 | `missing` | counts already present elsewhere in the graph |
 | `coverage` | `graph_view.column_coverage` |
 | `topology` | `graph["topology"]` |
+
+## Withholding an unearned ALLOW
+
+A graph that could not resolve its own citations has not earned an `ALLOW`.
+When `status` is not `READY`, `presentation.allow_withheld` is true and every
+recorded `ALLOW` is reported twice:
+
+- `what.decision` keeps the value the ledger recorded;
+- `what.decision_presentable` reports `UNOBSERVED`.
+
+Only `ALLOW` is withheld. Withholding a `DENY` or an `ASK` would hide a
+problem rather than avoid a false one.
+
+Both fields ship together on purpose. Presentation may compress toward
+unknown; it may not erase what the ledger holds. A consumer renders
+`decision_presentable` and can still show the recorded value beside it.
+
+This rule lives here, in one place, so that each surface reads the same answer
+instead of re-deciding it in its own language.
 
 ## What it refuses to do
 
