@@ -8,7 +8,8 @@
     "build": "node scripts/sync-runtime-identity-contract.mjs && astro build && node scripts/externalize-inline-scripts.mjs && node scripts/check-site-output.mjs && node scripts/check-bundle-size.mjs",
     "preview": "astro preview",
     "verify:evidence-graph": "node scripts/verify-evidence-graph.mjs",
-    "astro": "astro"
+    "astro": "astro",
+    "test:adapter": "node --test scripts/test-evidence-graph-adapter.mjs"
   },
   "dependencies": {
     "@astrojs/starlight": "^0.42.0",

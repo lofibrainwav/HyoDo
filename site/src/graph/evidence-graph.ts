@@ -36,7 +36,13 @@ export type DisplayKind =
 	| 'decision'
 	| 'unobserved';
 
-export type Row = 'human' | 'planner' | 'executor' | 'reviewer';
+/**
+ * A display lane. `unobserved` is not a participant: it is where an event
+ * goes when the producer did not report a role for it. Guessing one from an
+ * actor id or a tool name would be inventing a fact, so the gap is drawn
+ * instead of filled.
+ */
+export type Row = 'human' | 'planner' | 'executor' | 'reviewer' | 'unobserved';
 
 export interface EvidenceEvent {
 	eventId: string;
@@ -293,18 +299,23 @@ export const EVENTS: readonly EvidenceEvent[] = [
 	},
 ];
 
-const ROW_ORDER: readonly Row[] = ['human', 'planner', 'executor', 'reviewer'];
+// `unobserved` is last so the four participant lanes keep their indices and
+// the edge router's geometry is unchanged. The lane is always rendered: when
+// it is empty, that is itself the fact that every role was observed.
+const ROW_ORDER: readonly Row[] = ['human', 'planner', 'executor', 'reviewer', 'unobserved'];
 const ROW_LABEL: Record<Row, string> = {
 	human: 'Human',
 	planner: 'Planner',
 	executor: 'Executor',
 	reviewer: 'Reviewer',
+	unobserved: 'Role unobserved',
 };
 const ROW_SUB: Record<Row, string> = {
 	human: 'operator',
 	planner: 'agent',
 	executor: 'agent',
 	reviewer: 'agent',
+	unobserved: 'not reported',
 };
 
 const DECISION_GLYPH: Record<Decision, string> = {

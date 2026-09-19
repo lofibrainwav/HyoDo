@@ -71,6 +71,11 @@ jobs:
         working-directory: site
         run: npm audit --audit-level=low
 
+      - name: Adapter unit tests
+        if: steps.scope.outputs.changed == 'true'
+        working-directory: site
+        run: npm run test:adapter
+
       - name: Build
         if: steps.scope.outputs.changed == 'true'
         working-directory: site
