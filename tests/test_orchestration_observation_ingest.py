@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
 import typer.testing
 
 from hyodo.cli.main import app
@@ -30,6 +31,14 @@ def _observation(**over: object) -> dict[str, object]:
     }
     base.update(over)
     return base
+
+
+@pytest.mark.parametrize("field", ["execution", "state", "join_policy"])
+@pytest.mark.parametrize("value", [[], {}])
+def test_invalid_enum_types_do_not_crash_or_write(tmp_path: Path, field, value) -> None:
+    incoming = _observation(**{field: value})
+    assert append_orchestration_observation(tmp_path, incoming) is False
+    assert not (tmp_path / ".hyodo").exists()
 
 
 def test_an_observation_lands_in_its_own_file_not_the_event_ledger(tmp_path: Path) -> None:

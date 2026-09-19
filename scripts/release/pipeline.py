@@ -230,14 +230,23 @@ def _check_snapshot(root: Path, *, slug: str, sha: str) -> dict[str, Any]:
         if item.get("status") == "completed"
         and item.get("conclusion") not in {"success", "skipped"}
     ]
+    skipped = [
+        item["name"]
+        for item in checks
+        if item.get("status") == "completed" and item.get("conclusion") == "skipped"
+    ]
+    passed = sum(
+        item.get("status") == "completed" and item.get("conclusion") == "success" for item in checks
+    )
     return {
         "sha": sha,
         "total": len(checks),
         "pending": pending,
         "failed": failed,
-        "passed": len(checks) - len(pending) - len(failed),
+        "skipped": skipped,
+        "passed": passed,
         "result": "PASS"
-        if checks and not pending and not failed
+        if passed and not pending and not failed and not skipped
         else "WAIT"
         if pending
         else "BLOCK",
@@ -282,6 +291,15 @@ def _approved_review(root: Path, *, slug: str, number: int, author: str) -> dict
     }
 
 
+def _provided_reference(value: object) -> bool:
+    """Reject absence markers; the calling host still authenticates the grant."""
+    return (
+        isinstance(value, str)
+        and bool(value.strip())
+        and value.strip().upper() not in {UNOBSERVED, "UNKNOWN"}
+    )
+
+
 def _human_authority_gate(
     *,
     authorize_ref: str | None,
@@ -307,7 +325,7 @@ def _human_authority_gate(
             "residual": verifier_residual,
         },
     }
-    if not authorize_ref or not authorize_sha:
+    if not _provided_reference(authorize_ref) or not _provided_reference(authorize_sha):
         result.update(
             {
                 "stage": "WAITING_APPROVAL",
@@ -323,7 +341,10 @@ def _human_authority_gate(
         "remote_candidate_sha": remote_candidate_sha,
         "ci_verified_sha": ci_verified_sha,
     }
-    if len(set(observed.values())) != 1:
+    if (
+        not all(_provided_reference(value) for value in observed.values())
+        or len(set(observed.values())) != 1
+    ):
         result.update(
             {
                 "stage": "RECONCILIATION_REQUIRED",
@@ -533,7 +554,10 @@ def run_pipeline(
                 {
                     "stage": "BLOCKED" if checks["result"] == "BLOCK" else "WAITING_CI",
                     "result": "BLOCK" if checks["result"] == "BLOCK" else "WAIT",
-                    "residuals": checks["failed"] or checks["pending"],
+                    "residuals": checks["failed"]
+                    or checks["pending"]
+                    or checks.get("skipped")
+                    or ["no successful CI checks observed"],
                     "next_action": "wait and rerun the pipeline; no merge occurred",
                 }
             )

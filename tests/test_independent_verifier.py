@@ -125,3 +125,30 @@ def test_public_schema_pin_matches_schema_bytes() -> None:
     pin = json.loads((root / "schemas" / "independent-verifier-v1.pin.json").read_text())
     assert pin["algorithm"] == "sha256"
     assert pin["digest"] == hashlib.sha256(schema.read_bytes()).hexdigest()
+
+
+def test_dirty_candidate_is_blocked_without_modifying_other_work(tmp_path: Path) -> None:
+    import subprocess
+
+    _repo(tmp_path)
+    actual = subprocess.check_output(
+        ["git", "-C", str(tmp_path), "rev-parse", "HEAD"], text=True
+    ).strip()
+    (tmp_path / "x").write_text("unfinished tracked work", encoding="utf-8")
+    (tmp_path / "other-seat.txt").write_text("unfinished untracked work", encoding="utf-8")
+    before = {path.name: path.read_bytes() for path in tmp_path.iterdir() if path.is_file()}
+    git_before = subprocess.check_output(["git", "-C", str(tmp_path), "status", "--porcelain"])
+
+    result = verify_exact_candidate(
+        root=tmp_path,
+        expected_artifact_sha=actual,
+        verifier_nameplate=_plate(exact_artifact_sha=actual),
+        evidence={"diff": "observed"},
+    )
+
+    assert result["verdict"] == "BLOCK"
+    assert "candidate_worktree_dirty" in result["residuals"]
+    assert before == {path.name: path.read_bytes() for path in tmp_path.iterdir() if path.is_file()}
+    assert git_before == subprocess.check_output(
+        ["git", "-C", str(tmp_path), "status", "--porcelain"]
+    )

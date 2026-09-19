@@ -62,11 +62,11 @@ def validate_orchestration_observation(
             reasons.append(f"invalid_field:{field}")
 
     execution = raw.get("execution")
-    if execution not in EXECUTION_MODES:
+    if not isinstance(execution, str) or execution not in EXECUTION_MODES:
         reasons.append("invalid_field:execution")
 
     state = raw.get("state")
-    if state not in NODE_STATES:
+    if not isinstance(state, str) or state not in NODE_STATES:
         reasons.append("invalid_field:state")
 
     depends_on_raw = raw.get("depends_on", [])
@@ -82,7 +82,9 @@ def validate_orchestration_observation(
             reasons.append("invalid_field:depends_on:self")
 
     join_policy = raw.get("join_policy")
-    if join_policy is not None and join_policy not in JOIN_POLICIES:
+    if join_policy is not None and (
+        not isinstance(join_policy, str) or join_policy not in JOIN_POLICIES
+    ):
         reasons.append("invalid_field:join_policy")
     if join_policy is not None and len(depends_on) < 2:
         reasons.append("invalid_field:join_policy:requires_multiple_dependencies")

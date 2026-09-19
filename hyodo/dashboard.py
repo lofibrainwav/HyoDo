@@ -91,6 +91,85 @@ const FIELDS = [
   ["Why", "why"],
   ["How", "how"],
 ];
+const LENS_LABELS = { jin: "眞", seon: "善", mi: "美", in: "仁", hyo: "孝" };
+const LENS_ENGLISH = { jin: "Truth", seon: "Goodness", mi: "Beauty", in: "Benevolence", hyo: "Hyo" };
+function addText(parent, tag, text, className) {
+  const element = document.createElement(tag);
+  if (className) element.className = className;
+  element.textContent = text;
+  parent.appendChild(element);
+  return element;
+}
+function addSection(title, className) {
+  const section = document.createElement("section");
+  section.className = className;
+  addText(section, "h3", title);
+  return section;
+}
+function coverageState(entry) {
+  if (!entry || typeof entry !== "object") return "UNOBSERVED";
+  const observed = Number(entry.observed);
+  const expected = Number(entry.expected);
+  if (!Number.isFinite(observed) || !Number.isFinite(expected) || expected <= 0 || observed <= 0) {
+    return "UNOBSERVED";
+  }
+  return observed >= expected ? "OBSERVED" : "PARTIAL";
+}
+function lensMark(state) {
+  return state === "OBSERVED" ? "●" : state === "PARTIAL" ? "◐" : "○";
+}
+function addLensAperture(panel, data) {
+  const section = addSection("FIVE-LENS APERTURE", "lens-aperture");
+  const intro = document.createElement("p");
+  intro.className = "lens-aperture-intro";
+  intro.textContent = "永 / selected moment · event evidence and run coverage";
+  section.appendChild(intro);
+  const diagram = document.createElement("div");
+  diagram.className = "lens-aperture-diagram";
+  diagram.setAttribute("role", "group");
+  diagram.setAttribute("aria-label", "Five independent lens coverage indicators");
+  const columns = Array.isArray(data.columns) ? data.columns : [];
+  const runCoverage = data.runCoverage && typeof data.runCoverage === "object" ? data.runCoverage : {};
+  for (const key of Object.keys(LENS_LABELS)) {
+    const eventState = columns.includes(key) ? "OBSERVED" : "UNOBSERVED";
+    const runState = coverageState(runCoverage[key]);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "lens-segment";
+    button.dataset.lensKey = key;
+    button.dataset.lensState = eventState;
+    button.dataset.runLensState = runState;
+    button.setAttribute("aria-expanded", "false");
+    button.setAttribute("aria-label", `${LENS_ENGLISH[key]}, selected event ${eventState.toLowerCase()}, run coverage ${runState.toLowerCase()}`);
+    addText(button, "span", lensMark(eventState), "lens-glyph lens-event-glyph");
+    addText(button, "strong", LENS_LABELS[key], "lens-hanja");
+    addText(button, "small", lensMark(runState) + " " + runState, "lens-run-state");
+    const detail = document.createElement("span");
+    detail.className = "lens-segment-detail";
+    detail.hidden = true;
+    addText(detail, "span", `Selected event: ${eventState}`);
+    const coverage = runCoverage[key];
+    const coverageText = coverage && typeof coverage === "object"
+      ? `${String(coverage.observed ?? 0)} / ${String(coverage.expected ?? 0)}`
+      : "UNOBSERVED";
+    addText(detail, "span", `Run coverage: ${runState} · ${coverageText}`);
+    button.appendChild(detail);
+    button.addEventListener("click", () => {
+      const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded));
+      detail.hidden = expanded;
+    });
+    diagram.appendChild(button);
+  }
+  section.appendChild(diagram);
+  const axis = document.createElement("div");
+  axis.className = "lens-aperture-axis";
+  addText(axis, "span", "永", "lens-axis-symbol");
+  addText(axis, "span", `step ${String(data.stepIndex ?? "UNOBSERVED")}`, "lens-axis-step");
+  addText(axis, "span", "selected moment →", "lens-axis-arrow");
+  section.appendChild(axis);
+  panel.appendChild(section);
+}
 const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event], .daw-cell button[data-event]");
 let lastFocusedCell = null;
 function highlightEdges(eventId) {
@@ -180,6 +259,11 @@ cells.forEach((button) => {
       return;
     }
     panel.textContent = "";
+    const status = document.createElement("div");
+    status.className = "detail-status-strip";
+    addText(status, "span", "RECORDED " + String(data.recordedDecision || "UNOBSERVED"));
+    addText(status, "span", "PRESENTABLE " + String(data.presentableDecision || "UNOBSERVED"));
+    panel.appendChild(status);
     for (const [label, key] of FIELDS) {
       const p = document.createElement("p");
       const strong = document.createElement("strong");
@@ -188,6 +272,16 @@ cells.forEach((button) => {
       p.appendChild(document.createTextNode(String(data[key] ?? "not recorded")));
       panel.appendChild(p);
     }
+    addLensAperture(panel, data);
+    const proof = addSection("PROOF", "detail-proof");
+    addText(proof, "p", "Causal parents: " + String(data.causalParentCount ?? 0));
+    addText(proof, "p", "Evidence refs: " + String(data.evidenceRefCount ?? 0));
+    addText(proof, "p", "Output digest: " + String(data.outputDigest || "UNOBSERVED"));
+    panel.appendChild(proof);
+    const missing = addSection("WHAT IS MISSING", "detail-missing");
+    const missingItems = Array.isArray(data.missing) ? data.missing : [];
+    addText(missing, "p", missingItems.length ? missingItems.join(", ") : "None recorded");
+    panel.appendChild(missing);
   };
   button.addEventListener("focus", show);
   button.addEventListener("click", show);
@@ -771,8 +865,8 @@ def _event_title(node: dict[str, Any]) -> str:
     return f"{kind}: {name}" if isinstance(name, str) and name else kind
 
 
-def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
-    """5W1H fields for the detail panel (spec section 3's event fields only)."""
+def _event_detail_payload(node: dict[str, Any]) -> dict[str, Any]:
+    """5W1H plus canonical proof fields for the detail panel."""
     raw_tool = node.get("tool")
     tool: dict[str, Any] = raw_tool if isinstance(raw_tool, dict) else {}
     raw_policy = node.get("policy")
@@ -792,6 +886,12 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
     how = str(decision) if decision else "not recorded"
     if rule_id:
         how = f"{how} ({rule_id})"
+    raw_verification = node.get("verification")
+    verification: dict[str, Any] = raw_verification if isinstance(raw_verification, dict) else {}
+    raw_what = verification.get("what")
+    what: dict[str, Any] = raw_what if isinstance(raw_what, dict) else {}
+    raw_how_view = verification.get("how")
+    how_view: dict[str, Any] = raw_how_view if isinstance(raw_how_view, dict) else {}
     return {
         "who": str(node.get("actor") or "not recorded"),
         "what": _event_title(node),
@@ -801,6 +901,17 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, str]:
         if isinstance(policy, dict) and policy.get("reason")
         else "not recorded",
         "how": how,
+        "recordedDecision": what.get("decision") or node.get("decision") or "UNOBSERVED",
+        "presentableDecision": what.get("decision_presentable") or "UNOBSERVED",
+        "columns": list(verification.get("columns") or []),
+        "runCoverage": dict(verification.get("run_coverage") or {}),
+        "stepIndex": verification.get("when", {}).get("step_index")
+        if isinstance(verification.get("when"), dict)
+        else node.get("step_index"),
+        "causalParentCount": len(verification.get("causal_parents") or []),
+        "evidenceRefCount": len(verification.get("evidence_refs") or []),
+        "outputDigest": how_view.get("output_digest") or "UNOBSERVED",
+        "missing": list(verification.get("missing") or []),
     }
 
 
@@ -1413,6 +1524,118 @@ def _missing_sample(entries: list[Any]) -> list[str]:
     return sample
 
 
+def _unique_text(values: list[Any], *, empty: str = "UNOBSERVED") -> str:
+    """Display one canonical value without collapsing conflicting values."""
+    observed = sorted({value for value in values if isinstance(value, str) and value})
+    if not observed:
+        return empty
+    return observed[0] if len(observed) == 1 else "MULTIPLE"
+
+
+def _view_run_id(view: dict[str, Any]) -> str:
+    """Return the one run id already present in the verification view."""
+    run_ids = [
+        event.get("why", {}).get("run_id")
+        for event in (view.get("events") or {}).values()
+        if isinstance(event, dict) and isinstance(event.get("why"), dict)
+    ]
+    return _unique_text(run_ids)
+
+
+def _verification_stage_state(view: dict[str, Any], stage: str) -> str:
+    """Project one rail label from existing verification-view facts only."""
+    events = [event for event in (view.get("events") or {}).values() if isinstance(event, dict)]
+    kinds = [
+        event.get("what", {}).get("kind") for event in events if isinstance(event.get("what"), dict)
+    ]
+    raw_missing = view.get("missing")
+    missing: dict[str, Any] = raw_missing if isinstance(raw_missing, dict) else {}
+    if stage == "intent":
+        if "prompt" not in kinds:
+            return "UNOBSERVED"
+        return "UNOBSERVED" if missing.get("runs_without_intent") else "OBSERVED"
+    if stage == "action":
+        return "OBSERVED" if "tool_call" in kinds else "UNOBSERVED"
+    if stage == "result":
+        if "tool_result" not in kinds:
+            return "UNOBSERVED"
+        return "PARTIAL" if missing.get("calls_without_result") else "OBSERVED"
+    if stage == "evidence":
+        return "OBSERVED" if view.get("edges_evidence") else "UNOBSERVED"
+    if stage == "decision":
+        decisions = [
+            entry.get("decision_presentable")
+            for entries in (view.get("decisions_by_run") or {}).values()
+            if isinstance(entries, list)
+            for entry in entries
+            if isinstance(entry, dict)
+        ]
+        return _unique_text(decisions)
+    return "UNOBSERVED"
+
+
+def _render_verification_header(view: dict[str, Any]) -> str:
+    """Render the canonical case/status strip without inventing authority."""
+    events = [event for event in (view.get("events") or {}).values() if isinstance(event, dict)]
+    recorded = [
+        event.get("what", {}).get("decision")
+        for event in events
+        if isinstance(event.get("what"), dict) and event.get("what", {}).get("decision") is not None
+    ]
+    presentable = [
+        event.get("what", {}).get("decision_presentable")
+        for event in events
+        if isinstance(event.get("what"), dict)
+        and event.get("what", {}).get("decision_presentable") is not None
+    ]
+    raw_missing = view.get("missing")
+    missing: dict[str, Any] = raw_missing if isinstance(raw_missing, dict) else {}
+    gap_count = sum(len(entries) for entries in missing.values() if isinstance(entries, list))
+    status = str(view.get("status") or "UNOBSERVED")
+    authority = str(view.get("authority") or "UNOBSERVED")
+    return (
+        '<section class="verification-header" aria-label="verification status">'
+        '<div class="verification-case">'
+        f'<span class="verification-kicker">CASE</span><strong>{escape(_view_run_id(view))}</strong>'
+        f'<span class="verification-status" data-status="{escape(status)}">{escape(status)}</span>'
+        f'<span class="verification-gaps">{gap_count} GAP{"S" if gap_count != 1 else ""}</span>'
+        "</div>"
+        '<div class="verification-facts">'
+        f'<span>Recorded: <b data-recorded-decision="{escape(_unique_text(recorded))}">{escape(_unique_text(recorded))}</b></span>'
+        f'<span>Presentable: <b data-presentable-decision="{escape(_unique_text(presentable))}">{escape(_unique_text(presentable))}</b></span>'
+        f"<span>Authority: <b>{escape(authority)}</b></span>"
+        "</div></section>"
+    )
+
+
+def _render_verification_rail(view: dict[str, Any]) -> str:
+    """Render the five-stage rail supported by verification-view/v0."""
+    stages = (
+        ("intent", "INTENT"),
+        ("action", "ACTION"),
+        ("result", "RESULT"),
+        ("evidence", "EVIDENCE"),
+        ("decision", "DECISION"),
+    )
+    items: list[str] = []
+    for index, (key, label) in enumerate(stages):
+        state = _verification_stage_state(view, key)
+        connector = (
+            '<span class="verification-rail-link" aria-hidden="true">→</span>' if index else ""
+        )
+        items.append(
+            f'{connector}<div class="verification-rail-stage" data-stage="{key}" data-state="{escape(state)}">'
+            f'<span class="verification-rail-mark" aria-hidden="true"></span><b>{label}</b>'
+            f"<small>{escape(state)}</small></div>"
+        )
+    return (
+        '<section class="verification-rail" aria-label="verification rail">'
+        '<div class="verification-rail-head"><span>VERIFICATION RAIL</span>'
+        "<small>canonical facts only</small></div>"
+        f'<div class="verification-rail-track">{"".join(items)}</div></section>'
+    )
+
+
 def _render_missing_panel(graph: dict[str, Any], root: Path | None = None) -> str:
     """Render "what is missing" from the verification view's own counts.
 
@@ -1495,6 +1718,15 @@ def _render_daw_timeline(
     ]
     max_step = max(step_indices, default=0)
     columns = max_step + 1
+    step_timestamps: dict[int, str] = {}
+    for node in sorted(valid_nodes, key=lambda item: str(item.get("ts") or "")):
+        raw_step = node.get("step_index")
+        if not isinstance(raw_step, int):
+            continue
+        step = raw_step
+        timestamp = node.get("ts")
+        if isinstance(timestamp, str) and timestamp and step not in step_timestamps:
+            step_timestamps[step] = timestamp[11:19] if len(timestamp) >= 19 else timestamp
     run_id = next(
         (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
     )
@@ -1538,7 +1770,7 @@ def _render_daw_timeline(
         f'<div class="daw-rows" style="--daw-columns:{columns}">',
         '<div class="daw-ruler"><div class="daw-track-label">TRACK / SIGNAL</div>'
         + "".join(
-            f'<div class="daw-step">t{index}<small>{index:02d}</small></div>'
+            f'<div class="daw-step">t{index}<small>{escape(step_timestamps.get(index, "UNOBSERVED"))}</small></div>'
             for index in range(columns)
         )
         + "</div>",
@@ -1613,17 +1845,51 @@ def render_graph_html(
     reason = graph.get("reason")
     raw_nodes = graph.get("nodes")
     raw_edges = graph.get("edges")
-    nodes: list[dict[str, Any]] = raw_nodes if isinstance(raw_nodes, list) else []
+    raw_node_list: list[dict[str, Any]] = raw_nodes if isinstance(raw_nodes, list) else []
     edges: list[dict[str, Any]] = raw_edges if isinstance(raw_edges, list) else []
     missions = graph.get("missions") if isinstance(graph.get("missions"), dict) else {}
-    node_by_id: dict[str, dict[str, Any]] = {
-        node["id"]: node for node in nodes if isinstance(node.get("id"), str)
-    }
-
     effective_root = root
     if effective_root is None:
         graph_root = graph.get("root")
         effective_root = Path(graph_root) if isinstance(graph_root, str) and graph_root else None
+    verification_view = build_verification_view(graph, root=effective_root)
+    evidence_refs_by_target: dict[str, list[str]] = {}
+    for edge in verification_view.get("edges_evidence") or []:
+        if isinstance(edge, dict) and isinstance(edge.get("target"), str):
+            source = edge.get("source")
+            if isinstance(source, str):
+                evidence_refs_by_target.setdefault(edge["target"], []).append(source)
+    missing_by_event: dict[str, list[str]] = {}
+    missing_view = verification_view.get("missing")
+    if isinstance(missing_view, dict):
+        for bucket, entries in missing_view.items():
+            if not isinstance(entries, list):
+                continue
+            for entry in entries:
+                event_id = (
+                    entry
+                    if isinstance(entry, str)
+                    else entry.get("event_id")
+                    if isinstance(entry, dict)
+                    else None
+                )
+                if isinstance(event_id, str):
+                    missing_by_event.setdefault(event_id, []).append(str(bucket))
+    nodes = []
+    for node in raw_node_list:
+        node_id = node.get("id")
+        verification = (
+            verification_view.get("events", {}).get(node_id) if isinstance(node_id, str) else None
+        )
+        if isinstance(verification, dict):
+            verification = dict(verification)
+            verification["evidence_refs"] = evidence_refs_by_target.get(str(node_id), [])
+            verification["missing"] = missing_by_event.get(str(node_id), [])
+            verification["run_coverage"] = verification_view.get("coverage", {})
+        nodes.append({**node, "verification": verification or {}})
+    node_by_id: dict[str, dict[str, Any]] = {
+        node["id"]: node for node in nodes if isinstance(node.get("id"), str)
+    }
     assignments = {
         node_id: assign_columns(node, effective_root) for node_id, node in node_by_id.items()
     }
@@ -1819,6 +2085,28 @@ header {{ border-bottom:1px solid #3a393d; padding-bottom:18px; margin-bottom:20
 h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3vw,2.5rem); font-weight:300 }}
 .meta, .meta a {{ color:#aaa9ab }}
 .unobserved-notice {{ border-radius:0; background:#251716; color:#f5b5ad; border:1px solid #f05a24 }}
+.verification-header {{ display:flex; justify-content:space-between; gap:22px; align-items:center; border:1px solid #57565a; border-left:3px solid #f05a24; background:#17161a; padding:13px 15px; margin:4px 0 8px; min-width:980px }}
+.verification-case, .verification-facts {{ display:flex; align-items:baseline; gap:12px; flex-wrap:wrap }}
+.verification-kicker, .verification-rail-head span {{ color:#aaa9ab; font:600 .66rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.16em }}
+.verification-case strong {{ color:#f5f5f5; font-size:1.05rem; font-weight:400; letter-spacing:.08em }}
+.verification-status {{ color:#fab413; font:600 .72rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.1em }}
+.verification-gaps {{ color:#aaa9ab; font:600 .64rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.1em }}
+.verification-facts {{ color:#aaa9ab; font-size:.72rem; letter-spacing:.04em }}
+.verification-facts b {{ color:#f5f5f5; font-weight:400 }}
+.verification-facts b[data-presentable-decision="UNOBSERVED"] {{ color:#aaa9ab }}
+.verification-rail {{ overflow:auto; border:1px solid #3a393d; background:#121116; padding:11px 15px 13px; margin:0 0 12px; min-width:980px }}
+.verification-rail-head {{ display:flex; justify-content:space-between; margin-bottom:10px }}
+.verification-rail-head small {{ color:#747378; font-size:.64rem; letter-spacing:.08em }}
+.verification-rail-track {{ display:flex; align-items:stretch; min-width:760px }}
+.verification-rail-stage {{ display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:8px; align-items:center; min-width:128px; color:#aaa9ab }}
+.verification-rail-stage b {{ color:#f5f5f5; font-size:.66rem; font-weight:400; letter-spacing:.09em }}
+.verification-rail-stage small {{ grid-column:2; color:#747378; font:600 .58rem/1.3 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.08em }}
+.verification-rail-mark {{ grid-row:1 / span 2; width:11px; height:11px; border:1px solid #747378; border-radius:50%; background:transparent }}
+.verification-rail-stage[data-state="OBSERVED"] .verification-rail-mark {{ border-color:#7fc86a; background:#7fc86a }}
+.verification-rail-stage[data-state="PARTIAL"] .verification-rail-mark {{ border-color:#fab413; background:linear-gradient(90deg,#fab413 50%,transparent 50%) }}
+.verification-rail-stage[data-state="ALLOW"] .verification-rail-mark {{ border-color:#7fc86a; background:#7fc86a }}
+.verification-rail-stage[data-state="DENY"] .verification-rail-mark {{ border-color:#f05a24; background:#f05a24 }}
+.verification-rail-link {{ align-self:center; color:#57565a; padding:0 7px; font-size:1.1rem }}
 .daw-console {{ position:relative; overflow:auto; border:1px solid #57565a; background:#17161a; padding:14px; margin:4px 0 16px }}
 .daw-sessionbar {{ display:flex; justify-content:space-between; gap:20px; border:1px solid #3a393d; border-left:3px solid #f05a24; padding:11px 12px; margin-bottom:14px; min-width:980px; color:#d1d0d2; font-size:.68rem; letter-spacing:.1em }}
 .daw-sessionbar div {{ display:flex; gap:18px; align-items:center }} .daw-sessionbar span {{ color:#969598 }} .daw-sessionbar strong {{ color:#f5f5f5; letter-spacing:.12em; font-weight:300 }}
@@ -1847,7 +2135,7 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-ruler {{ color:#aaa9ab; font-size:.68rem; letter-spacing:.1em; border-bottom:1px solid #57565a }}
 .daw-step {{ padding:0 8px 8px; border-left:1px solid #302f33; font-variant-numeric:tabular-nums }}
 .daw-step small {{ display:block; color:#747378; margin-top:3px }}
-.daw-track-label {{ display:flex; align-items:center; gap:7px; padding:0 10px; color:#f5f5f5; font-size:.69rem; letter-spacing:.1em; border-right:1px solid #57565a }}
+.daw-track-label {{ position:sticky; left:0; z-index:4; display:flex; align-items:center; gap:7px; padding:0 10px; color:#f5f5f5; font-size:.69rem; letter-spacing:.1em; border-right:1px solid #57565a; background:#121116 }}
 .daw-track-label small {{ margin-left:auto; color:#747378 }}
 .track-empty-state {{ color:#747378; font-size:.54rem; letter-spacing:.12em }}
 .daw-row {{ min-height:78px; margin:8px 0; border:1px solid #3a393d; border-radius:0; background:#121116; overflow:visible }}
@@ -1882,10 +2170,35 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-rows .edge-broken {{ stroke:#f05a24 }}
 .daw-rows .edge.edge-active {{ stroke-width:3; opacity:1 }}
 .detail {{ border-radius:0; background:#17161a; border-color:#57565a; color:#f5f5f5; font-size:.75rem; min-height:86px }}
-@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} }}
-@media (prefers-reduced-motion:reduce) {{ .daw-cell button {{ transition:none }} }}
+.detail h3 {{ margin:.75rem 0 .35rem; color:#aaa9ab; font:600 .62rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.14em }}
+.detail-status-strip {{ display:flex; gap:14px; flex-wrap:wrap; padding-bottom:8px; border-bottom:1px solid #3a393d; color:#f5f5f5; font:600 .66rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.08em }}
+.detail-status-strip span:nth-child(2) {{ color:#aaa9ab }}
+.lens-aperture {{ margin-top:.78rem; padding-top:.72rem; border-top:1px solid #3a393d }}
+.lens-aperture h3 {{ margin-top:0 }}
+.lens-aperture-intro {{ margin:.1rem 0 .65rem; color:#8b929a; font-size:.66rem; letter-spacing:.04em }}
+.lens-aperture-diagram {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; align-items:stretch }}
+.lens-segment {{ display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:5px; align-items:center; min-width:0; padding:7px 6px; border:1px solid #3a393d; border-radius:0; background:#121116; color:#f5f5f5; text-align:left; transition:background 200ms ease,border-color 200ms ease }}
+.lens-segment:hover,.lens-segment:focus-visible,.lens-segment[aria-expanded="true"] {{ border-color:#f05a24; background:#1d1a1d }}
+.lens-glyph {{ grid-row:1 / span 2; font-size:1.15rem; line-height:1 }}
+.lens-event-glyph {{ color:#747378 }}
+.lens-segment[data-lens-state="OBSERVED"] .lens-event-glyph {{ color:#7fc86a }}
+.lens-hanja {{ font-size:.86rem; font-weight:400 }}
+.lens-run-state {{ color:#8b929a; font:600 .54rem/1.2 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.04em }}
+.lens-segment[data-run-lens-state="OBSERVED"] .lens-run-state {{ color:#7fc86a }}
+.lens-segment[data-run-lens-state="PARTIAL"] .lens-run-state {{ color:#fab413 }}
+.lens-segment-detail {{ grid-column:1 / -1; display:grid; gap:3px; margin-top:5px; padding-top:5px; border-top:1px solid #3a393d; color:#b9c0c7; font:500 .58rem/1.35 ui-monospace,SFMono-Regular,Consolas,monospace }}
+.lens-aperture-axis {{ display:flex; align-items:center; gap:7px; margin-top:8px; color:#8b929a; font:600 .58rem/1.3 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.08em }}
+.lens-axis-symbol {{ color:#fab413; font-size:.9rem }}
+.lens-axis-arrow {{ flex:1; border-bottom:1px solid #57565a; padding-bottom:3px; text-align:right }}
+.detail-proof, .detail-missing {{ color:#aaa9ab }}
+.detail-proof p, .detail-missing p {{ margin:.18rem 0 }}
+.detail-missing p {{ color:#fab413 }}
+@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} .lens-aperture-diagram {{ grid-template-columns:repeat(5, minmax(82px,1fr)); overflow-x:auto; padding-bottom:4px }} .lens-segment {{ min-width:82px }} }}
+@media (prefers-reduced-motion:reduce) {{ .daw-cell button,.lens-segment {{ transition:none }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
 {notice_html}
+{_render_verification_header(verification_view)}
+{_render_verification_rail(verification_view)}
 <section class="orb-wrap legacy-orb">{orb_html}</section>
 {daw_html}
 <div class="grid-wrap legacy-proof-grid">
