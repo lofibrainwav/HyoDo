@@ -1,9 +1,9 @@
 # 01 Project overview
 
-hyodo.app is the public home of HyoDo, an open-source, local-first guardrail
-CLI for AI-assisted development, and the first organ of an open-source Agent
-OS. The site exists to make one sentence land in thirty seconds: *when your AI
-says "done", HyoDo tells you whether that is true.*
+hyodo.app is the public home of HyoDo, an open-source, local-first evidence
+and guardrail CLI for AI-assisted development. The site exists to make one
+sentence land in thirty seconds: *when your AI says "done", HyoDo tells you
+what evidence supports that claim and what remains unknown.*
 
 ## Audience, in layers
 
@@ -28,5 +28,5 @@ says "done", HyoDo tells you whether that is true.*
 - No hosted service, no accounts, no analytics that phone home by default.
 - No claims that are not measured in the repository (no cost savings, no
   probabilities, no legal compliance statements).
-- No Korean or Kingdom-internal vocabulary. Public language is English; the
+- No project-internal vocabulary. Public language is English; the
   six virtue labels stay trilingual because the label is the label.
