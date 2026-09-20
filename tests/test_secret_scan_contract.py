@@ -55,7 +55,7 @@ def test_job_still_claims_history_and_working_tree() -> None:
 
 
 def test_history_and_working_tree_are_both_scanned() -> None:
-    scripts = {name: run for name, run in _run_steps()}
+    scripts = dict(_run_steps())
 
     history = scripts.get("Scan full history")
     assert history is not None, "no full-history scan step"
@@ -95,7 +95,7 @@ def test_scanner_is_pinned_by_digest() -> None:
 
 
 def test_a_planted_current_secret_must_be_reported() -> None:
-    scripts = {name: run for name, run in _run_steps()}
+    scripts = dict(_run_steps())
     planted = scripts.get("Baseline cannot hide a current secret")
     assert planted is not None, "no planted-secret regression step"
 
