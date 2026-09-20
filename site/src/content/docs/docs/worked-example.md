@@ -1,9 +1,11 @@
 ---
 title: A worked result
-description: One complete HyoDo run on a three-file project — the exact input, the exact command, the output it printed, and the exit code, produced by the published 4.19.9 wheel.
+description: Archival worked example from the published HyoDo 4.19.9 wheel — exact input, command, output, and exit code. It is not the current public package.
 ---
 
-Everything on this page was produced by running the published package. The
+This is an archival worked example produced by running the published 4.19.9
+package; it is not a claim about the current public package. Everything on
+this page was produced by running the published package. The
 output blocks are pasted from a terminal, not written by hand. Most are trimmed
 to the lines under discussion; Result 1 is the one shown whole, and no line is
 cut short. Two absolute paths are replaced by a placeholder — `/path/to/python`,

@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "hyodo"
 version = "4.20.0"
-description = "Open, model-agnostic evidence and verification for AI-assisted systems. Reuse your checks; missing evidence stays UNOBSERVED; scores never authorize."
+description = "Local evidence verification for AI-assisted work. See what ran, what the evidence supports, and what remains unknown. HyoDo does not run or authorize agents."
 # The published description is built by hatch_build.py so its links are absolute:
 # PyPI has no repository around the text, so relative links 404 there while
 # README.md must stay relative for GitHub readers.
@@ -15,18 +15,16 @@ authors = [
     { name = "AFO Kingdom" }
 ]
 keywords = [
-    "ai",
+    "evidence",
+    "verification",
+    "ai-agents",
+    "developer-tools",
+    "ci",
+    "auditability",
+    "mcp",
+    "local-first",
     "code-quality",
-    "claude",
     "model-agnostic",
-    "codex",
-    "grok",
-    "gemini",
-    "claude-code",
-    "automation",
-    "trinity-score",
-    "hygook-v5",
-    "llm",
     "cli",
     "code-review"
 ]

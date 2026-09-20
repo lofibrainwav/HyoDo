@@ -1,13 +1,13 @@
 # HyoDo
 
-**See which checks ran on AI-assisted work, what they found, and what remains
-unknown.**
+**Local evidence verification for AI-assisted work. See what ran, what the
+evidence supports, and what remains unknown.**
 
 HyoDo is an open-source Python tool that runs on your computer. It reuses the
 tests and linters your project already has, reports their results, and marks
 missing evidence `UNOBSERVED`. That means there is not enough evidence to say
-whether a check passed or failed. HyoDo helps people review work; it does not
-approve merges or deployments.
+whether a check passed or failed. HyoDo helps people review work. HyoDo does
+not run or authorize agents. It does not approve merges or deployments.
 
 [![CI](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml/badge.svg)](https://github.com/lofibrainwav/HyoDo/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/hyodo)](https://pypi.org/project/hyodo/)
@@ -30,8 +30,8 @@ answer:
 - Did the agent touch only approved tools and paths?
 - Was missing or unreadable evidence treated as a pass?
 
-HyoDo makes those boundaries explicit with local evidence, policy decisions,
-and fail-closed exit contracts.
+HyoDo makes those boundaries explicit with local evidence, policy-evaluation
+results, and fail-closed verification status.
 
 ## 30-second start
 
@@ -58,7 +58,7 @@ the rest of `.hyodo/` out of version control — see
 | --- | --- |
 | Early-warning safety scan | `hyodo safe` |
 | Reuse existing project checks | `hyodo init` → `hyodo check` |
-| Agent action audit trail | `hyodo event record` |
+| Local agent evidence log | `hyodo event record` |
 | Tool / path / step policy | `hyodo policy check` |
 | Schema / eval / evidence report | `hyodo schema`, `eval`, `report` |
 | Local evidence panel | `hyodo dashboard --open` |
@@ -140,7 +140,8 @@ The extra has to land in the same environment that runs `hyodo`; a pipx
 install is isolated, so `pip install 'hyodo[mcp]'` after `pipx install hyodo`
 installs into a different interpreter and the SDK stays missing.
 
-The MCP adapter uses the same CLI contracts rather than a second engine.
+The MCP adapter uses the same CLI contracts rather than a second engine. It is
+not an MCP gateway, traffic proxy, or central authorization layer, and
 `mcp.hyodo.app` is contract-only, not this path.
 
 ## Install and support

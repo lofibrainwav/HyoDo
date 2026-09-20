@@ -7,7 +7,7 @@ work on behalf of another system.
 
 ## HyoDo owns
 
-- local quality gates and their fail-closed exit contracts;
+- local quality gates and their fail-closed verification status;
 - evidence, measurement, validation, ledger, and attestation surfaces;
 - local policy evaluation and explicit `ALLOW` / `DENY` / `ASK` /
   `UNOBSERVED` results; and
