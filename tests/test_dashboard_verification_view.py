@@ -182,3 +182,37 @@ def test_route_serves_an_empty_ledger_without_inventing_a_case(tmp_path: Path) -
     assert payload["events"] == {}
     assert payload["lanes"] == []
     assert payload["authority"] == "UNOBSERVED"
+
+
+def test_acceptance_join_api_and_html_share_canonical_rows(tmp_path):
+    import hashlib
+
+    contract = {
+        "contract_id": "api-fixture",
+        "revision": 1,
+        "origin": "HUMAN_RECONSTITUTED",
+        "criteria_count": 7,
+        "required_criteria": [{"id": f"E{i:02}", "text": "required"} for i in range(1, 8)],
+        "governing_invariants": [{"id": f"E{i:02}", "text": "invariant"} for i in range(8, 13)],
+    }
+    path = tmp_path / "contract.json"
+    path.write_text(json.dumps(contract))
+    _write_ledger(tmp_path, _minimal_run())
+    (tmp_path / ".hyodo/acceptance-contract.json").write_text(
+        json.dumps(
+            {
+                "path": str(path),
+                "digest": hashlib.sha256(path.read_bytes()).hexdigest(),
+            }
+        )
+    )
+    with _running_server(tmp_path) as port:
+        status, _, body = _get(port, ROUTE)
+        html_status, _, html = _get(port, "/graph")
+    assert status == html_status == 200
+    join = json.loads(body)["acceptance_join"]
+    assert join["status"] == "HOLD"
+    assert len(join["criteria"]) == 7
+    for row in join["criteria"]:
+        assert f"{row['id']}: {row['state']}" in html.decode()
+    assert join["contract_digest"] in html.decode()

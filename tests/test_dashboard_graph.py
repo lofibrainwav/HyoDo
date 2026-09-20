@@ -1138,7 +1138,7 @@ def test_missing_panel_separates_a_recording_gap_from_a_mapping_gap() -> None:
     assert 'data-missing-bucket="unmeasured_events" data-missing-count="1"' in html
     assert 'data-missing-bucket="unclassified_events" data-missing-count="1"' in html
     assert "Fix the recording." in html
-    assert "Fix the table, never by tool name." in html
+    assert "never classify by tool name" in html
 
 
 def test_missing_panel_never_calls_an_empty_ledger_clean() -> None:
@@ -1264,3 +1264,187 @@ def test_policy_rationale_is_not_presented_as_actor_intent() -> None:
     assert payload["why"].startswith("UNOBSERVED")
     assert payload["policyRationale"] == "tests passed"
     assert "tests passed" not in payload["why"]
+
+
+def test_run_overview_selects_latest_run_and_exposes_recorded_trace(tmp_path: Path) -> None:
+    """The landing view keeps a large ledger readable without inventing intent."""
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="old-request", run_id="run-old", kind="prompt", step_index=0),
+            _event(event_id="new-request", run_id="run-new", kind="prompt", step_index=0),
+            _event(
+                event_id="new-call",
+                run_id="run-new",
+                kind="tool_call",
+                step_index=1,
+                parent_event_id="new-request",
+                tool={"name": "pytest"},
+            ),
+            _event(
+                event_id="new-result",
+                run_id="run-new",
+                kind="tool_result",
+                step_index=2,
+                parent_event_id="new-call",
+                io={"output_digest": "abc123"},
+            ),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode()
+    assert 'id="run-selector"' in html
+    assert '<option value="run-new" selected>' in html
+    assert 'data-run-summary="run-new"' in html
+    assert "REQUEST 1" in html
+    assert "RESULT 1" in html
+    assert "REQUEST → RESULT → EVIDENCE" in html
+    assert 'data-run-id="run-new"' in html
+    assert "Missing text stays UNOBSERVED" in html
+
+
+def test_event_detail_payload_marks_request_result_and_run() -> None:
+    from hyodo.dashboard import _event_detail_payload
+
+    prompt = _event_detail_payload({"run_id": "run-7", "kind": "prompt"})
+    result = _event_detail_payload(
+        {"run_id": "run-7", "kind": "tool_result", "io": {"output_digest": "abc123"}}
+    )
+    assert prompt["request"] is True
+    assert prompt["result"] is False
+    assert prompt["runId"] == "run-7"
+    assert result["request"] is False
+    assert result["result"] is True
+
+
+def test_run_overview_marks_missing_request_without_counting_opaque_run_id(tmp_path: Path) -> None:
+    _write_ledger(
+        tmp_path,
+        [_event(event_id="call", run_id="run-no-prompt", kind="tool_call", step_index=0)],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode()
+    assert "REQUEST UNOBSERVED" in html
+    assert "GAPS 3" in html
+    assert "[hidden] { display:none !important }" in html
+
+
+def test_timeline_is_bounded_for_large_ledgers(tmp_path: Path) -> None:
+    _write_ledger(
+        tmp_path,
+        [
+            _event(
+                event_id=f"event-{index}",
+                run_id="run-large",
+                kind="tool_call",
+                step_index=index,
+                ts=f"2026-09-06T00:{index // 60:02d}:{index % 60:02d}+00:00",
+            )
+            for index in range(100)
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _status, _headers, body = _request(port, "GET", "/graph")
+    html = body.decode()
+    assert "SHOWING 80 OF 100" in html
+
+
+def test_promise_observation_does_not_promote_activity_to_fulfillment(tmp_path: Path) -> None:
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="call", run_id="run-action-only", kind="tool_call", step_index=0),
+            _event(
+                event_id="result",
+                run_id="run-action-only",
+                kind="tool_result",
+                step_index=1,
+                parent_event_id="call",
+                io={"output_digest": "abc123"},
+            ),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _, _, body = _request(port, "GET", "/graph")
+    html = body.decode()
+    for stage in ("Human Intent", "Promise", "Contract", "Boundaries", "Artifact", "Readback"):
+        assert f'data-promise-stage="{stage}"><b>{stage}</b> <strong>UNOBSERVED</strong>' in html
+    assert 'data-promise-stage="Action"><b>Action</b> <strong>OBSERVED</strong>' in html
+    assert 'data-promise-stage="Trust"><b>Trust</b> <strong>HUMAN JUDGMENT</strong>' in html
+    assert "not verified connections or a completion score" in html
+
+
+def test_missing_panel_can_project_one_run_without_erasing_global_gaps() -> None:
+    from hyodo.dashboard import _render_missing_panel, _scoped_verification_view
+
+    view = {
+        "events": {
+            "a": {"why": {"run_id": "one"}, "what": {"kind": "tool_call"}},
+            "b": {"why": {"run_id": "two"}, "what": {"kind": "tool_call"}},
+        },
+        "event_order": ["a", "b"],
+        "missing": {"calls_without_result": ["a", "b"], "runs_without_intent": ["one", "two"]},
+    }
+    scoped = _scoped_verification_view(view, "one")
+    html = _render_missing_panel({}, view=scoped, scope="Selected run: one")
+    assert 'data-missing-bucket="calls_without_result" data-missing-count="1"' in html
+    assert "Selected run: one" in html
+    assert view["missing"]["calls_without_result"] == ["a", "b"]
+    assert "does not prove execution failed" in html
+
+
+def test_scoped_view_does_not_borrow_other_run_edges() -> None:
+    from hyodo.dashboard import _scoped_verification_view
+
+    view = {
+        "events": {
+            "a": {"why": {"run_id": "one"}},
+            "b": {"why": {"run_id": "one"}},
+            "c": {"why": {"run_id": "two"}},
+        },
+        "edges_causal": [{"source": "a", "target": "b"}, {"source": "c", "target": "a"}],
+        "edges_evidence": [{"source": "c", "target": "b"}],
+        "missing": {},
+    }
+    scoped = _scoped_verification_view(view, "one")
+    assert scoped["edges_causal"] == [{"source": "a", "target": "b"}]
+    assert scoped["edges_evidence"] == []
+    assert len(view["edges_causal"]) == 2
+
+
+def test_promise_focus_is_not_a_score_or_exclusive_assignment() -> None:
+    from hyodo.dashboard import _render_promise_observation
+
+    html = _render_promise_observation({"events": {}, "missing": {}})
+    assert "Primary: 仁 · 孝" in html
+    assert "Primary: 眞 · 永" in html
+    assert "not scores, measured evidence, or exclusive assignments" in html
+    assert "Supporting: 眞 · 善 · 美" in html
+    assert html.count("Lenses: 眞 · 善 · 美 · 仁 · 孝 · 永") == 9
+    assert "All six lenses inform human judgment" in html
+    assert "HUMAN JUDGMENT" in html
+
+
+def test_event_detail_preserves_output_observation_without_inference() -> None:
+    from hyodo.dashboard import _event_detail_payload
+
+    recorded = _event_detail_payload(
+        {
+            "kind": "tool_result",
+            "verification": {
+                "how": {
+                    "input_digest": "a123",
+                    "output_digest": "b123",
+                    "output_observation": "empty",
+                }
+            },
+        }
+    )
+    assert recorded["inputDigest"] == "a123"
+    assert recorded["outputObservation"] == "empty"
+    historical = _event_detail_payload(
+        {"kind": "tool_result", "verification": {"how": {"output_digest": "b123"}}}
+    )
+    assert historical["outputObservation"] == "UNOBSERVED"

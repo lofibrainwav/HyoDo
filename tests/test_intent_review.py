@@ -259,3 +259,115 @@ def test_equal_timestamps_require_recorded_same_run_order() -> None:
     assert project_intent_review(nodes["review"], nodes)["checks"][0]["state"] == "DEVIATES"
     nodes["result"]["step_index"] = 3
     assert project_intent_review(nodes["review"], nodes)["checks"][0]["state"] == "UNOBSERVED"
+
+
+def test_run_comparison_summary_preserves_withheld_and_escapes_host_text() -> None:
+    from hyodo.dashboard import _render_intent_comparisons, _scoped_verification_view
+
+    nodes = _nodes()
+    nodes["review"]["intent_review"]["mode"] = "PROJECTED"
+    review = project_intent_review(nodes["review"], nodes)
+    review["checks"][0]["id"] = "<script>bad</script>"
+    view = {
+        "events": {
+            "review": {"why": {"run_id": "selected", "intent_review": review}},
+            "other-secret": {"why": {"run_id": "other", "intent_review": review}},
+        }
+    }
+    html = _render_intent_comparisons(_scoped_verification_view(view, "selected"))
+    assert "PROJECTED" in html
+    assert "hypothetical_comparison" in html
+    assert "UNOBSERVED" in html
+    assert "other-secret" not in html
+    assert "<script>bad</script>" not in html
+    assert "&lt;script&gt;bad&lt;/script&gt;" in html
+    assert "constraints" in html
+    assert "verified fulfillment or authorization" in html
+
+
+def test_run_comparison_summary_does_not_infer_checks_from_activity() -> None:
+    from hyodo.dashboard import _render_intent_comparisons
+
+    html = _render_intent_comparisons({"events": {"call": {"what": {"kind": "tool_call"}}}})
+    assert "No requirement comparison recorded for this run" in html
+
+
+@pytest.mark.parametrize(
+    ("mode", "basis", "expected_state"),
+    [
+        ("OBSERVED", "DECLARED", "DEVIATES"),
+        ("OBSERVED", "INFERRED", "UNOBSERVED"),
+        ("PROJECTED", "DECLARED", "UNOBSERVED"),
+    ],
+)
+def test_host_cli_submission_preserves_comparison_boundaries(
+    tmp_path: Path, mode: str, basis: str, expected_state: str
+) -> None:
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+    from hyodo.dashboard import render_graph_html
+
+    runner = CliRunner()
+    nodes = _nodes()
+    nodes["review"]["intent_review"]["mode"] = mode
+    nodes["review"]["intent_review"]["checks"][0]["basis"] = basis
+    for index, (event_id, node) in enumerate(nodes.items()):
+        event = {
+            "schema_version": "hyodo.agent-event/v1",
+            "event_id": event_id,
+            "run_id": "host-cli-fixture",
+            "ts": node["ts"],
+            "kind": node["kind"],
+            "actor": node["actor"],
+            "step_index": index,
+            "io": node.get("io", {}),
+            "evidence_refs": ["result"] if event_id == "review" else [],
+        }
+        if event_id == "review":
+            event["meta"] = {"intent_review": node["intent_review"]}
+        result = runner.invoke(
+            app,
+            ["event", "record", "--stdin", "--root", str(tmp_path), "--json"],
+            input=json.dumps(event),
+        )
+        assert result.exit_code == 0, result.output
+    ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
+    before = ledger.read_bytes()
+    graph = build_report_graph(tmp_path)
+    view = build_verification_view(graph, root=tmp_path)
+    review = view["events"]["review"]["why"]["intent_review"]
+    assert review["checks"][0]["state"] == expected_state
+    assert review["checks"][0]["evidence_refs"] == ["result"]
+    assert view["authority"] == "UNOBSERVED"
+    html = render_graph_html(graph, root=tmp_path)
+    assert "Recorded requirement comparisons" in html
+    assert basis in html
+    assert ledger.read_bytes() == before
+
+
+def test_host_cli_rejects_malformed_review_without_append(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+
+    review = _review()
+    review["checks"][0]["basis"] = "AUTO_APPROVED"
+    event = {
+        "schema_version": "hyodo.agent-event/v1",
+        "event_id": "invalid",
+        "run_id": "host-cli-fixture",
+        "ts": "2026-09-19T10:02:00+00:00",
+        "kind": "model_response",
+        "actor": "agent",
+        "step_index": 0,
+        "meta": {"intent_review": review},
+    }
+    result = CliRunner().invoke(
+        app,
+        ["event", "record", "--stdin", "--root", str(tmp_path), "--json"],
+        input=json.dumps(event),
+    )
+    assert result.exit_code != 0
+    assert "invalid_field:meta.intent_review" in result.output
+    assert not (tmp_path / AGENT_EVENTS_RELATIVE_PATH).exists()

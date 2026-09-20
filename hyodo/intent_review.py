@@ -247,3 +247,227 @@ def project_intent_review(
         ],
         "boundary": "Host-supplied requirements and values; references are not authenticated intent, verified values, or authorization.",
     }
+
+
+def acceptance_join(contract: dict[str, Any], bindings: dict[str, Any]) -> dict[str, Any]:
+    """Join a frozen host contract to pinned receipt fields, without inferring criteria.
+
+    Bindings are host-owned verification semantics, not additional requirements.
+    Missing bindings never count as satisfied. This projection does not write to
+    the ledger, grant authority, or infer a human's intent from a tool name.
+    """
+    import hashlib
+    import json
+    from pathlib import Path
+
+    def aggregate(states: list[str]) -> str:
+        for state in ("CONFLICTING", "FAIL", "UNOBSERVED"):
+            if state in states:
+                return state
+        return "PASS" if states else "UNOBSERVED"
+
+    def compare(binding: Any) -> str:
+        if not isinstance(binding, dict):
+            return "UNOBSERVED"
+        operator = binding.get("operator")
+        expected = binding.get("expected")
+        if operator not in ("eq", "lte", "gte") or not _scalar(expected):
+            return "UNOBSERVED"
+        observations = binding.get("receipts")
+        if not isinstance(observations, list) or not observations:
+            return "UNOBSERVED"
+        values: list[Any] = []
+        missing = False
+        for ref in observations:
+            try:
+                raw = Path(ref["path"]).read_bytes()
+                if hashlib.sha256(raw).hexdigest() != ref["sha256"]:
+                    missing = True
+                    continue
+                value = json.loads(raw)
+                pointer = ref["pointer"]
+                if not isinstance(pointer, str) or not pointer.startswith("/"):
+                    missing = True
+                    continue
+                for key in pointer[1:].split("/"):
+                    key = key.replace("~1", "/").replace("~0", "~")
+                    value = value[int(key)] if isinstance(value, list) else value[key]
+                if not _scalar(value):
+                    missing = True
+                    continue
+                values.append(value)
+            except (OSError, ValueError, TypeError, KeyError, IndexError):
+                missing = True
+        # Conflict is about different values, even when both meet a threshold.
+        if len({(type(v).__name__, str(v)) for v in values}) > 1:
+            return "CONFLICTING"
+        if not values:
+            return "UNOBSERVED"
+        actual = values[0]
+        numeric = _number(expected) and _number(actual)
+        if not numeric and (type(expected) is not type(actual) or operator != "eq"):
+            return "UNOBSERVED"
+        matched = (
+            actual == expected
+            if operator == "eq"
+            else (actual <= expected if operator == "lte" else actual >= expected)
+        )
+        if not matched:
+            return "FAIL"
+        return "UNOBSERVED" if missing else "PASS"
+
+    rows = []
+    invariants = []
+    for key, target in (("required_criteria", rows), ("governing_invariants", invariants)):
+        for item in contract.get(key, []):
+            checks = bindings.get(item["id"])
+            states = [compare(c) for c in checks] if isinstance(checks, list) else []
+            target.append(
+                {
+                    "id": item["id"],
+                    "text": item["text"],
+                    "state": aggregate(states),
+                    "comparisons": states,
+                }
+            )
+    states = [r["state"] for r in rows + invariants]
+    valid_contract = (
+        contract.get("origin") == "HUMAN_RECONSTITUTED"
+        and contract.get("criteria_count") == 7
+        and len(rows) == 7
+        and len(invariants) == 5
+        and len({r["id"] for r in rows + invariants}) == 12
+    )
+    if not valid_contract:
+        states.append("UNOBSERVED")
+    # These are the approved completion guards, not extra success criteria.
+    guards = {}
+    for name in ("verification_observed", "identity_correlation", "visible_readback"):
+        checks = bindings.get(name)
+        guards[name] = (
+            aggregate([compare(c) for c in checks]) if isinstance(checks, list) else "UNOBSERVED"
+        )
+    # A boolean assertion cannot replace execution identity or exact-head CI.
+    try:
+        ref = bindings["execution_receipt"]
+        raw = Path(ref["path"]).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != ref["sha256"]:
+            raise ValueError("execution receipt changed")
+        execution = json.loads(raw)
+        shas = [execution[k] for k in ("candidate_sha", "source_sha", "runtime_sha", "served_sha")]
+        valid_shas = all(
+            isinstance(v, str) and len(v) == 40 and all(c in "0123456789abcdef" for c in v)
+            for v in shas
+        )
+        if not valid_shas or execution.get("dirty") is not False:
+            guards["identity_correlation"] = "UNOBSERVED"
+        elif len(set(shas)) != 1:
+            guards["identity_correlation"] = "FAIL"
+        else:
+            guards["identity_correlation"] = aggregate([guards["identity_correlation"], "PASS"])
+        observed = datetime.fromisoformat(execution["observed_at"].replace("Z", "+00:00"))
+        restarted = datetime.fromisoformat(execution["restarted_at"].replace("Z", "+00:00"))
+        if observed.tzinfo is None or restarted.tzinfo is None or observed <= restarted:
+            guards["verification_observed"] = "UNOBSERVED"
+        required = execution.get("required_checks")
+        checks = execution.get("checks", [])
+        ci_states = []
+        if isinstance(required, list) and required and all(isinstance(n, str) for n in required):
+            for name in required:
+                matches = [
+                    c for c in checks if c.get("name") == name and c.get("head_sha") == shas[0]
+                ]
+                conclusions = {
+                    c.get("conclusion") for c in matches if c.get("status") == "completed"
+                }
+                ci_states.append(
+                    "CONFLICTING"
+                    if len(conclusions) > 1
+                    else "FAIL"
+                    if conclusions & {"failure", "cancelled", "timed_out"}
+                    else "PASS"
+                    if conclusions == {"success"}
+                    and all(c.get("status") == "completed" for c in matches)
+                    else "UNOBSERVED"
+                )
+        guards["verification_observed"] = aggregate(
+            [guards["verification_observed"], aggregate(ci_states)]
+        )
+        visible = execution.get("visible_criteria")
+        expected_rows = {r["id"]: r["state"] for r in rows}
+        if (
+            execution.get("contract_id") != contract.get("contract_id")
+            or execution.get("revision") != contract.get("revision")
+            or execution.get("contract_digest") != contract.get("_frozen_digest")
+        ):
+            guards["visible_readback"] = "CONFLICTING"
+        elif visible != expected_rows:
+            guards["visible_readback"] = "FAIL" if visible is not None else "UNOBSERVED"
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        guards["identity_correlation"] = aggregate([guards["identity_correlation"], "UNOBSERVED"])
+        guards["verification_observed"] = aggregate([guards["verification_observed"], "UNOBSERVED"])
+        guards["visible_readback"] = aggregate([guards["visible_readback"], "UNOBSERVED"])
+    states.extend(guards.values())
+    state = aggregate(states)
+    return {
+        "contract_id": contract.get("contract_id"),
+        "revision": contract.get("revision"),
+        "origin": contract.get("origin"),
+        "criteria_count": len(rows),
+        "criteria": rows,
+        "invariants": invariants,
+        "guards": guards,
+        "state": state,
+        "status": {
+            "PASS": "COMPLETE",
+            "FAIL": "NOT_COMPLETE",
+            "UNOBSERVED": "HOLD",
+            "CONFLICTING": "CONFLICTING",
+        }[state],
+        "boundary": "Host-bound receipt comparisons; no execution authority.",
+    }
+
+
+def load_acceptance_join(root: Any) -> dict[str, Any]:
+    """Read the opt-in frozen contract and its digest-pinned binding receipt."""
+    import hashlib
+    import json
+    from pathlib import Path
+
+    missing = {
+        "status": "HOLD",
+        "state": "UNOBSERVED",
+        "criteria": [],
+        "reason": "acceptance_contract_or_bindings_unobserved",
+    }
+    if root is None:
+        return missing
+    try:
+        manifest = json.loads((Path(root) / ".hyodo/acceptance-contract.json").read_bytes())
+        raw = Path(manifest["path"]).read_bytes()
+        if hashlib.sha256(raw).hexdigest() != manifest["digest"]:
+            return {
+                **missing,
+                "state": "CONFLICTING",
+                "status": "CONFLICTING",
+                "reason": "frozen_contract_digest_mismatch",
+            }
+        contract = json.loads(raw)
+        binding_ref = manifest.get("bindings")
+        bindings = {}
+        if binding_ref:
+            payload = Path(binding_ref["path"]).read_bytes()
+            if hashlib.sha256(payload).hexdigest() != binding_ref["digest"]:
+                return {
+                    **missing,
+                    "state": "CONFLICTING",
+                    "status": "CONFLICTING",
+                    "reason": "binding_digest_mismatch",
+                }
+            bindings = json.loads(payload)
+        contract["_frozen_digest"] = manifest["digest"]
+        result = acceptance_join(contract, bindings)
+        result["contract_digest"] = manifest["digest"]
+        return result
+    except (OSError, ValueError, TypeError, KeyError, AttributeError):
+        return missing
