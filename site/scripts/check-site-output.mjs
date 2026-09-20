@@ -215,6 +215,9 @@ const publicSourceFiles = [
 	join(repoRoot, 'README.md'),
 	join(repoRoot, 'PHILOSOPHY.md'),
 	join(repoRoot, 'docs', 'PRODUCT_BOUNDARY.md'),
+	join(repoRoot, 'docs', 'CURRENT_STATE.md'),
+	join(repoRoot, 'docs', 'README.md'),
+	join(repoRoot, 'CONTRIBUTING.md'),
 	join(repoRoot, 'site', 'context', '01-project-overview.md'),
 	...[
 		'product-boundary.md',
