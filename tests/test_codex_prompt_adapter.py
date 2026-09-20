@@ -11,7 +11,7 @@ def _prompt(turn_id: str = "turn-1") -> dict[str, object]:
         "cwd": "/tmp/project",
         "model": "gpt-5-codex",
         "permission_mode": "default",
-        "prompt": "효도 대시보드 상태를 확인해 줘",
+        "prompt": "Check the HyoDo dashboard status",
         "session_id": "codex-session",
         "transcript_path": "/tmp/codex-session.jsonl",
         "turn_id": turn_id,
@@ -26,7 +26,7 @@ def test_codex_user_prompt_maps_to_digest_only_human_event() -> None:
     assert event.raw["kind"] == "prompt"
     assert event.raw["actor"] == "human"
     assert event.raw["event_id"] == "codex:UserPromptSubmit:codex-session:turn-1"
-    assert event.raw["io"] == {"input_digest": content_digest("효도 대시보드 상태를 확인해 줘")}
+    assert event.raw["io"] == {"input_digest": content_digest("Check the HyoDo dashboard status")}
     assert "input_text" not in event.raw["io"]
     assert "source:codex-transcript" in event.raw["meta"]["tags"]
     assert (

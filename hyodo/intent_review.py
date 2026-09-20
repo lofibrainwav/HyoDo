@@ -261,12 +261,14 @@ def acceptance_join(contract: dict[str, Any], bindings: dict[str, Any]) -> dict[
     from pathlib import Path
 
     def aggregate(states: list[str]) -> str:
+        """Preserve conflict, failure and missing-evidence precedence."""
         for state in ("CONFLICTING", "FAIL", "UNOBSERVED"):
             if state in states:
                 return state
         return "PASS" if states else "UNOBSERVED"
 
     def compare(binding: Any) -> str:
+        """Compare typed values from digest-pinned receipt fields."""
         if not isinstance(binding, dict):
             return "UNOBSERVED"
         operator = binding.get("operator")
