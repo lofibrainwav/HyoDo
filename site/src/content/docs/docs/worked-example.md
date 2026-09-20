@@ -4,9 +4,9 @@ description: One complete HyoDo run on a three-file project — the exact input,
 ---
 
 Everything on this page was produced by running the published package. The
-output blocks are pasted from a terminal, not written by hand. Some are trimmed
-to the lines under discussion — no line was reworded, and the full-result blocks
-below are shown whole.
+output blocks are pasted from a terminal, not written by hand. Most are trimmed
+to the lines under discussion; Result 1 is the one shown whole. Nothing inside a
+block was reworded, and no line is cut short.
 
 - **Package**: `hyodo` 4.19.9, installed from PyPI with
   `pipx install hyodo` into an empty pipx home.
@@ -123,9 +123,9 @@ Trust and run this command set now? [y/N] y
 
 The fingerprint covers the commands, not your source or its location, so editing
 `pricing.py` does not re-prompt but editing the gate command does. It is also the
-same value for anyone running this exact gate set: if you copied the config
-above, the fingerprint you are asked to approve should match the one printed
-here, character for character. Answering `y` records the decision and the run
+same value for anyone running this exact gate set on this version of HyoDo: if
+you copied the config above, the fingerprint you are asked to approve should
+match the one printed here, character for character. Answering `y` records the decision and the run
 continues. Every later run in this project goes straight to the result below.
 
 ## Result 1 — the gate passes
@@ -191,15 +191,23 @@ one to misread as success. Run the same command in a directory with no gates and
 no recognizable project:
 
 ```text
+No project gates were executed
+This is not a validation pass.
 Measurement: measured by hyodo 4.19.9 (wheel)
-HYODO UNOBSERVED — 0/0 gates observed, required gates UNOBSERVED
+HYODO UNOBSERVED — 0/0 gates observed, required gates UNOBSERVED; Sampled syntax gates only (up to 50 files per language); not a full-project validation
 ```
 
 Exit code **2**.
 
-Not `0`. An empty run is not a pass. The same thing happens if
-`.hyodo/gates.toml` exists but is malformed — during the making of this page an
-early draft of the config omitted the `schema` key, and the real output was:
+Not `0`. An empty run is not a pass. Note what the verdict line carries with it:
+with no `.hyodo/gates.toml` to read, HyoDo falls back to built-in sampled syntax
+gates, and it says so in the same breath as the verdict — sampled, not a
+full-project validation.
+
+A broken config arrives at the same verdict by a different route, and without
+the sampled-gates fallback, because there is a config and HyoDo refuses to guess
+what it meant. During the making of this page an early draft omitted the
+`schema` key, and the real output was:
 
 ```text
 .hyodo/gates.toml: unsupported schema None; expected 'hyodo.gates/v1'
