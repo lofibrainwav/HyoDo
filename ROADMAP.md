@@ -15,11 +15,9 @@ under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.19.9 is the current release target and source-tree release baseline, and
-it is now published. Its release chain receipt in `docs/releases/4.19.9.md`
-records all nine steps as `OBSERVED`: the signed verified tag, the GitHub Release
-and its durable SBOM evidence, the PyPI publish and provenance, and the install
-readback.
+HyoDo 4.20.0 is the current release target and source-tree release baseline.
+Publication is pending. Its release chain is recorded independently in
+`docs/releases/4.20.0.md`; unobserved steps do not imply completion.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
@@ -45,6 +43,13 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.20.0 (release candidate)
+
+- Preserve graph participants and explicit From/To relationships.
+- Show bounded, host-supplied intent comparisons with evidence references.
+- Keep temporal storage expansion and automatic intent extraction unimplemented.
+- Verify publication and installation separately from source and site delivery.
 
 ### External adoption
 

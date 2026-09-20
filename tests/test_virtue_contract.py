@@ -115,6 +115,12 @@ def test_current_facing_surfaces_use_published_version_and_boundary() -> None:
     )
     for path in current_surfaces:
         text = path.read_text(encoding="utf-8")
+        if path == REPO_ROOT / "ROADMAP.md":
+            # Published baseline and the next release candidate are separate facts.
+            # check_roadmap_sync validates the candidate against VERSION.
+            baseline, separator, _ = text.partition("## Current release\n")
+            assert separator, "ROADMAP must distinguish baseline from release target"
+            text = baseline
         assert "publication is pending" not in text.lower(), path
     assert (
         "4.19.3"
