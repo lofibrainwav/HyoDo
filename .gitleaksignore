@@ -13,3 +13,21 @@ f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/data/api_wallet.json:generic-a
 f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/data/api_wallet.json:generic-api-key:19
 f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/tests/infrastructure/test_messaging.py:generic-api-key:115
 f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/tests/test_api_wallet.py:generic-api-key:41
+
+# Incident 2026-09-20. Three genuine credentials were committed in f897f82 on
+# 2026-01-25 and are therefore in this repository's public history. History was
+# deliberately not rewritten: it cannot recall an already-public value and it
+# would break release provenance. Each entry below names one finding in one
+# commit, so a future secret in the same file is still reported.
+#
+# C1 -- revoked historical credential. The Cloudflare API token was revoked by
+# the operator at the Cloudflare dashboard. The value was never used from this
+# host to test or revoke it.
+f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/cleanup/purge_dns.sh:generic-api-key:3
+# C2, C3 -- decommissioned external historical credential, owner unavailable.
+# The notebook-bridge consumer was decommissioned on 2026-08-14, the project no
+# longer exists in our Vercel account, and the endpoint answers 404. No
+# validator is under our control, so this key cannot be rotated or revoked; it
+# is treated as permanently exposed rather than as revoked.
+f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/monitor_bridge.py:generic-api-key:61
+f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/verify_context_chain.py:generic-api-key:6

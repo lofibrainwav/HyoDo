@@ -60,9 +60,24 @@ def test_history_and_working_tree_are_both_scanned() -> None:
 
 def test_no_scan_step_is_conditioned_on_the_triggering_event() -> None:
     # Event-derived scope is the drift this contract exists to prevent: a step
-    # skipped on push would restore the split the job name denies.
+    # skipped on push would restore the split the job name denies. A condition
+    # that only keeps later scans running after an earlier failure is the
+    # opposite -- it produces more evidence, not less.
     for step in _secrets_job()["steps"]:
-        assert "if" not in step, f"step {step.get('name')!r} is conditional"
+        condition = step.get("if")
+        if condition is None:
+            continue
+        assert "github.event" not in condition, f"step {step.get('name')!r} depends on the event"
+        assert "github.ref" not in condition, f"step {step.get('name')!r} depends on the ref"
+
+
+def test_every_scan_reports_even_after_an_earlier_failure() -> None:
+    """A failed history scan must not hide the working-tree result or the
+    planted-secret check; each one is separate evidence."""
+    steps = {step.get("name"): step for step in _secrets_job()["steps"]}
+    for name in ("Scan working tree", "Baseline cannot hide a current secret"):
+        condition = steps[name].get("if", "")
+        assert "cancelled()" in condition, f"{name} would be skipped after an earlier failure"
 
 
 def test_scanner_is_pinned_by_digest() -> None:

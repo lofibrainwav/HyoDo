@@ -39,11 +39,13 @@ jobs:
           docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
             detect --source=/repo --redact --no-banner --exit-code 1
       - name: Scan working tree
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
             detect --source=/repo --no-git --redact --no-banner --exit-code 1
       - name: Baseline cannot hide a current secret
+        if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
           canary="$(mktemp -d)"
