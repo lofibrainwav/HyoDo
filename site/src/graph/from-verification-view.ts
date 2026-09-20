@@ -7,7 +7,16 @@
 //
 // Presentation may compress truth. It must never reconstruct truth.
 
-import type { Decision, DisplayKind, EvidenceEvent, Row, SchemaEventKind } from './evidence-graph';
+import type {
+	Decision,
+	DisplayKind,
+	EvidenceEvent,
+	LensKey,
+	ObservationState,
+	Row,
+	SchemaEventKind,
+	VerificationProjectionContext,
+} from './evidence-graph';
 
 export const VERIFICATION_VIEW_V0 = 'hyodo.verification-view/v0';
 
@@ -58,6 +67,39 @@ function asStepIndex(value: unknown): number | null {
 function stringList(value: unknown): string[] {
 	if (!Array.isArray(value)) return [];
 	return value.filter((item): item is string => typeof item === 'string' && item.trim() !== '');
+}
+
+function decisionValue(value: unknown): Decision | null {
+	return typeof value === 'string' && DECISIONS.has(value) ? (value as Decision) : null;
+}
+
+function missingByEvent(view: Record<string, unknown>): Map<string, string[]> {
+	const result = new Map<string, string[]>();
+	const missing = isRecord(view.missing) ? view.missing : {};
+	for (const [bucket, entries] of Object.entries(missing)) {
+		if (!Array.isArray(entries)) continue;
+		for (const entry of entries) {
+			const eventId = typeof entry === 'string' ? entry : isRecord(entry) ? entry.event_id : null;
+			if (typeof eventId !== 'string') continue;
+			result.set(eventId, [...(result.get(eventId) ?? []), bucket]);
+		}
+	}
+	return result;
+}
+
+export function verificationProjectionContext(view: unknown): VerificationProjectionContext {
+	const info = inspectVerificationView(view);
+	const record = isRecord(view) ? view : {};
+	const rawMissing = isRecord(record.missing) ? record.missing : {};
+	const missing = Object.fromEntries(
+		Object.entries(rawMissing).map(([key, value]) => [key, Array.isArray(value) ? value : []]),
+	);
+	return {
+		status: info.status,
+		allowWithheld: info.allowWithheld,
+		missing,
+		canonical: info.ok,
+	};
 }
 
 /** Read schema/status without mapping events. Never throws. */
@@ -138,6 +180,7 @@ export function fromVerificationView(view: unknown): EvidenceEvent[] {
 	if (!info.ok || !isRecord(view) || !isRecord(view.events)) return [];
 
 	const rowOf = laneIndex(view);
+	const missing = missingByEvent(view);
 	const order = stringList(view.event_order);
 	const ids = order.length ? order : Object.keys(view.events).sort();
 
@@ -170,6 +213,15 @@ export function fromVerificationView(view: unknown): EvidenceEvent[] {
 		const schemaKind = kind as SchemaEventKind;
 
 		const decision = presentableDecision(what);
+		const recordedDecision = decisionValue(what.decision);
+		const lensClassifications = stringList(entry.columns).filter(
+			(key): key is LensKey => ['jin', 'seon', 'mi', 'in', 'hyo'].includes(key),
+		);
+		// `columns` is a producer classification, not event-level observation.
+		// The v0 producer does not provide event lens states, so remain fail-closed.
+		const lensStates = Object.fromEntries(
+			(['jin', 'seon', 'mi', 'in', 'hyo'] as LensKey[]).map((key) => [key, 'UNOBSERVED' as ObservationState]),
+		) as Partial<Record<LensKey, ObservationState>>;
 		const toolName = asNonEmptyString(what.tool_name);
 		const paths = stringList(where.paths);
 		const urls = stringList(where.urls);
@@ -203,6 +255,12 @@ export function fromVerificationView(view: unknown): EvidenceEvent[] {
 			evidenceRefs: Array.from(new Set(evidenceOf.get(eventId) ?? [])).sort(),
 			note: asNonEmptyString(why.reason) ?? '',
 			intentReview: isRecord(why.intent_review) ? why.intent_review : null,
+			lensStates,
+			lensClassifications,
+			continuityState: 'UNOBSERVED',
+			recordedDecision,
+			presentableDecision: decision,
+			missing: missing.get(eventId) ?? [],
 		});
 	}
 

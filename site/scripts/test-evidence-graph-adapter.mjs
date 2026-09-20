@@ -2,11 +2,12 @@
 // Run: node --test site/scripts/test-evidence-graph-adapter.mjs
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { EVENTS, renderIntentReview } from '../src/graph/evidence-graph.ts';
+import { EVENTS, renderIntentReview, timelineProjection } from '../src/graph/evidence-graph.ts';
 import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../src/graph/from-v1.ts';
 import {
 	fromVerificationView,
 	inspectVerificationView,
+	verificationProjectionContext,
 } from '../src/graph/from-verification-view.ts';
 
 const FIXTURE_IDS = [
@@ -329,6 +330,42 @@ describe('fromVerificationView', () => {
 		const [, decision] = fromVerificationView(withheld);
 		assert.equal(decision.policy?.decision, 'UNOBSERVED');
 		assert.equal(decision.displayKind, 'unobserved');
+	});
+
+	it('keeps columns as classification and does not infer event observation', () => {
+		const payload = view({
+			status: 'UNOBSERVED',
+			presentation: { allow_withheld: true, reason: 'graph_status:UNOBSERVED' },
+			missing: { unresolved_refs: ['d1'], calls_without_result: [] },
+		});
+		payload.events.d1.when.ts = null;
+		payload.events.d1.what.decision_presentable = 'UNOBSERVED';
+		payload.events.d1.columns = ['jin', 'in'];
+		const [, decision] = fromVerificationView(payload);
+		assert.equal(decision.ts, '');
+		assert.equal(decision.lensStates?.jin, 'UNOBSERVED');
+		assert.equal(decision.lensStates?.seon, 'UNOBSERVED');
+		assert.deepEqual(decision.lensClassifications, ['jin', 'in']);
+		assert.equal(decision.continuityState, 'UNOBSERVED');
+		assert.deepEqual(decision.missing, ['unresolved_refs']);
+		assert.equal(decision.recordedDecision, 'ALLOW');
+		assert.equal(decision.presentableDecision, 'UNOBSERVED');
+		assert.equal(verificationProjectionContext(payload).canonical, true);
+	});
+
+	it('preserves producer event order instead of sorting or parsing timestamps', () => {
+		const payload = view({
+			event_order: ['d1', 'm1'],
+		});
+		payload.events.d1.when.ts = '2026-09-06T09:02:00-07:00';
+		payload.events.m1.when.ts = '2026-09-06T09:01:00-07:00';
+		const projection = timelineProjection(fromVerificationView(payload));
+		assert.deepEqual(projection.labels, [
+			'TS 2026-09-06T09:02:00-07:00',
+			'TS 2026-09-06T09:01:00-07:00',
+		]);
+		assert.equal(projection.columnByEvent.get('d1'), 0);
+		assert.equal(projection.columnByEvent.get('m1'), 1);
 	});
 
 	it('never draws an edge for a citation that resolved to nothing', () => {

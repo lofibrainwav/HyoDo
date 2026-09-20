@@ -322,6 +322,10 @@
 	color: var(--color-text-dim);
 	font-size: 0.7rem;
 	text-align: center;
+	white-space: nowrap;
+	transform: rotate(-28deg);
+	transform-origin: center bottom;
+	min-height: 2.8rem;
 	align-self: end;
 	padding-bottom: 4px;
 	font-variant-numeric: tabular-nums;
@@ -612,6 +616,102 @@
 
 .eg-page aside.panel .broken-ref {
 	color: var(--color-deny);
+}
+
+.eg-page aside.panel h3,
+.eg-page .eg-missing summary {
+	font-size: 0.68rem;
+	text-transform: uppercase;
+	letter-spacing: 0.06em;
+	color: var(--color-text-dim);
+	font-weight: 700;
+}
+
+.eg-page .panel-note {
+	color: var(--color-text-dim);
+	font-size: 0.72rem;
+}
+
+.eg-page .lens-aperture,
+.eg-page .verification-rail,
+.eg-page .panel-missing {
+	margin-top: 0.9rem;
+	padding-top: 0.7rem;
+	border-top: 1px solid var(--eg-border);
+}
+
+.eg-page .lens-aperture h3,
+.eg-page .verification-rail h3 {
+	margin: 0 0 0.35rem;
+}
+
+.eg-page .lens-list,
+.eg-page .rail-list {
+	display: grid;
+	grid-template-columns: repeat(2, minmax(0, 1fr));
+	gap: 0.35rem;
+}
+
+.eg-page .lens-state,
+.eg-page .rail-stage {
+	font-size: 0.68rem;
+	color: var(--color-text-dim);
+	word-break: break-word;
+}
+
+.eg-page .lens-state b,
+.eg-page .rail-stage b {
+	display: block;
+	color: var(--color-text);
+	font-size: 0.62rem;
+}
+
+.eg-page .panel-missing summary,
+.eg-page .eg-missing summary {
+	cursor: pointer;
+}
+
+.eg-page .panel-missing p,
+.eg-page .eg-missing p,
+.eg-page .eg-missing ul {
+	color: var(--color-text-dim);
+	font-size: 0.75rem;
+}
+
+.eg-page .eg-missing {
+	max-width: 62rem;
+	margin-top: 1rem;
+	padding: 0.8rem 1rem;
+	background: var(--eg-card);
+	border: 1px solid var(--eg-border);
+	border-radius: 8px;
+}
+
+.eg-page .eg-missing-count {
+	display: inline-block;
+	margin-left: 0.35rem;
+	padding: 0.05rem 0.4rem;
+	border-radius: 999px;
+	background: var(--color-tile-unlit);
+	font-size: 0.65rem;
+}
+
+.eg-page .eg-missing li {
+	display: grid;
+	grid-template-columns: minmax(0, 1fr) auto;
+	gap: 0.2rem 0.6rem;
+	margin-top: 0.45rem;
+}
+
+.eg-page .eg-missing li small {
+	grid-column: 1 / -1;
+	color: var(--color-text-dim);
+	word-break: break-word;
+}
+
+.eg-page .eg-missing-boundary {
+	padding-top: 0.6rem;
+	border-top: 1px solid var(--eg-border);
 }
 
 .eg-page footer.eg-footer {

@@ -14,6 +14,9 @@ def test_public_evidence_graph_page_names_demo_fixture_and_local_dashboard() -> 
     assert "hyodo dashboard" in lowered
     assert "/graph" in text
     assert "nothing is uploaded" in lowered or "nothing here is uploaded" in lowered
+    assert "hyodo.verification-view/v0" in lowered
+    assert "time unobserved" in lowered
+    assert "presentable decisions" in lowered
     assert "remote ledger" not in lowered or "no remote" in lowered or "not a remote" in lowered
 
 
@@ -23,3 +26,6 @@ def test_site_evidence_graph_doc_keeps_fixture_release_boundary() -> None:
     assert "demo fixture" in lowered
     assert "does not read a real ledger" in lowered
     assert "hyodo.evidence-graph/v1" in lowered
+    assert "hyodo.verification-view/v0" in lowered
+    assert "five independent lens" in lowered
+    assert "what is missing" in lowered

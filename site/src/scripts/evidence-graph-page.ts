@@ -1,8 +1,13 @@
-import { EVENTS, mountEvidenceGraph } from '../graph/evidence-graph';
+import {
+	EVENTS,
+	mountEvidenceGraph,
+	type VerificationProjectionContext,
+} from '../graph/evidence-graph';
 import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../graph/from-v1';
 import {
 	fromVerificationView,
 	inspectVerificationView,
+	verificationProjectionContext,
 } from '../graph/from-verification-view';
 
 const root = document.getElementById('eg-root');
@@ -13,6 +18,7 @@ const consoleSession = document.getElementById('eg-console-session');
 const consoleView = document.getElementById('eg-console-view');
 const consoleSteps = document.getElementById('eg-console-steps');
 const consoleBoundary = document.getElementById('eg-console-boundary');
+const missingRoot = document.getElementById('eg-missing');
 const fixtureBannerHtml = banner?.innerHTML ?? '';
 
 let dispose = () => {};
@@ -26,9 +32,24 @@ function escapeHtml(value: string): string {
 		.replace(/"/g, '&quot;');
 }
 
-function remount(events: typeof EVENTS): void {
+function renderMissing(context: VerificationProjectionContext | null): void {
+	if (!missingRoot) return;
+	if (!context?.canonical) {
+		missingRoot.innerHTML = '<summary>WHAT IS MISSING</summary><p>UNOBSERVED — load a canonical <code>hyodo.verification-view/v0</code> file to inspect producer-reported gaps.</p>';
+		return;
+	}
+	const rows = Object.entries(context.missing).filter(([, entries]) => entries.length > 0);
+	const total = rows.reduce((count, [, entries]) => count + entries.length, 0);
+	const body = rows.length
+		? `<ul>${rows.map(([bucket, entries]) => `<li><b>${escapeHtml(bucket)}</b> <span>${entries.length}</span><small>${escapeHtml(entries.slice(0, 5).map(String).join(', '))}${entries.length > 5 ? ' …' : ''}</small></li>`).join('')}</ul>`
+		: '<p>Every recorded event resolved for these buckets. This is not a pass; it is the absence of these particular gaps.</p>';
+	missingRoot.innerHTML = `<summary>WHAT IS MISSING <span class="eg-missing-count">${total}</span></summary>${body}<p class="eg-missing-boundary">Observation only. A gap is not a failure, and closing one authorizes nothing.</p>`;
+}
+
+function remount(events: typeof EVENTS, context: VerificationProjectionContext | null = null): void {
 	dispose();
 	if (root) dispose = mountEvidenceGraph(root, events);
+	renderMissing(context);
 }
 
 function showFixture(): void {
@@ -41,6 +62,7 @@ function showFixture(): void {
 		banner.innerHTML = fixtureBannerHtml;
 		banner.dataset.source = 'fixture';
 	}
+	renderMissing(null);
 }
 
 fileInput?.addEventListener('change', async () => {
@@ -66,7 +88,7 @@ fileInput?.addEventListener('change', async () => {
 	// banner text below and the note in `from-v1.ts`.
 	const viewInfo = inspectVerificationView(parsed);
 	if (viewInfo.ok) {
-		remount(fromVerificationView(parsed));
+		remount(fromVerificationView(parsed), verificationProjectionContext(parsed));
 		const status = escapeHtml(viewInfo.status ?? 'unknown');
 		const withheld = viewInfo.allowWithheld
 			? ' An ALLOW recorded under this graph is withheld as <code>UNOBSERVED</code>.'
@@ -91,6 +113,7 @@ fileInput?.addEventListener('change', async () => {
 	}
 
 	remount(fromEvidenceGraphV1(parsed));
+	renderMissing(null);
 	const graphNodes = Array.isArray((parsed as { nodes?: unknown }).nodes)
 		? (parsed as { nodes: Array<{ step_index?: unknown }> }).nodes
 		: [];

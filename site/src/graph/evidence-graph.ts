@@ -44,6 +44,17 @@ export type DisplayKind =
  */
 export type Row = 'human' | 'planner' | 'executor' | 'reviewer' | 'unobserved';
 
+export type ObservationState = 'OBSERVED' | 'PARTIAL' | 'UNOBSERVED';
+export type LensKey = 'jin' | 'seon' | 'mi' | 'in' | 'hyo';
+export type RailStage = 'intent' | 'action' | 'result' | 'evidence' | 'decision';
+
+export interface VerificationProjectionContext {
+	status: string | null;
+	allowWithheld: boolean;
+	missing: Record<string, unknown[]>;
+	canonical: boolean;
+}
+
 export interface EvidenceEvent {
 	eventId: string;
 	runId: string;
@@ -66,6 +77,17 @@ export interface EvidenceEvent {
 	note: string;
 	/** Producer-supplied bounded comparisons, never a viewer-derived judgement. */
 	intentReview?: Record<string, unknown> | null;
+	/** Producer lens classifications copied from verification-view/v0. */
+	lensStates?: Partial<Record<LensKey, ObservationState>>;
+	/** Producer classifications copied from `columns`; not observation state. */
+	lensClassifications?: LensKey[];
+	/** Eternity / 永 is independent from chronological placement. */
+	continuityState?: ObservationState;
+	/** Keep the ledger value beside the producer-approved presentable value. */
+	recordedDecision?: Decision | null;
+	presentableDecision?: Decision | null;
+	/** Missing buckets that name this event in verification-view/v0. */
+	missing?: string[];
 }
 
 const RUN_ID = 'run-2026-09-06-001';
@@ -337,9 +359,50 @@ const HOW_BY_SCHEMA_KIND: Record<SchemaEventKind, string> = {
 };
 
 const COLUMN_WIDTH = 104;
+const LENS_LABELS: Record<LensKey, string> = {
+	jin: '眞 / Truth',
+	seon: '善 / Goodness',
+	mi: '美 / Beauty',
+	in: '仁 / Benevolence',
+	hyo: '孝 / Hyo',
+};
+const LENS_KEYS: readonly LensKey[] = ['jin', 'seon', 'mi', 'in', 'hyo'];
+const RAIL_LABELS: Record<RailStage, string> = {
+	intent: 'INTENT',
+	action: 'ACTION',
+	result: 'RESULT',
+	evidence: 'EVIDENCE',
+	decision: 'DECISION',
+};
+const RAIL_STAGES: readonly RailStage[] = ['intent', 'action', 'result', 'evidence', 'decision'];
 
 function byId(events: readonly EvidenceEvent[], id: string): EvidenceEvent | undefined {
 	return events.find((e) => e.eventId === id);
+}
+
+export interface TimelineProjection {
+	columnByEvent: Map<string, number>;
+	labels: string[];
+}
+
+export function timelineProjection(events: readonly EvidenceEvent[]): TimelineProjection {
+	const columnByTimestamp = new Map<string, number>();
+	const columnByEvent = new Map<string, number>();
+	const labels: string[] = [];
+	for (const event of events) {
+		// `events` is already in producer order (event_order for the canonical
+		// view). Do not parse, sort, normalize, or otherwise reinterpret `when.ts`.
+		const rawTimestamp = event.ts.trim();
+		const key = rawTimestamp || 'TIME UNOBSERVED';
+		let column = columnByTimestamp.get(key);
+		if (column === undefined) {
+			column = labels.length;
+			columnByTimestamp.set(key, column);
+			labels.push(rawTimestamp ? `TS ${rawTimestamp}` : 'TIME UNOBSERVED');
+		}
+		columnByEvent.set(event.eventId, column);
+	}
+	return { columnByEvent, labels };
 }
 
 function chipGlyph(ev: EvidenceEvent): string {
@@ -410,6 +473,27 @@ function fieldHow(ev: EvidenceEvent): string {
 	return base;
 }
 
+function stateMark(state: ObservationState): string {
+	return state === 'OBSERVED' ? 'OBSERVED' : state === 'PARTIAL' ? 'PARTIAL' : 'UNOBSERVED';
+}
+
+function lensState(ev: EvidenceEvent, key: LensKey): ObservationState {
+	return ev.lensStates?.[key] ?? 'UNOBSERVED';
+}
+
+function railState(events: readonly EvidenceEvent[], ev: EvidenceEvent, stage: RailStage): ObservationState {
+	const run = events.filter((candidate) => candidate.runId === ev.runId);
+	if (stage === 'intent') return run.some((candidate) => candidate.schemaKind === 'prompt') ? 'OBSERVED' : 'UNOBSERVED';
+	if (stage === 'action') return run.some((candidate) => candidate.schemaKind === 'tool_call') ? 'OBSERVED' : 'UNOBSERVED';
+	if (stage === 'result') {
+		return run.some((candidate) => ['tool_result', 'model_response', 'error'].includes(candidate.schemaKind))
+			? 'OBSERVED'
+			: 'UNOBSERVED';
+	}
+	if (stage === 'evidence') return ev.evidenceRefs.length ? 'OBSERVED' : 'UNOBSERVED';
+	return ev.schemaKind === 'decision' && ev.policy ? (ev.policy.decision === 'UNOBSERVED' ? 'UNOBSERVED' : 'OBSERVED') : 'UNOBSERVED';
+}
+
 function escapeHtml(value: string): string {
 	return value
 		.replace(/&/g, '&amp;')
@@ -458,17 +542,38 @@ function renderPanelHtml(events: readonly EvidenceEvent[], ev: EvidenceEvent): s
 		: '— (run root)';
 	const evidence = ev.evidenceRefs.length ? ev.evidenceRefs.map(escapeHtml).join(', ') : 'none';
 
+	const decision = ev.policy
+		? row5(
+				'Decision',
+				`Recorded: ${escapeHtml(ev.recordedDecision ?? ev.policy.decision ?? 'UNOBSERVED')} · Presentable: ${escapeHtml(ev.presentableDecision ?? ev.policy.decision ?? 'UNOBSERVED')}`,
+			)
+		: '';
+	const lenses =
+		`<section class="lens-aperture" aria-label="five independent lens coverage indicators">` +
+		`<h3>FIVE-LENS APERTURE</h3><p class="panel-note">Evidence coverage only; no virtue score or aggregate.</p>` +
+		`<div class="lens-list">${LENS_KEYS.map((key) => `<span class="lens-state"><b>${escapeHtml(LENS_LABELS[key])}</b> ${stateMark(lensState(ev, key))}</span>`).join('')}</div>` +
+		`<p class="panel-note">Classification only: ${ev.lensClassifications?.length ? ev.lensClassifications.map((key) => escapeHtml(LENS_LABELS[key])).join(', ') : 'UNOBSERVED'}. Classification does not establish event observation.</p>` +
+		`<p class="panel-note">永 / CONTINUITY: ${stateMark(ev.continuityState ?? 'UNOBSERVED')} — chronological placement does not establish continuity.</p></section>`;
+	const rail =
+		`<section class="verification-rail" aria-label="verification rail"><h3>VERIFICATION RAIL</h3>` +
+		`<div class="rail-list">${RAIL_STAGES.map((stage) => `<span class="rail-stage"><b>${RAIL_LABELS[stage]}</b> ${stateMark(railState(events, ev, stage))}</span>`).join('')}</div></section>`;
+	const missing = ev.missing?.length
+		? `<details class="panel-missing"><summary>WHAT IS MISSING</summary><p>${escapeHtml(ev.missing.join(', '))}</p></details>`
+		: '<details class="panel-missing"><summary>WHAT IS MISSING</summary><p>UNOBSERVED for this event.</p></details>';
+
 	return (
 		`<h2>5W1H — ${escapeHtml(ev.eventId)}</h2>` +
 		row5('Who', `${escapeHtml(ev.actor)} (${escapeHtml(ROW_LABEL[ev.row])})`) +
-		row5('When', `${escapeHtml(ev.ts)} · step ${ev.stepIndex}`) +
+		row5('When', `${escapeHtml(ev.ts || 'TIME UNOBSERVED')} · step ${ev.stepIndex}`) +
 		row5('What', escapeHtml(fieldWhat(ev))) +
 		row5('Where', escapeHtml(fieldWhere(ev))) +
 		row5('How', escapeHtml(fieldHow(ev))) +
 		row5('Why', escapeHtml(fieldWhy(ev))) +
+		decision +
 		(ev.intentReview !== undefined ? row5('Policy rationale', escapeHtml(ev.policy?.reason ?? 'UNOBSERVED')) : '') +
 		renderIntentReview(ev.intentReview) +
-		`<div class="row links"><b>Links</b><span>Parent: ${parent} · Evidence: ${evidence}</span></div>`
+		`<div class="row links"><b>Links</b><span>Parent: ${parent} · Evidence: ${evidence}</span></div>` +
+		lenses + rail + missing
 	);
 }
 
@@ -583,15 +688,15 @@ export function mountEvidenceGraph(
 	const gridRoot: HTMLDivElement = gridRootOrNull;
 	const svgRoot: SVGSVGElement = svgRootOrNull;
 
-	const maxStep = events.reduce((m, e) => Math.max(m, e.stepIndex), 0);
-	const cols = maxStep + 1;
+	const timeline = timelineProjection(events);
+	const cols = timeline.labels.length;
 
 	// A single (row, step) can contain several schema events — most commonly
 	// a tool_call and its tool_result. Keep the full bucket instead of letting
 	// the later event overwrite the earlier one.
 	const atCell = new Map<string, EvidenceEvent[]>();
 	for (const ev of events) {
-		const key = `${ev.row}:${ev.stepIndex}`;
+		const key = `${ev.row}:${timeline.columnByEvent.get(ev.eventId) ?? cols - 1}`;
 		const bucket = atCell.get(key);
 		if (bucket) bucket.push(ev);
 		else atCell.set(key, [ev]);
@@ -610,7 +715,7 @@ export function mountEvidenceGraph(
 	gridRoot.appendChild(el('div', 'corner'));
 	for (let c = 0; c < cols; c++) {
 		const head = el('div', 'colhead');
-		head.textContent = `t${c}`;
+		head.textContent = timeline.labels[c] ?? 'TIME UNOBSERVED';
 		gridRoot.appendChild(head);
 	}
 
@@ -765,8 +870,8 @@ export function mountEvidenceGraph(
 
 		const rs = ROW_ORDER.indexOf(sourceEv.row);
 		const rt = ROW_ORDER.indexOf(targetEv.row);
-		const cs = sourceEv.stepIndex;
-		const ct = targetEv.stepIndex;
+		const cs = timeline.columnByEvent.get(sourceEv.eventId) ?? cols - 1;
+		const ct = timeline.columnByEvent.get(targetEv.eventId) ?? cols - 1;
 		const forward = cs <= ct;
 		const p1 = port(sourceRect, forward ? 'right' : 'left', wrapRect);
 		const p2 = port(targetRect, forward ? 'left' : 'right', wrapRect);
@@ -1005,7 +1110,9 @@ export function mountEvidenceGraph(
 				const sourceRect = refEv ? cellRect(refEv.eventId) : null;
 				if (!refEv || !sourceRect) continue;
 
-				const colDelta = ev.stepIndex - refEv.stepIndex;
+				const colDelta =
+					(timeline.columnByEvent.get(ev.eventId) ?? cols - 1) -
+					(timeline.columnByEvent.get(refEv.eventId) ?? cols - 1);
 				const rowDelta = rowIndex(ev.eventId) - rowIndex(refEv.eventId);
 				const bucketKey = `${colDelta}:${rowDelta}`;
 				const bucketIndex = bucketCounts.get(bucketKey) ?? 0;
