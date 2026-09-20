@@ -57,10 +57,10 @@ Neither proxy is authority. Both remain review signals with explicit
   model is being updated; a general per-axis evaluator is not yet in the public
   package.
 
-HYOGOOK V5 is the internal name for that older method, not HyoDo's current
-evaluation model. The public CLI label remains HyoDo Integrity Score for
-compatibility; HyoDo does not define its six reference values as one canonical
-score.
+That older method is retained only for compatibility; it is not HyoDo's
+current evaluation model. The public CLI label remains HyoDo Integrity Score
+for compatibility; HyoDo does not define its six reference values as one
+canonical score.
 
 ## 3. What a score means
 
@@ -71,9 +71,8 @@ implement a general per-axis evaluator. Missing evidence remains
 `UNOBSERVED`. That means there is not enough evidence to say whether a check
 passed or failed; it is neither a pass nor a failure. The current
 `hyodo score` command still combines five inputs with a geometric mean and
-floors zero inputs for historical compatibility. **HYOGOOK V5** is the
-internal name for that older calculation. It is advisory and is not HyoDo's
-current evaluation model.
+floors zero inputs for historical compatibility. That older calculation is retained only for compatibility. It is advisory
+and is not HyoDo's current evaluation model.
 
 `--partial` allows missing pillars and adds `SIGNAL_CONFIDENCE_WEAK`. It
 does not invent a strong signal via a silent fill-in of 1.0 for whatever was
