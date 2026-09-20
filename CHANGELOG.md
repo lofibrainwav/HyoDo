@@ -5,6 +5,28 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.0] - 2026-09-19
+
+### Added
+
+- Opt-in intent reviews compare host-supplied scalar requirements and link
+  previous reviews without inferring user intent or granting authority.
+- Local and public file viewers show comparison evidence, missing dimensions,
+  and changed requirements separately from policy rationale.
+
+### Fixed
+
+- Preserve distinct graph participants and explicit From/To endpoints; do not
+  classify unknown participants as workers.
+- Order recorded timestamps across runs and separate time navigation from
+  independent continuity and virtue observations.
+- Correct storefront version, privacy, first-run, and worked-example claims.
+
+### Evidence
+
+- Source changes landed in PR #429. Release verification and publication
+  evidence are recorded separately in the release chain receipt.
+
 ## [4.19.9] - 2026-09-19
 
 Storefront repairs from the 2026-09-19 first-visit audit. The version bump itself
