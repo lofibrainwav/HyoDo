@@ -4,8 +4,9 @@ description: Where HyoDo is headed, staged honestly against what ships today.
 ---
 
 HyoDo is a public, host-neutral trust, evidence, policy, and attestation layer.
-Integrating hosts own orchestration and execution authority. KINGDOM is a
-reference consumer and research harness, not part of HyoDo.
+Integrating hosts own orchestration and execution authority. External agent
+runtimes may act as reference consumers or research harnesses; they are not
+part of HyoDo.
 
 This page describes direction, not a delivery promise. The
 [ROADMAP.md](https://github.com/lofibrainwav/HyoDo/blob/main/ROADMAP.md) file
