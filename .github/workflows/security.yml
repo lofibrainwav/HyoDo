@@ -50,15 +50,17 @@ jobs:
           set -euo pipefail
           canary="$(mktemp -d)"
           cp .gitleaksignore "$canary/.gitleaksignore"
-          # Built at run time so this file never contains a scannable key itself.
-          key="AKIA$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Z0-9' | cut -c1-16)"
-          if [ "${#key}" -ne 20 ]; then
-            echo "::error::canary key generation produced ${#key} characters, not 20"
+          # Build a deterministic GitHub-PAT-shaped canary at run time.
+          # Keeping prefix and body separate means this workflow never contains
+          # a complete token-shaped literal for the working-tree scan to flag.
+          prefix="ghp_"
+          body="Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0UvWxYz"
+          key="${prefix}${body}"
+          if [ "${#key}" -ne 40 ]; then
+            echo "::error::canary key assembly produced ${#key} characters, not 40"
             exit 1
           fi
-          # Same shape as the fixtures this scan demonstrably reports, so a miss
-          # means suppression rather than a rule that never matched.
-          printf 'FAKE_AWS_KEY = "%s"\n' "$key" > "$canary/planted.py"
+          printf 'token = "%s"\n' "$key" > "$canary/planted.py"
           if docker run --rm -v "$canary:/canary" -w /canary "$GITLEAKS_IMAGE" \
                detect --source=. --no-git --redact --no-banner --exit-code 1; then
             echo "::error::A planted current secret was not reported. The baseline or the rule set is suppressing present-day findings."
