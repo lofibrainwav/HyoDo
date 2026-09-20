@@ -32,14 +32,14 @@ This keeps destructive actions, credential exposure, deployment risk, and unsafe
 
 ## Supported Versions
 
-The current public release is HyoDo **4.19.8**. Security fixes target the
-current `4.19.x` release line. Older release lines must be upgraded before a
+The current public release is HyoDo **4.20.0**. Security fixes target the
+current `4.20.x` release line. Older release lines must be upgraded before a
 security report can be reproduced against a supported artifact.
 
 | Version | Supported |
 |---------|-----------|
-| 4.19.x  | ✅ Current release line |
-| < 4.19  | ❌ Upgrade required |
+| 4.20.x  | ✅ Current release line |
+| < 4.20  | ❌ Upgrade required |
 
 ## Reporting a Vulnerability
 
