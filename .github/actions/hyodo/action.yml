@@ -3,7 +3,7 @@ description: >-
   Install HyoDo from the same pinned repository ref and run fail-closed quality
   gates (hyodo check). Exits non-zero when gates fail or when nothing measurable
   ran; missing evidence is never reported as green.
-author: AFO Kingdom
+author: BRNESTRM
 branding:
   icon: shield
   color: blue

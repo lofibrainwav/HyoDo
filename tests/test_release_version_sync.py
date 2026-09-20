@@ -21,7 +21,7 @@ SERVER_JSON = """{{
 
 MARKETPLACE_JSON = """{{
   "name": "hyodo",
-  "owner": {{"name": "AFO Kingdom"}},
+  "owner": {{"name": "BRNESTRM"}},
   "plugins": [
     {{"name": "hyodo", "source": "./", "version": "{version}"}}
   ]
