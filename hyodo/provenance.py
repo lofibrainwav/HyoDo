@@ -85,6 +85,9 @@ _GIT_TIMEOUT_SECONDS = 5
 def _run_git(root: Path, *args: str) -> str | None:
     """`git -C root <args>`, or None if git is absent or the call fails.
 
+    An empty stdout is a real, successful result — `git status --porcelain`
+    prints nothing for a clean tree — so it is returned as an empty string,
+    distinct from None (git missing, non-zero exit, timeout, or OSError).
     Provenance must never be the reason a measurement crashes: every failure
     here degrades to "not observed", which the caller reports honestly.
     """
@@ -102,7 +105,7 @@ def _run_git(root: Path, *args: str) -> str | None:
         return None
     if completed.returncode != 0:
         return None
-    return completed.stdout.strip() or None
+    return completed.stdout.strip()
 
 
 def git_commit(root: Path) -> str | None:

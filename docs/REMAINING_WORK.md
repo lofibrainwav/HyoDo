@@ -1,6 +1,6 @@
 # HyoDo remaining work and handoff
 
-Handoff snapshot: 2026-09-19, revised after the 4.19.9 release. This is a
+Handoff snapshot: 2026-09-20, revised after the 4.20.0 release. This is a
 bounded work register, not a live status feed or a claim that every possible
 defect has been discovered. Refresh linked evidence before starting or closing
 an item.
@@ -19,13 +19,12 @@ That priority orders the work in *this* register. It does not rank another
 owner's queue and does not make their work wait on HyoDo — see "KINGDOM handoff
 boundary" for why ordering and ownership are separate questions here.
 
-**Current state (2026-09-19, after the 4.19.9 release).** All six audited
-storefront items are closed on the surface a visitor actually meets. HyoDo
-4.19.9 is published; `main` is `897112b`. One residual remains, and it is a
-metadata field rather than a defect a reader hits: `project_urls` Homepage and
-Documentation are repointed at `hyodo.app` in source but still read GitHub on
-the published 4.19.9 page. It is queued for whenever a release is next
-authorized for other reasons — it does not itself call for one.
+**Current state (2026-09-20, after the 4.20.0 release).** HyoDo 4.20.0 is
+published; `main` is `b86931f`. All six audited storefront items are closed on
+the surface a visitor actually meets, and the 4.19.9 `project_urls` residual is
+closed too: the published 4.20.0 page reads Homepage `https://hyodo.app` and
+Documentation `https://hyodo.app/docs/quickstart/`. The register items below
+each carry a dated disposition; none is left silently `UNOBSERVED`.
 
 See "Public readiness" for each item and the evidence behind it.
 
@@ -121,6 +120,58 @@ Website, verified against the deployed site after `897112b`:
 - One transient `404` was seen on `/docs/worked-example/` seconds after the
   merge and resolved on the next probe: CDN propagation, not a routing defect.
 
+### Observed 2026-09-20, ~23:00 UTC — after the 4.20.0 release and #438
+
+This is the current reading. It supersedes the sections above where they
+disagree; they are kept, dated, as the record of what was true then.
+
+Published package and release, verified against PyPI, GitHub, and CI:
+
+- Latest version is **`4.20.0`**; `project_urls` Homepage and Documentation now
+  read `https://hyodo.app` and `https://hyodo.app/docs/quickstart/` on the
+  published page. The 4.19.9 metadata residual is closed.
+- GitHub Release `v4.20.0` reports `immutable: true` (API readback 2026-09-20),
+  with SBOM and SHA-256 receipt assets attached. The `v4.19.5` immutability
+  residual recorded in the third-party register is superseded by this release.
+- `main` is `b86931f`; its check runs are 20 success and 1 expected
+  PR-only dependency-review skip. Open pull requests: 0. Dependency PR #418
+  (`@types/three` 0.185.4 → 0.186.0) merged at 2026-09-20T18:35Z; its merge
+  commit is an ancestor of `main` and the lock carries `@types/three` 0.186.0.
+
+Website, verified against the deployed site:
+
+- `https://hyodo.app/` returns HTTP 200 with a strict same-origin CSP
+  (`default-src 'self'`, plus `frame-ancestors 'none'`, `form-action 'self'`,
+  `base-uri 'self'`, `object-src 'none'`) and **no `unsafe-inline`**. No
+  `Set-Cookie` is sent. The only external URLs in the served HTML are plain
+  links (GitHub, PyPI); the page loads no third-party script, image, font, or
+  fetch origin.
+
+Remote MCP boundary, verified by endpoint probe:
+
+- `https://mcp.hyodo.app/mcp` and `https://mcp.hyodo.app/` both return
+  HTTP 404, matching the repository's contract-only documentation on every
+  surface checked (README, ONBOARDING, SECURITY_SURFACE, the MCP design and
+  M5 contract documents). No hosted MCP service is advertised as live.
+
+Package data boundary, verified by source inspection of `main`:
+
+- `hyodo/` contains no HTTP client import and no telemetry or analytics
+  integration; runtime dependencies are `jsonschema`, `referencing`, `typer`,
+  `rich`, and the Python 3.10 `tomli` backport. The one raw-socket use is a
+  local port-availability probe. Combined with the 2026-09-19 local-write
+  check (only `.hyodo/gates-trust.json` written; nothing under `$HOME`), the
+  package-side privacy statement holds within its stated scope;
+  hosting-side request logging remains honestly `UNOBSERVED`.
+
+Accessibility, measured on the deployed site (see H4):
+
+- All three advertised journeys pass keyboard, focus, labeling, and AA
+  contrast checks within the stated scope (driven Chromium only). One minor
+  defect (a swallowed Tab after the last evidence-graph cell) and one
+  advisory (sub-3:1 tile fills, redundant with text) are recorded in the H4
+  row rather than fixed here.
+
 ### Status
 
 <!-- markdownlint-disable MD013 -->
@@ -132,7 +183,7 @@ Website, verified against the deployed site after `897112b`:
 | A3 first install | **closed** | **closed** | The deployed quickstart carries the prerequisites, `cd your-project`, and the per-installer extra step. Against the published 4.19.9 package in an isolated pipx sandbox: `hyodo mcp stdio` exits 2 with both installer paths, and after the advised extra install the MCP client completes initialize / list_tools (six tools) / a read-only call. |
 | A4 representative result | **closed** | n/a | `/docs/worked-example/` is served and carries one run of the published 4.19.9 wheel on a three-file project — input files, command, verbatim output, and exit codes `0` / `1` / `2` asserted against that wheel, including the malformed-config case that reports `UNOBSERVED` rather than a pass. |
 | A5 doc entry path | **closed** | n/a | Four sidebar groups serve, every label equals its page's frontmatter title, and the quickstart carries a support-scope table. `site/scripts/check-site-output.mjs` fails the build on a label mismatch or a dangling slug; adding it caught two mismatches beyond the audited one. |
-| A6 contact and data boundary | **closed** | **residual** | The footer's contact, security-reporting and maintenance links, the web-vs-local data-boundary paragraph, and `og:image` are all served and verified. Residual: `project_urls` Homepage and Documentation are repointed at `hyodo.app` in source but still read GitHub on the published 4.19.9 page. Queued for the next authorized release; it does not call for one. |
+| A6 contact and data boundary | **closed** | **closed** | The footer's contact, security-reporting and maintenance links, the web-vs-local data-boundary paragraph, and `og:image` are all served and verified. The `project_urls` residual closed with 4.20.0: the published page reads `hyodo.app` for Homepage and Documentation (readback 2026-09-20). |
 
 <!-- markdownlint-enable MD013 -->
 
@@ -238,21 +289,21 @@ Roles below identify responsibility; no individual assignee is designated.
 
 | ID | Priority / state | Work and next action | Responsible role | Completion evidence |
 | --- | --- | --- | --- | --- |
-| H1 | P1 / CLOSED for 4.19.9 (2026-09-19) | Released 4.19.9 under the release checklist after an explicit authorization naming commit `c2b85e8`. The next release decision is a fresh instance of this item, not a continuation of this one. | HyoDo release maintainer | Verified tag `v4.19.9` → `c2b85e8` (GitHub `verification.verified: true`); durable SBOM plus SHA-256 receipt on the published Release, checksum re-verified independently; publish run `35473994781` with provenance and install smoke green; wheel sha256 `7895a1c1fcf00a1f`; `verify_release_chain 4.19.9` records all nine steps `OBSERVED`; published description and isolated clean install read back by hand. Carried forward: `project_urls` Homepage/Documentation, fixed in source after the tag. |
-| H2 | P1 / UNOBSERVED | Audit public MCP wording, especially `mcp.hyodo.app`, against the actual supported service. Keep hosted contract-only status clear. | HyoDo public surface maintainer | Dated page/endpoint evidence and matching documentation; either supported behavior verified or unsupported/unavailable status stated clearly. Building a hosted service is not implied. |
-| H3 | P1 / UNOBSERVED | Audit privacy statements against actual collection, retention, consent, and deletion behavior of each advertised surface. | HyoDo public surface maintainer | Surface-specific data-flow evidence, matching public explanation, and disposition of each discrepancy. No private payloads in public receipts. |
-| H4 | P1 / UNOBSERVED | Verify accessibility of the advertised public user journeys; inspect existing receipts before defining fresh scope. | HyoDo UI maintainer | Dated keyboard, focus, labeling, and contrast checks for named journeys; defects fixed or explicitly scoped and tracked. |
-| H5 | P1 / UNOBSERVED | Check provenance of public evidence claims and provide a reproducible, non-private example. | HyoDo evidence maintainer | Source/version/method-bound receipt and independent reproduction instructions with expected results and limitations. Private ledger counts remain sample reports unless reproducible evidence is supplied. |
-| H6 | P2 / OPEN | Review dependency PR #418 separately (unchanged by the 4.19.9 release); refresh its base and inspect compatibility before deciding to merge. | HyoDo dependency maintainer | Reviewed dependency diff, relevant site checks, exact-head CI and post-merge evidence, or a documented decision to close/defer. |
-| H7 | P2 / OPEN | Refresh dated public claim documentation. The July external audit says `hyodo check` is checkout-only, while current guidance distinguishes BYOG from HyoDo self-verification. | HyoDo documentation maintainer | Dated scope-correct audit tied to current source/package behavior; historical observations labeled as historical. |
-| H8 | P2 / RECORDED | Preserve the reported missing model-attribution trailers on historical commits `07fdc0f` and `1b9b3f3`; verify and decide whether an additive correction is needed. | HyoDo repository maintainer | Maintainer disposition or additive attribution record. No history rewrite is required by this register. |
+| H1 | P1 / CLOSED for 4.20.0 (2026-09-20) | Released 4.20.0 from tag target `a5ecdcd`; all nine release-chain steps `OBSERVED` (verified tag signature, release evidence run, SBOM and SHA-256 receipt assets, PyPI publish and provenance, install smoke, wheel sha256 `b96759ca26c067e9`); the GitHub Release reports `immutable: true`. The 4.19.9 `project_urls` carry-forward closed with this release. The next release decision is a fresh instance of this item, not a continuation of this one. | HyoDo release maintainer | `docs/releases/4.20.0.md` receipt; PyPI and GitHub API readback 2026-09-20 recorded above. |
+| H2 | P1 / CLOSED (2026-09-20) | Audited public MCP wording against the actual supported service. Endpoint probe: `mcp.hyodo.app/mcp` and `/` both return HTTP 404; every surface checked (README, ONBOARDING, SECURITY_SURFACE, M5 contract, MCP design docs) states contract-only / not live. No surface advertises a hosted MCP service. Building a hosted service was never implied and is not begun. | HyoDo public surface maintainer | Dated probe and wording sweep across `main`, 2026-09-20, recorded above. |
+| H3 | P1 / CLOSED within stated scope (2026-09-20) | Site: no `Set-Cookie`, no third-party load origins, strict CSP without `unsafe-inline`, `connect-src 'self'`. Package: no network client, no telemetry, five declared runtime deps, local writes confined to `.hyodo/` (2026-09-19 check). Hosting-side request logging stays explicitly `UNOBSERVED` — a stated scope limit, not an unexamined gap. No private payloads appear in public receipts. | HyoDo public surface maintainer | Dated header/HTML readback and source inspection, 2026-09-20, recorded above. |
+| H4 | P1 / CLOSED within measured scope (2026-09-20) | Audited the three advertised journeys on the deployed site. Keyboard: full walk of `/` (34 focus stops, visible `:focus-visible` outline at every stop, skip-link present and functional), quickstart (78 stops, `lang=en`, main landmark, 0 images without alt), evidence-graph prototype (cells are real buttons with descriptive `aria-label`s; Escape clears the panel without losing focus; DOM order equals visual order). Contrast, computed from the served CSS: body text 15.85:1, secondary text 6.19:1, panel text 5.27:1, ask 7.93:1, warn badge ink 10.57:1, focus ring 3.96:1 vs node fill — all pass AA (4.5:1 text / 3:1 UI). Two recorded non-blockers: one Tab press is consumed by `BODY` after the last graph cell (the cell's blur handler resets the side panel with an innerHTML swap that destroys the `<summary>` which was the next focus target mid transfer, so focus aborts to `BODY`; the next Tab reaches the link — exactly one wasted keypress, nothing unreachable, non-recurring), and decision-tile fills sit below 3:1 but the decision is redundantly available as cell text (advisory). Not covered, stated as scope: screen readers, real handsets, browsers other than the driven Chromium. | HyoDo UI maintainer | Dated keyboard/focus/labeling/contrast evidence above, 2026-09-20; defect and advisory explicitly scoped rather than silently passed. |
+| H5 | P1 / CLOSED (2026-09-20) | Public evidence claims carry reproducible provenance: the worked-example page reproduces one full run of the published wheel (input files, command, verbatim output, asserted exit codes `0`/`1`/`2`), and the 4.20.0 release receipt records the full chain with wheel sha256 and a verified tag. Private ledger counts are not cited as public evidence. | HyoDo evidence maintainer | `/docs/worked-example/` served output; `docs/releases/4.20.0.md` nine-step `OBSERVED` receipt. |
+| H6 | P2 / CLOSED (2026-09-20) | Dependency PR #418 reviewed and merged (2026-09-20T18:35Z); the merge commit is an ancestor of `main`, `site/package-lock.json` carries `@types/three` 0.186.0, and `main` CI is green after it (20 success + 1 expected skip). | HyoDo dependency maintainer | GitHub API readback 2026-09-20 recorded above. |
+| H7 | P2 / CLOSED (2026-09-20) | `docs/EXTERNAL_CLAIM_AUDIT.md` now carries a dated 2026-09-20 scope-supersession note marking the 2026-07-21 audit as historical and recording the current `check` scope (BYOG gates in any project; sampled language-agnostic gates as the no-config default; HyoDo self-verification a separate checkout-scoped path), with dependency/MCP findings re-observed unchanged. Landed with this register update. | HyoDo documentation maintainer | Dated note in the audit document itself. |
+| H8 | P2 / DISPOSITIONED (2026-09-20) | `07fdc0f` and `1b9b3f3` were verified to carry no model-attribution trailer; both predate the recorded convention. History is not rewritten. The repository convention (CLAUDE.md) requires model attribution via `Co-Authored-By` going forward and recent history shows it in use. No additive correction record is owed beyond this entry. | HyoDo repository maintainer | This register entry is the disposition record. |
 
 <!-- markdownlint-enable MD013 -->
 
-H2-H5 carry forward reported public-surface concerns. They were not freshly
-audited during the #414 closeout and must not be presented as confirmed
-vulnerabilities or as completed work. H8 is a reported historical concern,
-not a newly verified finding.
+H2, H3, H5, H6, and H7 now carry dated 2026-09-20 dispositions in the rows
+above. The 2026-09-19 note that H2–H5 "carry forward reported public-surface
+concerns" was true then and is superseded by those rows. H8 is dispositioned
+without history rewrite.
 
 ## Order of work and closure rule
 
@@ -263,10 +314,9 @@ not a newly verified finding.
    Storefront work done in September 2026 touched adjacent ground — a
    data-boundary statement near H3, a keyboard walk near H4 — but neither is the
    audit those items ask for, and neither closes them.
-3. H1 is closed for 4.19.9. A further release is a new instance of H1 and needs
-   its own authorization and verification gates; the `project_urls` residual
-   rides along with whatever release is next authorized rather than justifying
-   one.
+3. H1 is closed for 4.19.9 and 4.20.0. A further release is a new instance of
+   H1 and needs its own authorization and verification gates. The
+   `project_urls` residual closed with 4.20.0 and no longer rides along.
 4. Handle H6 and H8 independently; neither automatically expands release
    scope or authorizes rewriting history.
 5. Record each item's evidence link, observed date, final state, and owner

@@ -67,13 +67,13 @@ deployed and tested.
 | --- | --- | --- |
 | Compose default exposure | RETIRED | The Compose surface is no longer part of the live product; historical YAML/runtime evidence remains recorded below |
 | Historical credential disposition | RECONCILED / HISTORICAL RESIDUAL | 13 narrow test/fixture/non-secret baselines are documented; C1 is revoked; C2/C3 are decommissioned external historical credentials with unavailable owners and no current validation control. None is treated as an active credential |
-| Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, package metadata, and site source claims now name public release `4.20.0`; public deployment readback is separate |
-| Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
+| Version/support-policy reconciliation | VERIFIED ON PUBLIC SURFACES (2026-09-20) | Source, docs, and site name `4.20.0`; PyPI serves `4.20.0` with `hyodo.app` project URLs (readback 2026-09-20) |
+| Docker image boundary | RETIRED FROM LIVE PRODUCT (2026-09-20) | Docker is no longer part of the repository tree or the live product surface; the historical evidence below is retained as record |
 | Clean security verification | VERIFIED IN ISOLATED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Isolated Python 3.12 environment: `1499 passed, 7 skipped`; `ruff`, `pyright`, `pip-audit --local`, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. A later host-global `pip-audit` attempt could not start because that environment lacks `certifi`; it is not counted as a vulnerability result |
 | CI secret/dependency scan | VERIFIED ON REMOTE MAIN / REQUIRED | SHA-pinned `security.yml` runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; required contexts include the historical secret scan and runtime dependency audit |
 | CI action/dependency maintenance | VERIFIED ON REMOTE MAIN | Site and security workflow actions are SHA-pinned; remote `main` contains the merged site hardening and security workflow |
-| Public remediation tracking | IMPLEMENTED LOCALLY / NOT PUBLISHED | The register exists locally; the fresh remote readback found no open issue or PR dedicated to this remediation |
-| GitHub release immutability | OBSERVED RESIDUAL | Public `v4.19.5` reports `immutable: false`; signed tag and artifact provenance are separate evidence and do not establish release-record immutability |
+| Public remediation tracking | PUBLISHED ON PUBLIC MAIN (2026-09-20) | The register is tracked in the public repository and reconciled through reviewed PRs (most recently #438); open pull requests at readback: 0. The 2026-09-13 "not published" reading is superseded |
+| GitHub release immutability | RESIDUAL SUPERSEDED FOR CURRENT RELEASE (2026-09-20) | `v4.19.5` reported `immutable: false` (2026-09-13 reading, kept below); the current release `v4.20.0` reports `immutable: true` (API readback 2026-09-20) |
 | Public sdist scope gate | IMPLEMENTED_AND_VERIFIED_LOCALLY | `verify-public.sh` now delegates archive-scope validation to `verify_sdist_scope.py`; a 512,954-byte sdist passed with 199 members and no `afo_core` |
 | Site dependency/build verification | PRODUCTION HEADER VERIFIED / ARTIFACT READBACK SEPARATE | `npm ci` previously reported 0 vulnerabilities; local build/browser evidence remains separate, while a fresh 2026-09-14 production readback returned `200` with strict same-origin CSP on `/` and `/docs/quickstart/` |
 
@@ -87,7 +87,9 @@ scan, and runtime dependency audit; it also reports force-push and
 branch-deletion denial. Required approving review count is currently `0`, and
 required signed commits are disabled. The rulesets endpoint returned an empty
 list. Security scan enforcement is observed on remote `main`; the historical
-findings themselves remain an independent owner-disposition hold.
+findings carry documented dispositions (13 narrow baselines, C1 revoked,
+C2/C3 decommissioned historical residuals — see
+`docs/security/GITLEAKS_DISPOSITION.md`), superseding the 2026-09-13 hold.
 
 The public site hardening from [PR #296](https://github.com/lofibrainwav/HyoDo/pull/296)
 is merged and the corresponding Vercel production deployment is `READY`. A
@@ -106,16 +108,17 @@ post-build artifact has removed these classes of inline content.
 ### Public tracking and release mutability
 
 As of the 2026-09-13 PT readback, the public repository had no open issues or
-open pull requests for this remediation. The local register therefore remains
-an implementation artifact until it is published through a reviewed PR or an
-explicitly linked security issue. The latest public GitHub Release, `v4.19.5`,
-reported `immutable: false`; the signed tag, artifact hashes, and PyPI
-provenance remain valuable independent evidence, but they do not prove that
-the GitHub release record cannot be changed.
+open pull requests for this remediation, and the latest public GitHub Release,
+`v4.19.5`, reported `immutable: false`. Both readings are superseded as of
+2026-09-20: this register is tracked on public `main` (reconciled through
+reviewed PRs, most recently #438), the repository shows zero open pull
+requests at readback, and the current release `v4.20.0` reports
+`immutable: true`.
 
 The closure condition is not merely “documented”: the public tracking item
 must link the exact source SHA, owner disposition receipt, and final external
-readback. Until then, this lane is `IMPLEMENTED LOCALLY / NOT PUBLISHED`.
+readback. That condition is now met by this document's presence on `main`
+with dated readbacks; the lane is `PUBLISHED`.
 
 ## 3. P1 conditional — harden the optional Compose stack
 
@@ -565,3 +568,13 @@ Until step 8 is complete, the appropriate external statement is:
 > controls. Compose runtime readback, historical secret disposition, Docker
 > reproducibility, remote security-workflow enforcement, and CSP tightening
 > remain open or explicitly unobserved.
+
+Readback note (2026-09-20): the statement above described the state when the
+plan was written and is kept as the historical close-of-plan wording. As of
+2026-09-20: historical secret disposition is reconciled
+(`docs/security/GITLEAKS_DISPOSITION.md`); the Compose surface is retired from
+the repository; the security workflow is required on remote `main`; the
+deployed CSP carries no `unsafe-inline`. Docker reproducibility stays
+unobserved because Docker is no longer part of the live product. The honest
+external statement is the current register, not this plan's 2026-09-13
+snapshot.
