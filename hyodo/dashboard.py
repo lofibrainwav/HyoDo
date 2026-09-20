@@ -118,6 +118,36 @@ function coverageState(entry) {
 function lensMark(state) {
   return state === "OBSERVED" ? "●" : state === "PARTIAL" ? "◐" : "○";
 }
+function addIntentReview(panel, data) {
+  const section = addSection("WHY / INTENT COMPARISON", "intent-review");
+  const review = data.intentReview || {};
+  addText(section, "p", "User intent source: " + String(review.intent_ref || "UNOBSERVED"));
+  addText(section, "p", "Comparison target: " + String(review.target || "UNOBSERVED") + " · " + String(review.mode || "UNOBSERVED"));
+  addText(section, "p", "Host-supplied requirements and values; resolved references do not authenticate intent, verify values, or authorize action.");
+  const history = review.history || {};
+  addText(section, "p", "Previous comparison: " + String(history.previous_review_ref || "UNOBSERVED") + " · " + String(history.state || "UNOBSERVED"));
+  if (history.intent_source_changed === true) addText(section, "p", "Intent source changed. This link does not establish user approval of the change.");
+  for (const change of (Array.isArray(history.requirement_changes) ? history.requirement_changes : [])) {
+    addText(section, "p", "Recorded requirement change: " + String(change.id) + " · " + String(change.kind) + " · " + JSON.stringify(change.before) + " → " + JSON.stringify(change.after));
+  }
+  const checks = Array.isArray(review.checks) ? review.checks : [];
+  if (!checks.length) addText(section, "p", "UNOBSERVED · no requirement comparison was recorded.");
+  for (const check of checks) {
+    const item = addSection(String(check.dimension) + " / " + String(check.id), "intent-check");
+    addText(item, "p", "Evidence-qualified comparison: " + String(check.state));
+    addText(item, "p", "Requirement basis: " + String(check.basis));
+    addText(item, "p", "Expected: " + JSON.stringify(check.expected) + " · operator: " + String(check.operator));
+    addText(item, "p", "Reported actual: " + (check.actual === null ? "UNOBSERVED" : JSON.stringify(check.actual)) + " · unit: " + String(check.unit || "not specified"));
+    addText(item, "p", "Value comparison: " + String(check.comparison) + " · actual minus expected: " + String(check.delta ?? "not applicable"));
+    addText(item, "p", "Evidence refs: " + (Array.isArray(check.evidence_refs) ? check.evidence_refs.join(", ") : "UNOBSERVED"));
+    if (Array.isArray(check.missing) && check.missing.length) addText(item, "p", "Missing or withheld: " + check.missing.join(", "));
+    section.appendChild(item);
+  }
+  if (Array.isArray(review.missing_dimensions) && review.missing_dimensions.length) {
+    addText(section, "p", "Dimensions without checks: " + review.missing_dimensions.join(", "));
+  }
+  panel.appendChild(section);
+}
 function addLensAperture(panel, data) {
   const section = addSection("FIVE-LENS APERTURE", "lens-aperture");
   const intro = document.createElement("p");
@@ -294,6 +324,7 @@ cells.forEach((button) => {
     }
     addText(panel, "p", "Recorded actor: " + String(data.recordedActor || "UNOBSERVED"));
     addText(panel, "p", "Policy rationale: " + String(data.policyRationale || "UNOBSERVED"));
+    addIntentReview(panel, data);
     addLensAperture(panel, data);
     const proof = addSection("PROOF", "detail-proof");
     addText(proof, "p", "Causal parents: " + String(data.causalParentCount ?? 0));
@@ -919,6 +950,8 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, Any]:
     how_view: dict[str, Any] = raw_how_view if isinstance(raw_how_view, dict) else {}
     who_view = verification.get("who")
     who_view = who_view if isinstance(who_view, dict) else {}
+    why_view = verification.get("why")
+    why_view = why_view if isinstance(why_view, dict) else {}
 
     def participant(direction: str) -> str:
         """Display a recorded relationship endpoint without inferring its identity."""
@@ -932,6 +965,7 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, Any]:
 
     return {
         "who": f"From: {participant('from')} → To: {participant('to')}",
+        "intentReview": why_view.get("intent_review") or {},
         "recordedActor": " ".join(str(node[key]) for key in ("actor", "actor_id") if node.get(key))
         or "UNOBSERVED",
         "what": _event_title(node),

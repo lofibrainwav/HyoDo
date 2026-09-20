@@ -4,8 +4,10 @@
 `hyodo.evidence-graph/v1` payload. It answers two questions about a run —
 *what is proven* and *what is missing* — and it answers nothing else.
 
-It is a projection, not a measurement. Every field is copied, filtered, or
-re-grouped from the graph it is handed. It carries no score, confidence, or
+It is a projection, not a new observation. Evidence fields are copied, filtered,
+or re-grouped. Optional intent reviews compare explicitly supplied scalar
+values under the [intent review contract](./INTENT_REVIEW_V1.md); they do not
+infer semantic intent or verify those values. It carries no score, confidence, or
 aggregate, its `authority` is the literal `UNOBSERVED`, and it authorizes
 nothing. A view is not evidence; evidence is not a decision.
 
@@ -129,14 +131,13 @@ continuity only when separate supporting evidence is available. Who's From / To 
 can inform Benevolence / 仁; it does not establish recipient impact. None of
 these projections promotes evidence into action authority.
 
-## Fields
-
-### WHY and distance from user intent (design target)
+## WHY and distance from user intent
 
 An intent comparison is a separate, attributable evaluation referencing the
-original event. It must not rewrite the event's WHY. The current viewer does
-not compute this comparison; absent intent and comparison evidence remain
-`UNOBSERVED`.
+original event. It must not rewrite the event's WHY. The viewer supports
+[bounded host-supplied comparisons](./INTENT_REVIEW_V1.md). Natural-language
+intent extraction and general semantic alignment remain host responsibilities;
+absent intent and comparison evidence remain `UNOBSERVED`.
 
 Keep four records distinguishable: the user's declared request, the agent's
 interpretation of that request, the agent's declared action rationale, and a
@@ -177,10 +178,12 @@ own source and creates a new intent version; it does not erase the original
 request or retroactively authorize earlier actions. Resolving apparent alignment
 never supplies execution permission.
 
+## Fields
+
 | Field | Source |
 | --- | --- |
 | `lanes` | `graph["rows"]`, reshaped only |
-| `events[].who` … `how` | existing node fields, regrouped only |
+| `events[].who` … `how` | recorded fields plus the explicit intent-review comparison |
 | `events[].columns` | `graph_view.assign_columns` |
 | `events[].gutter` | `unclassified` or `unmeasured`, kept distinct |
 | `events[].hyo_chained` | `graph_view.hyo_chain` |

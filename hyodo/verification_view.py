@@ -2,10 +2,11 @@
 
 This module answers two questions about an already-built
 ``hyodo.evidence-graph/v1`` payload: *what is proven* and *what is missing*.
-It is a projection, not a measurement. Every field it emits is either copied
-from the graph, filtered from the graph, or re-grouped from the graph. It
-introduces no new fact, no score, no confidence, and no aggregate, and it
-never decides anything.
+It is a projection, not a measurement. Evidence fields are copied, filtered,
+or re-grouped from the graph. Optional intent reviews delegate bounded scalar
+comparisons to ``intent_review``; those compare host-supplied values, not the
+meaning of a person's intent. No score, confidence, aggregate, or execution
+authority is introduced.
 
 Why this module exists
 ----------------------
@@ -43,6 +44,7 @@ from hyodo.graph_view import (
     column_coverage,
     hyo_chain,
 )
+from hyodo.intent_review import project_intent_review
 
 VERIFICATION_VIEW_SCHEMA_VERSION = "hyodo.verification-view/v0"
 
@@ -317,6 +319,9 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
         elif columns == [UNMEASURED]:
             unmeasured.append(node_id)
         entry = _five_w_one_h(node, allow_withheld=allow_withheld)
+        entry["why"]["intent_review"] = project_intent_review(
+            node, node_by_id, references_ready=not allow_withheld
+        )
         entry["columns"] = [
             column for column in columns if column not in {UNCLASSIFIED, UNMEASURED}
         ]

@@ -21,6 +21,7 @@ import stat
 from pathlib import Path
 from typing import Any
 
+from hyodo.intent_review import normalize_intent_review
 from hyodo.retrieval_provenance import normalize_event_provenance
 
 AGENT_EVENT_SCHEMA_VERSION = "hyodo.agent-event/v1"
@@ -432,6 +433,13 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
                                 "actor_id": endpoint.get("actor_id"),
                             }
                     meta_out["participants"] = endpoints
+
+            if "intent_review" in meta_raw:
+                review = normalize_intent_review(meta_raw["intent_review"])
+                if review is None:
+                    reasons.append("invalid_field:meta.intent_review")
+                else:
+                    meta_out["intent_review"] = review
 
             ephemeral_raw = meta_raw.get("ephemeral")
             if ephemeral_raw is not None:

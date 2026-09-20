@@ -202,6 +202,7 @@ export function fromVerificationView(view: unknown): EvidenceEvent[] {
 			parentEventIds: parents,
 			evidenceRefs: Array.from(new Set(evidenceOf.get(eventId) ?? [])).sort(),
 			note: asNonEmptyString(why.reason) ?? '',
+			intentReview: isRecord(why.intent_review) ? why.intent_review : null,
 		});
 	}
 
