@@ -37,6 +37,18 @@ possible to distinguish a misunderstood request from a poorly executed plan.
 The host explicitly chooses the intent baseline; HyoDo does not select a newer
 or more convenient request automatically.
 
+## Artifacts and subsequent extraction
+
+Artifacts, failed attempts, corrections, and unresolved residuals can inform the
+next iteration of the same loop. The host retains and retrieves those records;
+an extracted lesson cites its source artifacts and preserves its applicable
+conditions, contrary evidence, and uncertainty. HyoDo does not create a separate
+memory owner or automatically promote a past pattern into current user intent.
+The current contract references result events and their output digests. It does
+not fetch artifact contents or independently verify an extracted claim against
+them. A supplied artifact reference and a satisfied scalar comparison are not
+proof that the user's complete intent was fulfilled.
+
 ## Record shape
 
 The block is opt-in on the existing agent event. The event's actor and timestamp
@@ -104,8 +116,9 @@ is missing, the requirement is inferred, the mode is projected, the graph is not
 ready, or result evidence is missing, self-referential, lacks an output digest,
 or is later than the comparison. Equal timestamps require a recorded earlier
 step in the same run. A changed requirement under the same intent source is
-also withheld until a new attributable source is provided. Ambiguous or missing timestamps also withhold
-the result. Values and references remain visible with the withholding reasons.
+also withheld until a new attributable source is provided. Ambiguous or missing
+timestamps also withhold the result. Values and references remain visible
+with the withholding reasons.
 A resolved digest reference does not independently verify the supplied value.
 
 `state: RECORDED` on the review means that a valid comparison block exists. It

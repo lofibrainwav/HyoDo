@@ -25,7 +25,8 @@ limits are in [Current State](./CURRENT_STATE.md).
 
 ## Integrations and evidence
 
-- [Intent review](./INTENT_REVIEW_V1.md) — attributed requirement comparisons and their limits.
+- [Intent review](./INTENT_REVIEW_V1.md) — attributed requirement comparisons
+  and their limits.
 
 - [Connect](./CONNECT.md) — hooks, pre-commit, GitHub Actions, and shadow mode.
 - [Host adapters](./HOST_ADAPTERS.md) — native adapter and live-canary boundary.
