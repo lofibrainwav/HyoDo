@@ -3,10 +3,10 @@ title: Support allocation field note
 description: A research-only field note on evidence-grounded support profiles, strategy priors, collaboration topology, and measurable friction.
 ---
 
-> **Status — research-only field note, reviewed 2026-09-20.** This is not a
-> shipped HyoDo capability, runtime, classifier, or authority layer. It is not a
-> claim of peer review, venue submission, first-in-field novelty, or measured
-> effectiveness.
+> **Status — research-only field note, reviewed 2026-09-20.**
+> This is not a shipped HyoDo capability, runtime, classifier, or authority layer.
+> It is not a claim of peer review, venue submission, first-in-field novelty, or
+> measured effectiveness.
 
 # Support allocation field note
 
