@@ -208,7 +208,7 @@ if (currencyFailures.length > 0) {
 
 // Public-language contract. Internal project lineage must not leak back into
 // product-facing source or visitor-visible generated HTML. Stable URL paths
-// such as /docs/acl/ and academic URL identifiers are not visible text, so
+// (for example /docs/acl/) and academic URL identifiers are not visible text, so
 // they remain compatible without weakening this check.
 const repoRoot = join(root, '..', '..');
 const publicSourceFiles = [
