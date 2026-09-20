@@ -23,9 +23,18 @@ REPO_ROOT = Path(__file__).parent.parent
 WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "security.yml"
 BASELINE_PATH = REPO_ROOT / ".gitleaksignore"
 
-#: ``<commit sha>:<path>:<rule id>:<line>`` -- gitleaks' fingerprint form. Only
-#: this shape names one finding; anything shorter would suppress a class.
-FINGERPRINT = re.compile(r"^[0-9a-f]{40}:[^:]+:[^:]+:\d+$")
+#: gitleaks names a finding differently depending on the scan. A history scan
+#: produces ``<commit sha>:<path>:<rule id>:<line>``; a ``--no-git`` scan has no
+#: commit and produces ``<path>:<rule id>:<line>``. Both name one line of one
+#: file under one rule, which is the property that matters: anything shorter --
+#: a bare path, a glob, a rule name -- would suppress a class rather than a
+#: finding, and could hide a secret added later.
+HISTORY_FINGERPRINT = re.compile(r"^[0-9a-f]{40}:[^:]+:[^:]+:\d+$")
+WORKING_TREE_FINGERPRINT = re.compile(r"^[^:]+:[^:]+:\d+$")
+
+
+def _names_one_finding(entry: str) -> bool:
+    return bool(HISTORY_FINGERPRINT.match(entry) or WORKING_TREE_FINGERPRINT.match(entry))
 
 
 def _secrets_job() -> dict:
@@ -108,5 +117,21 @@ def test_baseline_suppresses_only_named_findings() -> None:
     ]
     assert entries, "baseline is empty"
     for entry in entries:
-        assert FINGERPRINT.match(entry), f"not a single-finding fingerprint: {entry}"
+        assert _names_one_finding(entry), f"not a single-finding fingerprint: {entry}"
         assert "*" not in entry, f"glob in baseline: {entry}"
+
+
+def test_baseline_entries_are_mount_independent() -> None:
+    """A working-tree fingerprint carries the source path. Scanning an absolute
+    mount point would bake ``/repo`` into every entry and break the moment the
+    scan runs anywhere else."""
+    for name, run in _run_steps():
+        if "detect" in run:
+            assert "--source=." in run, f"{name} does not scan a relative source"
+    entries = [
+        line.strip()
+        for line in BASELINE_PATH.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    for entry in entries:
+        assert not entry.startswith("/"), f"absolute path in baseline: {entry}"

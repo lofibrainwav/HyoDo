@@ -31,3 +31,17 @@ f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/cleanup/purge_dns.sh:generic-ap
 # is treated as permanently exposed rather than as revoked.
 f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/monitor_bridge.py:generic-api-key:61
 f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/verify_context_chain.py:generic-api-key:6
+
+# Working-tree fingerprints (`path:rule:line`) for the same fixtures the history
+# entries above already cover. A --no-git scan names a finding without a commit,
+# so the historical form does not match it. These are test fixtures holding
+# deliberately fake AWS keys; each entry still names one line in one file, so a
+# real secret added anywhere else -- or on another line of these files -- is
+# reported.
+tests/test_inspect.py:aws-access-token:29
+tests/test_observability_contracts.py:aws-access-token:45
+tests/test_observability_contracts.py:aws-access-token:49
+tests/test_observability_contracts.py:aws-access-token:62
+tests/test_observability_contracts.py:aws-access-token:66
+tests/test_safe_json.py:aws-access-token:22
+tests/test_mcp_stdio.py:aws-access-token:251

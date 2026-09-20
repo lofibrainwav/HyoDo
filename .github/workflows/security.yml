@@ -36,14 +36,14 @@ jobs:
       - name: Scan full history
         run: |
           set -euo pipefail
-          docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
-            detect --source=/repo --redact --no-banner --verbose --exit-code 1
+          docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS_IMAGE" \
+            detect --source=. --redact --no-banner --verbose --exit-code 1
       - name: Scan working tree
         if: ${{ !cancelled() }}
         run: |
           set -euo pipefail
-          docker run --rm -v "$PWD:/repo" "$GITLEAKS_IMAGE" \
-            detect --source=/repo --no-git --redact --no-banner --verbose --exit-code 1
+          docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS_IMAGE" \
+            detect --source=. --no-git --redact --no-banner --verbose --exit-code 1
       - name: Baseline cannot hide a current secret
         if: ${{ !cancelled() }}
         run: |
@@ -53,8 +53,8 @@ jobs:
           # Built at run time so this file never contains a scannable key itself.
           key="AKIA$(head -c 256 /dev/urandom | LC_ALL=C tr -dc 'A-Z0-9' | cut -c1-16)"
           printf 'aws_access_key_id = %s\n' "$key" > "$canary/planted.txt"
-          if docker run --rm -v "$canary:/canary" "$GITLEAKS_IMAGE" \
-               detect --source=/canary --no-git --redact --no-banner --exit-code 1; then
+          if docker run --rm -v "$canary:/canary" -w /canary "$GITLEAKS_IMAGE" \
+               detect --source=. --no-git --redact --no-banner --exit-code 1; then
             echo "::error::A planted current secret was not reported. The baseline or the rule set is suppressing present-day findings."
             exit 1
           fi
