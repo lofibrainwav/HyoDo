@@ -43,7 +43,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 				<button type="button" id="eg-reset">Show demo fixture</button>
 			</div>
 
-			<p class="eg-key">Rows are producer-declared participant lanes, columns are observed timestamps from left to right, and step index is event detail. Missing timestamps stay <code>TIME UNOBSERVED</code>. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
+			<p class="eg-key">Rows are producer-declared participant lanes, columns preserve producer-recorded <code>when.ts</code> values from left to right, and step index is event detail. Missing timestamps stay <code>TIME UNOBSERVED</code>. ALLOW, ASK, DENY, and UNOBSERVED are policy-evaluation outputs, not execution permissions. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
 
 			<section class="eg-consolebar" aria-label="evidence session console">
 				<div class="eg-console-brand">

@@ -214,12 +214,13 @@ export function fromVerificationView(view: unknown): EvidenceEvent[] {
 
 		const decision = presentableDecision(what);
 		const recordedDecision = decisionValue(what.decision);
-		const columns = stringList(entry.columns);
+		const lensClassifications = stringList(entry.columns).filter(
+			(key): key is LensKey => ['jin', 'seon', 'mi', 'in', 'hyo'].includes(key),
+		);
+		// `columns` is a producer classification, not event-level observation.
+		// The v0 producer does not provide event lens states, so remain fail-closed.
 		const lensStates = Object.fromEntries(
-			(['jin', 'seon', 'mi', 'in', 'hyo'] as LensKey[]).map((key) => [
-				key,
-				(columns.includes(key) ? 'OBSERVED' : 'UNOBSERVED') as ObservationState,
-			]),
+			(['jin', 'seon', 'mi', 'in', 'hyo'] as LensKey[]).map((key) => [key, 'UNOBSERVED' as ObservationState]),
 		) as Partial<Record<LensKey, ObservationState>>;
 		const toolName = asNonEmptyString(what.tool_name);
 		const paths = stringList(where.paths);
@@ -255,6 +256,7 @@ export function fromVerificationView(view: unknown): EvidenceEvent[] {
 			note: asNonEmptyString(why.reason) ?? '',
 			intentReview: isRecord(why.intent_review) ? why.intent_review : null,
 			lensStates,
+			lensClassifications,
 			continuityState: 'UNOBSERVED',
 			recordedDecision,
 			presentableDecision: decision,

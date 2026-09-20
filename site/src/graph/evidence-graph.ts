@@ -77,8 +77,10 @@ export interface EvidenceEvent {
 	note: string;
 	/** Producer-supplied bounded comparisons, never a viewer-derived judgement. */
 	intentReview?: Record<string, unknown> | null;
-	/** Canonical lens columns copied from verification-view/v0. */
+	/** Producer lens classifications copied from verification-view/v0. */
 	lensStates?: Partial<Record<LensKey, ObservationState>>;
+	/** Producer classifications copied from `columns`; not observation state. */
+	lensClassifications?: LensKey[];
 	/** Eternity / 永 is independent from chronological placement. */
 	continuityState?: ObservationState;
 	/** Keep the ledger value beside the producer-approved presentable value. */
@@ -378,35 +380,27 @@ function byId(events: readonly EvidenceEvent[], id: string): EvidenceEvent | und
 	return events.find((e) => e.eventId === id);
 }
 
-interface TimelineProjection {
+export interface TimelineProjection {
 	columnByEvent: Map<string, number>;
 	labels: string[];
 }
 
-function observedTime(event: EvidenceEvent): number | null {
-	if (!event.ts.trim()) return null;
-	const value = Date.parse(event.ts);
-	return Number.isFinite(value) ? value : null;
-}
-
-function timelineProjection(events: readonly EvidenceEvent[]): TimelineProjection {
-	const known = new Map<number, EvidenceEvent[]>();
-	const unknown: EvidenceEvent[] = [];
-	for (const event of events) {
-		const time = observedTime(event);
-		if (time === null) unknown.push(event);
-		else known.set(time, [...(known.get(time) ?? []), event]);
-	}
-	const times = [...known.keys()].sort((a, b) => a - b);
+export function timelineProjection(events: readonly EvidenceEvent[]): TimelineProjection {
+	const columnByTimestamp = new Map<string, number>();
 	const columnByEvent = new Map<string, number>();
-	const labels = times.map((time) => new Date(time).toISOString().slice(11, 19) + ' UTC');
-	for (const [column, time] of times.entries()) {
-		for (const event of known.get(time) ?? []) columnByEvent.set(event.eventId, column);
-	}
-	if (unknown.length) {
-		const column = labels.length;
-		labels.push('TIME UNOBSERVED');
-		for (const event of unknown) columnByEvent.set(event.eventId, column);
+	const labels: string[] = [];
+	for (const event of events) {
+		// `events` is already in producer order (event_order for the canonical
+		// view). Do not parse, sort, normalize, or otherwise reinterpret `when.ts`.
+		const rawTimestamp = event.ts.trim();
+		const key = rawTimestamp || 'TIME UNOBSERVED';
+		let column = columnByTimestamp.get(key);
+		if (column === undefined) {
+			column = labels.length;
+			columnByTimestamp.set(key, column);
+			labels.push(rawTimestamp ? `TS ${rawTimestamp}` : 'TIME UNOBSERVED');
+		}
+		columnByEvent.set(event.eventId, column);
 	}
 	return { columnByEvent, labels };
 }
@@ -558,6 +552,7 @@ function renderPanelHtml(events: readonly EvidenceEvent[], ev: EvidenceEvent): s
 		`<section class="lens-aperture" aria-label="five independent lens coverage indicators">` +
 		`<h3>FIVE-LENS APERTURE</h3><p class="panel-note">Evidence coverage only; no virtue score or aggregate.</p>` +
 		`<div class="lens-list">${LENS_KEYS.map((key) => `<span class="lens-state"><b>${escapeHtml(LENS_LABELS[key])}</b> ${stateMark(lensState(ev, key))}</span>`).join('')}</div>` +
+		`<p class="panel-note">Classification only: ${ev.lensClassifications?.length ? ev.lensClassifications.map((key) => escapeHtml(LENS_LABELS[key])).join(', ') : 'UNOBSERVED'}. Classification does not establish event observation.</p>` +
 		`<p class="panel-note">永 / CONTINUITY: ${stateMark(ev.continuityState ?? 'UNOBSERVED')} — chronological placement does not establish continuity.</p></section>`;
 	const rail =
 		`<section class="verification-rail" aria-label="verification rail"><h3>VERIFICATION RAIL</h3>` +
