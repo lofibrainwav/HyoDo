@@ -7,6 +7,7 @@ import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../src/graph/from-v
 import {
 	fromVerificationView,
 	inspectVerificationView,
+	verificationProjectionContext,
 } from '../src/graph/from-verification-view.ts';
 
 const FIXTURE_IDS = [
@@ -329,6 +330,26 @@ describe('fromVerificationView', () => {
 		const [, decision] = fromVerificationView(withheld);
 		assert.equal(decision.policy?.decision, 'UNOBSERVED');
 		assert.equal(decision.displayKind, 'unobserved');
+	});
+
+	it('copies lens columns and missing buckets without inferring role or continuity', () => {
+		const payload = view({
+			status: 'UNOBSERVED',
+			presentation: { allow_withheld: true, reason: 'graph_status:UNOBSERVED' },
+			missing: { unresolved_refs: ['d1'], calls_without_result: [] },
+		});
+		payload.events.d1.when.ts = null;
+		payload.events.d1.what.decision_presentable = 'UNOBSERVED';
+		payload.events.d1.columns = ['jin', 'in'];
+		const [, decision] = fromVerificationView(payload);
+		assert.equal(decision.ts, '');
+		assert.equal(decision.lensStates?.jin, 'OBSERVED');
+		assert.equal(decision.lensStates?.seon, 'UNOBSERVED');
+		assert.equal(decision.continuityState, 'UNOBSERVED');
+		assert.deepEqual(decision.missing, ['unresolved_refs']);
+		assert.equal(decision.recordedDecision, 'ALLOW');
+		assert.equal(decision.presentableDecision, 'UNOBSERVED');
+		assert.equal(verificationProjectionContext(payload).canonical, true);
 	});
 
 	it('never draws an edge for a citation that resolved to nothing', () => {

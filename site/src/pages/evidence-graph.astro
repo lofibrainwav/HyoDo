@@ -18,7 +18,7 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 		<meta name="theme-color" content="#0b0d10" />
 		<meta
 			name="description"
-			content="A public, browser-only prototype of the HyoDo evidence graph. Defaults to fixed demo data; you can opt in to render a local hyodo.evidence-graph/v1 JSON file. Nothing is uploaded."
+			content="A public, browser-only HyoDo verification view. Defaults to fixed demo data; you can opt in to render a local hyodo.verification-view/v0 JSON file. Nothing is uploaded."
 		/>
 	</head>
 	<body class="eg-page">
@@ -35,15 +35,15 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 		<main class="eg-wrap">
 			<h1>HyoDo Evidence Graph <span class="eg-badge">Prototype</span></h1>
 
-			<p class="eg-banner" id="eg-banner" data-source="fixture" role="note" aria-live="polite"><strong>Demo fixture.</strong> This is in-memory demo data, not a live run — nothing here is uploaded, stored, or fetched from a network. The <code>parent_event_id</code> and <code>evidence_refs</code> links shown below are optional <code>hyodo.agent-event/v1</code> fields shipped since 4.14.0; the installed <code>hyodo dashboard</code> renders them from your real ledger at <code>/graph</code>, while this public page defaults to fixed fixture data. You can opt in to render a local <code>hyodo.evidence-graph/v1</code> JSON file in this browser only. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
+			<p class="eg-banner" id="eg-banner" data-source="fixture" role="note" aria-live="polite"><strong>Demo fixture.</strong> This is in-memory demo data, not a live run — nothing here is uploaded, stored, or fetched from a network. The canonical public input is <code>hyodo.verification-view/v0</code>, the same read-only projection served by the local dashboard. You can opt in to render that JSON in this browser only. A raw <code>hyodo.evidence-graph/v1</code> file remains a compatibility input and cannot supply presentable decisions or lens coverage. See <a href="/docs/evidence-graph/">the docs</a> for the exact boundary.</p>
 
 			<div class="eg-load">
-				<label class="eg-load-label" for="eg-file">Load local <code>hyodo.evidence-graph/v1</code> JSON</label>
+				<label class="eg-load-label" for="eg-file">Load local <code>hyodo.verification-view/v0</code> JSON</label>
 				<input id="eg-file" type="file" accept="application/json" />
 				<button type="button" id="eg-reset">Show demo fixture</button>
 			</div>
 
-			<p class="eg-key">Rows are participants, columns are step index, cells are events. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
+			<p class="eg-key">Rows are producer-declared participant lanes, columns are observed timestamps from left to right, and step index is event detail. Missing timestamps stay <code>TIME UNOBSERVED</code>. Solid elbow = <code>parent_event_id</code> ("result of"). Dashed curve = <code>evidence_refs</code> ("decided from"). Red stub = broken link.</p>
 
 			<section class="eg-consolebar" aria-label="evidence session console">
 				<div class="eg-console-brand">
@@ -105,7 +105,9 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 				<p class="eg-key">The interactive grid needs JavaScript; the fixture and field meanings are documented at <a href="/docs/evidence-graph/">/docs/evidence-graph/</a>.</p>
 			</noscript>
 
-			<footer class="eg-footer">Data shape: <code>hyodo.agent-event/v1</code> events inside optional local <code>hyodo.evidence-graph/v1</code> JSON (event_id, run_id, ts, kind, actor, step_index, tool, policy, optional parent_event_id/evidence_refs). Default view is the demo fixture. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
+			<details class="eg-missing" id="eg-missing"><summary>WHAT IS MISSING</summary><p>Load a <code>hyodo.verification-view/v0</code> file to inspect canonical evidence gaps.</p></details>
+
+			<footer class="eg-footer">Canonical input: <code>hyodo.verification-view/v0</code>. A raw <code>hyodo.evidence-graph/v1</code> file remains a compatibility input and cannot supply presentable decisions or producer-declared lens coverage. Default view is the demo fixture. Live ledger: <code>hyodo dashboard</code> at <code>/graph</code>. See <a href="/docs/evidence-graph/">the documentation</a> for details.</footer>
 		</main>
 
 		<script src="../scripts/evidence-graph-page.ts"></script>
