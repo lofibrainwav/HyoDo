@@ -11,8 +11,8 @@ HyoDo is deliberately narrow:
 - `hyodo safe` is an early-warning scanner, not a full security audit.
 - A DENY result must still be enforced by the caller.
 - The legacy HyoDo score command is a review signal, never approval. It retains
-  the older five-input geometric-mean method, internally named HYOGOOK V5, for
-  compatibility while HyoDo's replacement evaluation model is being updated.
+  the older five-input geometric-mean method for compatibility while HyoDo's
+  replacement evaluation model is being updated.
   The current package has no general per-axis evaluator and defines no
   canonical score across the six reference values.
 - The public MCP server supports loopback or authenticated Tailscale binding;
