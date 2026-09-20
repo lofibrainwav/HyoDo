@@ -1,4 +1,4 @@
-"""Keep the HyoDo/Kingdom product boundary explicit and regression-tested."""
+"""Keep HyoDo's standalone public product boundary explicit and regression-tested."""
 
 from pathlib import Path
 
@@ -10,15 +10,14 @@ def test_product_boundary_is_the_explicit_ownership_contract() -> None:
     text = BOUNDARY.read_text(encoding="utf-8")
 
     required_phrases = (
-        "HyoDo is a verification and evidence plane",
-        "Kingdom is an execution plane",
-        "BB is a continuity plane",
-        "KINGDOM = Agency · HyoDo = Trust · BB = Continuity",
-        "Evidence is not authority, memory is not runtime state",
-        "does not plan tasks, execute",
-        "execution authority and worker lifecycle",
-        "are not HyoDo state",
-        "HyoDo closeout and Kingdom closeout are separate decisions",
+        "HyoDo is a local verification and evidence layer",
+        "## HyoDo owns",
+        "## HyoDo does not own",
+        "Execution is not evidence",
+        "Evidence is not authority",
+        "Missing evidence is not a pass",
+        "Recorded history is not current runtime truth",
+        "does not execute the observed work",
         "UNATTRIBUTED",
     )
     for phrase in required_phrases:
@@ -34,5 +33,6 @@ def test_public_docs_point_to_the_boundary_contract() -> None:
 
     assert "docs/PRODUCT_BOUNDARY.md" in readme
     assert "PRODUCT_BOUNDARY.md" in current_state
-    assert "KINGDOM = Agency · HyoDo = Trust · BB = Continuity" in site_boundary
-    assert "BB is a continuity plane" in site_boundary
+    assert "## HyoDo owns" in site_boundary
+    assert "## HyoDo does not own" in site_boundary
+    assert "Evidence is not authority" in site_boundary

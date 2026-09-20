@@ -1,6 +1,6 @@
 ---
 title: Friction Contribution
-description: Privacy-first local friction derivation for future ACL research priors.
+description: Privacy-first local friction derivation for future support-allocation research.
 ---
 
 > **Version boundary.** The `hyodo friction` command is introduced in **HyoDo 4.17.0**. HyoDo 4.16.x and earlier do not expose this command. Friction Contribution v1 is local only: HyoDo does not upload friction data, and network transport is disabled.
@@ -135,7 +135,7 @@ claiming its own work was allowed.
 ## The authority invariant
 
 ```text
-Population evidence → ACL support recommendation  ✅
+Population evidence → support recommendation  ✅
 Population evidence → execution authority         ❌
 Population evidence → override local policy       ❌
 Population evidence → override Evidence Gate      ❌
@@ -144,17 +144,17 @@ Population evidence → override Evidence Gate      ❌
 Population experience can eventually help answer **what support profile is
 useful here?** It cannot answer **whether this action is authorized?**
 
-That separation keeps the research model aligned with HyoDo/KINGDOM:
+That separation keeps three responsibilities distinct:
 
-- **EROS / Authority — whether?**
-- **ACL — what support profile?**
-- **Evidence Gate — done?**
+- **Authorization policy — whether?**
+- **Support allocation — what support profile?**
+- **Evidence validation — done?**
 
 ## No collector yet
 
 v1 deliberately ships without a telemetry endpoint, uploader, installation
-identifier, population-prior download, or automatic ACL support change. The
+identifier, population-prior download, or automatic support-allocation change. The
 export is a local, explicit file write only; it is not a collector. The first
 goal is an inspectable, reproducible local measurement contract.
 
-See the [ACL field note](/docs/acl/) for the Wisdom Reflex and collaboration-topology hypothesis, the [Research](/docs/research/) page for the broader empirical program, and the repository's `docs/FRICTION_CONTRIBUTION.md` for the detailed protocol boundary.
+See the [support-allocation field note](/docs/acl/) for the strategy-prior and collaboration-topology hypothesis, the [Research](/docs/research/) page for the broader empirical program, and the repository's `docs/FRICTION_CONTRIBUTION.md` for the detailed protocol boundary.

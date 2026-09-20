@@ -7,7 +7,7 @@ INDEX = REPO_ROOT / "site" / "src" / "pages" / "index.astro"
 EVIDENCE_GRAPH = REPO_ROOT / "site" / "src" / "pages" / "evidence-graph.astro"
 ASTRO_CONFIG = REPO_ROOT / "site" / "astro.config.mjs"
 TOKENS = REPO_ROOT / "site" / "src" / "styles" / "tokens.css"
-ACL = REPO_ROOT / "site" / "src" / "content" / "docs" / "docs" / "acl.md"
+FIELD_NOTE = REPO_ROOT / "site" / "src" / "content" / "docs" / "docs" / "acl.md"
 RESEARCH = REPO_ROOT / "site" / "src" / "content" / "docs" / "docs" / "research.md"
 FRICTION = REPO_ROOT / "site" / "src" / "content" / "docs" / "docs" / "friction-contribution.md"
 
@@ -40,23 +40,23 @@ def test_friction_docs_state_the_cli_version_boundary() -> None:
     assert '"hyodo_version": "4.17.0"' in text
 
 
-def test_acl_does_not_claim_friction_taxonomy_is_automatically_classified() -> None:
-    text = ACL.read_text(encoding="utf-8")
+def test_field_note_does_not_claim_friction_taxonomy_is_automatically_classified() -> None:
+    text = FIELD_NOTE.read_text(encoding="utf-8")
     assert "research-only field note" in text
     assert "not a shipped HyoDo capability" in text
     assert "research labeling target" in text
     assert "not a shipped HyoDo classifier" in text
-    assert "Baselines designed to disprove the Wisdom Reflex" in text
+    assert "Baselines designed to disprove the strategy-prior hypothesis" in text
     assert "Threats to validity" in text
 
 
-def test_acl_and_research_explain_their_distinct_roles() -> None:
-    acl = ACL.read_text(encoding="utf-8")
+def test_field_note_and_research_explain_their_distinct_roles() -> None:
+    field_note = FIELD_NOTE.read_text(encoding="utf-8")
     research = RESEARCH.read_text(encoding="utf-8")
-    assert "Reader map." in acl
+    assert "Reader map." in field_note
     assert "Reader map." in research
-    assert "focused field note" in acl
-    assert "](/docs/research/)" in acl
+    assert "focused field note" in field_note
+    assert "](/docs/research/)" in field_note
     assert "broader empirical program" in research
     assert "benchmark status" in research
     assert "](/docs/acl/)" in research

@@ -37,7 +37,7 @@ Cursor host observations remain `UNOBSERVED`; the matrix below is historical.
 | gates, policy, event ledger | SHIPPED | SHIPPED |
 | local Friction Contribution | SHIPPED | SHIPPED; no collector/uploader |
 | MCP stdio, loopback, private Tailscale | SHIPPED | SHIPPED |
-| canonical runtime identity v1 | SHIPPED | SHIPPED; `/api/identity` + receipt contract, KINGDOM consumer merged |
+| canonical runtime identity v1 | SHIPPED | SHIPPED; `/api/identity` + receipt contract, reference-host consumer merged |
 | MCP access-audit readback | SHIPPED | SHIPPED; operation outcome and `audit.state` are separate, audit loss is fail-visible |
 | release-note drift verifier | SHIPPED | SHIPPED; repository notes are canonical, remote-unavailable is UNOBSERVED, mutation is explicit + readback verified |
 | Codex host adapter | SHIPPED | SHIPPED; fresh canonical live canary remains UNOBSERVED |
@@ -52,8 +52,8 @@ Cursor host observations remain `UNOBSERVED`; the matrix below is historical.
 
 ## Ownership invariant
 
-- KINGDOM executes and orchestrates.
-- EROS / host policy owns execution authority.
+- The integrating host executes and orchestrates.
+- Host authorization policy owns execution authority.
 - Evidence Gate judges completion evidence.
 - Downstream research may make non-authoritative shadow recommendations.
 - HyoDo observes, records, validates, attests and measures.
@@ -68,6 +68,6 @@ on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
 identity from this page alone; use the signed release, CI receipt, or runtime
 identity receipt. Fresh
 Codex/Cursor host observations,
-QMD/Neo4j closed-loop memory, and matched support-allocation/KINGDOM shadow experiments are
+QMD/Neo4j closed-loop memory, and matched support-allocation/host shadow experiments are
 downstream integration/research work and must not silently reopen HyoDo product
 authority or rewrite sealed release evidence.

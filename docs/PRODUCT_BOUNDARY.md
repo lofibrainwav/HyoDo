@@ -1,73 +1,53 @@
-# HyoDo, Kingdom, and BB product boundary
+# HyoDo product boundary
 
-This is the canonical boundary contract for describing HyoDo, Kingdom, and BB
-together. It prevents an external executor's state, or a continuity projection,
-from being mistaken for HyoDo product state.
+HyoDo is a local verification and evidence layer for AI-assisted work. It helps
+people see which checks ran, what they found, and what remains unknown. It does
+not become the authority that plans, executes, merges, deploys, or remembers
+work on behalf of another system.
 
 ## HyoDo owns
 
-- quality gates, policy decisions, and fail-closed exit contracts;
-- evidence, measurement, validation, ledger, and attestation surfaces; and
-- observation of externally supplied execution evidence.
+- local quality gates and their fail-closed exit contracts;
+- evidence, measurement, validation, ledger, and attestation surfaces;
+- local policy evaluation and explicit `ALLOW` / `DENY` / `ASK` /
+  `UNOBSERVED` results; and
+- observation of execution evidence supplied by an integrating host.
 
-HyoDo is a verification and evidence plane. It does not plan tasks, execute
-workers, own worker lifecycle, orchestrate dependencies, recover work, or
-settle execution.
+## HyoDo does not own
 
-HyoDo policy decisions and gates apply within HyoDo's declared product scope.
-They validate evidence and report HyoDo outcomes; they do not authorize a
-user's action in an integrating host. The host owns action-specific
-authorization under its own delegated policy. A host's virtue lens or a HyoDo
-receipt may inform that policy only through an explicit, versioned contract;
-neither silently grants or expands authority.
+- task planning, routing, dispatch, or worker lifecycle;
+- orchestration, recovery, settlement, merge, or deployment authority;
+- the integrating host's current runtime state;
+- external memory, knowledge bases, or continuity systems; or
+- facts that HyoDo did not observe.
 
-## Kingdom owns
+An integrating host may choose to enforce a HyoDo result, but the act of
+enforcement belongs to that host.
 
-- task planning and dispatch;
-- execution authority and worker lifecycle;
-- orchestration, recovery, and settlement.
+## Invariants
 
-Kingdom is an execution plane. Its processes, tests, worktrees, branches, and
-runtime state are not HyoDo state merely because HyoDo can observe or attest
-them.
+1. **Execution is not evidence.** Work happening does not prove the claimed
+   checks ran.
+2. **Evidence is not authority.** A receipt or policy result does not itself
+   execute, merge, deploy, or approve anything.
+3. **Missing evidence is not a pass.** Unreadable or absent evidence remains
+   `UNOBSERVED`.
+4. **Recorded history is not current runtime truth.** A memory, report, or
+   previous receipt can inform review without proving what is true now.
 
-## BB owns
+## External integrations
 
-- human-owned durable memory, provenance, decisions, and lessons; and
-- settled evidence that has been deliberately promoted for future reuse.
+Agent runtimes, CI systems, editors, and continuity stores may provide evidence
+to HyoDo or consume evidence from it. Those integrations do not become HyoDo
+state merely because HyoDo can observe or attest them.
 
-BB is a continuity plane. It does not own live runtime truth, host execution
-authority, HyoDo's event ledger, or HyoDo product status. A BB projection is a
-record or memory surface, not proof of current Kingdom or HyoDo state.
-
-## Shared three-plane invariant
-
-`KINGDOM = Agency · HyoDo = Trust · BB = Continuity`. The canonical loop is
-`Human Intent → KINGDOM → HyoDo → BB → Skill/Eval/Memory → Better KINGDOM`.
-Evidence is not authority, memory is not runtime state, and each plane's current
-status must be read from its owning source/runtime.
-
-HyoDo's internal improvement-loop and lesson-promotion contract is defined in
-[`CORE_LOOP.md`](./CORE_LOOP.md). That contract does not change the ownership
-boundary: KINGDOM still owns action and execution, BB owns durable continuity,
-and HyoDo owns evidence quality and trust in promotion.
-
-## Non-equivalence rules
-
-1. A Kingdom process or test is not evidence that HyoDo is open, closed,
-   healthy, or unhealthy.
-2. A HyoDo dashboard or evidence receipt is not execution authority and does
-   not control Kingdom work.
-3. `hyodo.orchestration-observation/v1` records a sidecar observation from an
-   external executor; it does not mutate the agent event ledger or execute the
-   observed work.
-4. HyoDo closeout and Kingdom closeout are separate decisions. Report them as
-   separate axes even when one system observes the other.
+`hyodo.orchestration-observation/v1` records an observation supplied by an
+external executor. It does not execute the observed work, mutate the host, or
+grant execution authority.
 
 ## Status vocabulary
 
-Use **HyoDo status** for HyoDo source, package, gates, evidence, dashboard, and
-HyoDo-owned runtime surfaces. Use **Kingdom status** for Kingdom branches,
-worktrees, workers, orchestration, tests, and execution runtime. If ownership
-is not established, report the item as `UNATTRIBUTED` rather than assigning it
-to either product.
+Use **HyoDo status** only for HyoDo-owned source, package, gates, evidence,
+dashboard, and HyoDo-owned runtime surfaces. Describe an external system's
+state as that system's state. If ownership is not established, report it as
+`UNATTRIBUTED` rather than assigning it to HyoDo.

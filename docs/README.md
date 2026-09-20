@@ -48,7 +48,7 @@ limits are in [Current State](./CURRENT_STATE.md).
 
 - [Current State](./CURRENT_STATE.md) — measured source and published status.
 - [Remaining work and handoff](./REMAINING_WORK.md) — open work, responsible
-  roles, completion evidence, and the KINGDOM handoff boundary.
+  roles, completion evidence, and the external-host handoff boundary.
 - [External Claim Audit](./EXTERNAL_CLAIM_AUDIT.md) — evidence for external claims.
 - [Convergence workflow](./CONVERGENCE_WORKFLOW.md) — parallel research
   and safe integration.

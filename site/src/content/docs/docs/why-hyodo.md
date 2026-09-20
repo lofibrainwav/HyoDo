@@ -27,8 +27,8 @@ fail-closed by default — it runs in your own environment, reuses your own
 tooling, and reports missing or unreadable evidence as `UNOBSERVED` instead of
 turning it into a pass. Its optional legacy HyoDo score is a review signal,
 not permission to merge or deploy. The compatibility command retains an older
-five-input geometric-mean method, internally named HYOGOOK V5, while HyoDo's
-replacement evaluation model is being updated. The current public package
+five-input geometric-mean method while HyoDo's replacement evaluation model is
+being updated. The current public package
 does not yet provide a general per-axis evaluator, and the model does not
 define the six reference values as one canonical score.
 

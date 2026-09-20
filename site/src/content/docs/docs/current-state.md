@@ -49,13 +49,13 @@ The matrix below compares the 4.19.5 public package with main as measured on
 ## Ownership stays separate
 
 ```text
-KINGDOM  executes / orchestrates
-EROS / host policy owns execution authority
-Evidence Gate      judges completion evidence
-Downstream research makes non-authoritative shadow recommendations
-HyoDo    observes / records / validates / attests / measures
+Integrating host       executes / orchestrates
+Host authorization     owns execution authority
+Evidence validation    judges completion evidence
+Downstream research    makes non-authoritative shadow recommendations
+HyoDo                  observes / records / validates / attests / measures
 ```
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
-Support-allocation/KINGDOM experiments are downstream integration/research work. They are not
+Support-allocation/host experiments are downstream integration/research work. They are not
 prerequisites for calling the HyoDo 4.20.0 public artifact released and verified.

@@ -3,24 +3,22 @@ title: Research
 description: Working research notes behind HyoDo's evidence-grounded human–AI collaboration model.
 ---
 
-> **Status — research-only program, updated 2026-09-08.** This page describes research in progress, not a shipped HyoDo capability or runtime. It is not a claim of peer review, submission, or acceptance by the Association for Computational Linguistics (ACL) or any other venue.
+> **Status — research-only program, updated 2026-09-08.** This page describes research in progress, not a shipped HyoDo capability or runtime. It is not a claim of peer review, submission, or acceptance by the Association for Computational Linguistics or any other venue.
 
-# Adaptive Collaboration Layer research program
+# Support allocation research program
 
-**Reader map.** This page is the broader empirical program: benchmark status, related work, evaluation design, ablations, and publication boundary. For the focused **Wisdom Reflex + collaboration-topology** hypothesis, including corpus governance, null baselines, and threats to validity, see the [ACL field note](/docs/acl/). For the local privacy-minimized sensor contract, see [Friction Contribution](/docs/friction-contribution/).
+**Reader map.** This page is the broader empirical program: benchmark status, related work, evaluation design, ablations, and publication boundary. For the focused **strategy-prior + collaboration-topology** hypothesis, including corpus governance, null baselines, and threats to validity, see the [support-allocation field note](/docs/acl/). For the local privacy-minimized sensor contract, see [Friction Contribution](/docs/friction-contribution/).
 
-**Working title:** *Adaptive Collaboration Layer: Evidence-Grounded Support Allocation for Human–AI Agents*
+**Working title:** *Evidence-Grounded Support Allocation for Human–AI Agents*
 
-HyoDo is the local-first evidence and gate substrate. The Adaptive Collaboration Layer (ACL) is the research layer that asks: **what support profile should a human–AI workflow receive in this context?**
-
-To avoid an overloaded acronym: **ACL on this page means Adaptive Collaboration Layer**. The Association for Computational Linguistics is written out when we refer to a publication venue.
+HyoDo is the local-first evidence and gate substrate. The support-allocation research layer asks: **what support profile should a human–AI workflow receive in this context?**
 
 ## Three questions, three responsibilities
 
 | Layer | Question | Responsibility |
 | --- | --- | --- |
-| **EROS / Authority** | **Whether?** | Is this action permitted at all? |
-| **ACL / Support allocation** | **What support profile?** | What oversight, verification, explanation, exploration, or budget is appropriate? |
+| **Authorization policy** | **Whether?** | Is this action permitted at all? |
+| **Support allocation** | **What support profile?** | What oversight, verification, explanation, exploration, or budget is appropriate? |
 | **Evidence Gate** | **Done?** | Is completion actually proven by evidence? |
 
 This separation is a hard research invariant:
@@ -31,7 +29,7 @@ A task can be statistically routine and still require approval or be blocked bec
 
 ## Current support model
 
-The working ACL model combines four evidence families:
+The working support-allocation model combines four evidence families:
 
 ```text
 local prior
@@ -42,7 +40,7 @@ context similarity
     +
 current evidence
         ↓
-ACL support-profile recommendation
+support-profile recommendation
 ```
 
 Candidate conditioning signals include:
@@ -64,7 +62,7 @@ The output is a **support recommendation**, not an authorization token. The rese
 
 ## Current claim lock
 
-The public product boundary is fixed below. The [Measured Run #1 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md) records the observed KINGDOM/HyoDo execution; it is not a claim of ACL effectiveness.
+The public product boundary is fixed below. The [Measured Run #1 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md) records the observed host/HyoDo execution; it is not a claim of support-allocation effectiveness.
 
 | Capability | Status | Evidence boundary |
 | --- | --- | --- |
@@ -75,7 +73,7 @@ The public product boundary is fixed below. The [Measured Run #1 receipt](https:
 | Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
 | IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
 | remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
-| ACL runtime / Wisdom Reflex | RESEARCH | Research-only hypothesis; no shipped runtime or automatic router. |
+| Support-allocation runtime / strategy-prior hypothesis | RESEARCH | Research-only hypothesis; no shipped runtime or automatic router. |
 | friction collector | NOT BUILT | No collector/uploader; transport disabled. |
 
 ## Instrument version boundary
@@ -86,7 +84,7 @@ That distinction matters for reproducibility: a paper, benchmark, or measured ru
 
 Friction Contribution v1 defines a local-only, explicit-opt-in derived measurement surface before any population collector exists. Raw prompts, model responses, source code, diffs, credentials, file paths, email bodies, and raw event bodies are not population features by default.
 
-Before any population signal is consumed by ACL, it must pass validation, aggregation, versioning, deduplication, and bias / poisoning checks.
+Before any population signal is used for support allocation, it must pass validation, aggregation, versioning, deduplication, and bias / poisoning checks.
 
 ## Research status
 
@@ -109,7 +107,7 @@ The existing sealed baseline is intentionally small:
 
 The benchmark integrity layer also passed its sealed regression suites (**9/9** vessel checks and **6/6** trace-experiment checks) and surfaced one definition-to-implementation design debt around an unreachable evidence-missing decision path.
 
-That is enough to say **the evaluation vessel exists and catches at least one real design gap**. It is not enough to say ACL's support-allocation policy or Wisdom Reflex has been empirically validated.
+That is enough to say **the evaluation vessel exists and catches at least one real design gap**. It is not enough to say the support-allocation policy or strategy-prior hypothesis has been empirically validated.
 
 Before submission, the measured set must grow across task classes, risk levels, orchestration patterns, models/environments, and support profiles, with genuine ACT / ASK / ABSTAIN diversity and failure cases. Synthetic perfect scores must remain separated from measured evidence.
 
@@ -121,16 +119,16 @@ The working hypothesis is narrower:
 
 > **Human–AI agent systems can allocate support more effectively when local experience, population experience, context similarity, current evidence, and task structure are combined, while execution authority and proof-of-completion remain independently governed.**
 
-The Wisdom Reflex is an additional hypothesis, not an assumed ingredient: a provenance-governed strategy prior must outperform simpler task-structure and semantic-routing baselines after accounting for cost, or it has not earned a place in the model.
+The strategy-prior hypothesis is an additional hypothesis, not an assumed ingredient: a provenance-governed strategy prior must outperform simpler task-structure and semantic-routing baselines after accounting for cost, or it has not earned a place in the model.
 
 ## Related work we have to beat or complement
 
 - [HILA — Adaptive Collaboration with Humans (2026)](https://arxiv.org/abs/2603.07972) learns a metacognitive policy for autonomous solving versus human deferral in multi-agent systems.
-- [HAAS — Human-AI Adaptive Symbiosis (2026)](https://arxiv.org/abs/2605.02832) is a particularly close comparator: governance constraints define feasible actions first, then a contextual-bandit learner selects among five human/AI collaboration modes from outcome feedback. ACL therefore has to show value beyond policy-aware adaptive task allocation, not merely reproduce it with different terminology.
-- [Balancing autonomy and oversight in reliable agentic AI (2026)](https://doi.org/10.1007/s44163-026-01373-2) treats human oversight as a dynamically allocated resource rather than a fixed checkpoint and evaluates a three-way routing policy on 5,000 synthetic enterprise tasks. Its reliance on synthetic tasks and confidence proxies also provides a useful methodological comparison for ACL's planned measured-runtime evidence.
+- [HAAS — Human-AI Adaptive Symbiosis (2026)](https://arxiv.org/abs/2605.02832) is a particularly close comparator: governance constraints define feasible actions first, then a contextual-bandit learner selects among five human/AI collaboration modes from outcome feedback. This research therefore has to show value beyond policy-aware adaptive task allocation, not merely reproduce it with different terminology.
+- [Balancing autonomy and oversight in reliable agentic AI (2026)](https://doi.org/10.1007/s44163-026-01373-2) treats human oversight as a dynamically allocated resource rather than a fixed checkpoint and evaluates a three-way routing policy on 5,000 synthetic enterprise tasks. Its reliance on synthetic tasks and confidence proxies also provides a useful methodological comparison for the planned measured-runtime evidence.
 - [Levels of Autonomy for AI Agents (2025)](https://arxiv.org/abs/2506.12469) defines five autonomy levels through changing human roles: operator, collaborator, consultant, approver, and observer.
 - [Measuring AI agent autonomy in practice (Anthropic, 2026)](https://www.anthropic.com/research/measuring-agent-autonomy) measures real human–agent autonomy patterns across millions of interactions.
-- [AI Agents Push Humans Out of the Loop (2026)](https://arxiv.org/abs/2608.23642) argues that agent design can degrade the cognitive capacities required for effective human oversight. ACL should therefore treat human cognitive burden and skill preservation as possible outcomes, not assume that fewer interventions are automatically better.
+- [AI Agents Push Humans Out of the Loop (2026)](https://arxiv.org/abs/2608.23642) argues that agent design can degrade the cognitive capacities required for effective human oversight. The research should therefore treat human cognitive burden and skill preservation as possible outcomes, not assume that fewer interventions are automatically better.
 - [Towards a Science of Scaling Agent Systems](https://arxiv.org/abs/2512.08296) shows that coordination topology must match measurable task properties and that multi-agent overhead can harm sequential work.
 - [Imagining and building wise machines: the centrality of AI metacognition](https://pubmed.ncbi.nlm.nih.gov/41760502/) treats intellectual humility, perspective-taking, and context adaptability as metacognitive strategy-selection capabilities.
 - [LATTICE (2026)](https://doi.org/10.3389/frai.2026.1800407) separates planning, execution, and governance with deterministic policy enforcement and auditable authorization.
@@ -144,7 +142,7 @@ The next public-quality evaluation should report, at minimum:
 
 | Metric | What it tests |
 | --- | --- |
-| Support-profile quality | Did ACL recommend an appropriate combination of oversight, verification, explanation, exploration, and budget? |
+| Support-profile quality | Did the model recommend an appropriate combination of oversight, verification, explanation, exploration, and budget? |
 | Human intervention rate | Did the system reduce unnecessary intervention? |
 | Human cognitive burden / retention | Did support allocation preserve the operator's ability to notice, judge, and recover from agent errors rather than merely reduce clicks? |
 | Rework / retry rate | Did lower support increase recovery work? |
@@ -155,7 +153,7 @@ The next public-quality evaluation should report, at minimum:
 | Authority violations | Did population/local priors ever bypass policy? Target: **zero**. |
 | Calibration by cohort | Does the recommendation remain reliable across task, model, environment, and orchestration cohorts? |
 
-The friction taxonomy on the ACL field note — necessary, productive, avoidable — is an **analysis target**, not an automatically observed label in Friction Contribution v1. Any result using those classes must document who or what labeled them and how outcome leakage was controlled.
+The friction taxonomy on the support-allocation field note — necessary, productive, avoidable — is an **analysis target**, not an automatically observed label in Friction Contribution v1. Any result using those classes must document who or what labeled them and how outcome leakage was controlled.
 
 ## Required ablations
 
@@ -168,7 +166,7 @@ vs population prior + current evidence
 vs local + population + similarity + current evidence
 ```
 
-The Wisdom Reflex ablation should separately compare:
+The strategy-prior ablation should separately compare:
 
 ```text
 fixed orchestration / support
@@ -183,7 +181,7 @@ Population observations must be weighted by context similarity and uncertainty r
 ## Non-negotiable invariants
 
 ```text
-Population evidence → ACL support recommendation  ✅
+Population evidence → support recommendation  ✅
 Population evidence → execution authority         ❌
 Population evidence → override local policy       ❌
 Population evidence → override Evidence Gate      ❌
@@ -195,7 +193,7 @@ Likewise, HyoDo's Integrity Score remains a **review signal**, never approval.
 
 **Not submitted. Not peer reviewed. Not accepted.**
 
-The intended path is an ACL-family human-centered NLP / LLM-agent research submission through ACL Rolling Review once the refreshed empirical evidence is strong enough. Venue timing is deliberately not treated as product truth; the research should earn submission readiness from measurements first.
+The intended path is a human-centered NLP / LLM-agent research submission through the Association for Computational Linguistics Rolling Review once the refreshed empirical evidence is strong enough. Venue timing is deliberately not treated as product truth; the research should earn submission readiness from measurements first.
 
 ## Reproducibility direction
 
@@ -210,6 +208,6 @@ The public artifact should ultimately include:
 - latency / token / compute accounting;
 - human cognitive-burden measures where human oversight is part of the claim;
 - failure cases, null results, and contradictory evidence; and
-- corpus provenance plus counter-principle links for any Wisdom Reflex experiment.
+- corpus provenance plus counter-principle links for any strategy-prior experiment.
 
 Until those artifacts exist and have been read back successfully, this page remains a **working research program**, not a finished paper.
