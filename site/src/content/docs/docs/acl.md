@@ -1,352 +1,207 @@
 ---
-title: ACL — Adaptive Collaboration Layer
-description: A working field note on evidence-grounded support profiles, human wisdom as a metacognitive prior, and measurable collaboration friction.
+title: Support allocation field note
+description: A research-only field note on evidence-grounded support profiles, strategy priors, collaboration topology, and measurable friction.
 ---
 
-> **Status — research-only field note, reviewed 2026-09-08.** ACL here means **Adaptive Collaboration Layer**, not the Association for Computational Linguistics. It is not a shipped HyoDo capability, runtime, or authority layer. This page is not a claim of peer review, venue submission, first-in-field novelty, or measured effectiveness.
+> **Status — research-only field note, reviewed 2026-09-20.** This is not a
+> shipped HyoDo capability, runtime, classifier, or authority layer. It is not a
+> claim of peer review, venue submission, first-in-field novelty, or measured
+> effectiveness.
 
-# Adaptive Collaboration Layer
+# Support allocation field note
 
-**Reader map.** This page is the focused field note for the **Wisdom Reflex + collaboration-topology** hypothesis. See [Research](/docs/research/) for the broader ACL empirical program, sealed benchmark baseline, related work, and publication status. See [Friction Contribution](/docs/friction-contribution/) for the local measurement contract.
+**Reader map.** This is the focused field note for the **strategy-prior +
+collaboration-topology** hypothesis. See [Research](/docs/research/) for the
+broader empirical program, benchmark status, related work, evaluation design,
+and publication boundary. See
+[Friction Contribution](/docs/friction-contribution/) for the local,
+privacy-minimized measurement contract.
 
-## Current claim lock
+The page keeps its historical URL so existing links do not break. The public
+terminology is intentionally generic: the research question matters more than
+an internal project name.
 
-The public product boundary is fixed below. The [Measured Run #1 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md) records one observed KINGDOM/HyoDo execution; it is not a claim of ACL effectiveness.
+## Product boundary first
 
-| Capability | Status | Evidence boundary |
+HyoDo measures and records evidence. The research described here asks a
+different question: **what support profile should a human–AI workflow receive
+in this context?**
+
+Three responsibilities stay separate:
+
+| Responsibility | Question | Meaning |
 | --- | --- | --- |
-| gates / ledger / friction preview | SHIPPED | Local preview/export; ledger. |
-| Graph v1 | SHIPPED (site DEMO FIXTURE) | Local dashboard; fixed demo site. |
-| Graph v2 join | SHIPPED | Multi-parent runtime/viewer with v1 compatibility; public site remains fixture-only. |
-| Codex host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; a fresh canonical live canary is separate evidence. |
-| Cursor host adapter | SHIPPED / LIVE UNOBSERVED | Native adapter shipped; fresh live host observation is not yet sealed. |
-| IFA v0 | SHIPPED | Observer-only information-flow attestation; never execution authority. |
-| remote MCP / ChatGPT | CONTRACT ONLY | Hosted contract; runtime unobserved. |
-| ACL runtime / Wisdom Reflex | RESEARCH | Research-only hypothesis; no shipped runtime or automatic router. |
-| friction collector | NOT BUILT | No collector/uploader; transport disabled. |
+| **Authorization policy** | **Whether?** | Is this action permitted at all? |
+| **Support allocation** | **What support profile?** | What oversight, verification, explanation, exploration, or budget is useful? |
+| **Evidence validation** | **Done?** | Is completion actually supported by evidence? |
 
-HyoDo measures what happened. ACL asks a different question:
-
-> **What support profile should this human–AI workflow receive in this context?**
-
-“Support” should not be treated as one scalar before evidence justifies that simplification. A useful profile may vary independently across dimensions:
-
-| Support dimension | Example question |
-| --- | --- |
-| **Human oversight** | Is a checkpoint or explicit approval useful? |
-| **Verification depth** | How much independent checking is warranted? |
-| **Explanation depth** | How much rationale or trace visibility is useful? |
-| **Exploration / topology** | Single path, parallel specialists, diverse replicas, or diverge→converge? |
-| **Resource budget** | How much extra time / compute / coordination is justified? |
-
-The research goal is not maximum autonomy and not minimum human involvement. It is to reduce **avoidable friction** while preserving **necessary friction** and allowing **productive friction** when clarification, dissent, or verification improves the outcome.
-
-## Hard separation: authority, support, proof
-
-| Layer | Question | Responsibility |
-| --- | --- | --- |
-| **EROS / local authority** | **Whether?** | Is this action permitted at all? |
-| **ACL / support allocation** | **What support profile?** | What oversight, verification, explanation, exploration, or budget is useful? |
-| **Evidence Gate** | **Done?** | Is completion actually supported by evidence? |
-
-The invariant is intentionally stronger than a recommendation policy:
+This separation is a hard invariant:
 
 ```text
-Population evidence → ACL support recommendation  ✅
-Population evidence → execution authority         ❌
-Population evidence → override local policy       ❌
-Population evidence → override Evidence Gate      ❌
+Population evidence → support recommendation  ✅
+Population evidence → execution authority     ❌
+Population evidence → override local policy   ❌
+Population evidence → override evidence gate  ❌
 ```
 
-A common task may still require approval. A statistically successful pattern may still be blocked. A culturally familiar maxim may suggest a perspective, but it never grants authority.
+A support recommendation is advisory. The integrating host still owns
+execution and enforcement.
 
-## Human wisdom as a metacognitive prior
+## Working support model
 
-The working hypothesis extends ACL beyond telemetry. Human societies have compressed recurring experience about timing, cooperation, restraint, trust, conflict, verification, and responsibility into classical texts, maxims, proverbs, and stories.
-
-We do **not** treat that material as universal truth or as executable policy.
+The current hypothesis combines four evidence families:
 
 ```text
-Wisdom ≠ truth
-Wisdom ≠ authority
-Wisdom = accumulated human hypothesis / perspective prior
+local prior
+    +
+population prior
+    +
+context similarity
+    +
+current evidence
+        ↓
+support-profile recommendation
 ```
 
-The useful capability is not recalling a proverb on command. It is having relevant and countervailing perspectives available quickly enough to test them against the current situation.
+Candidate conditioning signals include:
 
-For example:
+- prior successful executions;
+- missing or incomplete evidence;
+- task risk and reversibility;
+- task novelty;
+- retries and rework;
+- verification failures;
+- human interventions;
+- approval wait;
+- resource conflicts; and
+- orchestration pattern.
 
-- **Romanized Korean: “Baekjijangdo matdeulmyeon natda”** — even a sheet of paper is easier to lift together — can suggest more parallel workers when work is independently decomposable.
-- **Romanized Korean: “Sagongi maneumyeon baega saneuro ganda”** — too many boatmen send the boat up the mountain — can warn against multiple competing decision owners or writers.
+The output should remain a profile rather than being forced into one scalar
+unless data shows that a scalar preserves the distinctions that matter.
 
-These are not executable rules. They are contextual lenses. The same system may use broad parallel exploration, converge to one plan, then execute with a single authority line and many independent workers.
+## Strategy-prior hypothesis
 
-A compact operating hypothesis is:
+Human communities have compressed recurring experience about timing,
+cooperation, restraint, trust, conflict, verification, and responsibility into
+texts, maxims, proverbs, and stories. The research question is whether a
+provenance-governed strategy corpus can provide a useful metacognitive prior
+for choosing *how to reason and collaborate* without becoming authority.
 
-> **Think widely. Decide once. Execute in parallel where independence permits. Verify independently.**
+A usable strategy prior must:
 
-The research question is whether a culturally and historically grounded strategy prior adds measurable value to **contextual topology choice** and **support allocation** beyond simpler task-structure heuristics.
+1. preserve source provenance;
+2. expose counter-principles rather than presenting one maxim as universal;
+3. remain conditioned on task structure and current evidence;
+4. never grant execution authority; and
+5. beat simpler baselines after accounting for cost.
 
-## Corpus governance: culture is provenance, not authority
+If it cannot do that, it has not earned a place in the model.
 
-A wisdom corpus creates its own risks. The research contract should therefore require:
+## Friction as a research target
 
-- source provenance: tradition, era, edition, translator, and uncertainty where known;
-- counter-principles rather than one-sided maxim retrieval;
-- culture or language as **source metadata**, never a basis for inferring what a user should believe from nationality, ethnicity, or identity;
-- explicit treatment of translation ambiguity and copyright / licensing constraints;
-- exclusion or quarantining of dehumanizing, discriminatory, or otherwise unsafe material from recommendation authority; and
-- inspectable links from a recommendation back to the corpus items that influenced it.
+Friction Contribution v1 observes coarse operational signals such as retries,
+rework, intervention, wait, resource conflict, evidence completeness, and
+outcome. It does **not** automatically know whether friction was necessary,
+productive, or avoidable.
 
-The phrase **KINGDOM 86-strategy project canon** on this page refers to a project-specific machine-readable strategy set. It is not a claim that history contains a universally recognized “86-strategy canon.”
+Those three classes are a **research labeling target**, not a shipped HyoDo
+classifier. Any experiment using them must document who or what produced the
+label and how outcome leakage was controlled. HyoDo is **not a shipped HyoDo
+classifier** for those categories.
 
-## Why this is a real research problem in 2026
+Examples:
 
-Several adjacent research strands point at the same gap from different directions.
+- a retry may be productive if it catches a real defect;
+- an approval wait may be necessary for a destructive action;
+- fewer interventions may be harmful if operators lose the ability to notice
+  failures.
 
-### 1. Agent architecture must match task structure
+The research therefore measures outcomes and evidence quality, not merely
+whether interaction counts went down.
 
-The primary paper **“Towards a Science of Scaling Agent Systems”** evaluates **180 agent configurations** across five architectures and three model families. It reports that centralized coordination improved a parallelizable Finance-Agent task by **80.9%** over a single agent, while multi-agent variants degraded sequential PlanCraft performance by **39–70%**. Its empirical model selected the optimal coordination strategy for **87% of held-out configurations**, and independent multi-agent systems showed much larger error amplification than centralized coordination.
-
-Sources: [Kim et al., arXiv:2512.08296](https://arxiv.org/abs/2512.08296) and the companion [Google Research summary](https://research.google/blog/towards-a-science-of-scaling-agent-systems-when-and-why-agent-systems-work/).
-
-This supports a narrower principle than “more agents are better”:
+## Proposed strategy-prior loop
 
 ```text
-parallelizable / decomposable → parallelism may help
-sequential / tightly shared state → coordination tax may dominate
+provenance-governed strategy corpus
+        ↓
+retrieve candidate principles + counter-principles
+        ↓
+combine with task structure + current evidence
+        ↓
+recommend support profile / collaboration topology
+        ↓
+observe outcome, cost, rework, and evidence quality
+        ↓
+evaluate against simpler baselines
 ```
 
-### 2. “Wisdom” is being separated from raw intelligence
+There is no automatic router in the shipped HyoDo product that performs this
+loop.
 
-A 2026 *Trends in Cognitive Sciences* article, **“Imagining and building wise machines: the centrality of AI metacognition,”** distinguishes object-level strategies from metacognitive strategies such as **intellectual humility, perspective-taking, and context adaptability**. It argues that wisdom evaluation should be context-sensitive and should judge the strategy-selection process, not only the outcome.
+## Minimal benchmark
 
-Sources: [Johnson et al., PubMed](https://pubmed.ncbi.nlm.nih.gov/41760502/) and DOI `10.1016/j.tics.2026.01.002`.
+A useful benchmark needs materially different task classes and collaboration
+patterns rather than one synthetic happy path. At minimum, report:
 
-That is close to the role proposed here for a Wisdom Reflex: not a database of answers, but a repertoire of strategies for judging **which way of thinking fits the current problem**.
-
-### 3. Understanding a proverb is easier than using it well
-
-EACL 2026 research on culturally grounded figurative language evaluated 22 LLMs and found a **14.07% drop** from understanding to pragmatic use. Providing contextual sentences improved pragmatic-use accuracy by **10.66%**.
-
-Source: [Attia et al., “Beyond Understanding: Evaluating the Pragmatic Gap in LLMs’ Cultural Processing of Figurative Language,” EACL 2026](https://aclanthology.org/2026.eacl-long.341/).
-
-A system that can explain a maxim but cannot select, reject, or balance it in context does not yet demonstrate the proposed reflex.
-
-### 4. Korean cultural knowledge has the same application gap
-
-KIM Bench contains **1,175 Korean idiom instances** and reports persistent difficulty with deep semantic and contextual understanding.
-
-Source: [Wang, Park & Kim, “Benchmarking Korean Idiom Understanding,” RANLP 2025](https://aclanthology.org/2025.ranlp-1.156/).
-
-Nunchi-Bench likewise distinguishes factual cultural recognition from practical application and reports stronger gains from explicit cultural framing than from simply changing the prompt language.
-
-Source: [Kim & Lee, “Nunchi-Bench,” Findings of ACL 2025](https://aclanthology.org/2025.findings-acl.794/).
-
-These results make **contextual application** a better benchmark target than quote recall.
-
-### 5. Friction can be productive
-
-Anthropic’s August 2026 independent-research program reported privacy-preserving analyses across roughly **250,000 Claude.ai / Claude Code conversations**. The Stanford SALT work in that program found human direction and oversight in nearly three-quarters of conversations and described human–AI friction as common but often productive: iteration can clarify intent, refine output, and keep people engaged.
-
-Source: [Anthropic — “Enabling independent research on how people use Claude” (2026-08-26)](https://www.anthropic.com/research/enabling-independent-research).
-
-This argues against a one-dimensional objective such as “minimize all friction.”
-
-### 6. Production teams are already measuring operational friction
-
-Google Cloud has recommended operational measures such as revert / undo behavior, intervention rate, time-to-verify, and output friction for production agents.
-
-Source: [Google Cloud — “The KPIs that actually matter for production AI agents”](https://cloud.google.com/transform/the-kpis-that-actually-matter-for-production-ai-agents).
-
-This is industry guidance rather than peer-reviewed evidence, but it reinforces the practical need for runtime measures beyond task accuracy.
-
-## Working friction taxonomy — and its measurement boundary
-
-```text
-TOTAL COLLABORATION FRICTION
-        │
-        ├── Necessary friction
-        │     approval for consequential action
-        │     security review
-        │     evidence gate
-        │
-        ├── Productive friction
-        │     clarification
-        │     dissent / counter-plan
-        │     useful verification
-        │     learning / perspective shift
-        │
-        └── Avoidable friction
-              duplicate work
-              bad routing
-              unnecessary retries
-              preventable rework
-              excessive coordination
-              ambiguous ownership
-```
-
-This taxonomy is a **research labeling target**, not a shipped HyoDo classifier. HyoDo Friction Contribution v1 derives coarse operational buckets such as retry, rework, intervention, wait, resource conflict, evidence completeness, and outcome. It does not automatically know whether a particular episode was necessary, productive, or avoidable.
-
-The `hyodo friction` command is introduced in **HyoDo 4.17.0**. Installations on 4.16.x or earlier do not expose it. See [Friction Contribution](/docs/friction-contribution/) for the exact contract and version boundary.
-
-The first empirical version should resist collapsing the three friction classes into one scalar until measured data shows that such an aggregation is defensible.
-
-## The proposed Wisdom Reflex loop
-
-```text
-Human wisdom corpus
-(classics · KINGDOM 86-strategy project canon · proverbs · accumulated lessons)
-        ↓
-contextual perspective retrieval
-        ↓
-counter-principle retrieval
-        ↓
-task-structure assessment
-(decomposability · sequential dependence · uncertainty · reversibility · consequence)
-        ↓
-collaboration topology / support-profile recommendation
-        ↓
-execution
-        ↓
-HyoDo runtime evidence
-        ↓
-friction + outcome measurement
-        ↓
-next hypothesis / calibration
-```
-
-The critical transition is from **retrieval** to **contextual application**. The system should be able to say not only “this maxim is related,” but “this principle appears more relevant than its counter-principle under these observed conditions — and the execution evidence did or did not support that choice.”
-
-## Current project state: what exists and what does not
-
-This page separates HyoDo from its experimental companion runtime, KINGDOM.
-
-### HyoDo
-
-- HyoDo has a local `hyodo.agent-event/v1` evidence ledger and policy / evidence surfaces.
-- Friction Contribution v1 is implemented on the 4.17.0 line as a local-only, explicit-opt-in derived record. It does not ship a collector, uploader, or population backend.
-- The contribution contract is intentionally privacy-minimized: it derives coarse task / orchestration / retry / intervention / verification / evidence buckets rather than exporting raw prompts, responses, code, paths, or local identifiers.
-- HyoDo does **not** contain the KINGDOM strategy runtime and does not gain execution authority from wisdom or population evidence.
-- HyoDo 4.19.4 ships Graph v2 multi-parent causal joins while keeping `evidence_refs` separate from causality and preserving v1 compatibility. The public site graph remains a fixture/demo surface rather than a claim of live KINGDOM execution.
-
-### KINGDOM reference implementation and research case study
-
-The following KINGDOM material is a reference-consumer case study, not part of
-the public HyoDo product or its execution authority.
-
-At the verified KINGDOM snapshot used for this note, several ingredients already exist:
-
-- a project-specific **86-strategy ↔ EROS ↔ lessons ↔ Korean-proverb SSOT**: [86-stratagem-eros-map.json](https://github.com/lofibrainwav/kingdom/blob/28f5c33700f4832d697578086db79f82bdbc22bf/.claude/skills/strategy/86-stratagem-eros-map.json);
-- a [command doctrine](https://github.com/lofibrainwav/kingdom/blob/28f5c33700f4832d697578086db79f82bdbc22bf/agent/core/command-doctrine.js) that retrieves strategy principles from task text;
-- a [Wisdom Imprint](https://github.com/lofibrainwav/kingdom/blob/28f5c33700f4832d697578086db79f82bdbc22bf/agent/core/wisdom-imprint.js) model that keeps interpretation separate from measured reality and forbids direct EROS score mutation from the wisdom layer; and
-- an observation-only KINGDOM → HyoDo bridge proposed in [KINGDOM PR #773](https://github.com/lofibrainwav/kingdom/pull/773).
-
-But the key gap remains open:
-
-> **There is no measured, automatic Wisdom Reflex router that converts contextual wisdom + task structure into a support profile / collaboration topology and then demonstrates better outcomes or lower avoidable friction.**
-
-The current command doctrine is still primarily keyword-driven and currently stamps its mission execution mode as sequential. Parallel-agent capabilities exist elsewhere in KINGDOM, but the wisdom layer has not yet been empirically shown to select among single, replica-parallel, structural-parallel, or diverge→converge topologies.
-
-## Evidence status: do not count fixtures as reality
-
-The observation bridge’s own contract explicitly distinguishes CI fixtures from measured production evidence. **Measured KINGDOM ↔ HyoDo Run #1 is now counted as an observability baseline only**; it does not establish ACL effectiveness, a friction reduction, or a Wisdom Reflex result. See the [receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/research/MEASURED_RUN_1_2026-09-08.md).
-
-That is the next scientific gate. A useful result is allowed to be disappointing — for example, missing evidence completeness, unexpectedly sequential execution, or no measurable friction reduction. Those are measurements, not failures to hide.
-
-## Minimal Wisdom Reflex benchmark
-
-The first benchmark should test contextual use, not memorization.
-
-| Scenario | Expected reasoning pressure | Candidate topology |
-| --- | --- | --- |
-| Large set of independent transformations | “many hands” can help; low shared state | structural parallelism |
-| One shared-state migration / single-writer operation | coordination and ownership dominate | single authority / serialized write |
-| Uncertain architecture choice | benefit from diverse hypotheses before commitment | replica planning → compare → converge |
-| Consequential destructive operation | reversibility and evidence dominate speed | extra verification / approval support |
-
-For each case, measure:
-
-- task success / outcome quality;
-- avoidable retry and rework where defensibly labeled;
+- task class and reversibility;
+- model / environment version;
+- support profile;
+- orchestration pattern;
 - human intervention;
-- verification failure;
+- retry / rework;
+- verification failures;
 - evidence completeness;
-- coordination overhead;
-- wall-clock latency and token / compute cost;
-- productive clarification / useful dissent where observable;
-- topology and support profile selected;
-- whether a counter-principle was considered; and
-- **authority violations — target: zero**.
+- wall-clock and token / compute cost; and
+- final outcome.
 
-## Baselines designed to disprove the Wisdom Reflex
+Measured runs and synthetic fixtures must remain separate.
 
-A useful experiment must make it possible for the wisdom layer to lose. At minimum, compare:
+## Baselines designed to disprove the strategy-prior hypothesis
+
+The strategy prior should be compared against:
 
 ```text
-A. fixed sequential / fixed-support baseline
-B. task-structure heuristic only
-C. generic semantic retrieval, no project wisdom corpus
-D. wisdom retrieval without counter-principle
-E. wisdom + counter-principle + task structure
+fixed support / orchestration
+vs task-structure heuristic
+vs generic semantic retrieval
+vs strategy retrieval without counter-principle
+vs strategy + counter-principle + task structure
 ```
 
-The important question is not whether E can produce plausible rationales. It is whether E improves outcomes, calibration, or friction **beyond B and C after accounting for extra latency, tokens, and coordination cost**.
+A more complicated method is not better merely because it is more
+philosophically interesting. It must improve measured outcomes or reduce
+avoidable burden enough to justify its cost.
 
-## Falsifiable hypotheses
+## Related work boundary
 
-1. **Topology alignment:** task-structure-aware topology selection will outperform a fixed orchestration mode on mixed sequential / parallelizable tasks.
-2. **Wisdom increment:** a contextual wisdom prior will add measurable value beyond a task-structure-only router; if it does not, the custom wisdom layer is not justified by this benchmark.
-3. **Context over recall:** contextual wisdom application will outperform keyword-only strategy retrieval on topology-choice accuracy.
-4. **Counter-principle check:** explicitly retrieving a countervailing principle will reduce over-application of a single maxim enough to justify its added cost.
-5. **Support without authority:** ACL can reduce avoidable intervention / rework without increasing unsafe or unproven execution.
-6. **Measurement honesty:** some friction will correlate with better outcomes; therefore a useful friction model must distinguish productive / necessary / avoidable classes rather than optimizing only for lower totals.
+Relevant work already covers human deferral, autonomy levels, dynamic
+oversight, topology selection, authorization, and metacognitive strategy
+selection. The contribution cannot simply be "agents should know when to ask"
+or "more agents are better."
+
+One useful cultural-context benchmark is
+[Kim & Lee, “Nunchi-Bench,” Findings of the Association for Computational Linguistics 2025](https://aclanthology.org/2025.findings-acl.794/).
+The broader [Research](/docs/research/) page tracks the comparison set used for
+the working paper.
 
 ## Threats to validity
 
-Before treating a positive result as evidence for “wisdom,” test these alternatives:
+- **Selection bias:** measured tasks may overrepresent one workflow or risk
+  class.
+- **Outcome leakage:** a friction label produced after seeing the result may
+  encode the answer.
+- **Model drift:** provider and model updates can change the operating regime.
+- **Operator adaptation:** people learn the system, so intervention rates are
+  not stationary.
+- **Cost blindness:** a small quality gain may not justify extra latency or
+  compute.
+- **Corpus bias:** a strategy source can reflect one culture, era, or author;
+  counter-principles and provenance are required.
+- **Authority leakage:** no empirical prior may bypass local authorization.
 
-- the gain may come entirely from **task-structure classification**, not cultural or historical wisdom;
-- a generic semantic router may match the project corpus;
-- counter-principle retrieval may improve rhetoric while adding cost without improving outcomes;
-- topology effects may dominate all support-allocation effects;
-- labels for productive / necessary / avoidable friction may be subjective or outcome-leaking;
-- repeated tasks, models, or operators may create non-independent samples;
-- results may not generalize across model families, task classes, languages, or cultural corpora; and
-- a corpus may encode historical bias or obsolete norms even when retrieval quality is technically high.
+## Publication boundary
 
-These are not footnotes to remove later; they are part of the benchmark design.
-
-## What would count as progress
-
-```text
-HyoDo friction-capable instrument release
-        ↓
-KINGDOM observation bridge merged
-        ↓
-Measured Run #1
-        ↓
-~10 real runs: observability-gap audit
-        ↓
-30–50 real runs across task / risk / topology classes
-        ↓
-ACL + Wisdom Reflex ablations
-        ↓
-only then: population contribution experiments
-```
-
-Population contribution remains downstream of local measurement. The system should learn which coarse fields are actually useful **before** building a network collector.
-
-## Novelty boundary
-
-This field note does **not** claim that HyoDo invented multi-agent coordination, AI metacognition, cultural reasoning, human–AI friction, adaptive autonomy, or proverb-based reasoning. Each is an active research area.
-
-The narrower research opportunity is to test whether these currently adjacent strands can be joined into one auditable loop:
-
-> **provenance-governed metacognitive strategy prior → contextual support profile / topology choice → privacy-minimized runtime friction evidence → falsifiable calibration, while authority remains local and separately governed.**
-
-In the sources reviewed above, the components are largely studied separately. That observation is a research map, not a priority claim. The project still has to earn its contribution through measured results and competitive baselines.
-
-## Source discipline
-
-External quantitative claims on this page link to the source that reports them, with primary papers preferred where practical and institutional summaries treated as companion context. Project implementation claims link to exact repository snapshots or public PRs where possible. Synthetic fixtures, release-preparation receipts, design intent, and plausible rationales are never counted as measured ACL effectiveness.
+This is a working research note. It is **not submitted, not peer reviewed, and
+not accepted**. Publication readiness should be earned from broader measured
+evidence, reproducible evaluation, ablations, failure cases, and explicit
+limits rather than from a target venue name.
