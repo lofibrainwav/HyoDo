@@ -105,7 +105,8 @@ def test_a_planted_current_secret_must_be_reported() -> None:
     assert 'prefix="ghp_"' in planted
     assert 'body="Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0UvWxYz"' in planted
     assert 'key="${prefix}${body}"' in planted
-    assert "ghp_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0UvWxYz" not in planted
+    # Never spell the assembled PAT-shaped value in this test source: the
+    # external history scan would correctly treat the test itself as a finding.
     assert "/dev/urandom" not in planted
     assert ".gitleaksignore" in planted, "the check must run against the real baseline"
     assert "exit 1" in planted, "an unreported plant must fail the job"
