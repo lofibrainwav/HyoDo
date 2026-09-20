@@ -1,12 +1,14 @@
 ---
 title: A worked result
-description: One complete HyoDo run on a three-file project — the exact input, the exact command, the verbatim output, and the exit code, produced by the published 4.19.9 wheel.
+description: One complete HyoDo run on a three-file project — the exact input, the exact command, the output it printed, and the exit code, produced by the published 4.19.9 wheel.
 ---
 
 Everything on this page was produced by running the published package. The
 output blocks are pasted from a terminal, not written by hand. Most are trimmed
-to the lines under discussion; Result 1 is the one shown whole. Nothing inside a
-block was reworded, and no line is cut short.
+to the lines under discussion; Result 1 is the one shown whole, and no line is
+cut short. Two absolute paths are replaced by a placeholder — `/path/to/python`,
+and the directory in front of the malformed-config error — so the page does not
+encode one machine's filesystem. Nothing else was changed.
 
 - **Package**: `hyodo` 4.19.9, installed from PyPI with
   `pipx install hyodo` into an empty pipx home.
@@ -125,8 +127,12 @@ The fingerprint covers the commands, not your source or its location, so editing
 `pricing.py` does not re-prompt but editing the gate command does. It is also the
 same value for anyone running this exact gate set on this version of HyoDo: if
 you copied the config above, the fingerprint you are asked to approve should
-match the one printed here, character for character. Answering `y` records the decision and the run
-continues. Every later run in this project goes straight to the result below.
+match the one printed here, character for character. A matching fingerprint says
+the command text matches. It says nothing about what that command resolves to on
+your machine — the interpreter, the installed packages, your project's code and
+the result are all still yours, which is why the prerequisites above matter.
+Answering `y` records the decision and the run continues. Every later run in this
+project goes straight to the result below.
 
 ## Result 1 — the gate passes
 
