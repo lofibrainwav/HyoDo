@@ -51,8 +51,14 @@ jobs:
           canary="$(mktemp -d)"
           cp .gitleaksignore "$canary/.gitleaksignore"
           # Built at run time so this file never contains a scannable key itself.
-          key="AKIA$(head -c 256 /dev/urandom | LC_ALL=C tr -dc 'A-Z0-9' | cut -c1-16)"
-          printf 'aws_access_key_id = %s\n' "$key" > "$canary/planted.txt"
+          key="AKIA$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Z0-9' | cut -c1-16)"
+          if [ "${#key}" -ne 20 ]; then
+            echo "::error::canary key generation produced ${#key} characters, not 20"
+            exit 1
+          fi
+          # Same shape as the fixtures this scan demonstrably reports, so a miss
+          # means suppression rather than a rule that never matched.
+          printf 'FAKE_AWS_KEY = "%s"\n' "$key" > "$canary/planted.py"
           if docker run --rm -v "$canary:/canary" -w /canary "$GITLEAKS_IMAGE" \
                detect --source=. --no-git --redact --no-banner --exit-code 1; then
             echo "::error::A planted current secret was not reported. The baseline or the rule set is suppressing present-day findings."
