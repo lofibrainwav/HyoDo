@@ -65,13 +65,23 @@ vulnerability_report:
 
 ## Security Gates (`safety_gate`)
 
-HyoDo uses the `safety_gate` hook to detect and block or escalate risky operations.
+HyoDo's `safety_gate` and `hyodo safe` scan for risky-operation patterns and
+report findings. They do not execute, authorize, block, or escalate an
+operation. A caller or CI system may use the result to enforce a stop or
+request review.
 
-### CRITICAL Keywords (blocked immediately)
+### High-risk patterns (reported; caller/CI enforcement)
 
-- `rm -rf /`
-- `DROP DATABASE`
-- `--force --hard`
+- `rm -rf` against absolute or home-directory targets
+- `git reset --hard`
+- `git push ... --force`
+- `DROP DATABASE` or `DROP SCHEMA`
+- `DROP TABLE`
+- `chmod 777`
+
+By default, `hyodo safe` prints findings and exits `0`. With
+`hyodo safe --strict`, a high-severity finding returns a non-zero exit code;
+the caller or CI decides whether that result blocks further action.
 
 ### HIGH Keywords (manual review recommended)
 

@@ -45,7 +45,7 @@ corresponding proof receipt exist. A source change alone is **IMPLEMENTED**, not
 | Priority | Finding | Required disposition |
 | --- | --- | --- |
 | P1 conditional | Optional Compose stack exposes unauthenticated Redis and a fixed PostgreSQL development password | Harden before recommending the stack for any non-isolated host |
-| P1 investigation | Historical `gitleaks` matches include removed `afo_core` material | Determine whether any value was real; rotate first if uncertain |
+| P1 investigation | Historical `gitleaks` matches include removed `afo_core` material | Preserve the redacted 2026-09-13 snapshot and current `.gitleaksignore` dispositions; keep C2/C3 as explicit historical residuals |
 | P2 | Docker image installs floating dependencies | Pin or lock build inputs and publish a reproducible image procedure |
 | P2 | Security and public-state documentation trails the live package | Establish one version/release-status source and update public pages |
 | P2 | Local verification environment could not execute all focused tests | Re-run in a clean supported environment and attach the receipt |
@@ -66,8 +66,8 @@ deployed and tested.
 | Item | Status | Evidence boundary |
 | --- | --- | --- |
 | Compose default exposure | RETIRED | The Compose surface is no longer part of the live product; historical YAML/runtime evidence remains recorded below |
-| Historical credential disposition | HOLD | No credential owner disposition or rotation receipt |
-| Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, package metadata, and site source claims now name published `4.19.5`; public deployment readback is separate |
+| Historical credential disposition | RECONCILED / HISTORICAL RESIDUAL | 13 narrow test/fixture/non-secret baselines are documented; C1 is revoked; C2/C3 are decommissioned external historical credentials with unavailable owners and no current validation control. None is treated as an active credential |
+| Version/support-policy reconciliation | IMPLEMENTED LOCALLY / DEPLOYMENT-UNOBSERVED | Current-state, roadmap, security, capabilities, package metadata, and site source claims now name public release `4.20.0`; public deployment readback is separate |
 | Docker image boundary | IMPLEMENTED LOCALLY / BUILD UNOBSERVED | Runtime-only install, non-editable package install, reduced build context, and lock-derived exact runtime requirements are encoded; image build, base-image digest, and reproducibility receipt remain unobserved |
 | Clean security verification | VERIFIED IN ISOLATED ENVIRONMENT / HOST GLOBAL AUDIT UNOBSERVABLE | Isolated Python 3.12 environment: `1499 passed, 7 skipped`; `ruff`, `pyright`, `pip-audit --local`, package build, scope, wheel install smoke, CLI smoke, and claim regression passed. A later host-global `pip-audit` attempt could not start because that environment lacks `certifi`; it is not counted as a vulnerability result |
 | CI secret/dependency scan | VERIFIED ON REMOTE MAIN / REQUIRED | SHA-pinned `security.yml` runs full-history gitleaks, verifies the lock-derived runtime export, audits that exact set with `pip-audit`, and reviews pull-request dependency changes; required contexts include the historical secret scan and runtime dependency audit |
@@ -211,18 +211,22 @@ can reach `subprocess.run`:
 
 `gitleaks` scanned 603 commits and reported 16 matches. The current checkout
 does not contain the old `afo_core` tree, but Git history contains paths such as
-`afo_core/data/api_wallet.json`. The inspected records appear to contain
-read-only metadata and encrypted/hash-shaped values, but their authenticity has
-not been established.
+`afo_core/data/api_wallet.json`. The current redacted disposition source
+separates 13 narrow test/fixture/non-secret baselines from three genuine
+historical credentials: C1 was revoked, while C2/C3 belong to decommissioned
+external consumers whose owners and validation endpoints are unavailable.
+Those C2/C3 values remain permanently exposed historical residuals, not active
+credentials.
 
 The current redacted finding index is maintained in
 [`docs/security/GITLEAKS_DISPOSITION.md`](security/GITLEAKS_DISPOSITION.md).
-It includes the present-code `hyodo/cli/main.py:350` rule match, which appears
-to be an identifier false positive but remains pending owner confirmation.
+It includes the present-code `hyodo/cli/main.py:350` identifier match in the
+accepted narrow historical baseline; an unexplained current or active finding
+would remain actionable and would not be hidden by that baseline.
 
-This is deliberately classified as **unresolved**, not as a confirmed leak and
-not as a clean result. A deleted file remains available to anyone with the
-repository history.
+This is deliberately classified as **historical residual**, not as an active
+credential and not as a clean-history claim. A deleted file remains available
+to anyone with the repository history.
 
 ### Repair and investigation sequence
 
@@ -507,11 +511,11 @@ from this worktree.
 
 ### 12.1 Historical finding disposition
 
-The credential owner should review [the metadata-only register](security/GITLEAKS_DISPOSITION.md)
-one row at a time. For every match, record the disposition and a private
-receipt reference; never place the value, a populated `.env`, or an unredacted
-scanner report in Git. If validity is uncertain, revoke or rotate first, then
-run a fresh full-history scan and artifact scan before closing the row.
+The [metadata-only register](security/GITLEAKS_DISPOSITION.md) records the
+current disposition. Keep raw values, populated `.env` files, and unredacted
+scanner reports outside Git. Any newly discovered or unexplained finding still
+requires owner review and, when validity is uncertain, revocation or rotation
+before a fresh full-history and artifact scan.
 
 ### 12.2 Review and publish the local remediation
 
