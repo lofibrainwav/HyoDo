@@ -401,6 +401,38 @@ def validate_event(raw: Any) -> tuple[bool, list[str], dict[str, Any] | None]:
             else:
                 meta_out["tags"] = list(tags)
 
+            # Host-declared communication endpoints are display evidence, never authority.
+            if "participants" in meta_raw:
+                participants = meta_raw["participants"]
+                if not isinstance(participants, dict) or set(participants) - {"from", "to"}:
+                    reasons.append("invalid_field:meta.participants")
+                else:
+                    endpoints: dict[str, Any] = {}
+                    for direction in ("from", "to"):
+                        endpoint = participants.get(direction)
+                        if endpoint is None:
+                            endpoints[direction] = None
+                        elif (
+                            not isinstance(endpoint, dict)
+                            or set(endpoint) - {"actor", "actor_id"}
+                            or not isinstance(endpoint.get("actor"), str)
+                            or endpoint.get("actor") not in ACTORS
+                            or (
+                                endpoint.get("actor_id") is not None
+                                and not (
+                                    isinstance(endpoint["actor_id"], str)
+                                    and _ACTOR_ID_RE.fullmatch(endpoint["actor_id"])
+                                )
+                            )
+                        ):
+                            reasons.append(f"invalid_field:meta.participants.{direction}")
+                        else:
+                            endpoints[direction] = {
+                                "actor": endpoint["actor"],
+                                "actor_id": endpoint.get("actor_id"),
+                            }
+                    meta_out["participants"] = endpoints
+
             ephemeral_raw = meta_raw.get("ephemeral")
             if ephemeral_raw is not None:
                 if not isinstance(ephemeral_raw, dict):

@@ -40,11 +40,94 @@ server was started without an evidence root.
 
 ## Axes
 
-The horizontal axis is time, which is the Eternity / 永 lens. The vertical axis
-is participants. That split is not invented here: `graph_view.VIRTUE_COLUMNS`
-already holds five measured columns and treats Eternity as a separate
-continuity indicator rather than a sixth column. See
+The six questions preserve the recorded event, temporal projections interpret
+its position and context, and independent virtue lenses evaluate it. These
+layers reference each other without owning or rewriting each other's content.
+
+The horizontal axis is time; the vertical axis is participants. Eternity / 永
+is an independent continuity lens, not time itself. The current graph exposes
+five measured columns and no independent event-level Eternity assessment, so
+that assessment remains `UNOBSERVED`. The legacy `time_axis.continuity_lens`
+field names the related lens for compatibility; it does not measure it. See
 [Canonical Virtue Contract](./VIRTUE_CONTRACT.md).
+
+## Participants and Who
+
+Timeline rows preserve each producer-provided participant lane. A role is a
+separate annotation, not a bucket that merges people or agents. A child agent
+with an observed parent lane may be a worker; an unrelated tool-calling session
+has an unobserved role (`null`), not an assumed worker role. Review citations
+can cross distinct agent identities even when both have `actor: agent`.
+
+`who.actor` and `who.actor_id` retain the event's recorded actor. `who.from`
+and `who.to` retain explicit `meta.participants` endpoints from the ledger:
+
+```json
+{"meta": {"participants": {
+  "from": {"actor": "human", "actor_id": "requester"},
+  "to": {"actor": "agent", "actor_id": "recipient"}
+}}}
+```
+
+An endpoint uses the existing actor vocabulary (`human`, `agent`, `hyodo`) and
+an optional opaque actor ID. Missing endpoints remain `null`. An existing actor
+is not silently reinterpreted as a message sender; causal parents and tool names
+do not manufacture a recipient. A reply records its own reversed endpoints.
+These are host-declared relationships, not authenticated identities or authority.
+The Benevolence / 仁 lens can inspect this relationship evidence without treating
+its presence as a measured impact, a virtue score, or approval. Tools remain
+part of how the work was carried out, not invented people in this relation.
+
+The local dashboard places timezone-aware event timestamps from earlier to later
+on the horizontal time axis. Per-run step indices remain in event
+details because they reset across runs. Missing or ambiguous timestamps are
+explicitly marked `TIME UNOBSERVED`; their placement does not assert chronology.
+Selecting an event exposes six questions and five independent radial lenses
+(Truth, Goodness, Beauty, Benevolence, and Hyo). Eternity is shown separately
+from time navigation.
+This layout does not change lens evidence status or decision authority.
+
+## Temporal contract target (not implemented)
+
+The following is a design target, not a claim that the current event schema or
+storage enforces it. The current view exposes `ts`, not separate occurrence,
+observation, and recording timestamps. Its `why.reason` comes from
+`policy.reason`; it is policy rationale, not an observed actor motive.
+
+Use one host-owned event history with three read projections: historical record,
+fresh observation, and hypothetical projection. HyoDo can validate and present
+evidence contracts; the host retains storage, planning, execution, and authority.
+
+- Preserve the original claim and its provenance, including claims later found
+  false. A correction is a new event referencing the old event. A derived
+  `superseded_by` lookup must not require rewriting the original envelope.
+- Give observations, corrections, predictions, and execution results distinct
+  event IDs. Link their subject and evidence explicitly; sharing a subject does
+  not mean reusing an event ID. A prediction can be recorded now while its
+  predicted outcome remains hypothetical indefinitely.
+- Keep occurrence time, observation time, and recording time distinct. Absent
+  times remain unknown. Freshness is assessed for a specific source identity,
+  surface, and question; a recent timestamp alone cannot establish current code.
+- Separate declared intent, inferred motive, and policy rationale. A proposed
+  WHY claim carries a value, provenance kind, attributable source reference,
+  and evidence references. Missing WHY remains `UNOBSERVED`. Observing someone
+  declare a motive does not independently verify that motive. Later supporting
+  evidence is a new record, not an in-place promotion of an inferred claim.
+- Keep provenance kind, evidence status, freshness, and authorization separate.
+  A digest checks content consistency against a trusted expected digest; by
+  itself it establishes neither truth, authorship, nor append-only enforcement.
+- A current observation may contradict an older claim without erasing it. An
+  unobserved current surface does not automatically refute historical evidence.
+  A hypothetical projection never becomes an executed result without a separate
+  actual execution observation, and a dry-run's own side effects remain actual
+  events even when the modeled outcome is hypothetical.
+
+In the graph, recorded events and predictions must remain visually distinct.
+The time axis provides temporal navigation, while the independent
+five-lens aperture inspects the selected record. Eternity / 永 assesses
+continuity only when separate supporting evidence is available. Who's From / To relationship
+can inform Benevolence / 仁; it does not establish recipient impact. None of
+these projections promotes evidence into action authority.
 
 ## Fields
 

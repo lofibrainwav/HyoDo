@@ -426,11 +426,12 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
       therefore mark more than one spawning row as an orchestrator without
       inventing a singular nesting parent.
     - `"reviewer"`: this row has at least one event whose `evidence_refs`
-      cite another actor's events (an `evidence_ref` edge whose source
-      belongs to a different `actor`) *and* the row has no write-shaped
+      cite another participant's events (an `evidence_ref` edge whose source
+      belongs to a different participant row) *and* the row has no write-shaped
       tool call (`tool.name` containing `write`, `edit`, `create`,
       `delete`, `rm`, `patch`, `commit`, or `push`, case-insensitive).
-    - `"worker"`: none of the above.
+    - `"worker"`: an agent with an observed parent participant lane.
+    - `None`: no role established by the recorded relations.
 
     `hyo_hierarchy` is `{"own_connected": bool, "children": int,
     "children_disconnected": int}`: `own_connected` is `True` when every
@@ -593,14 +594,14 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
                 return True
         return False
 
-    def _cites_another_actor(row_events: list[str], actor: Any) -> bool:
+    def _cites_another_actor(row_events: list[str], row_key: str) -> bool:
         row_event_ids = set(row_events)
         for edge in edges:
             if edge.get("type") != "evidence_ref" or edge.get("target") not in row_event_ids:
                 continue
             source_id = edge.get("source")
             source_node = node_by_id.get(source_id) if isinstance(source_id, str) else None
-            if source_node is not None and source_node.get("actor") != actor:
+            if source_node is not None and _row_key_and_label(source_node)[0] != row_key:
                 return True
         return False
 
@@ -625,12 +626,12 @@ def build_actor_rows(nodes: list[dict[str, Any]], edges: list[dict[str, Any]]) -
             row["role"] = "human"
         elif key in orchestrator_keys:
             row["role"] = "orchestrator"
-        elif _cites_another_actor(row["events"], row["actor"]) and not _has_write_tool_call(
-            row["events"]
-        ):
+        elif _cites_another_actor(row["events"], key) and not _has_write_tool_call(row["events"]):
             row["role"] = "reviewer"
-        else:
+        elif row["actor"] == "agent" and row["parent_row"] is not None:
             row["role"] = "worker"
+        else:
+            row["role"] = None
 
     return {"order": order, "rows": rows}
 

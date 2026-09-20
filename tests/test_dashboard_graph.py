@@ -500,7 +500,7 @@ def test_edge_overlay_draws_parent_and_evidence_ref_edges(tmp_path: Path) -> Non
     assert 'marker-end="url(#daw-arrow-evidence)"' in html
 
 
-def test_daw_parallel_events_use_a_labeled_two_by_two_cluster(tmp_path: Path) -> None:
+def test_daw_parallel_events_do_not_merge_distinct_participants(tmp_path: Path) -> None:
     _write_ledger(
         tmp_path,
         [
@@ -514,7 +514,14 @@ def test_daw_parallel_events_use_a_labeled_two_by_two_cluster(tmp_path: Path) ->
         _status, _headers, body = _request(port, "GET", "/graph")
     html = body.decode("utf-8")
 
-    assert 'class="daw-cell daw-cluster" data-event-count="4"' in html
+    assert 'class="daw-cell daw-cluster" data-event-count="4"' not in html
+    for event_id in (
+        "parallel-a-call",
+        "parallel-b-call",
+        "parallel-a-result",
+        "parallel-b-result",
+    ):
+        assert f'data-daw-track="agent:{event_id}"' in html
     assert ">A call</button>" in html
     assert ">B call</button>" in html
     assert ">A res</button>" in html
@@ -964,8 +971,9 @@ def test_daw_lanes_follow_the_role_the_graph_already_decided(tmp_path: Path) -> 
     # Both are actor="agent", so the old actor-only reading pooled them.
     assert _daw_track(by_id["lead-call"]) == _daw_track(by_id["sub-call"]) == "agent"
     # Once a role is observed, the lane stops claiming it is unobserved.
-    assert "Agent / worker" in html
-    assert "Agent / role unobserved" not in html
+    assert 'data-daw-track="agent:lead"' in html
+    assert 'data-daw-track="agent:sub"' in html
+    assert "Agent / worker" not in html
 
 
 def test_dashboard_header_and_rail_read_verification_view_facts(tmp_path: Path) -> None:
@@ -1059,6 +1067,9 @@ def test_dashboard_withheld_allow_stays_withheld_in_header_and_rail(tmp_path: Pa
     assert 'data-stage="decision" data-state="UNOBSERVED"' in html
     assert "recordedDecision" in html
     assert "FIVE-LENS APERTURE" in html
+    assert "永 / CONTINUITY" in html
+    assert "no independent continuity assessment is supplied by this view" in html
+    assert "Chronological placement alone does not establish continuity" in html
     assert "data-run-lens-state" in html
     assert "runCoverage" in html
     assert "prefers-reduced-motion:reduce" in html
@@ -1186,3 +1197,70 @@ def test_dashboard_truth_fixture_registry(tmp_path: Path, case: dict[str, object
     assert isinstance(rail, dict)
     for stage, state in rail.items():
         assert f'data-stage="{stage}" data-state="{state}"' in html
+
+
+def test_same_unknown_role_keeps_two_participants_in_separate_timeline_rows(tmp_path: Path) -> None:
+    _write_ledger(
+        tmp_path,
+        [
+            _event(event_id="one", kind="tool_call", actor="agent", actor_id="one"),
+            _event(event_id="two", kind="tool_call", actor="agent", actor_id="two"),
+        ],
+    )
+    with _running_server(tmp_path) as port:
+        _, _, body = _request(port, "GET", "/graph")
+    html = body.decode()
+    assert 'data-daw-track="agent:one"' in html
+    assert 'data-daw-track="agent:two"' in html
+    assert 'class="participant-role">role unobserved' in html
+    assert "Agent / worker" not in html
+
+
+def test_time_axis_orders_real_time_across_reset_run_indices() -> None:
+    from hyodo.dashboard import _render_daw_timeline
+
+    nodes = [
+        {
+            "id": "later",
+            "actor": "agent",
+            "run_id": "new",
+            "step_index": 0,
+            "ts": "2026-09-19T01:00:00+00:00",
+        },
+        {
+            "id": "earlier",
+            "actor": "agent",
+            "run_id": "old",
+            "step_index": 99,
+            "ts": "2026-09-18T18:00:00-06:00",
+        },
+        {"id": "unknown", "actor": "agent", "run_id": "old", "step_index": 2, "ts": "not a time"},
+    ]
+    html, anchors = _render_daw_timeline(nodes, [])
+    assert anchors["earlier"][1] < anchors["later"][1]
+    assert "TIME UNOBSERVED" in html
+    assert "TIME <b>EARLIER → LATER</b>" in html
+    assert "永 / TIME" not in html
+    assert "EARLIER → LATER" in html
+    assert "2 recorded runs" in html
+
+
+def test_how_shows_the_recorded_tool_without_claiming_policy_evaluation() -> None:
+    from hyodo.dashboard import _event_detail_payload
+
+    detail = _event_detail_payload(
+        {"actor": "agent", "kind": "tool_call", "tool": {"name": "Bash"}, "policy": {}}
+    )
+    assert detail["how"] == "Bash"
+    assert detail["presentableDecision"] == "UNOBSERVED"
+
+
+def test_policy_rationale_is_not_presented_as_actor_intent() -> None:
+    from hyodo.dashboard import _event_detail_payload
+
+    payload = _event_detail_payload(
+        {"id": "decision", "policy": {"reason": "tests passed", "decision": "ALLOW"}}
+    )
+    assert payload["why"].startswith("UNOBSERVED")
+    assert payload["policyRationale"] == "tests passed"
+    assert "tests passed" not in payload["why"]

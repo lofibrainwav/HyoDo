@@ -122,12 +122,18 @@ function addLensAperture(panel, data) {
   const section = addSection("FIVE-LENS APERTURE", "lens-aperture");
   const intro = document.createElement("p");
   intro.className = "lens-aperture-intro";
-  intro.textContent = "永 / selected moment · event evidence and run coverage";
+  intro.textContent = "Selected event · independent evidence coverage, not a virtue verdict";
   section.appendChild(intro);
   const diagram = document.createElement("div");
   diagram.className = "lens-aperture-diagram";
   diagram.setAttribute("role", "group");
   diagram.setAttribute("aria-label", "Five independent lens coverage indicators");
+  const center = document.createElement("div");
+  center.className = "lens-aperture-center";
+  center.textContent = "SELECTED EVENT";
+  diagram.appendChild(center);
+  const details = document.createElement("div");
+  details.className = "lens-aperture-details";
   const columns = Array.isArray(data.columns) ? data.columns : [];
   const runCoverage = data.runCoverage && typeof data.runCoverage === "object" ? data.runCoverage : {};
   for (const key of Object.keys(LENS_LABELS)) {
@@ -153,21 +159,35 @@ function addLensAperture(panel, data) {
       ? `${String(coverage.observed ?? 0)} / ${String(coverage.expected ?? 0)}`
       : "UNOBSERVED";
     addText(detail, "span", `Run coverage: ${runState} · ${coverageText}`);
-    button.appendChild(detail);
+    if (key === "in") {
+      addText(detail, "span", String(data.who || "From: UNOBSERVED → To: UNOBSERVED"));
+      addText(detail, "span", "A recorded relationship does not establish its impact or grant authority.");
+    }
+    detail.id = `lens-detail-${key}`;
+    button.setAttribute("aria-controls", detail.id);
+    details.appendChild(detail);
     button.addEventListener("click", () => {
       const expanded = button.getAttribute("aria-expanded") === "true";
+      button.setAttribute("aria-expanded", String(!expanded));
+      details.querySelectorAll(".lens-segment-detail").forEach((entry) => { entry.hidden = true; });
+      diagram.querySelectorAll(".lens-segment").forEach((entry) => { entry.setAttribute("aria-expanded", "false"); });
       button.setAttribute("aria-expanded", String(!expanded));
       detail.hidden = expanded;
     });
     diagram.appendChild(button);
   }
   section.appendChild(diagram);
+  section.appendChild(details);
   const axis = document.createElement("div");
   axis.className = "lens-aperture-axis";
-  addText(axis, "span", "永", "lens-axis-symbol");
+  addText(axis, "span", "TIME", "lens-axis-symbol");
   addText(axis, "span", `step ${String(data.stepIndex ?? "UNOBSERVED")}`, "lens-axis-step");
   addText(axis, "span", "selected moment →", "lens-axis-arrow");
   section.appendChild(axis);
+  const continuity = addSection("永 / CONTINUITY", "lens-continuity");
+  addText(continuity, "p", "UNOBSERVED · no independent continuity assessment is supplied by this view.");
+  addText(continuity, "p", "Chronological placement alone does not establish continuity or long-term value.");
+  section.appendChild(continuity);
   panel.appendChild(section);
 }
 const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event], .daw-cell button[data-event]");
@@ -272,6 +292,8 @@ cells.forEach((button) => {
       p.appendChild(document.createTextNode(String(data[key] ?? "not recorded")));
       panel.appendChild(p);
     }
+    addText(panel, "p", "Recorded actor: " + String(data.recordedActor || "UNOBSERVED"));
+    addText(panel, "p", "Policy rationale: " + String(data.policyRationale || "UNOBSERVED"));
     addLensAperture(panel, data);
     const proof = addSection("PROOF", "detail-proof");
     addText(proof, "p", "Causal parents: " + String(data.causalParentCount ?? 0));
@@ -284,7 +306,10 @@ cells.forEach((button) => {
     panel.appendChild(missing);
   };
   button.addEventListener("focus", show);
-  button.addEventListener("click", show);
+  button.addEventListener("click", () => {
+    show();
+    if (panel) panel.scrollIntoView({ block: "nearest" });
+  });
 });
 const rowToggles = document.querySelectorAll(".row-toggle[data-row-toggle]");
 function descendantRows(key) {
@@ -882,22 +907,38 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, Any]:
     ]
     where = ", ".join([*(str(p) for p in paths), *domains]) or "not recorded"
     rule_id = policy.get("rule_id") if isinstance(policy, dict) else None
-    decision = node.get("decision")
-    how = str(decision) if decision else "not recorded"
+    method_parts = [str(tool[key]) for key in ("name", "method") if tool.get(key)]
+    how = " · ".join(method_parts) or "UNOBSERVED"
     if rule_id:
-        how = f"{how} ({rule_id})"
+        how = f"{how} · policy rule: {rule_id}"
     raw_verification = node.get("verification")
     verification: dict[str, Any] = raw_verification if isinstance(raw_verification, dict) else {}
     raw_what = verification.get("what")
     what: dict[str, Any] = raw_what if isinstance(raw_what, dict) else {}
     raw_how_view = verification.get("how")
     how_view: dict[str, Any] = raw_how_view if isinstance(raw_how_view, dict) else {}
+    who_view = verification.get("who")
+    who_view = who_view if isinstance(who_view, dict) else {}
+
+    def participant(direction: str) -> str:
+        """Display a recorded relationship endpoint without inferring its identity."""
+        endpoint = who_view.get(direction)
+        if not isinstance(endpoint, dict):
+            return "UNOBSERVED"
+        return (
+            " ".join(str(endpoint[key]) for key in ("actor", "actor_id") if endpoint.get(key))
+            or "UNOBSERVED"
+        )
+
     return {
-        "who": str(node.get("actor") or "not recorded"),
+        "who": f"From: {participant('from')} → To: {participant('to')}",
+        "recordedActor": " ".join(str(node[key]) for key in ("actor", "actor_id") if node.get(key))
+        or "UNOBSERVED",
         "what": _event_title(node),
         "when": str(node.get("ts") or "not recorded"),
         "where": where,
-        "why": str(policy.get("reason"))
+        "why": "UNOBSERVED · actor intent is not recorded by this view",
+        "policyRationale": str(policy.get("reason"))
         if isinstance(policy, dict) and policy.get("reason")
         else "not recorded",
         "how": how,
@@ -1704,6 +1745,7 @@ def _render_daw_timeline(
     edges: list[dict[str, Any]],
     edge_overlay: str = "",
     role_by_event: dict[str, str] | None = None,
+    lanes: list[dict[str, Any]] | None = None,
 ) -> tuple[str, dict[str, tuple[int, int, int]]]:
     """Render the user-facing DAW timeline and return edge anchor membership.
 
@@ -1713,23 +1755,38 @@ def _render_daw_timeline(
     """
     valid_nodes = [node for node in nodes if isinstance(node.get("id"), str)]
 
-    step_indices = [
-        value for node in valid_nodes if isinstance(value := node.get("step_index"), int)
-    ]
-    max_step = max(step_indices, default=0)
-    columns = max_step + 1
-    step_timestamps: dict[int, str] = {}
-    for node in sorted(valid_nodes, key=lambda item: str(item.get("ts") or "")):
-        raw_step = node.get("step_index")
-        if not isinstance(raw_step, int):
-            continue
-        step = raw_step
-        timestamp = node.get("ts")
-        if isinstance(timestamp, str) and timestamp and step not in step_timestamps:
-            step_timestamps[step] = timestamp[11:19] if len(timestamp) >= 19 else timestamp
-    run_id = next(
-        (str(node.get("run_id")) for node in valid_nodes if node.get("run_id")), "unobserved"
-    )
+    # Per-run step indices reset; they cannot serve as a shared time axis.
+    def observed_time(node: dict[str, Any]) -> datetime | None:
+        """Normalize timezone-aware event time; leave missing or ambiguous time unknown."""
+        raw = node.get("ts")
+        if not isinstance(raw, str):
+            return None
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        return parsed.astimezone(timezone.utc) if parsed.tzinfo is not None else None
+
+    times = {str(node["id"]): observed_time(node) for node in valid_nodes}
+    observed = sorted({value for value in times.values() if value is not None})
+    column_by_time = {value: index for index, value in enumerate(observed)}
+    column_by_event: dict[str, int] = {}
+    step_timestamps = {
+        index: value.strftime("%m-%d %H:%M:%S UTC") for value, index in column_by_time.items()
+    }
+    next_unknown = len(observed)
+    for node in valid_nodes:
+        event_id = str(node["id"])
+        value = times[event_id]
+        if value is None:
+            column_by_event[event_id] = next_unknown
+            step_timestamps[next_unknown] = "TIME UNOBSERVED"
+            next_unknown += 1
+        else:
+            column_by_event[event_id] = column_by_time[value]
+    columns = max(1, next_unknown)
+    run_ids = {str(node["run_id"]) for node in valid_nodes if node.get("run_id")}
+    run_id = next(iter(run_ids)) if len(run_ids) == 1 else f"{len(run_ids)} recorded runs"
     track_order = ["human", "planner", "agent", "reviewer"]
     # The agent lane no longer claims the role is unobserved when the graph
     # observed one. Saying "unobserved" about something already measured is
@@ -1741,6 +1798,26 @@ def _render_daw_timeline(
         "agent": "Agent / worker" if roles_observed else "Agent / role unobserved",
         "reviewer": "Reviewer",
     }
+    participant_by_event: dict[str, str] = {}
+    track_styles = {key: key for key in track_order}
+    track_roles: dict[str, str] = {}
+    if lanes:
+        track_order = []
+        track_labels = {}
+        track_styles = {}
+        for lane in lanes:
+            key = str(lane["lane_id"])
+            track_order.append(key)
+            track_labels[key] = _display_row_label(key, str(lane.get("label") or key))
+            role = lane.get("role")
+            track_roles[key] = str(role) if role else "role unobserved"
+            track_styles[key] = _DAW_LANE_BY_ROLE.get(str(role), "agent")
+            for event_id in lane.get("events") or []:
+                participant_by_event[str(event_id)] = key
+        if any(str(node["id"]) not in participant_by_event for node in valid_nodes):
+            track_order.append("unattributed")
+            track_labels["unattributed"] = "Participant unobserved"
+            track_styles["unattributed"] = "agent"
     buckets: dict[tuple[str, int], list[dict[str, Any]]] = {}
     anchors: dict[str, tuple[int, int, int]] = {}
     for node in sorted(
@@ -1750,19 +1827,21 @@ def _render_daw_timeline(
             str(item.get("ts", "")),
         ),
     ):
-        track = _daw_track(node, role_by_event)
-        raw_step = node.get("step_index")
-        step: int = raw_step if isinstance(raw_step, int) else 0
+        track = (
+            participant_by_event.get(str(node["id"]), "unattributed")
+            if lanes
+            else _daw_track(node, role_by_event)
+        )
+        step = column_by_event[str(node["id"])]
         buckets.setdefault((track, step), []).append(node)
 
-    # Keep the prototype's four-lane structure even when a role is absent from
-    # the measured source. Empty lanes make absence observable without
-    # fabricating events or role assignments.
+    # Canonical participant lanes retain identity even when roles match.
+    # The legacy fallback is used only when the producer supplied no lanes.
     visible_tracks = track_order
     parts = [
         '<section class="daw-console" aria-label="Evidence session timeline">',
         f'<div class="daw-sessionbar"><div><span>EVIDENCE CONSOLE</span><strong>SESSION / {escape(run_id)}</strong></div>'
-        f'<div><span class="session-state">■ STATIC VIEW</span><span>STEP INDEX <b>t0 — t{max_step}</b></span>'
+        f'<div><span class="session-state">■ STATIC VIEW</span><span>TIME <b>EARLIER → LATER</b></span>'
         '<span class="session-boundary">LOCAL DATA / NOT SEALED</span></div></div>',
         '<div class="daw-console-head"><div><span class="daw-kicker">EVIDENCE SESSION / LIVE READBACK</span>'
         '<h2>Run timeline</h2></div><div class="daw-legend"><span><i class="legend-call"></i>CALL</span>'
@@ -1777,26 +1856,29 @@ def _render_daw_timeline(
     ]
     for row_index, track in enumerate(visible_tracks):
         label = track_labels[track]
+        role_label = track_roles.get(track)
+        role_html = (
+            f'<span class="participant-role">{escape(role_label)}</span>' if role_label else ""
+        )
         is_empty_track = not any(buckets.get((track, step)) for step in range(columns))
         row_class = "daw-row daw-row-empty" if is_empty_track else "daw-row"
         empty_state = '<span class="track-empty-state">UNOBSERVED</span>' if is_empty_track else ""
         parts.append(
             f'<div class="{row_class}" data-daw-track="{escape(track)}"><div class="daw-track-label">'
-            f'<span class="track-led track-{escape(track)}"></span>{escape(label)}{empty_state}'
+            f'<span class="track-led track-{escape(track_styles[track])}"></span>'
+            f'<span class="participant-label">{escape(label)}{role_html}</span>{empty_state}'
             f"<small>{row_index:02d}</small></div>"
         )
-        for step in range(columns):
-            events = buckets.get((track, step), [])
-            if not events:
-                parts.append('<div class="daw-cell daw-empty"></div>')
-                continue
+        for step in sorted(index for lane, index in buckets if lane == track):
+            events = buckets[(track, step)]
             is_parallel_cluster = len(events) > 1 and all(
                 "parallel-" in str(node["id"]).lower() for node in events
             )
             cluster_class = " daw-cluster" if len(events) > 1 else ""
             parallel_attr = ' data-parallel-cluster="true"' if is_parallel_cluster else ""
             parts.append(
-                f'<div class="daw-cell{cluster_class}" data-event-count="{len(events)}"{parallel_attr}>'
+                f'<div class="daw-cell{cluster_class}" data-event-count="{len(events)}"'
+                f' style="grid-column:{step + 2}"{parallel_attr}>'
             )
             if is_parallel_cluster:
                 parts.append(
@@ -1917,9 +1999,13 @@ def render_graph_html(
 
     missing_html = _render_missing_panel(graph, effective_root)
     daw_roles = _role_by_event(graph)
-    _daw_preview, daw_anchors = _render_daw_timeline(nodes, edges, role_by_event=daw_roles)
+    _daw_preview, daw_anchors = _render_daw_timeline(
+        nodes, edges, role_by_event=daw_roles, lanes=verification_view["lanes"]
+    )
     daw_edge_overlay = _render_edge_overlay(graph, daw_anchors, overlay_id="daw-edge-overlay")
-    daw_html, _ = _render_daw_timeline(nodes, edges, daw_edge_overlay, daw_roles)
+    daw_html, _ = _render_daw_timeline(
+        nodes, edges, daw_edge_overlay, daw_roles, verification_view["lanes"]
+    )
 
     # Brief finding 1: one grid, columns x actor rows, each event a tile at
     # (its column, its row) — replaces the old two-separate-lists layout
@@ -2137,6 +2223,8 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .daw-step small {{ display:block; color:#747378; margin-top:3px }}
 .daw-track-label {{ position:sticky; left:0; z-index:4; display:flex; align-items:center; gap:7px; padding:0 10px; color:#f5f5f5; font-size:.69rem; letter-spacing:.1em; border-right:1px solid #57565a; background:#121116 }}
 .daw-track-label small {{ margin-left:auto; color:#747378 }}
+.participant-label {{ overflow-wrap:anywhere }}
+.participant-role {{ display:block; color:#8b929a; font-size:.6rem; margin-top:4px }}
 .track-empty-state {{ color:#747378; font-size:.54rem; letter-spacing:.12em }}
 .daw-row {{ min-height:78px; margin:8px 0; border:1px solid #3a393d; border-radius:0; background:#121116; overflow:visible }}
 .daw-row.daw-row-empty {{ min-height:36px; margin:4px 0; border-color:#302f33; background:#101015 }}
@@ -2176,7 +2264,15 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .lens-aperture {{ margin-top:.78rem; padding-top:.72rem; border-top:1px solid #3a393d }}
 .lens-aperture h3 {{ margin-top:0 }}
 .lens-aperture-intro {{ margin:.1rem 0 .65rem; color:#8b929a; font-size:.66rem; letter-spacing:.04em }}
-.lens-aperture-diagram {{ display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; align-items:stretch }}
+.lens-aperture-diagram {{ position:relative; width:min(100%,430px); aspect-ratio:1; margin:8px auto; border:1px solid #3a393d; border-radius:50% }}
+.lens-aperture-center {{ position:absolute; inset:38%; display:grid; place-items:center; border:1px solid #57565a; border-radius:50%; color:#aaa9ab; text-align:center; font-size:.6rem }}
+.lens-aperture-diagram .lens-segment {{ position:absolute; width:100px; min-height:70px; transform:translate(-50%,-50%) }}
+.lens-segment[data-lens-key="jin"] {{ left:50%; top:12% }}
+.lens-segment[data-lens-key="seon"] {{ left:85%; top:39% }}
+.lens-segment[data-lens-key="mi"] {{ left:72%; top:80% }}
+.lens-segment[data-lens-key="in"] {{ left:28%; top:80% }}
+.lens-segment[data-lens-key="hyo"] {{ left:15%; top:39% }}
+.lens-segment-detail[hidden] {{ display:none }}
 .lens-segment {{ display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; column-gap:5px; align-items:center; min-width:0; padding:7px 6px; border:1px solid #3a393d; border-radius:0; background:#121116; color:#f5f5f5; text-align:left; transition:background 200ms ease,border-color 200ms ease }}
 .lens-segment:hover,.lens-segment:focus-visible,.lens-segment[aria-expanded="true"] {{ border-color:#f05a24; background:#1d1a1d }}
 .lens-glyph {{ grid-row:1 / span 2; font-size:1.15rem; line-height:1 }}
@@ -2193,7 +2289,7 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .detail-proof, .detail-missing {{ color:#aaa9ab }}
 .detail-proof p, .detail-missing p {{ margin:.18rem 0 }}
 .detail-missing p {{ color:#fab413 }}
-@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} .lens-aperture-diagram {{ grid-template-columns:repeat(5, minmax(82px,1fr)); overflow-x:auto; padding-bottom:4px }} .lens-segment {{ min-width:82px }} }}
+@media (max-width:820px) {{ main {{ padding:18px 14px 40px }} .daw-console {{ margin-inline:-14px; border-inline:0 }} .daw-console-head {{ padding-inline:14px }} .detail {{ border-radius:0 }} .lens-aperture-diagram .lens-segment {{ width:82px; min-width:0 }} }}
 @media (prefers-reduced-motion:reduce) {{ .daw-cell button,.lens-segment {{ transition:none }} }}
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
 {notice_html}

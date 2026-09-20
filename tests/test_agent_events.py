@@ -915,3 +915,20 @@ def test_url_shape_observation_and_missing_digest(entry, shape):
     url = event["tool"]["urls"][0]
     assert url["credential_shaped"] is shape
     assert url["digest"] == (content_digest(entry["path"]) if "path" in entry else None)
+
+
+@pytest.mark.parametrize(
+    "endpoint",
+    [
+        [],
+        {"actor": []},
+        {"actor": "tool"},
+        {"actor": "agent", "actor_id": "bad id"},
+        {"actor": "agent", "secret": "not accepted"},
+    ],
+)
+def test_malformed_communication_endpoint_is_rejected(endpoint) -> None:
+    ok, reasons, normalized = validate_event(_valid_event(meta={"participants": {"to": endpoint}}))
+    assert not ok
+    assert "invalid_field:meta.participants.to" in reasons
+    assert normalized is None

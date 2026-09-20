@@ -335,6 +335,7 @@ def build_event_graph(
             "kind": event.get("kind"),
             "actor": event.get("actor"),
             "actor_id": event.get("actor_id"),
+            "participants": (event.get("meta") or {}).get("participants"),
             "step_index": event.get("step_index"),
             "parent_event_ids": parents,
             "decision": policy.get("decision"),

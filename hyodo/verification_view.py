@@ -19,10 +19,10 @@ remember not to guess.
 
 Presentation contract
 ---------------------
-The horizontal axis is time, which is the Eternity/Yeong lens; the vertical
-axis is participants. That split is not invented here: ``graph_view``'s
-``VIRTUE_COLUMNS`` already holds five measured columns and treats Eternity as a
-separate continuity indicator.
+The horizontal axis places recorded events in time; the vertical axis is
+participants. Temporal placement is not an Eternity assessment. ``graph_view``'s
+``VIRTUE_COLUMNS`` holds five measured columns; independent continuity assessment
+remains separate from chronological ordering.
 
 Causal edges and evidence edges are kept in two separate lists because they
 mean different things. ``build_event_graph`` already emits them as distinct
@@ -49,8 +49,8 @@ VERIFICATION_VIEW_SCHEMA_VERSION = "hyodo.verification-view/v0"
 #: The horizontal axis is always time. Consumers must not re-map it.
 TIME_DIRECTION = "left_to_right"
 
-#: The lens the time axis represents. Eternity is not one of the five measured
-#: columns in the viewer; it is the axis the other five are read along.
+#: Compatibility metadata naming the related continuity lens. This association
+#: does not equate chronology with a measured Eternity assessment.
 CONTINUITY_LENS = "eternity"
 
 #: A graph that could not resolve its own references has not earned an ALLOW.
@@ -114,6 +114,8 @@ def _five_w_one_h(node: dict[str, Any], *, allow_withheld: bool) -> dict[str, An
         "who": {
             "actor": _text(node.get("actor")),
             "actor_id": _text(node.get("actor_id")),
+            "from": _field(node, "participants").get("from"),
+            "to": _field(node, "participants").get("to"),
         },
         "what": {
             "kind": _text(node.get("kind")),
@@ -139,6 +141,8 @@ def _five_w_one_h(node: dict[str, Any], *, allow_withheld: bool) -> dict[str, An
             "run_id": _text(node.get("run_id")),
         },
         "how": {
+            "tool_name": _text(tool.get("name")),
+            "method": _text(tool.get("method")),
             "rule_id": _text(policy.get("rule_id")),
             "evaluated_by": _text(policy.get("evaluated_by")),
             "output_digest": _text(io.get("output_digest")),
