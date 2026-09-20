@@ -30,11 +30,12 @@ actor names, tool names, or grid position.
 
 ## Decisions
 
-`ALLOW`, `ASK`, `DENY`, and `UNOBSERVED` are live policy decisions as of
+`ALLOW`, `ASK`, `DENY`, and `UNOBSERVED` are policy-evaluation outputs as of
 v4.13.0. `hyodo policy check` exits `0` for `ALLOW`, `1` for `DENY`, `2` for
 `UNOBSERVED`, and `3` for `ASK`. `UNOBSERVED` is never treated as a pass —
 it means no policy record exists for that step, not that the step was
-approved.
+approved. These outputs are not execution permissions: HyoDo does not run or
+authorize agents, and the host or a human decides what happens next.
 
 ## Verification and release boundary
 

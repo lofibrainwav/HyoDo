@@ -12,7 +12,7 @@ const publicVersion = versionFile.trim();
 const pypiUrl = 'https://pypi.org/project/hyodo/';
 const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
 const installCommand = 'pipx install hyodo';
-const siteDescription = 'See which project checks ran on AI-assisted work, what they found, and what remains unknown. HyoDo runs locally and leaves decisions to people.';
+const siteDescription = 'Local evidence verification for AI-assisted work. See what ran, what the evidence supports, and what remains unknown. HyoDo does not run or authorize agents.';
 const canonicalUrl = 'https://hyodo.app/';
 ---
 
@@ -21,20 +21,20 @@ const canonicalUrl = 'https://hyodo.app/';
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>HyoDo — Evidence before "done"</title>
+		<title>HyoDo — Local evidence verification for AI-assisted work</title>
 		<meta name="description" content={siteDescription} />
 		<link rel="canonical" href={canonicalUrl} />
 		<meta property="og:type" content="website" />
 		<meta property="og:site_name" content="HyoDo" />
-		<meta property="og:title" content="HyoDo — Evidence before done" />
+		<meta property="og:title" content="HyoDo — Local evidence verification for AI-assisted work" />
 		<meta property="og:description" content={siteDescription} />
 		<meta property="og:url" content={canonicalUrl} />
 		<meta property="og:image" content={new URL('/og-image.png', canonicalUrl).href} />
 		<meta property="og:image:width" content="1200" />
 		<meta property="og:image:height" content="630" />
-		<meta property="og:image:alt" content="HyoDo — When AI says done, ask what proves it." />
+		<meta property="og:image:alt" content="HyoDo — See what ran and what the evidence supports." />
 		<meta name="twitter:card" content="summary_large_image" />
-		<meta name="twitter:title" content="HyoDo — Evidence before done" />
+		<meta name="twitter:title" content="HyoDo — Local evidence verification for AI-assisted work" />
 		<meta name="twitter:description" content={siteDescription} />
 		<meta name="twitter:image" content={new URL('/og-image.png', canonicalUrl).href} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -430,7 +430,7 @@ const canonicalUrl = 'https://hyodo.app/';
 				<div class="hero-scrim"></div>
 			</div>
 			<div class="wrap hero-content">
-				<span class="eyebrow">Local checks for AI-assisted work</span>
+				<span class="eyebrow">Local evidence verification for AI-assisted work</span>
 				<h1 id="hero-heading" data-hero-headline>
 					When AI says “done,” ask what proves it.
 				</h1>
@@ -440,7 +440,7 @@ const canonicalUrl = 'https://hyodo.app/';
 					that technology should respect people's time and choices, and carry its
 					share of the burden instead of passing it back to them. Missing evidence
 					is UNOBSERVED: there is not enough evidence to call it a pass or a failure.
-					People decide what to do.
+					HyoDo does not run or authorize agents. People decide what to do.
 				</p>
 				<div class="install-block">
 					<code id="install-cmd">{installCommand}</code>
@@ -448,14 +448,14 @@ const canonicalUrl = 'https://hyodo.app/';
 				</div>
 				<p class="copy-status" id="copy-status" role="status" aria-live="polite" aria-atomic="true"></p>
 				<a class="quickstart-link" href="/docs/quickstart/">New to HyoDo? Read the quickstart →</a>
-				<a class="quickstart-link" href="/docs/worked-example/">Or see one finished run first — real output, exit codes, 4.19.9 →</a>
+				<a class="quickstart-link" href="/docs/worked-example/">Or see an archival worked example — real output from the published 4.19.9 wheel →</a>
 			</div>
 		</header>
 
 		<section class="eg-page eg-embed" aria-labelledby="eg-heading">
 			<div class="eg-wrap">
 				<h2 id="eg-heading">Evidence graph <span class="eg-badge">Prototype</span></h2>
-				<p class="eg-key">Rows show participants, columns show steps, and cells show events. A solid line links a causal parent, a dashed line points to supporting evidence, and a red stub marks a broken link.</p>
+				<p class="eg-key">Rows show participants, columns show steps, and cells show events. A solid line links a causal parent, a dashed line points to supporting evidence, and a red stub marks a broken link. ALLOW, ASK, DENY, and UNOBSERVED are policy-evaluation outputs, not execution permissions.</p>
 				<p class="eg-banner" role="note">This interactive example uses sample data only; nothing is uploaded. A local HyoDo dashboard can show the same relationships from a real event ledger.</p>
 			<div class="legend" aria-hidden="false">
 				<span class="lg-item"

@@ -100,8 +100,9 @@ connect a detected host; it previews the changes and asks before writing.
 hyodo start
 ```
 
-The MCP adapter is an optional extra, not part of the base install, and it
-must land in the same environment that runs `hyodo`. Install it the way you
+The MCP adapter is an optional extra, not part of the base install, and it is
+not an MCP gateway, traffic proxy, or central authorization layer. It must
+land in the same environment that runs `hyodo`. Install it the way you
 installed HyoDo:
 
 ```bash
