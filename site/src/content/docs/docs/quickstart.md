@@ -18,7 +18,7 @@ command, and the verbatim output with its exit code.
 | **Reads** | your checkout, and the commands you register in `.hyodo/gates.toml`. |
 | **Reports** | which gates ran, what they returned, and `UNOBSERVED` when nothing ran. |
 | **Does not** | run your CI, gate your merges, approve or deploy anything. |
-| **Does not** | send your code or results anywhere. Everything below is local. |
+| **Does not** | send your code or results to HyoDo or its maintainers. The commands below run locally; a gate you register goes wherever you point it, and an MCP host you connect reads what you hand it. |
 | **Optional** | an MCP adapter, so a host such as Claude or Cursor can read the same evidence. Step 5. |
 
 A HyoDo result is evidence for a decision, never the decision. The exit codes
@@ -189,5 +189,5 @@ does not get to look like a gate that passed.
 ## Next steps
 
 - [Why HyoDo](/docs/why-hyodo/)
-- [Philosophy → Math → Code](/docs/philosophy/)
+- [From values to evidence](/docs/philosophy/)
 - [Trust](/docs/trust/)

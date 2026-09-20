@@ -4,15 +4,64 @@ description: One complete HyoDo run on a three-file project — the exact input,
 ---
 
 Everything on this page was produced by running the published package. The
-output blocks are pasted from a terminal, not written by hand.
+output blocks are pasted from a terminal, not written by hand. Some are trimmed
+to the lines under discussion — no line was reworded, and the full-result blocks
+below are shown whole.
 
 - **Package**: `hyodo` 4.19.9, installed from PyPI with
   `pipx install hyodo` into an empty pipx home.
 - **Reported by the tool itself**: `HyoDo v4.19.9 - model-agnostic quality gates`,
   and every result line below ends with `measured by hyodo 4.19.9 (wheel)`.
-- **Platform**: macOS, Python 3.14.7.
+- **Platform**: macOS. HyoDo itself ran on Python 3.14.7; the gate below ran on
+  the `python` found on `PATH`, which is a separate interpreter. That
+  distinction matters, and the next section says why.
 
 You can reproduce it in about a minute. Nothing leaves your machine.
+
+## Before you run it
+
+Two things are easy to skip, and skipping either one changes the exit code you
+get. Both were reproduced against this same 4.19.9 wheel.
+
+**1. The gate command needs its own tool installed.** HyoDo does not supply
+pytest. The gate below runs `python -m pytest`, and `python` there is resolved
+from your `PATH` — not from the environment HyoDo was installed into. `pipx`
+deliberately isolates HyoDo, so installing HyoDo does not put pytest anywhere.
+Check the interpreter that will actually run the gate:
+
+```bash
+python -m pytest --version
+```
+
+If that fails, install it for that interpreter (`python -m pip install pytest`).
+Otherwise the gate runs and reports a genuine failure that is not about your
+code:
+
+```text
+  FAIL pytest (善 선 Good): /path/to/python: No module named pytest
+HYODO FAIL — 1/1 gates observed, pytest
+```
+
+Exit code **1**. The gate ran; the command inside it could not.
+
+**2. A new gate command set has to be approved once.** `.hyodo/gates.toml`
+registers commands that HyoDo will execute, so HyoDo will not run an unreviewed
+command set on your behalf. In a non-interactive shell it refuses and says so:
+
+```text
+  SKIP pytest (善 선 Good): gates.toml command set is new or unapproved in a
+non-interactive environment -- set HYODO_GATES_TRUST_ALL=1 to pre-approve or run
+`hyodo check` interactively once to review and record trust
+
+==================================================
+No user gates were executed
+This is not a validation pass.
+HYODO UNOBSERVED — 0/1 gates observed, required gates UNOBSERVED
+```
+
+Exit code **2**, not `0`. Run it once in a real terminal to review and approve —
+that is the step shown under "The command" below. The recorded decision lives in
+`.hyodo/gates-trust.json` in your project, and changing a command invalidates it.
 
 ## The input
 
@@ -61,6 +110,23 @@ timeout = 120
 ```bash
 hyodo check
 ```
+
+The first time, HyoDo shows the command set it is about to run and waits. This
+is the approval from "Before you run it", verbatim:
+
+```text
+HyoDo Bring-Your-Own-Gates: .hyodo/gates.toml command set changed or is new.
+  [goodness] pytest: python -m pytest tests -q
+  fingerprint: 2be698af424180e66492c8c54c1481b507789c2ea7a7f05c177ae044c8bd7ca0
+Trust and run this command set now? [y/N] y
+```
+
+The fingerprint covers the commands, not your source or its location, so editing
+`pricing.py` does not re-prompt but editing the gate command does. It is also the
+same value for anyone running this exact gate set: if you copied the config
+above, the fingerprint you are asked to approve should match the one printed
+here, character for character. Answering `y` records the decision and the run
+continues. Every later run in this project goes straight to the result below.
 
 ## Result 1 — the gate passes
 
@@ -120,8 +186,9 @@ measurements.
 
 ## Result 3 — nothing was measured, and it says so
 
-This is the result most tools get wrong, so it is worth showing on purpose.
-Run the same command in a directory with no gates and no recognizable project:
+This is the result worth showing on purpose, because an empty run is the easiest
+one to misread as success. Run the same command in a directory with no gates and
+no recognizable project:
 
 ```text
 Measurement: measured by hyodo 4.19.9 (wheel)
