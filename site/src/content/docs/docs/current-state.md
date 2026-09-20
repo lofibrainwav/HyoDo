@@ -8,26 +8,26 @@ description: Public release, current main, and measured HyoDo state separated by
 Public release readback: **2026-09-19 PT**. Runtime capability matrix below
 was measured 2026-09-13 PT, before 4.19.6; it is a historical snapshot.
 
-HyoDo **4.19.9** is the current public package. Product capability and live
+HyoDo **4.20.0** is the current public package. Product capability and live
 host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Latest public package: **4.19.9**
+- Latest public package: **4.20.0**
 - Release chain: **CLOSED** — signed tag, GitHub Release + SBOM, PyPI provenance,
-  and install smoke verified in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.19.9.md).
+  and install smoke verified in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.20.0.md).
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
 
-HyoDo 4.19.9 repairs the storefront surfaces found in the 2026-09-19 first-visit
-audit: the published project description now carries links that resolve, the
-optional MCP extra names the path for each installer, and the homepage hero
-keeps its copy in normal flow. The bump itself carries no runtime change. It
-does not claim fresh Codex or Cursor host observations; those remain
-`UNOBSERVED`.
+HyoDo 4.20.0 preserves distinct graph participants and explicit From/To
+endpoints, and adds opt-in comparisons of host-supplied scalar requirements.
+Evidence references, missing observations, and changed requirements are shown
+without claiming automatic intent understanding or execution authority.
+Separately stored occurrence, observation, and recording timestamps remain a
+design target. Fresh Codex or Cursor host observations remain `UNOBSERVED`.
 
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for 4.19.9.
+2026-09-13. It is not a fresh runtime readback for 4.20.0.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |
@@ -58,4 +58,4 @@ HyoDo    observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/KINGDOM experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.19.9 public artifact released and verified.
+prerequisites for calling the HyoDo 4.20.0 public artifact released and verified.

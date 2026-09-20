@@ -1,6 +1,6 @@
 {
   "schema": "hyodo.capabilities/v1",
-  "public_release": "4.19.8",
+  "public_release": "4.20.0",
   "public_claim_table": [
     [
       "gates / ledger / friction preview",
