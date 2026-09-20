@@ -73,8 +73,7 @@ package stores evidence digests and receipts, not captured payloads. See the
 [product boundary](./docs/PRODUCT_BOUNDARY.md), [measured state snapshot](./docs/CURRENT_STATE.md),
 and [security model](./SECURITY.md) for the authoritative details.
 The legacy HyoDo Integrity Score command is advisory only. It retains a
-five-input geometric-mean method for compatibility; `HYOGOOK V5` is its
-internal name.
+five-input geometric-mean method for compatibility.
 HyoDo's replacement evaluation model is being updated; it does not define the
 six reference values as one canonical score. The current package does not yet
 provide a general per-axis evaluator. Current source status may differ from
