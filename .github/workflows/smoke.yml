@@ -136,7 +136,7 @@ jobs:
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
           grep -q "$VERSION" CHANGELOG.md
-          grep -q "HYOGOOK V5" README.md
-          grep -q "HYOGOOK V5" PHILOSOPHY.md
-          grep -q "HYOGOOK V5" CONTRIBUTING.md
+          grep -q "legacy HyoDo Integrity Score" README.md
+          grep -q "Legacy CLI display name.*HyoDo Integrity Score" PHILOSOPHY.md
+          grep -q "older five-input geometric-mean method" CONTRIBUTING.md
           grep -q "Release readiness" RELEASE_CHECKLIST.md
