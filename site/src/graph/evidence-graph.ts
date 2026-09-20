@@ -64,6 +64,8 @@ export interface EvidenceEvent {
 	evidenceRefs: string[];
 	/** Prototype-only narrative used for the "why" field when policy.reason is absent. */
 	note: string;
+	/** Producer-supplied bounded comparisons, never a viewer-derived judgement. */
+	intentReview?: Record<string, unknown> | null;
 }
 
 const RUN_ID = 'run-2026-09-06-001';
@@ -391,6 +393,11 @@ function fieldWhere(ev: EvidenceEvent): string {
 }
 
 function fieldWhy(ev: EvidenceEvent): string {
+	if (ev.intentReview !== undefined) {
+		return typeof ev.intentReview?.intent_ref === 'string'
+			? `Recorded intent source: ${ev.intentReview.intent_ref}; meaning is not inferred by this viewer.`
+			: 'UNOBSERVED — no user intent comparison was recorded.';
+	}
 	if (ev.policy?.reason) return ev.policy.reason;
 	return ev.note || '—';
 }
@@ -414,6 +421,32 @@ function escapeHtml(value: string): string {
 const PANEL_PLACEHOLDER =
 	'<h2>5W1H</h2><p class="placeholder">Hover or focus (Tab) a cell to inspect its record — who, when, what, where, how, why.</p>';
 
+export function renderIntentReview(review: Record<string, unknown> | null | undefined): string {
+	if (review === undefined) return '';
+	const checks = Array.isArray(review?.checks) ? review.checks : [];
+	let html = '<h3>WHY / intent comparison</h3><p>Host-supplied requirements and values; references do not authenticate intent, verify values, or authorize action.</p>';
+	html += `<p>Target: ${escapeHtml(String(review?.target ?? 'UNOBSERVED'))} · ${escapeHtml(String(review?.mode ?? 'UNOBSERVED'))}</p>`;
+	const history = review?.history;
+	if (history && typeof history === 'object' && !Array.isArray(history)) {
+		const record = history as Record<string, unknown>;
+		html += `<p>Previous comparison: ${escapeHtml(String(record.previous_review_ref ?? 'UNOBSERVED'))} · ${escapeHtml(String(record.state ?? 'UNOBSERVED'))}</p>`;
+		if (record.intent_source_changed === true) html += '<p>Intent source changed; this does not establish user approval.</p>';
+		for (const change of (Array.isArray(record.requirement_changes) ? record.requirement_changes : [])) {
+			if (change && typeof change === 'object') html += `<p>Recorded requirement change: ${escapeHtml(JSON.stringify(change))}</p>`;
+		}
+	}
+	if (!checks.length) html += '<p>UNOBSERVED — no requirement comparison was recorded.</p>';
+	for (const check of checks) {
+		if (!check || typeof check !== 'object' || Array.isArray(check)) continue;
+		html += `<p><b>${escapeHtml(String(check.dimension))} / ${escapeHtml(String(check.id))}</b>: ${escapeHtml(String(check.state))}</p>`;
+		html += `<p>Basis: ${escapeHtml(String(check.basis))} · expected: ${escapeHtml(String(check.expected))} · ${escapeHtml(String(check.operator))} · reported actual: ${escapeHtml(String(check.actual ?? 'UNOBSERVED'))} · unit: ${escapeHtml(String(check.unit ?? 'not specified'))}</p>`;
+		html += `<p>Value comparison: ${escapeHtml(String(check.comparison))} · actual minus expected: ${escapeHtml(String(check.delta ?? 'not applicable'))}</p>`;
+		html += `<p>Evidence: ${escapeHtml(Array.isArray(check.evidence_refs) ? check.evidence_refs.join(', ') : 'UNOBSERVED')}</p>`;
+		if (Array.isArray(check.missing) && check.missing.length) html += `<p>Missing or withheld: ${escapeHtml(check.missing.join(', '))}</p>`;
+	}
+	return html;
+}
+
 function renderPanelHtml(events: readonly EvidenceEvent[], ev: EvidenceEvent): string {
 	const row5 = (label: string, html: string) =>
 		`<div class="row"><b>${escapeHtml(label)}</b><span>${html}</span></div>`;
@@ -433,6 +466,8 @@ function renderPanelHtml(events: readonly EvidenceEvent[], ev: EvidenceEvent): s
 		row5('Where', escapeHtml(fieldWhere(ev))) +
 		row5('How', escapeHtml(fieldHow(ev))) +
 		row5('Why', escapeHtml(fieldWhy(ev))) +
+		(ev.intentReview !== undefined ? row5('Policy rationale', escapeHtml(ev.policy?.reason ?? 'UNOBSERVED')) : '') +
+		renderIntentReview(ev.intentReview) +
 		`<div class="row links"><b>Links</b><span>Parent: ${parent} · Evidence: ${evidence}</span></div>`
 	);
 }

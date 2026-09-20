@@ -2,7 +2,7 @@
 // Run: node --test site/scripts/test-evidence-graph-adapter.mjs
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
-import { EVENTS } from '../src/graph/evidence-graph.ts';
+import { EVENTS, renderIntentReview } from '../src/graph/evidence-graph.ts';
 import { fromEvidenceGraphV1, inspectEvidenceGraphV1 } from '../src/graph/from-v1.ts';
 import {
 	fromVerificationView,
@@ -300,6 +300,24 @@ describe('fromVerificationView', () => {
 			events.map((event) => event.row),
 			['human', 'planner'],
 		);
+	});
+
+	it('preserves withheld intent comparisons and safely renders their labels', () => {
+		const payload = view();
+		const review = {
+			mode: 'PROJECTED', target: 'outcome', intent_ref: 'm1',
+			checks: [{ id: '<img src=x onerror=alert(1)>', dimension: 'constraints', basis: 'INFERRED',
+				state: 'UNOBSERVED', comparison: 'SATISFIED', expected: 0, actual: 0, delta: 0,
+				operator: 'lte', unit: 'count', evidence_refs: ['m1'], missing: ['hypothetical_comparison'] }],
+		};
+		payload.events.d1.why.intent_review = review;
+		const [, event] = fromVerificationView(payload);
+		assert.deepEqual(event.intentReview, review);
+		const html = renderIntentReview(event.intentReview);
+		assert.ok(html.includes('UNOBSERVED'));
+		assert.ok(html.includes('reported actual: 0'));
+		assert.ok(html.includes('&lt;img'));
+		assert.ok(!html.includes('<img'));
 	});
 
 	it('shows the presentable decision, not the recorded one', () => {

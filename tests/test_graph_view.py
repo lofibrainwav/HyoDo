@@ -530,7 +530,7 @@ def test_citing_actor_with_a_write_shaped_tool_call_is_not_a_reviewer() -> None:
     nodes = [tool_call, writer_call, decision]
     edges = [_evidence_edge("t1", "d1")]
     tree = build_actor_rows(nodes, edges)
-    assert tree["rows"]["hyodo"]["role"] == "worker"
+    assert tree["rows"]["hyodo"]["role"] is None
 
 
 def test_worker_with_a_disconnected_event_bumps_its_orchestrator_children_disconnected() -> None:
@@ -819,3 +819,17 @@ def test_classified_events_are_untouched_by_the_split() -> None:
     assert assign_columns(_node("e2", kind="decision", decision="ALLOW")) == ["seon"]
     assert assign_columns(_node("e3", kind="prompt", actor="human")) == ["hyo"]
     assert assign_columns(_node("e4", kind="error")) == ["jin"]
+
+
+def test_unrelated_agent_sessions_do_not_default_to_workers() -> None:
+    nodes = [_node("a", actor_id="first"), _node("b", actor_id="second")]
+    rows = build_actor_rows(nodes, [])["rows"]
+    assert len(rows) == 2
+    assert all(row["role"] is None for row in rows.values())
+
+
+def test_review_citation_can_cross_two_agent_identities() -> None:
+    nodes = [_node("a", actor_id="author"), _node("b", actor_id="reviewer")]
+    rows = build_actor_rows(nodes, [_evidence_edge("a", "b")])["rows"]
+    assert rows["agent:reviewer"]["role"] == "reviewer"
+    assert rows["agent:author"]["role"] is None

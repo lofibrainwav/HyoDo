@@ -128,7 +128,7 @@ def test_lanes_reuse_the_graph_role_instead_of_guessing(tmp_path: Path) -> None:
     # already calls it a reviewer. The projection must not relabel it.
     assert "human" in roles
     assert "reviewer" in roles
-    assert "worker" in roles
+    assert None in roles  # A human prompt does not establish a worker role.
     assert sum(len(lane["events"]) for lane in view["lanes"]) == len(view["events"])
 
 
@@ -320,7 +320,7 @@ def test_evidence_recorded_after_the_decision_is_flagged_not_reordered(
 def test_five_w_one_h_only_regroups_recorded_fields(tmp_path: Path) -> None:
     view = _view(tmp_path, _normal_close())
     call = view["events"]["e1"]
-    assert call["who"] == {"actor": "agent", "actor_id": "a1"}
+    assert call["who"] == {"actor": "agent", "actor_id": "a1", "from": None, "to": None}
     assert call["what"]["kind"] == "tool_call"
     assert call["what"]["tool_name"] == "pytest"
     assert call["when"]["step_index"] == 1
@@ -424,3 +424,37 @@ def test_a_deny_is_never_withheld(tmp_path: Path) -> None:
     assert view["presentation"]["allow_withheld"] is True
     assert view["events"]["d1"]["what"]["decision_presentable"] == "DENY"
     assert view["decisions_by_run"]["run-1"][0]["decision_presentable"] == "DENY"
+
+
+def test_who_preserves_explicit_from_to_without_inventing_recipients(tmp_path: Path) -> None:
+    sender = {"actor": "human", "actor_id": "requester"}
+    recipient = {"actor": "agent", "actor_id": "recipient"}
+    view = _view(
+        tmp_path,
+        [
+            _event(event_id="request", meta={"participants": {"from": sender, "to": recipient}}),
+            _event(
+                event_id="response",
+                kind="model_response",
+                actor="agent",
+                step_index=1,
+                parent_event_id="request",
+                meta={"participants": {"from": recipient, "to": sender}},
+            ),
+            _event(
+                event_id="legacy",
+                actor="agent",
+                kind="tool_call",
+                step_index=2,
+                parent_event_id="request",
+                tool={"name": "send_message"},
+            ),
+        ],
+    )
+    assert view["events"]["request"]["who"]["from"] == sender
+    assert view["events"]["request"]["who"]["to"] == recipient
+    assert view["events"]["response"]["who"]["from"] == recipient
+    assert view["events"]["response"]["who"]["to"] == sender
+    assert view["events"]["legacy"]["who"]["to"] is None
+    assert view["events"]["legacy"]["who"]["from"] is None
+    assert view["authority"] == "UNOBSERVED"

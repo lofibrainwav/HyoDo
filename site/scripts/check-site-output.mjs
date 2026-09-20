@@ -161,5 +161,51 @@ if (labelMismatches.length > 0) {
 	throw new Error(`Sidebar label contract failed: ${labelMismatches.join('; ')}`);
 }
 
+// Current-version contract. The audit of 2026-09-19 found the storefront calling
+// 4.19.8 the current public package while VERSION, the latest tag and PyPI all
+// said 4.19.9, so a released version shipped a page describing the previous one.
+// Only sentences that assert what is current are checked. Historical readings —
+// the 4.19.5 snapshot table, "before 4.19.6", a link to an older release receipt
+// — are legitimate and must keep their own versions. Each anchor is also
+// required to match at least once, so rewording a claim fails the build instead
+// of silently removing it from coverage.
+const currentVersion = readFileSync(join(root, '..', '..', 'VERSION'), 'utf8').trim();
+const currencyAnchors = [
+	{
+		what: 'homepage public-version line',
+		source: homepage,
+		pattern: /Public version:\s*<strong[^>]*>HyoDo\s+([\d.]+)<\/strong>/g,
+	},
+	{
+		what: 'current-state summary sentence',
+		source: readFileSync(join(root, '..', 'src', 'content', 'docs', 'docs', 'current-state.md'), 'utf8'),
+		pattern: /HyoDo \*\*([\d.]+)\*\* is the current public package/g,
+	},
+	{
+		what: 'current-state latest-package bullet',
+		source: readFileSync(join(root, '..', 'src', 'content', 'docs', 'docs', 'current-state.md'), 'utf8'),
+		pattern: /Latest public package:\s*\*\*([\d.]+)\*\*/g,
+	},
+];
+
+const currencyFailures = [];
+for (const { what, source, pattern } of currencyAnchors) {
+	const found = [...source.matchAll(pattern)];
+	if (found.length === 0) {
+		currencyFailures.push(`${what}: no longer matches; reword the contract here or the claim goes unchecked`);
+		continue;
+	}
+	for (const [, claimed] of found) {
+		if (claimed !== currentVersion) {
+			currencyFailures.push(`${what}: claims ${claimed} is current, but VERSION says ${currentVersion}`);
+		}
+	}
+}
+
+if (currencyFailures.length > 0) {
+	throw new Error(`Current-version contract failed: ${currencyFailures.join('; ')}`);
+}
+
 console.log(`Sidebar label contract: PASS (${sidebarEntries.length} entries agree with their page titles)`);
+console.log(`Current-version contract: PASS (${currencyAnchors.length} anchors agree with VERSION ${currentVersion})`);
 console.log('Static 404 and homepage output contracts: PASS');

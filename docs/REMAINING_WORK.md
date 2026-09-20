@@ -160,12 +160,20 @@ Measured on 2026-09-19 against the published 4.19.9 wheel and the live site:
   The package half does not: PyPI keeps 4.19.9's metadata until a new release, so
   `project_urls` Homepage and Documentation still point at GitHub for anyone
   reading the published page today.
-- **The data-boundary claim was verified, not asserted.** The live site sends no
-  `Set-Cookie`, loads no third-party `src`, and is served under
-  `script-src 'self'; connect-src 'self'`, which makes third-party scripts and
-  cross-origin calls impossible rather than merely absent. The local claim was
-  checked too: after a full `hyodo check` run the tool had written only
-  `.hyodo/gates-trust.json` inside the project, and nothing under `$HOME`.
+- **The data-boundary claim was verified, not asserted — within a stated
+  scope.** The live site sends no `Set-Cookie`, loads no third-party `src`, and
+  is served under `script-src 'self'; connect-src 'self'`, which makes
+  third-party scripts and page-originated cross-origin calls impossible rather
+  than merely absent. That scope has two edges the earlier wording overreached.
+  `connect-src` governs the page's own fetch/XHR/WebSocket destinations, not
+  every outbound request: images and fonts fall under `img-src`/`font-src`,
+  which the deployed policy opens to `https:`. And no client-side policy speaks
+  to what the host records about a request, so hosting-side request logging
+  stays `UNOBSERVED` rather than disproved. The local claim was checked too:
+  after a full `hyodo check` run the tool had written only
+  `.hyodo/gates-trust.json` inside the project, and nothing under `$HOME`; that
+  covers HyoDo's own writes, not the gate commands a user registers or an MCP
+  host they deliberately connect.
 
 Still `UNOBSERVED`, after the deployed readback:
 

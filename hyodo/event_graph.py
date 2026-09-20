@@ -320,6 +320,8 @@ def build_event_graph(
         tool = _tool(event)
         policy = _policy(event)
         io = _io(event)
+        meta = event.get("meta")
+        meta = meta if isinstance(meta, dict) else {}
         urls = tool.get("urls")
         urls = urls if isinstance(urls, list) else []
         node_io: dict[str, Any] = {"output_digest": io.get("output_digest")}
@@ -335,6 +337,8 @@ def build_event_graph(
             "kind": event.get("kind"),
             "actor": event.get("actor"),
             "actor_id": event.get("actor_id"),
+            "participants": meta.get("participants"),
+            "intent_review": meta.get("intent_review"),
             "step_index": event.get("step_index"),
             "parent_event_ids": parents,
             "decision": policy.get("decision"),

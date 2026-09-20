@@ -1,22 +1,75 @@
 ---
 title: A worked result
-description: One complete HyoDo run on a three-file project — the exact input, the exact command, the verbatim output, and the exit code, produced by the published 4.19.9 wheel.
+description: One complete HyoDo run on a three-file project — the exact input, the exact command, the output it printed, and the exit code, produced by the published 4.19.9 wheel.
 ---
 
 Everything on this page was produced by running the published package. The
-output blocks are pasted from a terminal, not written by hand.
+output blocks are pasted from a terminal, not written by hand. Most are trimmed
+to the lines under discussion; Result 1 is the one shown whole, and no line is
+cut short. Two absolute paths are replaced by a placeholder — `/path/to/python`,
+and the directory in front of the malformed-config error — so the page does not
+encode one machine's filesystem. Nothing else was changed.
 
 - **Package**: `hyodo` 4.19.9, installed from PyPI with
   `pipx install hyodo` into an empty pipx home.
 - **Reported by the tool itself**: `HyoDo v4.19.9 - model-agnostic quality gates`,
-  and every result line below ends with `measured by hyodo 4.19.9 (wheel)`.
-- **Platform**: macOS, Python 3.14.7.
+  with `Measurement: measured by hyodo 4.19.9 (wheel)` in the pass, fail,
+  empty-project and malformed-config results below.
+- **Platform**: macOS. HyoDo itself ran on Python 3.14.7; the gate below ran on
+  the `python` found on `PATH`, which is a separate interpreter. That
+  distinction matters, and the next section says why.
 
-You can reproduce it in about a minute. Nothing leaves your machine.
+The example runs locally. Installing the tools downloads packages; the gate
+shown here runs your local pytest tests.
+
+## Before you run it
+
+Two things are easy to skip, and skipping either one changes the exit code you
+get. Both were reproduced against this same 4.19.9 wheel.
+
+**1. The gate command needs its own tool installed.** HyoDo does not supply
+pytest. The gate below runs `python -m pytest`, and `python` there is resolved
+from your `PATH` — not from the environment HyoDo was installed into. `pipx`
+deliberately isolates HyoDo, so installing HyoDo does not put pytest anywhere.
+Check the interpreter that will actually run the gate:
+
+```bash
+python -m pytest --version
+```
+
+If that fails, install it for that interpreter (`python -m pip install pytest`).
+Otherwise the gate runs and reports a genuine failure that is not about your
+code:
+
+```text
+  FAIL pytest (善 선 Good): /path/to/python: No module named pytest
+HYODO FAIL — 1/1 gates observed, pytest
+```
+
+Exit code **1**. The gate ran; the command inside it could not.
+
+**2. A new gate command set has to be approved once.** `.hyodo/gates.toml`
+registers commands that HyoDo will execute, so HyoDo will not run an unreviewed
+command set on your behalf. In a non-interactive shell it refuses and says so:
+
+```text
+  SKIP pytest (善 선 Good): gates.toml command set is new or unapproved in a
+non-interactive environment -- set HYODO_GATES_TRUST_ALL=1 to pre-approve or run
+`hyodo check` interactively once to review and record trust
+
+==================================================
+No user gates were executed
+This is not a validation pass.
+HYODO UNOBSERVED — 0/1 gates observed, required gates UNOBSERVED
+```
+
+Exit code **2**, not `0`. Run it once in a real terminal to review and approve —
+that is the step shown under "The command" below. The recorded decision lives in
+`.hyodo/gates-trust.json` in your project, and changing a command invalidates it.
 
 ## The input
 
-Three files, plus one HyoDo config. This is the whole project.
+Two Python files and one HyoDo config make up the example input.
 
 `src/pricing.py`
 
@@ -62,6 +115,27 @@ timeout = 120
 hyodo check
 ```
 
+The first time, HyoDo shows the command set it is about to run and waits. This
+is the approval from "Before you run it", verbatim:
+
+```text
+HyoDo Bring-Your-Own-Gates: .hyodo/gates.toml command set changed or is new.
+  [goodness] pytest: python -m pytest tests -q
+  fingerprint: 2be698af424180e66492c8c54c1481b507789c2ea7a7f05c177ae044c8bd7ca0
+Trust and run this command set now? [y/N] y
+```
+
+The fingerprint covers the commands, not your source or its location, so editing
+`pricing.py` does not re-prompt but editing the gate command does. It is also the
+same value for anyone running this exact gate set on this version of HyoDo: if
+you copied the config above, the fingerprint you are asked to approve should
+match the one printed here, character for character. A matching fingerprint says
+the command text matches. It says nothing about what that command resolves to on
+your machine — the interpreter, the installed packages, your project's code and
+the result are all still yours, which is why the prerequisites above matter.
+Answering `y` records the decision and the run continues. With this command set
+unchanged, later runs reuse the recorded approval.
+
 ## Result 1 — the gate passes
 
 ```text
@@ -81,7 +155,7 @@ HYODO PASS — 1/1 gates observed, all executed gates passed
 
 Exit code **0**.
 
-Read the second-to-last line carefully: *"Gates support review readiness. Human
+Read the approval reminder carefully: *"Gates support review readiness. Human
 approval still required."* A pass is evidence that the gates you registered ran
 and succeeded. It is not approval to merge or deploy. That is the whole product
 boundary in one line of output.
@@ -120,19 +194,28 @@ measurements.
 
 ## Result 3 — nothing was measured, and it says so
 
-This is the result most tools get wrong, so it is worth showing on purpose.
-Run the same command in a directory with no gates and no recognizable project:
+This is the result worth showing on purpose, because an empty run is the easiest
+one to misread as success. Run the same command in a directory with no gates and
+no recognizable project:
 
 ```text
+No project gates were executed
+This is not a validation pass.
 Measurement: measured by hyodo 4.19.9 (wheel)
-HYODO UNOBSERVED — 0/0 gates observed, required gates UNOBSERVED
+HYODO UNOBSERVED — 0/0 gates observed, required gates UNOBSERVED; Sampled syntax gates only (up to 50 files per language); not a full-project validation
 ```
 
 Exit code **2**.
 
-Not `0`. An empty run is not a pass. The same thing happens if
-`.hyodo/gates.toml` exists but is malformed — during the making of this page an
-early draft of the config omitted the `schema` key, and the real output was:
+Not `0`. An empty run is not a pass. Note what the verdict line carries with it:
+with no `.hyodo/gates.toml` to read, HyoDo falls back to built-in sampled syntax
+gates, and it says so in the same breath as the verdict — sampled, not a
+full-project validation.
+
+A broken config arrives at the same verdict by a different route, and without
+the sampled-gates fallback, because there is a config and HyoDo refuses to guess
+what it meant. During the making of this page an early draft omitted the
+`schema` key, and the real output was:
 
 ```text
 .hyodo/gates.toml: unsupported schema None; expected 'hyodo.gates/v1'
