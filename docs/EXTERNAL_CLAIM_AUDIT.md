@@ -6,6 +6,17 @@
 `pyproject.toml`, `tests/`, `scripts/`, `.github/workflows/`)
 **Method:** file/CLI/CI/GitHub Dependabot readback (no estimation)
 
+**Scope supersession (2026-09-20):** this audit is kept as the historical
+record of the 2026-07-21 repository state. Its central positioning claim —
+`hyodo check` scoped to "a HyoDo checkout only" — no longer describes the
+product: `check` now runs caller-configured gates (`.hyodo/gates.toml`, BYOG)
+in any project, with sampled language-agnostic gates as the no-config default
+outside a HyoDo checkout; HyoDo's own full verification remains a separate
+checkout-scoped path. Re-observed unchanged on 2026-09-20: minimal runtime
+dependencies (`jsonschema`, `referencing`, `typer`, `rich`, plus `tomli` on
+Python 3.10), no required container services, no network client or telemetry
+in the package, and `mcp.hyodo.app` contract-only (HTTP 404 at probe time).
+
 This audit checks external market/strategy claims against the current
 repository state. HyoDo publishes a single public surface — there is no
 separate extended or advisory tree in this repo.

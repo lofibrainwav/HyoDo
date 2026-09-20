@@ -208,6 +208,32 @@ def test_matching_commits_with_a_dirty_tree_cannot_claim_equality(tmp_path: Path
     assert provenance.validity == "UNOBSERVED"
 
 
+@requires_git
+def test_a_clean_tree_reports_dirty_false_not_unobserved(tmp_path: Path) -> None:
+    """A clean checkout must report `dirty=False`, not `None` (UNOBSERVED).
+
+    `git status --porcelain` prints an empty string for a clean tree. The
+    helper used to fold that empty output into `None`, which degraded every
+    clean-checkout provenance receipt to "dirty unobserved" — the exact
+    opposite of what a verification tool should claim about a clean tree.
+    Found on the live 4.20.0 dashboard: a fully aligned, clean checkout still
+    reported `source_dirty: null`.
+    """
+    target = _write_checkout(tmp_path / "HyoDo")
+    commit = _git_init(target, "target")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(target), str(clone)], check=True, capture_output=True)
+
+    provenance = resolve_provenance(clone, package_root=clone, tool_version=SAME_VERSION)
+
+    assert provenance.tool_commit == commit
+    assert provenance.target_commit == commit
+    assert provenance.tool_dirty is False
+    assert provenance.target_dirty is False
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+    assert provenance.validity == "OBSERVED"
+
+
 # --------------------------------------------------------------------------
 # The contract itself
 # --------------------------------------------------------------------------
