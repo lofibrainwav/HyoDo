@@ -131,6 +131,52 @@ these projections promotes evidence into action authority.
 
 ## Fields
 
+### WHY and distance from user intent (design target)
+
+An intent comparison is a separate, attributable evaluation referencing the
+original event. It must not rewrite the event's WHY. The current viewer does
+not compute this comparison; absent intent and comparison evidence remain
+`UNOBSERVED`.
+
+Keep four records distinguishable: the user's declared request, the agent's
+interpretation of that request, the agent's declared action rationale, and a
+comparison with observed actions or outcomes. An interpretation is not a
+user-confirmed requirement, and policy rationale is not actor intent.
+
+Compare explicit requirements along four dimensions:
+
+| Dimension | Comparison question |
+| --- | --- |
+| Goal | Does the observed outcome satisfy the requested outcome? |
+| Scope | Was requested work omitted, or unrequested work added? |
+| Constraints | Were stated prohibitions, resource limits, and boundaries respected? |
+| Completion | Were the user's acceptance conditions actually observed? |
+
+Each comparison needs an intent event reference, a requirement reference,
+action/result evidence references, an attributable evaluator, an observation
+time, and an assessment such as `SATISFIED`, `DEVIATES`, or `UNOBSERVED`.
+Assessment states are distinct from evidence observation and action authority.
+Conflicting intent sources require clarification; the viewer must not silently
+choose the latest or most convenient wording.
+
+Distance is a per-requirement difference: for example, an observed cost exceeds
+an explicit budget by an amount in the same currency. Such differences require
+compatible units and an explicit comparison basis. Counts of satisfied,
+deviating, and unobserved requirements are descriptive; they do not constitute
+a semantic alignment percentage. An unknown requirement is neither satisfied
+nor a measured deviation, and one violated prohibition cannot be averaged away
+by many satisfied preferences.
+Execution progress is separate: unfinished work is not automatically an intent
+violation, and a completed action is not automatically a satisfied requirement.
+
+Compare the agent's interpretation with declared intent separately from
+comparing actual results with that intent. A correctly executed misunderstood
+plan is still misaligned with the request. Predicted deviation stays hypothetical
+until supported by actual observations. A user-approved change references its
+own source and creates a new intent version; it does not erase the original
+request or retroactively authorize earlier actions. Resolving apparent alignment
+never supplies execution permission.
+
 | Field | Source |
 | --- | --- |
 | `lanes` | `graph["rows"]`, reshaped only |
