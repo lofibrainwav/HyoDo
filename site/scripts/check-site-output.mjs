@@ -245,19 +245,19 @@ const publicBuiltFiles = [
 ].map((rel) => join(repoRoot, 'site', 'dist', rel));
 
 const forbiddenPublicTerms = [
-	['KINGDOM', /\\bKINGDOM\\b/],
-	['BB', /\\bBB\\b/],
-	['EROS', /\\bEROS\\b/],
-	['HYOGOOK', /\\bHYOGOOK\\b/],
+	['KINGDOM', /\bKINGDOM\b/],
+	['BB', /\bBB\b/],
+	['EROS', /\bEROS\b/],
+	['HYOGOOK', /\bHYOGOOK\b/],
 	['Wisdom Reflex', /Wisdom Reflex/],
 	['Adaptive Collaboration Layer', /Adaptive Collaboration Layer/],
-	['ACL', /\\bACL\\b/],
+	['ACL', /\bACL\b/],
 ];
 
-const stripMarkdownDestinations = (text) => text.replace(/\\]\\([^)]*\\)/g, ']');
+const stripMarkdownDestinations = (text) => text.replace(/\]\([^)]*\)/g, ']');
 const visibleHtmlText = (html) => html
-	.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, ' ')
-	.replace(/<style\\b[\\s\\S]*?<\\/style>/gi, ' ')
+	.replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+	.replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
 	.replace(/<[^>]+>/g, ' ')
 	.replace(/&nbsp;|&#160;/g, ' ');
 
@@ -281,4 +281,5 @@ if (publicLanguageFailures.length > 0) {
 
 console.log(`Sidebar label contract: PASS (${sidebarEntries.length} entries agree with their page titles)`);
 console.log(`Current-version contract: PASS (${currencyAnchors.length} anchors agree with VERSION ${currentVersion})`);
-console.log('Public-language contract: PASS (source + generated visible text)');\nconsole.log('Static 404 and homepage output contracts: PASS');
+console.log('Public-language contract: PASS (source + generated visible text)');
+console.log('Static 404 and homepage output contracts: PASS');
