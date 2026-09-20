@@ -104,10 +104,10 @@ rework, intervention, wait, resource conflict, evidence completeness, and
 outcome. It does **not** automatically know whether friction was necessary,
 productive, or avoidable.
 
-Those three classes are a **research labeling target**, not a shipped HyoDo
+Those three classes are a **research labeling target**. They are not a shipped HyoDo
 classifier. Any experiment using them must document who or what produced the
-label and how outcome leakage was controlled. HyoDo is **not a shipped HyoDo
-classifier** for those categories.
+label and how outcome leakage was controlled. HyoDo is **not a shipped HyoDo classifier**
+for those categories.
 
 Examples:
 
