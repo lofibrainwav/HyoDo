@@ -99,9 +99,14 @@ def test_a_planted_current_secret_must_be_reported() -> None:
     planted = scripts.get("Baseline cannot hide a current secret")
     assert planted is not None, "no planted-secret regression step"
 
-    # The planted key is built at run time; a literal here would make this file
-    # itself a finding in the working-tree scan.
-    assert "/dev/urandom" in planted
+    # The planted key is assembled from separate prefix/body literals at run
+    # time; a complete token-shaped literal in the workflow would become a
+    # working-tree finding itself.
+    assert 'prefix="ghp_"' in planted
+    assert 'body="Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0UvWxYz"' in planted
+    assert 'key="${prefix}${body}"' in planted
+    assert "ghp_Ab1Cd2Ef3Gh4Ij5Kl6Mn7Op8Qr9St0UvWxYz" not in planted
+    assert "/dev/urandom" not in planted
     assert ".gitleaksignore" in planted, "the check must run against the real baseline"
     assert "exit 1" in planted, "an unreported plant must fail the job"
 
