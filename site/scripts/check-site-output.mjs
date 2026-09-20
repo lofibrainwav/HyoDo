@@ -206,6 +206,79 @@ if (currencyFailures.length > 0) {
 	throw new Error(`Current-version contract failed: ${currencyFailures.join('; ')}`);
 }
 
+// Public-language contract. Internal project lineage must not leak back into
+// product-facing source or visitor-visible generated HTML. Stable URL paths
+// such as /docs/acl/ and academic URL identifiers are not visible text, so
+// they remain compatible without weakening this check.
+const repoRoot = join(root, '..', '..');
+const publicSourceFiles = [
+	join(repoRoot, 'README.md'),
+	join(repoRoot, 'PHILOSOPHY.md'),
+	join(repoRoot, 'docs', 'PRODUCT_BOUNDARY.md'),
+	join(repoRoot, 'site', 'context', '01-project-overview.md'),
+	...[
+		'product-boundary.md',
+		'why-hyodo.md',
+		'trust.md',
+		'philosophy.md',
+		'current-state.md',
+		'roadmap.md',
+		'research.md',
+		'friction-contribution.md',
+		'acl.md',
+	].map((name) => join(repoRoot, 'site', 'src', 'content', 'docs', 'docs', name)),
+];
+
+const publicBuiltFiles = [
+	'index.html',
+	...[
+		'product-boundary',
+		'why-hyodo',
+		'trust',
+		'philosophy',
+		'current-state',
+		'roadmap',
+		'research',
+		'friction-contribution',
+		'acl',
+	].map((slug) => join('docs', slug, 'index.html')),
+].map((rel) => join(repoRoot, 'site', 'dist', rel));
+
+const forbiddenPublicTerms = [
+	['KINGDOM', /\\bKINGDOM\\b/],
+	['BB', /\\bBB\\b/],
+	['EROS', /\\bEROS\\b/],
+	['HYOGOOK', /\\bHYOGOOK\\b/],
+	['Wisdom Reflex', /Wisdom Reflex/],
+	['Adaptive Collaboration Layer', /Adaptive Collaboration Layer/],
+	['ACL', /\\bACL\\b/],
+];
+
+const stripMarkdownDestinations = (text) => text.replace(/\\]\\([^)]*\\)/g, ']');
+const visibleHtmlText = (html) => html
+	.replace(/<script\\b[\\s\\S]*?<\\/script>/gi, ' ')
+	.replace(/<style\\b[\\s\\S]*?<\\/style>/gi, ' ')
+	.replace(/<[^>]+>/g, ' ')
+	.replace(/&nbsp;|&#160;/g, ' ');
+
+const publicLanguageFailures = [];
+for (const file of publicSourceFiles) {
+	const text = stripMarkdownDestinations(readFileSync(file, 'utf8'));
+	for (const [label, pattern] of forbiddenPublicTerms) {
+		if (pattern.test(text)) publicLanguageFailures.push(file + ': visitor-facing source contains ' + label);
+	}
+}
+for (const file of publicBuiltFiles) {
+	const text = visibleHtmlText(readFileSync(file, 'utf8'));
+	for (const [label, pattern] of forbiddenPublicTerms) {
+		if (pattern.test(text)) publicLanguageFailures.push(file + ': generated visible text contains ' + label);
+	}
+}
+
+if (publicLanguageFailures.length > 0) {
+	throw new Error('Public-language contract failed: ' + publicLanguageFailures.join('; '));
+}
+
 console.log(`Sidebar label contract: PASS (${sidebarEntries.length} entries agree with their page titles)`);
 console.log(`Current-version contract: PASS (${currencyAnchors.length} anchors agree with VERSION ${currentVersion})`);
-console.log('Static 404 and homepage output contracts: PASS');
+console.log('Public-language contract: PASS (source + generated visible text)');\nconsole.log('Static 404 and homepage output contracts: PASS');
