@@ -68,8 +68,9 @@ the rest of `.hyodo/` out of version control — see
 
 HyoDo provides local checks and evidence contracts; it does not grant execution
 authority or turn missing evidence into a pass. `hyodo safe` is an early-warning
-scan, not a full security audit, and callers must enforce DENY decisions. The
-package stores evidence digests and receipts, not captured payloads. See the
+scan, not a full security audit, and callers must enforce DENY decisions. By
+default, HyoDo stores evidence digests and receipts; raw prompt and tool bodies
+are retained only when an operator explicitly opts into full-body storage. See the
 [product boundary](./docs/PRODUCT_BOUNDARY.md), [measured state snapshot](./docs/CURRENT_STATE.md),
 and [security model](./SECURITY.md) for the authoritative details.
 The legacy HyoDo Integrity Score command is advisory only. It retains a
