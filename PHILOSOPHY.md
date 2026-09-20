@@ -14,8 +14,8 @@ Philosophy branding is intentional. Every public label pairs with a
 - **Current implementation status:** the score command retains an older
   five-input geometric-mean method for compatibility. The replacement
   per-axis evaluator is not yet implemented as a general public API.
-- **HYOGOOK V5** is the internal name for that older method, not a separate
-  philosophy or HyoDo's current score direction.
+- The older five-input method is retained only for compatibility; it is not a
+  separate philosophy or HyoDo's current score direction.
 
 The `loyalty=` alias was removed in 4.0.0. Legacy
 `calculate_trinity_score()` stays frozen for historical reproducibility.
@@ -86,8 +86,8 @@ pass nor a failure.
 
 The current command still accepts five inputs and combines them with a
 geometric mean. It floors a zero input for historical compatibility and
-scales the result to its legacy score range. `HYOGOOK V5` is simply the
-internal name for this older calculation; its `S_eternity` is not the
+scales the result to its legacy score range. This older calculation is kept
+only for compatibility; its `S_eternity` is not the
 `Eternity` virtue.
 
 The older formula uses a **geometric mean**:
