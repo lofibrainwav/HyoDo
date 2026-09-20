@@ -1,0 +1,45 @@
+{
+  "connect": {
+    "schema_version": null,
+    "state": "ABSENT",
+    "targets": []
+  },
+  "connect_state_path": ".hyodo/connect.json",
+  "ledger": {
+    "corrupt_lines": 0,
+    "events": 8990,
+    "path_digest": "974fca5ca2e78735",
+    "schema_version": "hyodo.agent-event/v1",
+    "state": "OBSERVED"
+  },
+  "ledger_path": ".hyodo/agent-events.jsonl",
+  "measurer": {
+    "install_mode": "source",
+    "source_commit": "cd6052a1c97203f6382a52b262a836cff561e2d6",
+    "source_dirty": true,
+    "tool_name": "hyodo",
+    "tool_version": "4.20.0"
+  },
+  "observed_at": "2026-09-20T13:31:13.439905+00:00",
+  "provenance": {
+    "relation": "SELF_OTHER_CHECKOUT",
+    "schema_version": "hyodo.measurement-provenance/v1",
+    "validity": "MISMATCH"
+  },
+  "runtime": {
+    "pid": 39707,
+    "started_at": "2026-09-20T06:17:20.457905+00:00"
+  },
+  "schema_version": "hyodo.runtime-identity/v1",
+  "service": {
+    "endpoint": "127.0.0.1:8768",
+    "http_observed": true,
+    "name": "hyodo-dashboard"
+  },
+  "target": {
+    "git_commit": "b467f4ae4818a069bcf4b47013120fd55a66637e",
+    "git_dirty": true,
+    "root_digest": "2559c57c1fd634b3",
+    "root_realpath": "/Users/brnestrm/orca/workspaces/HyoDo/hyung-2"
+  }
+}

@@ -222,6 +222,32 @@ function addLensAperture(panel, data) {
 }
 const cells = document.querySelectorAll(".cells button[data-event], .grid-cell button[data-event], .daw-cell button[data-event]");
 let lastFocusedCell = null;
+const runSelector = document.getElementById("run-selector");
+function applyRunSelection() {
+  const selected = runSelector ? runSelector.value : "UNOBSERVED";
+  document.querySelectorAll("button[data-event-id][data-run-id]").forEach((button) => {
+    const visible = selected === "ALL" || button.dataset.runId === selected;
+    button.hidden = !visible;
+    button.setAttribute("aria-hidden", String(!visible));
+  });
+  document.querySelectorAll(".run-summary").forEach((summary) => {
+    summary.hidden = summary.dataset.runSummary !== selected;
+  });
+  document.querySelectorAll(".run-rail").forEach((rail) => {
+    rail.hidden = rail.dataset.runRail !== selected;
+  });
+  document.querySelectorAll(".daw-cell, .grid-cell, .cells").forEach((cell) => {
+    const buttons = Array.from(cell.querySelectorAll("button[data-event-id]"));
+    if (buttons.length) cell.hidden = buttons.every((button) => button.hidden);
+  });
+  const first = Array.from(document.querySelectorAll("button[data-event-id][data-run-id]"))
+    .find((button) => !button.hidden && button.dataset.eventKind === "prompt")
+    || Array.from(document.querySelectorAll("button[data-event-id][data-run-id]"))
+      .find((button) => !button.hidden);
+  if (first) first.focus();
+  layoutEdges();
+}
+if (runSelector) runSelector.addEventListener("change", applyRunSelection);
 function highlightEdges(eventId) {
   document.querySelectorAll("#daw-edge-overlay .edge, #edge-overlay .edge").forEach((edge) => {
     const source = edge.dataset.dawSource || edge.dataset.source;
@@ -324,12 +350,20 @@ cells.forEach((button) => {
     }
     addText(panel, "p", "Recorded actor: " + String(data.recordedActor || "UNOBSERVED"));
     addText(panel, "p", "Policy rationale: " + String(data.policyRationale || "UNOBSERVED"));
+    const trace = addSection("REQUEST → RESULT → EVIDENCE", "detail-trace");
+    addText(trace, "p", "Request event: " + String(data.requestEventId || "UNOBSERVED"));
+    addText(trace, "p", "Result event: " + (data.result ? "recorded on this event" : "UNOBSERVED"));
+    addText(trace, "p", "Evidence refs: " + (data.evidence ? String(data.evidence) : "UNOBSERVED"));
+    addText(trace, "p", "Run/session: " + String(data.runId || "UNOBSERVED"));
+    panel.appendChild(trace);
     addIntentReview(panel, data);
     addLensAperture(panel, data);
     const proof = addSection("PROOF", "detail-proof");
     addText(proof, "p", "Causal parents: " + String(data.causalParentCount ?? 0));
     addText(proof, "p", "Evidence refs: " + String(data.evidenceRefCount ?? 0));
+    addText(proof, "p", "Input digest: " + String(data.inputDigest || "UNOBSERVED"));
     addText(proof, "p", "Output digest: " + String(data.outputDigest || "UNOBSERVED"));
+    addText(proof, "p", "Host output observation: " + String(data.outputObservation || "UNOBSERVED"));
     panel.appendChild(proof);
     const missing = addSection("WHAT IS MISSING", "detail-missing");
     const missingItems = Array.isArray(data.missing) ? data.missing : [];
@@ -407,6 +441,7 @@ document.addEventListener("keydown", (event) => {
   if (lastRingButton) lastRingButton.focus();
 });
 layoutEdges();
+applyRunSelection();
 window.addEventListener("load", layoutEdges);
 window.addEventListener("resize", layoutEdges);"""
 
@@ -986,7 +1021,18 @@ def _event_detail_payload(node: dict[str, Any]) -> dict[str, Any]:
         "causalParentCount": len(verification.get("causal_parents") or []),
         "evidenceRefCount": len(verification.get("evidence_refs") or []),
         "outputDigest": how_view.get("output_digest") or "UNOBSERVED",
+        "inputDigest": how_view.get("input_digest") or "UNOBSERVED",
+        "outputObservation": how_view.get("output_observation") or "UNOBSERVED",
         "missing": list(verification.get("missing") or []),
+        "request": node.get("kind") == "prompt",
+        "requestEventId": (
+            (verification.get("request_event_id") if isinstance(verification, dict) else None)
+            or (node.get("id") if node.get("kind") == "prompt" else None)
+            or "UNOBSERVED"
+        ),
+        "result": node.get("kind") in {"tool_result", "model_response", "error"},
+        "evidence": len(verification.get("evidence_refs") or []),
+        "runId": node.get("run_id") or "UNOBSERVED",
     }
 
 
@@ -1000,9 +1046,68 @@ def _event_button(node: dict[str, Any], *, label: str | None = None) -> str:
         f"cell-{str(decision).lower()}" if isinstance(decision, str) and decision else "cell-plain"
     )
     return (
-        f'<button type="button" class="{cell_class}" data-event-id="{node_id}" data-event-kind="{escape(str(node.get("kind") or "event"))}" '
+        f'<button type="button" class="{cell_class}" data-event-id="{node_id}" data-event-kind="{escape(str(node.get("kind") or "event"))}" data-run-id="{escape(str(node.get("run_id") or "UNOBSERVED"), quote=True)}" '
         f'data-event="{detail}" title="{title}">{escape(label)}</button>'
     )
+
+
+def _scoped_verification_view(view: dict[str, Any], run_id: str) -> dict[str, Any]:
+    """Keep the verification rail honest when the graph is narrowed to one run."""
+    raw_events = view.get("events")
+    events: dict[str, Any] = raw_events if isinstance(raw_events, dict) else {}
+    scoped_events = {
+        event_id: event
+        for event_id, event in events.items()
+        if isinstance(event, dict)
+        and isinstance(event.get("why"), dict)
+        and event["why"].get("run_id") == run_id
+    }
+    scoped_ids = set(scoped_events)
+    raw_missing = view.get("missing")
+    missing: dict[str, Any] = raw_missing if isinstance(raw_missing, dict) else {}
+    scoped_missing: dict[str, Any] = {}
+    for bucket, entries in missing.items():
+        if not isinstance(entries, list):
+            continue
+        if bucket == "runs_without_intent":
+            scoped_missing[bucket] = (
+                [run_id]
+                if not any(
+                    event.get("what", {}).get("kind") == "prompt"
+                    for event in scoped_events.values()
+                    if isinstance(event, dict)
+                )
+                else []
+            )
+            continue
+        scoped_missing[bucket] = [
+            entry
+            for entry in entries
+            if (
+                entry
+                if isinstance(entry, str)
+                else entry.get("event_id")
+                if isinstance(entry, dict)
+                else None
+            )
+            in scoped_ids
+        ]
+    scoped = dict(view)
+    scoped["events"] = scoped_events
+    scoped["event_order"] = [
+        event_id for event_id in view.get("event_order", []) if event_id in scoped_ids
+    ]
+    scoped["missing"] = scoped_missing
+    for edge_key in ("edges_causal", "edges_evidence"):
+        scoped[edge_key] = [
+            edge
+            for edge in view.get(edge_key, [])
+            if isinstance(edge, dict)
+            and edge.get("source") in scoped_ids
+            and edge.get("target") in scoped_ids
+        ]
+    scoped["decisions_by_run"] = {run_id: (view.get("decisions_by_run") or {}).get(run_id, [])}
+    return scoped
 
 
 #: Outer-to-inner draw order for the actor-ring SVG (spec section 5 reads
@@ -1561,8 +1666,8 @@ _MISSING_BUCKET_MEANING: tuple[tuple[str, str, str], ...] = (
     ),
     (
         "calls_without_result",
-        "Tool calls with no recorded effect",
-        "The call was recorded. Nothing downstream ever cited it as a parent.",
+        "Tool calls without a recorded causal child",
+        "No causal child references this call in the observed ledger. It may be pending, unpaired, or unrecorded; this does not prove execution failed.",
     ),
     (
         "runs_without_intent",
@@ -1571,13 +1676,13 @@ _MISSING_BUCKET_MEANING: tuple[tuple[str, str, str], ...] = (
     ),
     (
         "unmeasured_events",
-        "Events that recorded nothing readable",
-        "No paths, urls, method, rule, or digest. Fix the recording.",
+        "Events without lens-classifiable measurement",
+        "No paths, URLs, method, rule ID, or output digest used by this classifier. An input digest may still exist. Inspect the recording before adding fields.",
     ),
     (
         "unclassified_events",
-        "Evidence the mapping table has no row for",
-        "The event did record evidence. Fix the table, never by tool name.",
+        "Recorded measurements without a lens classification",
+        "Measurement fields exist, but no current lens rule applies. An output digest alone does not prove a virtue or fulfillment. Review mapping only when justified; never classify by tool name.",
     ),
 )
 
@@ -1683,6 +1788,93 @@ def _render_verification_header(view: dict[str, Any]) -> str:
     )
 
 
+def _render_run_overview(nodes: list[dict[str, Any]], view: dict[str, Any]) -> str:
+    """Render a bounded run/session selector from recorded event fields.
+
+    This is intentionally a summary of the ledger, not an intent classifier:
+    prompt/result counts and evidence references are all direct event facts.
+    """
+    run_ids: list[str] = []
+    for node in nodes:
+        run_id = node.get("run_id")
+        if isinstance(run_id, str) and run_id not in run_ids:
+            run_ids.append(run_id)
+    run_ids.sort()
+    latest_by_run: dict[str, tuple[datetime, int]] = {}
+    for node in nodes:
+        run_id = node.get("run_id")
+        timestamp = _parse_iso_ts(node.get("ts"))
+        if isinstance(run_id, str) and timestamp is not None:
+            candidate = (timestamp, int(node.get("step_index") or 0))
+            if run_id not in latest_by_run or candidate > latest_by_run[run_id]:
+                latest_by_run[run_id] = candidate
+    selected = (
+        max(
+            run_ids,
+            key=lambda run_id: latest_by_run.get(
+                run_id, (datetime.min.replace(tzinfo=timezone.utc), 0)
+            ),
+        )
+        if run_ids
+        else "UNOBSERVED"
+    )
+    options = "".join(
+        f'<option value="{escape(run_id, quote=True)}"'
+        f"{' selected' if run_id == selected else ''}>{escape(run_id)}</option>"
+        for run_id in run_ids
+    )
+    if not options:
+        options = '<option value="UNOBSERVED" selected>UNOBSERVED</option>'
+
+    raw_missing = view.get("missing")
+    missing: dict[str, Any] = raw_missing if isinstance(raw_missing, dict) else {}
+    rows: list[str] = []
+    for run_id in run_ids or ["UNOBSERVED"]:
+        members = [node for node in nodes if node.get("run_id") == run_id]
+        member_ids = {str(node.get("id")) for node in members}
+        prompt_count = sum(node.get("kind") == "prompt" for node in members)
+        result_count = sum(
+            node.get("kind") in {"tool_result", "model_response", "error"} for node in members
+        )
+        evidence_count = sum(
+            len((node.get("verification") or {}).get("evidence_refs") or [])
+            for node in members
+            if isinstance(node.get("verification"), dict)
+        )
+        gap_count = sum(
+            1
+            for bucket in missing.values()
+            if isinstance(bucket, list)
+            for entry in bucket
+            if (
+                entry
+                if isinstance(entry, str)
+                else entry.get("event_id")
+                if isinstance(entry, dict)
+                else None
+            )
+            in member_ids
+        )
+        has_request = prompt_count > 0
+        if not has_request and run_id in (missing.get("runs_without_intent") or []):
+            gap_count += 1
+        request_label = str(prompt_count) if has_request else "UNOBSERVED"
+        rows.append(
+            f'<div class="run-summary" data-run-summary="{escape(run_id, quote=True)}">'
+            f"<span><b>{escape(run_id)}</b></span>"
+            f"<span>REQUEST {request_label}</span><span>RESULT {result_count}</span>"
+            f"<span>EVIDENCE {evidence_count}</span><span>GAPS {gap_count}</span></div>"
+        )
+    return (
+        '<section class="run-overview" aria-label="run overview">'
+        '<div class="run-overview-head"><div><span class="verification-kicker">RUN / SESSION</span>'
+        "<h2>Read one recorded run at a time</h2>"
+        "<p>Counts come from recorded requests, results, evidence links, and gaps. Missing text stays UNOBSERVED.</p></div>"
+        f'<label>Selected run <select id="run-selector" aria-label="Select recorded run">{options}</select></label></div>'
+        f'<div class="run-summaries">{"".join(rows)}</div></section>'
+    )
+
+
 def _render_verification_rail(view: dict[str, Any]) -> str:
     """Render the five-stage rail supported by verification-view/v0."""
     stages = (
@@ -1711,7 +1903,187 @@ def _render_verification_rail(view: dict[str, Any]) -> str:
     )
 
 
-def _render_missing_panel(graph: dict[str, Any], root: Path | None = None) -> str:
+def _render_intent_comparisons(view: dict[str, Any]) -> str:
+    """Show recorded comparisons in the selected run without awarding completion."""
+    join = view.get("acceptance_join", {})
+    join_html = [
+        "<article aria-label='Acceptance Join'><h4>Acceptance Join</h4><p>"
+        + escape(str(join.get("status", "HOLD")))
+        + " · "
+        + escape(str(join.get("contract_digest", "UNOBSERVED")))
+        + "</p><ul>"
+        + "".join(
+            "<li>" + escape(str(row["id"])) + ": " + escape(str(row["state"])) + "</li>"
+            for row in join.get("criteria", [])
+        )
+        + "</ul></article>"
+    ]
+    rows = []
+    for event_id, event in view.get("events", {}).items():
+        review = event.get("why", {}).get("intent_review", {})
+        if review.get("state") != "RECORDED":
+            continue
+        checks = []
+        for check in review.get("checks", []):
+            missing = ", ".join(check.get("missing", [])) or "none recorded"
+            checks.append(
+                "<li>"
+                + escape(str(check.get("dimension")))
+                + " / "
+                + escape(str(check.get("id")))
+                + ": "
+                + escape(str(check.get("state")))
+                + " · basis: "
+                + escape(str(check.get("basis")))
+                + " · evidence: "
+                + escape(", ".join(check.get("evidence_refs", [])) or "UNOBSERVED")
+                + " · withheld: "
+                + escape(missing)
+                + "</li>"
+            )
+        rows.append(
+            "<article><h4>"
+            + escape(str(event_id))
+            + "</h4><p>Intent: "
+            + escape(str(review.get("intent_ref")))
+            + " · "
+            + escape(str(review.get("mode")))
+            + " / "
+            + escape(str(review.get("target")))
+            + "</p><ul>"
+            + "".join(checks)
+            + "</ul><p>Dimensions without checks: "
+            + escape(", ".join(review.get("missing_dimensions", [])) or "none")
+            + "</p></article>"
+        )
+    return (
+        '<section class="run-intent-comparisons" aria-label="Recorded requirement comparisons">'
+        "<h3>Recorded requirement comparisons</h3>"
+        "<p>Host-supplied values, not verified fulfillment or authorization. "
+        "Each comparison retains its own source and missing evidence.</p>"
+        + "".join(join_html)
+        + ("".join(rows) or "<p>UNOBSERVED · No requirement comparison recorded for this run.</p>")
+        + "</section>"
+    )
+
+
+def _render_promise_observation(view: dict[str, Any]) -> str:
+    """Expose observation coverage, never infer a promise from tool activity."""
+    stages = (
+        (
+            "Human Intent",
+            _verification_stage_state(view, "intent"),
+            "Recorded request; understanding and acceptance require separate evidence.",
+        ),
+        ("Promise", "UNOBSERVED", "No explicit acceptance is mapped by this view."),
+        (
+            "Contract",
+            "UNOBSERVED",
+            "Scope, constraints, and completion criteria are not mapped by this view.",
+        ),
+        (
+            "Boundaries",
+            "UNOBSERVED",
+            "Authority and prohibitions are not established by a policy outcome.",
+        ),
+        (
+            "Action",
+            _verification_stage_state(view, "action"),
+            "Recorded activity does not establish success.",
+        ),
+        ("Artifact", "UNOBSERVED", "A tool result alone does not verify a deliverable."),
+        (
+            "Evidence",
+            _verification_stage_state(view, "evidence"),
+            "Evidence coverage does not establish fulfillment or authorization.",
+        ),
+        (
+            "Readback",
+            "UNOBSERVED",
+            "Actual target identity and applied result are not mapped by this view.",
+        ),
+        (
+            "Trust",
+            "HUMAN JUDGMENT",
+            "Repeated, inspectable fulfillment can inform trust; this view does not award it.",
+        ),
+    )
+    focus = {
+        "Human Intent": ("仁 · 孝", "眞", "Whose request is recorded, and what was asked and why?"),
+        "Promise": (
+            "仁 · 孝",
+            "眞 · 善 · 美",
+            "What responsibility was explicitly accepted and clearly communicated?",
+        ),
+        "Contract": (
+            "眞 · 善",
+            "美 · 孝",
+            "Are scope, constraints, and completion conditions accurate and clear?",
+        ),
+        "Boundaries": ("善 · 眞", "孝 · 仁", "Who may act, and what must not be done?"),
+        "Action": ("善 · 美 · 眞", "孝", "What was actually done, and how?"),
+        "Artifact": (
+            "美 · 眞 · 善",
+            "仁 · 孝",
+            "Does the result exist and serve the intended person?",
+        ),
+        "Evidence": (
+            "眞 · 永",
+            "美 · 善",
+            "Which claim and exact target does the evidence support?",
+        ),
+        "Readback": ("眞 · 永", "善 · 美", "Can the result be checked again on the actual target?"),
+        "Trust": (
+            "眞 · 善 · 美 · 仁 · 孝 · 永",
+            "",
+            "What do repeated fulfillment, failures, and corrections support?",
+        ),
+    }
+    rows = "".join(
+        f'<li data-promise-stage="{escape(label, quote=True)}"><b>{escape(label)}</b> '
+        f"<strong>{escape(state)}</strong><p>{escape(reason)}</p>"
+        '<p class="promise-lenses">Lenses: 眞 · 善 · 美 · 仁 · 孝 · 永</p>'
+        + (
+            '<p class="promise-focus">All six lenses inform human judgment.</p>'
+            if label == "Trust"
+            else f'<p class="promise-focus">Primary: {escape(focus[label][0])}<br>'
+            f"Supporting: {escape(focus[label][1])}</p>"
+        )
+        + f"<p>{escape(focus[label][2])}</p></li>"
+        for label, state, reason in stages
+    )
+    return (
+        '<section class="promise-observation" aria-label="Promise observation coverage">'
+        "<h2>From your request to an inspectable result</h2>"
+        "<p>We will preserve what you entrusted to us, distinguish unknowns from facts, "
+        "report only work actually performed, carry our share of the verification burden, "
+        "and leave evidence you can inspect.</p>"
+        "<p>These are observation checkpoints, not verified connections or a completion score. "
+        "UNOBSERVED means this view cannot establish the claim, not that the activity never happened.</p>"
+        "<p>Primary and Supporting guide review questions, not scores, measured evidence, or exclusive assignments. All six lenses remain independent at every stage.</p>"
+        f"<ol>{rows}</ol>{_render_intent_comparisons(view)}</section>"
+    )
+
+
+def _render_run_rails(view: dict[str, Any], run_ids: list[str], selected: str) -> str:
+    """Render one canonical rail per run so filtering never mixes scopes."""
+    rails = []
+    for run_id in run_ids or ["UNOBSERVED"]:
+        scoped = _scoped_verification_view(view, run_id)
+        rails.append(
+            f'<div class="run-rail" data-run-rail="{escape(run_id, quote=True)}"'
+            f"{'' if run_id == selected else ' hidden'}>{_render_promise_observation(scoped)}{_render_verification_rail(scoped)}{_render_missing_panel({}, view=scoped, scope='Selected run: ' + run_id)}</div>"
+        )
+    return "".join(rails)
+
+
+def _render_missing_panel(
+    graph: dict[str, Any],
+    root: Path | None = None,
+    *,
+    view: dict[str, Any] | None = None,
+    scope: str = "Entire observed ledger",
+) -> str:
     """Render "what is missing" from the verification view's own counts.
 
     Every number here is already in the graph; this reads
@@ -1723,7 +2095,8 @@ def _render_missing_panel(graph: dict[str, Any], root: Path | None = None) -> st
     whole point: a reader should not have to page through the ledger to learn
     that nothing downstream ever cited a call.
     """
-    view = build_verification_view(graph, root=root)
+    if view is None:
+        view = build_verification_view(graph, root=root)
     missing = view["missing"]
     rows: list[str] = []
     total = 0
@@ -1767,7 +2140,7 @@ def _render_missing_panel(graph: dict[str, Any], root: Path | None = None) -> st
         '<section class="missing-wrap" aria-label="what is missing" '
         f'data-missing-total="{total}">'
         '<div class="missing-head"><p class="missing-kicker">EVIDENCE GAPS</p>'
-        "<h2>What is missing</h2></div>"
+        f"<h2>What is missing</h2><p>{escape(scope)}</p></div>"
         f"{body}"
         '<p class="missing-boundary">Observation only. A gap is not a failure, '
         "and closing one authorizes nothing.</p></section>"
@@ -1780,6 +2153,7 @@ def _render_daw_timeline(
     edge_overlay: str = "",
     role_by_event: dict[str, str] | None = None,
     lanes: list[dict[str, Any]] | None = None,
+    total_events: int | None = None,
 ) -> tuple[str, dict[str, tuple[int, int, int]]]:
     """Render the user-facing DAW timeline and return edge anchor membership.
 
@@ -1788,6 +2162,7 @@ def _render_daw_timeline(
     with `graph["rows"]` instead of re-deriving a weaker answer here.
     """
     valid_nodes = [node for node in nodes if isinstance(node.get("id"), str)]
+    total_events = total_events if isinstance(total_events, int) else len(valid_nodes)
 
     # Per-run step indices reset; they cannot serve as a shared time axis.
     def observed_time(node: dict[str, Any]) -> datetime | None:
@@ -1876,7 +2251,7 @@ def _render_daw_timeline(
         '<section class="daw-console" aria-label="Evidence session timeline">',
         f'<div class="daw-sessionbar"><div><span>EVIDENCE CONSOLE</span><strong>SESSION / {escape(run_id)}</strong></div>'
         f'<div><span class="session-state">■ STATIC VIEW</span><span>TIME <b>EARLIER → LATER</b></span>'
-        '<span class="session-boundary">LOCAL DATA / NOT SEALED</span></div></div>',
+        f'<span class="session-boundary">SHOWING {len(valid_nodes)} OF {total_events} · LOCAL DATA / NOT SEALED</span></div></div>',
         '<div class="daw-console-head"><div><span class="daw-kicker">EVIDENCE SESSION / LIVE READBACK</span>'
         '<h2>Run timeline</h2></div><div class="daw-legend"><span><i class="legend-call"></i>CALL</span>'
         '<span><i class="legend-result"></i>RESULT</span><span><i class="legend-human"></i>HUMAN</span></div></div>',
@@ -1969,6 +2344,21 @@ def render_graph_html(
         graph_root = graph.get("root")
         effective_root = Path(graph_root) if isinstance(graph_root, str) and graph_root else None
     verification_view = build_verification_view(graph, root=effective_root)
+    run_ids = sorted(
+        {str(node["run_id"]) for node in raw_node_list if isinstance(node.get("run_id"), str)}
+    )
+    latest_run = max(
+        run_ids,
+        key=lambda run_id: max(
+            (
+                _parse_iso_ts(node.get("ts")) or datetime.min.replace(tzinfo=timezone.utc),
+                int(node.get("step_index") or 0),
+            )
+            for node in raw_node_list
+            if node.get("run_id") == run_id
+        ),
+        default="UNOBSERVED",
+    )
     evidence_refs_by_target: dict[str, list[str]] = {}
     for edge in verification_view.get("edges_evidence") or []:
         if isinstance(edge, dict) and isinstance(edge.get("target"), str):
@@ -2006,6 +2396,30 @@ def render_graph_html(
     node_by_id: dict[str, dict[str, Any]] = {
         node["id"]: node for node in nodes if isinstance(node.get("id"), str)
     }
+    # Resolve the request shown in an event detail through recorded causal
+    # parents only. Same-run membership is not enough to claim a request.
+    for node_id, node in node_by_id.items():
+        verification = node.get("verification")
+        if not isinstance(verification, dict):
+            continue
+        frontier = list(verification.get("causal_parents") or [])
+        seen: set[str] = set()
+        request_event_id: str | None = node_id if node.get("kind") == "prompt" else None
+        while frontier and request_event_id is None:
+            parent_id = frontier.pop(0)
+            if not isinstance(parent_id, str) or parent_id in seen:
+                continue
+            seen.add(parent_id)
+            parent = node_by_id.get(parent_id)
+            if not isinstance(parent, dict):
+                continue
+            if parent.get("kind") == "prompt":
+                request_event_id = parent_id
+                break
+            parent_view = parent.get("verification")
+            if isinstance(parent_view, dict):
+                frontier.extend(parent_view.get("causal_parents") or [])
+        verification["request_event_id"] = request_event_id or "UNOBSERVED"
     assignments = {
         node_id: assign_columns(node, effective_root) for node_id, node in node_by_id.items()
     }
@@ -2031,14 +2445,34 @@ def render_graph_html(
         else ""
     )
 
-    missing_html = _render_missing_panel(graph, effective_root)
+    missing_html = (
+        "<details><summary>Entire ledger: observation gaps across all runs</summary>"
+        + _render_missing_panel(graph, effective_root)
+        + "</details>"
+    )
     daw_roles = _role_by_event(graph)
+    timeline_nodes = sorted(
+        nodes,
+        key=lambda node: (
+            _parse_iso_ts(node.get("ts")) or datetime.min.replace(tzinfo=timezone.utc),
+            int(node.get("step_index") or 0),
+        ),
+    )[-80:]
     _daw_preview, daw_anchors = _render_daw_timeline(
-        nodes, edges, role_by_event=daw_roles, lanes=verification_view["lanes"]
+        timeline_nodes,
+        edges,
+        role_by_event=daw_roles,
+        lanes=verification_view["lanes"],
+        total_events=len(nodes),
     )
     daw_edge_overlay = _render_edge_overlay(graph, daw_anchors, overlay_id="daw-edge-overlay")
     daw_html, _ = _render_daw_timeline(
-        nodes, edges, daw_edge_overlay, daw_roles, verification_view["lanes"]
+        timeline_nodes,
+        edges,
+        daw_edge_overlay,
+        daw_roles,
+        verification_view["lanes"],
+        total_events=len(nodes),
     )
 
     # Brief finding 1: one grid, columns x actor rows, each event a tile at
@@ -2138,7 +2572,7 @@ def render_graph_html(
 <title>HyoDo Evidence Graph</title><style>
 :root {{ color-scheme: light dark; --ink:#182033; --muted:#5b6475; --surface:#fff; --bg:#f5f7fb; --line:#dbe1ed; --line-soft:#edf0f5; --focus:#111827; }}
 @media (prefers-color-scheme: dark) {{ :root {{ --ink:#e6eaf3; --muted:#9aa3b5; --surface:#161b28; --bg:#0d1119; --line:#2a3245; --line-soft:#232a3b; --focus:#e6eaf3; }} }}
-* {{ box-sizing:border-box }} body {{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 ui-sans-serif,system-ui,sans-serif }}
+* {{ box-sizing:border-box }} [hidden] {{ display:none !important }} body {{ margin:0; background:var(--bg); color:var(--ink); font:16px/1.45 ui-sans-serif,system-ui,sans-serif }}
 main {{ max-width:1180px; margin:auto; padding:28px 20px 48px }} h1 {{ margin:0; font-size:clamp(1.5rem,4vw,2.2rem) }} .meta {{ color:var(--muted); margin:.35rem 0 0 }} .meta a {{ color:inherit }}
 .unobserved-notice {{ background:#fdeaea; color:#7a1f1f; border:1px solid #f0b8b8; border-radius:10px; padding:10px 14px; font-weight:600; margin:18px 0 }}
 @media (prefers-color-scheme: dark) {{ .unobserved-notice {{ background:#3f2626; color:#f5c9c9; border-color:#7a3b3b }} }}
@@ -2214,6 +2648,21 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 .verification-facts {{ color:#aaa9ab; font-size:.72rem; letter-spacing:.04em }}
 .verification-facts b {{ color:#f5f5f5; font-weight:400 }}
 .verification-facts b[data-presentable-decision="UNOBSERVED"] {{ color:#aaa9ab }}
+.run-overview {{ border:1px solid #3a393d; background:#121116; padding:13px 15px; margin:0 0 12px; min-width:980px }}
+.run-overview-head {{ display:flex; justify-content:space-between; gap:18px; align-items:start }}
+.run-overview h2 {{ margin:.25rem 0; font-size:1rem; font-weight:400 }}
+.run-overview p {{ margin:.25rem 0 0; color:#aaa9ab; font-size:.72rem }}
+.run-overview label {{ color:#aaa9ab; font-size:.72rem; white-space:nowrap }}
+.run-overview select {{ margin-left:6px; padding:5px 8px; background:#17161a; color:#f5f5f5; border:1px solid #57565a; border-radius:4px }}
+.run-summaries {{ display:grid; gap:6px; margin-top:11px }}
+.run-summary {{ display:flex; gap:14px; flex-wrap:wrap; color:#aaa9ab; font:600 .62rem/1.4 ui-monospace,SFMono-Regular,Consolas,monospace; letter-spacing:.06em }}
+.run-summary b {{ color:#f5f5f5; font-weight:500 }}
+.detail-trace {{ color:#aaa9ab; border-top:1px solid #3a393d; margin-top:10px; padding-top:7px }}
+.detail-trace p {{ margin:.18rem 0 }}
+.promise-observation {{ border:1px solid #3a393d; padding:16px; margin-bottom:12px }}
+.promise-observation ol {{ display:grid; grid-template-columns:repeat(auto-fit,minmax(210px,1fr)); gap:16px; padding-left:24px }}
+.promise-observation p {{ color:#aaa9ab; font-size:.85rem }}
+.promise-observation strong {{ display:block; font-size:.75rem; color:#fab413 }}
 .verification-rail {{ overflow:auto; border:1px solid #3a393d; background:#121116; padding:11px 15px 13px; margin:0 0 12px; min-width:980px }}
 .verification-rail-head {{ display:flex; justify-content:space-between; margin-bottom:10px }}
 .verification-rail-head small {{ color:#747378; font-size:.64rem; letter-spacing:.08em }}
@@ -2328,7 +2777,8 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 </style></head><body><main><header><div><h1>HyoDo Evidence Graph</h1><p class="meta">Local only · No composite score · <a href="/">Back to instrument panel</a></p></div></header>
 {notice_html}
 {_render_verification_header(verification_view)}
-{_render_verification_rail(verification_view)}
+{_render_run_overview(nodes, verification_view)}
+{_render_run_rails(verification_view, run_ids, latest_run)}
 <section class="orb-wrap legacy-orb">{orb_html}</section>
 {daw_html}
 <div class="grid-wrap legacy-proof-grid">
@@ -2340,5 +2790,5 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 </div>
 <div class="legacy-proof-gutter">{gutter_html}</div>
 {missing_html}
-<section id="event-detail" class="detail" aria-live="polite"><p class="detail-kicker">RUN #3 / READING GUIDE</p><p>Select a timeline pad to inspect its recorded 5W1H evidence.</p><p><strong>SOLID</strong> execution route · <strong>DASHED</strong> evidence relation · <strong>ORANGE</strong> human or unresolved signal.</p></section>
+<section id="event-detail" class="detail" aria-live="polite"><p class="detail-kicker">SELECTED EVENT / READING GUIDE</p><p>Select a timeline pad to inspect its recorded 5W1H evidence.</p><p><strong>SOLID</strong> execution route · <strong>DASHED</strong> evidence relation · <strong>ORANGE</strong> human or unresolved signal.</p></section>
 </main><script>{GRAPH_SCRIPT}</script></body></html>"""

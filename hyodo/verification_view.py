@@ -44,7 +44,7 @@ from hyodo.graph_view import (
     column_coverage,
     hyo_chain,
 )
-from hyodo.intent_review import project_intent_review
+from hyodo.intent_review import load_acceptance_join, project_intent_review
 
 VERIFICATION_VIEW_SCHEMA_VERSION = "hyodo.verification-view/v0"
 
@@ -147,7 +147,9 @@ def _five_w_one_h(node: dict[str, Any], *, allow_withheld: bool) -> dict[str, An
             "method": _text(tool.get("method")),
             "rule_id": _text(policy.get("rule_id")),
             "evaluated_by": _text(policy.get("evaluated_by")),
+            "input_digest": _text(io.get("input_digest")),
             "output_digest": _text(io.get("output_digest")),
+            "output_observation": _text(io.get("output_observation")) or "UNOBSERVED",
         },
     }
 
@@ -337,6 +339,7 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
 
     return {
         "schema_version": VERIFICATION_VIEW_SCHEMA_VERSION,
+        "acceptance_join": load_acceptance_join(root),
         "status": graph.get("status"),
         "presentation": {
             "allow_withheld": allow_withheld,

@@ -11,6 +11,15 @@ from hyodo.events import content_digest, credential_shaped_path
 from hyodo.graph_v2 import V1_SCHEMA, V2_SCHEMA, causal_parents, validate_graph_v2
 
 GRAPH_SCHEMA_VERSION = "hyodo.evidence-graph/v1"
+OUTPUT_OBSERVATION_TAGS = frozenset(
+    {
+        "output:empty",
+        "output:observed",
+        "output:null",
+        "output:missing",
+        "output:unsupported_shape",
+    }
+)
 
 
 def _event_id(event: dict[str, Any]) -> str | None:
@@ -37,6 +46,25 @@ def _policy(event: dict[str, Any]) -> dict[str, Any]:
 def _io(event: dict[str, Any]) -> dict[str, Any]:
     block = event.get("io")
     return block if isinstance(block, dict) else {}
+
+
+def _output_observation(event: dict[str, Any]) -> str:
+    """Carry one exact host observation tag, or fail closed.
+
+    A digest is deliberately not treated as proof of how the host represented
+    its response. Older events and hand-built records therefore remain
+    ``UNOBSERVED`` until a native adapter records one unambiguous tag.
+    """
+    if event.get("kind") != "tool_result":
+        return "UNOBSERVED"
+    meta = event.get("meta")
+    tags = meta.get("tags") if isinstance(meta, dict) else None
+    if not isinstance(tags, list):
+        return "UNOBSERVED"
+    output_tags = [tag for tag in tags if isinstance(tag, str) and tag.startswith("output:")]
+    if len(output_tags) != 1 or output_tags[0] not in OUTPUT_OBSERVATION_TAGS:
+        return "UNOBSERVED"
+    return output_tags[0]
 
 
 def _edge_issue(
@@ -324,7 +352,11 @@ def build_event_graph(
         meta = meta if isinstance(meta, dict) else {}
         urls = tool.get("urls")
         urls = urls if isinstance(urls, list) else []
-        node_io: dict[str, Any] = {"output_digest": io.get("output_digest")}
+        node_io: dict[str, Any] = {
+            "input_digest": io.get("input_digest"),
+            "output_digest": io.get("output_digest"),
+            "output_observation": _output_observation(event),
+        }
         if isinstance(io.get("duration_ms"), int) and not isinstance(io.get("duration_ms"), bool):
             node_io["duration_ms"] = io["duration_ms"]
         parents, _ = _parent_refs(event)

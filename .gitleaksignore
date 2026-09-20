@@ -1,0 +1,47 @@
+# Narrow historical test/fixture and non-secret findings only.
+# Active or unresolved credential-like findings are intentionally absent.
+ca18cf43cbfd656a36783aa84c3b60be7ef95096:tests/test_inspect.py:aws-access-token:29
+caa88250b5786689667d936e3e375ace1c0f5a57:tests/test_observability_contracts.py:aws-access-token:45
+caa88250b5786689667d936e3e375ace1c0f5a57:tests/test_observability_contracts.py:aws-access-token:49
+caa88250b5786689667d936e3e375ace1c0f5a57:tests/test_observability_contracts.py:aws-access-token:62
+caa88250b5786689667d936e3e375ace1c0f5a57:tests/test_observability_contracts.py:aws-access-token:66
+931be769b8d0f526b15af977d4a8bc6fb7611d56:tests/test_mcp_stdio.py:aws-access-token:109
+e7c6ba7c3a83a1aedcbde65fc72758a744138d96:hyodo/cli/main.py:generic-api-key:350
+d8c5df139a63aaacf1cb82fe63c72683dad6b40e:tests/test_safe_json.py:aws-access-token:22
+f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/.env.example:generic-api-key:50
+f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/data/api_wallet.json:generic-api-key:6
+f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/data/api_wallet.json:generic-api-key:19
+f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/tests/infrastructure/test_messaging.py:generic-api-key:115
+f897f82253862ca6b2e27ba8e78cc17014205dfa:afo_core/tests/test_api_wallet.py:generic-api-key:41
+
+# Incident 2026-09-20. Three genuine credentials were committed in f897f82 on
+# 2026-01-25 and are therefore in this repository's public history. History was
+# deliberately not rewritten: it cannot recall an already-public value and it
+# would break release provenance. Each entry below names one finding in one
+# commit, so a future secret in the same file is still reported.
+#
+# C1 -- revoked historical credential. The Cloudflare API token was revoked by
+# the operator at the Cloudflare dashboard. The value was never used from this
+# host to test or revoke it.
+f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/cleanup/purge_dns.sh:generic-api-key:3
+# C2, C3 -- decommissioned external historical credential, owner unavailable.
+# The notebook-bridge consumer was decommissioned on 2026-08-14, the project no
+# longer exists in our Vercel account, and the endpoint answers 404. No
+# validator is under our control, so this key cannot be rotated or revoked; it
+# is treated as permanently exposed rather than as revoked.
+f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/monitor_bridge.py:generic-api-key:61
+f897f82253862ca6b2e27ba8e78cc17014205dfa:scripts/verify_context_chain.py:generic-api-key:6
+
+# Working-tree fingerprints (`path:rule:line`) for the same fixtures the history
+# entries above already cover. A --no-git scan names a finding without a commit,
+# so the historical form does not match it. These are test fixtures holding
+# deliberately fake AWS keys; each entry still names one line in one file, so a
+# real secret added anywhere else -- or on another line of these files -- is
+# reported.
+tests/test_inspect.py:aws-access-token:29
+tests/test_observability_contracts.py:aws-access-token:45
+tests/test_observability_contracts.py:aws-access-token:49
+tests/test_observability_contracts.py:aws-access-token:62
+tests/test_observability_contracts.py:aws-access-token:66
+tests/test_safe_json.py:aws-access-token:22
+tests/test_mcp_stdio.py:aws-access-token:251

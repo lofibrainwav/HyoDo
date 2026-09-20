@@ -32,7 +32,10 @@ def _event_id(payload: dict[str, Any], host: str, event_name: str) -> str | None
 
 
 def _digestable(value: Any) -> str | None:
-    if isinstance(value, str) and value:
+    # An empty string is an observed response and must hash as the bytes that
+    # were observed. ``None`` remains the sentinel for a missing/unsupported
+    # value; callers must not turn that sentinel into a digest.
+    if isinstance(value, str):
         return value
     if isinstance(value, (dict, list, int, float, bool)):
         return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
@@ -124,16 +127,39 @@ def map_tool_payload(
         io["duration_ms"] = duration
     # Only the result half can carry a result. A digest on a `tool_call` would
     # be a claim about something that has not happened yet.
+    output_state: str | None = None
     output = None
     if event_name in post_events:
+        output_key_seen = False
+        output_null_seen = False
         for key in output_keys:
-            candidate = payload.get(key)
-            if candidate is not None:
-                output = candidate
-                break
+            if key not in payload:
+                continue
+            output_key_seen = True
+            candidate = payload[key]
+            if candidate is None:
+                output_null_seen = True
+                continue
+            output = candidate
+            if _digestable(output) is None:
+                output_state = "unsupported_shape"
+            elif isinstance(output, str) and output == "":
+                output_state = "empty"
+            else:
+                output_state = "observed"
+            # Preserve the established host behavior: the first non-null
+            # host-owned key wins, while null placeholders fall through to a
+            # lower-priority concrete response.
+            break
+        if output_state is None and output_key_seen and output_null_seen:
+            output_state = "null"
+        elif not output_key_seen:
+            output_state = "missing"
     output_text = _digestable(output)
-    if output_text:
+    if output_state in {"observed", "empty"} and output_text is not None:
         io["output_digest"] = content_digest(output_text)
+    if output_state is not None:
+        tags.append(f"output:{output_state}")
     if io:
         raw["io"] = io
 

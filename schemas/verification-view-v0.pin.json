@@ -1,6 +1,6 @@
 {
   "algorithm": "sha256",
-  "digest": "112746b1309c8354180242f2424e4320c5bb0ad2d535245375d845907771418e",
+  "digest": "a618ee4d28d64a723537ce03ca984100d852a3977fc26ea36ecce60240da0e54",
   "schema": "verification-view-v0.schema.json",
   "schema_id": "https://hyodo.app/schemas/verification-view-v0.schema.json",
   "schema_version": "hyodo.verification-view/v0"

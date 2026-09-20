@@ -19,16 +19,52 @@ jobs:
     name: Historical and working-tree secret scan
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    # The job name promises history and the working tree. gitleaks-action derived
+    # its scope from the triggering event, so a push to main scanned one commit
+    # while a manual run scanned the whole history -- the same tree could pass and
+    # fail depending on how the run started. These steps pin one contract for
+    # every event: the full history, then the working tree, then a check that the
+    # baseline cannot hide a secret that is present now.
+    env:
+      GITLEAKS_IMAGE: ghcr.io/gitleaks/gitleaks@sha256:691af3c7c5a48b16f187ce3446d5f194838f91238f27270ed36eef6359a574d9
     steps:
       - name: Checkout full history
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           persist-credentials: false
           fetch-depth: 0
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scan full history
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS_IMAGE" \
+            detect --source=. --redact --no-banner --verbose --exit-code 1
+      - name: Scan working tree
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          docker run --rm -v "$PWD:/repo" -w /repo "$GITLEAKS_IMAGE" \
+            detect --source=. --no-git --redact --no-banner --verbose --exit-code 1
+      - name: Baseline cannot hide a current secret
+        if: ${{ !cancelled() }}
+        run: |
+          set -euo pipefail
+          canary="$(mktemp -d)"
+          cp .gitleaksignore "$canary/.gitleaksignore"
+          # Built at run time so this file never contains a scannable key itself.
+          key="AKIA$(head -c 512 /dev/urandom | LC_ALL=C tr -dc 'A-Z0-9' | cut -c1-16)"
+          if [ "${#key}" -ne 20 ]; then
+            echo "::error::canary key generation produced ${#key} characters, not 20"
+            exit 1
+          fi
+          # Same shape as the fixtures this scan demonstrably reports, so a miss
+          # means suppression rather than a rule that never matched.
+          printf 'FAKE_AWS_KEY = "%s"\n' "$key" > "$canary/planted.py"
+          if docker run --rm -v "$canary:/canary" -w /canary "$GITLEAKS_IMAGE" \
+               detect --source=. --no-git --redact --no-banner --exit-code 1; then
+            echo "::error::A planted current secret was not reported. The baseline or the rule set is suppressing present-day findings."
+            exit 1
+          fi
+          echo "Planted secret was reported, as required."
 
   dependencies:
     name: Runtime dependency audit

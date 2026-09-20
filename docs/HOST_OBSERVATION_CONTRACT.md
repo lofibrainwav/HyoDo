@@ -92,7 +92,8 @@ no hook-level failure record is available in this report.
 `hyodo/events.py` `EVENT_KINDS` already includes `prompt`, so the ledger
 schema carries intent today. `hyodo/connect.py` installs hooks for
 `PreToolUse` and `PostToolUse` only and rejects every other hook event name.
-`hyodo/host_adapters/codex.py` likewise maps only those two.
+At the time of this measurement, `hyodo/host_adapters/codex.py` likewise
+mapped only those two.
 
 Codex exposes more. Its `HookEventName` vocabulary, read from the installed
 binary, includes `user_prompt_submit` alongside `pre_tool_use` and
@@ -104,8 +105,33 @@ Two of two runs in this ledger therefore have no recorded intent. Reported as
 100%. Under the five-questions model those runs answer Who, What, When, Where
 and How, and leave Why unobserved.
 
-What is **UNOBSERVED**: the payload shape of a real `user_prompt_submit` hook
-event. The name is measured, the contents are not.
+At the original audit time, the payload shape of a real
+`user_prompt_submit` hook event was **UNOBSERVED**. The follow-up below
+records the later observation without changing that historical finding.
+
+### Local candidate follow-up
+
+The Codex adapter now accepts `UserPromptSubmit` through the existing CLI
+dispatch. Its field contract is based on the installed Codex 0.155.1 native
+`user-prompt-submit.command.input` schema, with isolated adapter and graph
+tests. That initial implementation evidence did not establish live delivery.
+A subsequent local observation at 2026-09-20T05:59:41Z captured one native
+human submission, followed by six directly linked actions and six results.
+The ledger, verification API, and existing browser view were checked against
+the same event identity. This establishes one local input chain, not coverage
+of other seats or a general `hyodo connect` installation guarantee. No
+historical requests were reconstructed or inserted.
+
+Prompt bodies are reduced to input digests. Session and turn identity must
+come from the host. Transcript paths are not event IDs and must not be placed
+in `evidence_refs`. A recorded prompt does not establish acceptance, an
+execution contract, fulfillment, or trust.
+
+Tool-result observation now distinguishes a supplied empty response from a
+missing, null, or unsupported response using existing metadata tags. An empty
+response has a digest; absent data does not. The graph and verification view
+carry this distinction without changing lens evaluations or authority.
+Historical events without these tags retain `UNOBSERVED` observation state.
 
 ## Finding 4 — `apply_patch` input shape is unobserved, so the work is held
 
@@ -166,3 +192,30 @@ In dependency order, each gated on an observation rather than an assumption.
 
 `evidence_refs` stay absent until something in the loop has a reason to cite
 evidence. That is a product question, not an adapter gap.
+
+## Supplying a requirement comparison
+
+The existing `hyodo event record --file EVENT.json --root PROJECT --json`
+entry point accepts a canonical `hyodo.agent-event/v1` event containing
+`meta.intent_review` (`hyodo.intent-review/v1`). This is an explicit host
+submission, not information inferred from a tool name or a successful exit.
+
+The host must supply the original human prompt event ID in `intent_ref`,
+`mode` (`OBSERVED` or `PROJECTED`), `target` (`interpretation`, `action`, or
+`outcome`), and checks containing `id`, `dimension`, `basis`, `operator`,
+`expected`, `actual`, `unit`, and `evidence_refs`. Dimensions are `goal`,
+`scope`, `constraints`, and `completion`. Each evidence reference identifies
+an existing result event; missing observations must remain absent or null.
+The event's top-level `evidence_refs` also declares its evidence graph links.
+
+Declare `basis: DECLARED` only for an actual user requirement. An agent's
+interpretation uses `INFERRED`; hypothetical comparisons use `PROJECTED`.
+Neither becomes verified fulfillment merely because the values match.
+Record a new comparison after observing the result, preserving the earlier
+request and result events. Do not replay missing historical prompts.
+
+The dashboard shows these comparisons per selected run, including each
+source, check state, evidence reference, and missing dimension. The detailed
+event view retains expected and actual values and comparison history.
+This summary does not establish a promise, accepted contract, artifact
+verification, or execution authority.
