@@ -45,3 +45,10 @@ tests/test_observability_contracts.py:aws-access-token:62
 tests/test_observability_contracts.py:aws-access-token:66
 tests/test_safe_json.py:aws-access-token:22
 tests/test_mcp_stdio.py:aws-access-token:251
+
+# PR #433 test-fixture incident. Commit da09cda accidentally spelled the
+# deterministic GitHub-PAT-shaped canary as one literal inside the regression
+# test. The current test no longer does that. This fingerprint suppresses only
+# that one historical fake finding; it does not suppress the rule, file, or
+# current working tree.
+da09cda6564f1ff8637868261cd0718616b93b1f:tests/test_secret_scan_contract.py:github-pat:108
