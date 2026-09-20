@@ -13,12 +13,14 @@ encode one machine's filesystem. Nothing else was changed.
 - **Package**: `hyodo` 4.19.9, installed from PyPI with
   `pipx install hyodo` into an empty pipx home.
 - **Reported by the tool itself**: `HyoDo v4.19.9 - model-agnostic quality gates`,
-  and every result line below ends with `measured by hyodo 4.19.9 (wheel)`.
+  with `Measurement: measured by hyodo 4.19.9 (wheel)` in the pass, fail,
+  empty-project and malformed-config results below.
 - **Platform**: macOS. HyoDo itself ran on Python 3.14.7; the gate below ran on
   the `python` found on `PATH`, which is a separate interpreter. That
   distinction matters, and the next section says why.
 
-You can reproduce it in about a minute. Nothing leaves your machine.
+The example runs locally. Installing the tools downloads packages; the gate
+shown here runs your local pytest tests.
 
 ## Before you run it
 
@@ -67,7 +69,7 @@ that is the step shown under "The command" below. The recorded decision lives in
 
 ## The input
 
-Three files, plus one HyoDo config. This is the whole project.
+Two Python files and one HyoDo config make up the example input.
 
 `src/pricing.py`
 
@@ -131,8 +133,8 @@ match the one printed here, character for character. A matching fingerprint says
 the command text matches. It says nothing about what that command resolves to on
 your machine — the interpreter, the installed packages, your project's code and
 the result are all still yours, which is why the prerequisites above matter.
-Answering `y` records the decision and the run continues. Every later run in this
-project goes straight to the result below.
+Answering `y` records the decision and the run continues. With this command set
+unchanged, later runs reuse the recorded approval.
 
 ## Result 1 — the gate passes
 
@@ -153,7 +155,7 @@ HYODO PASS — 1/1 gates observed, all executed gates passed
 
 Exit code **0**.
 
-Read the second-to-last line carefully: *"Gates support review readiness. Human
+Read the approval reminder carefully: *"Gates support review readiness. Human
 approval still required."* A pass is evidence that the gates you registered ran
 and succeeded. It is not approval to merge or deploy. That is the whole product
 boundary in one line of output.
