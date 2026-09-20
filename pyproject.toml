@@ -12,7 +12,7 @@ description = "Local evidence verification for AI-assisted work. See what ran, w
 dynamic = ["readme"]
 license = "MIT"
 authors = [
-    { name = "AFO Kingdom" }
+    { name = "BRNESTRM" }
 ]
 keywords = [
     "evidence",

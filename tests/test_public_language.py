@@ -32,6 +32,13 @@ ALLOWED_SYLLABLES = frozenset("\uc9c4\uc120\ubbf8\uc778\ud6a8\uc601")
 
 SCANNED_SUFFIXES = (".py", ".md")
 
+ACTIVE_ATTRIBUTION_FILES = (
+    Path("pyproject.toml"),
+    Path(".claude-plugin/plugin.json"),
+    Path(".claude-plugin/marketplace.json"),
+    Path(".github/actions/hyodo/action.yml"),
+)
+
 
 def _tracked_files() -> list[Path]:
     listing = subprocess.run(
@@ -84,6 +91,12 @@ def test_this_file_is_itself_scanned():
     # drops out of the tracked set, the check above silently stops covering it.
     tracked = {path.name for path in _tracked_files()}
     assert Path(__file__).name in tracked
+
+
+def test_legacy_attribution_stays_out_of_active_surfaces():
+    for relative_path in ACTIVE_ATTRIBUTION_FILES:
+        text = (REPO_ROOT / relative_path).read_text(encoding="utf-8")
+        assert "AFO Kingdom" not in text, relative_path
 
 
 def test_the_scan_would_actually_catch_korean_prose(tmp_path):
