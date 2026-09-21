@@ -40,7 +40,9 @@ pre-registered candidate, with the independent judge's
 [`PORTABILITY_JUDGE_RECEIPT_V0.md`](./PORTABILITY_JUDGE_RECEIPT_V0.md) verdict
 `SOFTWARE_V0_PARTIAL` and two open findings preserved. Portability overall is
 `PARTIAL / WAITING_FOR_INDEPENDENT_DOMAINS`, and Core promotion stays
-`NOT_ELIGIBLE`.
+`NOT_ELIGIBLE`. The two findings the judge left open are carried forward as
+questions in [`PORTABILITY_BACKLOG_V0.md`](./PORTABILITY_BACKLOG_V0.md), which
+reopens nothing.
 
 ## 0. Top-level technical roadmap — what belongs where and when
 
