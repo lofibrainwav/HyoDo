@@ -1,0 +1,23 @@
+{
+  "bounded_claim": "the project was validated because the check ran",
+  "evidence": {
+    "all_gates_passed_occurrences": 0,
+    "command_succeeded_in_running": true,
+    "contract_line": "echo \"ERROR: false-green 'All gates passed' on empty tree\"",
+    "gates_ran": 0,
+    "observed_command": "hyodo check <empty tree>",
+    "observed_exit_code": 2,
+    "observed_qualifier": "This is not a validation pass.",
+    "observed_summary": "No project gates were executed",
+    "observed_terminal": "HYODO UNOBSERVED - 0/0 gates observed, required gates UNOBSERVED"
+  },
+  "family": "domain-specific near miss",
+  "id": "SW-12",
+  "sources": [
+    {
+      "path": "scripts/verify-public.sh",
+      "sha256": "c483d284b15ac8c90f1053323ab95a0306366563eeb7795f6ccdaeba54d7f9e9"
+    }
+  ],
+  "subject": "an empty directory under hyodo check"
+}

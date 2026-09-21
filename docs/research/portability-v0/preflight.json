@@ -1,0 +1,113 @@
+{
+  "schema": "hyodo.portability-v0-preflight/v1",
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "gate_rule": "One NOT_REPRESENTABLE family and the arms never run; the run seals as SOFTWARE_V0_PARTIAL. Manufacturing a fixture to reach twelve is forbidden.",
+  "gate_result": "12/12 REPRESENTABLE - arms proceed",
+  "correction_recorded": "An earlier pass searched only examples/ and concluded SW-06 and SW-09 had no artifact. That conclusion was wrong: it was a statement about the adequacy of a search, not about the repository. The tests/ policy contracts below were found on a second pass. The judge re-runs this search independently.",
+  "families": [
+    {
+      "id": "SW-01",
+      "family": "stale evidence",
+      "status": "REPRESENTABLE",
+      "artifact": "docs/CURRENT_STATE.md",
+      "observed": "Line 11 records 'Latest public package: HyoDo 4.20.2'; line 41 heads a 'Runtime capability snapshot (2026-09-13 PT)' whose table column reads 'Public 4.19.5 at snapshot'."
+    },
+    {
+      "id": "SW-02",
+      "family": "wrong subject binding",
+      "status": "REPRESENTABLE",
+      "artifact": "tests/fixtures/acceptance-join-live-mismatch.json",
+      "observed": "provenance.validity=MISMATCH, provenance.relation=SELF_OTHER_CHECKOUT, measurer.source_commit=cd6052a1..., measurer.source_dirty=true."
+    },
+    {
+      "id": "SW-03",
+      "family": "replayed or duplicated evidence",
+      "status": "REPRESENTABLE",
+      "artifact": "docs/research/M1_STAGE_OBSERVATION_LIVE_READBACK_2026-09-11.md",
+      "observed": "Lines 100-105: a second pass appended 3 observation rows, leaving 6 rows for 3 distinct observation_id values; a direct consumer must dedupe by observation_id.",
+      "rejected_alternative": "tests/fixtures/graph-v2-join/triangle-cycle.json and a-j-join-cycle.json are cycle topology controls, not replayed evidence."
+    },
+    {
+      "id": "SW-04",
+      "family": "missing claimed effect",
+      "status": "REPRESENTABLE",
+      "artifact": "docs/research/EVIDENCE_RECONCILIATION_2026-09-20.md",
+      "observed": "4,965 tool calls; 316 remain UNOBSERVED with no structured terminal-mode field exposed by the producer."
+    },
+    {
+      "id": "SW-05",
+      "family": "unsupported conclusion beyond the evidence scope",
+      "status": "REPRESENTABLE",
+      "artifact": "scripts/verify-public.sh (contract) + observed hyodo score output",
+      "observed": "Output states REVIEW_SIGNAL_STRONG (90+) with 'Strong review signal only. Still run tests/security checks; human approval required.' verify-public.sh asserts the REVIEW_SIGNAL marker."
+    },
+    {
+      "id": "SW-06",
+      "family": "ambiguous authority or approval boundary",
+      "status": "REPRESENTABLE",
+      "artifact": "tests/test_policy_self_report_boundary.py",
+      "executable_contract": {
+        "test_function": "test_caller_asserted_ask_is_not_a_decision",
+        "line_range": [75, 87],
+        "semantic_alignment": "The assertions fix that a caller-asserted ASK leaves policy.decision and policy.evaluated_by null while preserving the claim under policy.claimed. That is exactly the bounded claim under test.",
+        "execution_readback": "PASS",
+        "boundary_not_proven": "The assertion does not establish what the correct policy decision for that call would be, nor that any authority exists to make it. It fixes only that the caller's claim is not one."
+      }
+    },
+    {
+      "id": "SW-07",
+      "family": "incomplete provenance",
+      "status": "REPRESENTABLE",
+      "artifact": "tests/fixtures/graph-v2-join/unresolved-parent.json",
+      "observed": "Node A declares parent 'does-not-exist'; expected.unresolved_refs lists it."
+    },
+    {
+      "id": "SW-08",
+      "family": "conflicting evidence",
+      "status": "REPRESENTABLE",
+      "artifact": "tests/fixtures/dashboard-truth-cases.json",
+      "observed": "Case withheld_allow records ALLOW while the presentable value is UNOBSERVED."
+    },
+    {
+      "id": "SW-09",
+      "family": "missing human decision",
+      "status": "REPRESENTABLE",
+      "artifact": "tests/test_cli_policy_check.py + examples/factory-loop/factory-loop.sh",
+      "executable_contract": {
+        "test_functions": [
+          "test_policy_check_ask_exits_three_and_serializes_measurement",
+          "test_event_record_ask_exits_three_but_records_audit_event"
+        ],
+        "semantic_alignment": "ASK serializes to CLI exit 3 and is written to the ledger, while the loop halts: factory-loop.sh documents exit 3 as 'the policy asked for an operator decision (ASK) and nobody is here at night' and 'operator decision required before this evidence counts'. The absence of a human response is expressible from source, not merely the presence of an ASK.",
+        "execution_readback": "PASS",
+        "boundary_not_proven": "The contract does not establish what an operator would have decided, only that the evidence does not stand in for that decision."
+      },
+      "rejected_alternative": "examples/fde-evidence-spine/ was ruled out: sample-tool-call.json carries policy.decision=null, rule_id=null, reason=null, which is an undecided event, not an ASK without an approval. examples/host-policies/claude-and-cursor.policy.toml contains zero occurrences of ask, approval, or require. The live .hyodo ledger carries no event with a recorded policy.decision."
+    },
+    {
+      "id": "SW-10",
+      "family": "valid bounded support",
+      "status": "REPRESENTABLE",
+      "artifact": "examples/factory-loop/factory-loop.sh",
+      "observed": "Dry run exits 0 with 'HYODO ALLOW - 3/3 surfaces observed, trust=1, policy checks allow' and closes with the queue item staying open until a person merges."
+    },
+    {
+      "id": "SW-11",
+      "family": "valid support with an explicit limitation",
+      "status": "REPRESENTABLE",
+      "artifact": "scripts/verify-public.sh (contract) + observed hyodo check output",
+      "observed": "hyodo check . exits 0 with 'All executed gates passed (4/4 gates ran)' and 'Gates support review readiness. Human approval still required.'"
+    },
+    {
+      "id": "SW-12",
+      "family": "domain-specific near miss",
+      "status": "REPRESENTABLE",
+      "artifact": "scripts/verify-public.sh (contract) + observed hyodo check output on an empty tree",
+      "observed": "hyodo check on an empty directory exits 2 with 'No project gates were executed', 'This is not a validation pass.', and 'HYODO UNOBSERVED - 0/0 gates observed'. The string 'All gates passed' occurs zero times; verify-public.sh fails the build if it ever appears."
+    }
+  ],
+  "counts": {
+    "REPRESENTABLE": 12,
+    "NOT_REPRESENTABLE": 0
+  }
+}

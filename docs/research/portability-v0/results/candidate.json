@@ -1,0 +1,446 @@
+{
+  "arm": "candidate",
+  "counter_totals": {
+    "adapter_exception_cost": 0,
+    "instrumentation_steps": 12,
+    "required_context_boundaries": 12,
+    "required_cross_checks": 12,
+    "required_source_lookups": 13,
+    "unresolved_required_fields": 17
+  },
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "oracle_consulted": false,
+  "results": [
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "fields": {
+        "authority_boundary": "document describes state; it does not authorize anything",
+        "binding_basis": {
+          "kind": "path_identity",
+          "value": "docs/CURRENT_STATE.md"
+        },
+        "claim_scope": "the capability snapshot describes the current public package",
+        "effect_observed": true,
+        "evidence_refs": [
+          "docs/CURRENT_STATE.md"
+        ],
+        "freshness_basis": {
+          "reference_point": "4.20.2",
+          "relation": "before"
+        },
+        "observed_at": "2026-09-13",
+        "subject_ref": "the runtime capability table in docs/CURRENT_STATE.md"
+      },
+      "id": "SW-01",
+      "notes": [
+        "evidence predates its own reference point"
+      ],
+      "secondary": [],
+      "state": "BLOCKED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 1
+      },
+      "fields": {
+        "authority_boundary": "measurement describes a runtime; it is not an approval",
+        "binding_basis": {
+          "kind": "digest_match",
+          "value": "cd6052a1c97203f6382a52b262a836cff561e2d6"
+        },
+        "claim_scope": "the recorded measurement describes this checkout's runtime",
+        "effect_observed": true,
+        "evidence_refs": [
+          "tests/fixtures/acceptance-join-live-mismatch.json"
+        ],
+        "freshness_basis": {
+          "reference_point": "this checkout's runtime",
+          "relation": "unknown"
+        },
+        "observed_at": "2026-09-20T13:31:13.439905+00:00",
+        "subject_ref": "the running HyoDo process described by the acceptance join"
+      },
+      "id": "SW-02",
+      "notes": [
+        "freshness_basis relation is unknown"
+      ],
+      "secondary": [],
+      "state": "AMBIGUOUS"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 1
+      },
+      "display_unit": {
+        "Evidence": [
+          "docs/research/M1_STAGE_OBSERVATION_LIVE_READBACK_2026-09-11.md"
+        ],
+        "Limitations": "bounded to the stated claim; establishes no general software quality and no authorization",
+        "Observed at": "see fixture evidence",
+        "Scope": "six sidecar rows represent six independent observations",
+        "Support": "SUPPORTED"
+      },
+      "fields": {
+        "authority_boundary": "observation records a stage; it grants nothing",
+        "binding_basis": {
+          "kind": "id_match",
+          "value": "observation_id"
+        },
+        "claim_scope": "six sidecar rows represent six independent observations",
+        "effect_observed": true,
+        "evidence_refs": [
+          "docs/research/M1_STAGE_OBSERVATION_LIVE_READBACK_2026-09-11.md"
+        ],
+        "freshness_basis": {
+          "reference_point": "the first collection pass",
+          "relation": "at_or_after"
+        },
+        "observed_at": null,
+        "subject_ref": "the stage observation sidecar after a second collection pass"
+      },
+      "id": "SW-03",
+      "notes": [],
+      "secondary": [],
+      "state": "SUPPORTED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 1
+      },
+      "fields": {
+        "authority_boundary": "a terminal result would be evidence, never authorization",
+        "binding_basis": {
+          "kind": "id_match",
+          "value": "run_id + event_id"
+        },
+        "claim_scope": "those calls completed successfully",
+        "effect_observed": false,
+        "evidence_refs": [
+          "docs/research/EVIDENCE_RECONCILIATION_2026-09-20.md"
+        ],
+        "freshness_basis": {
+          "reference_point": "the recorded call",
+          "relation": "at_or_after"
+        },
+        "observed_at": null,
+        "subject_ref": "the 316 tool calls with no recorded terminal result"
+      },
+      "id": "SW-04",
+      "notes": [
+        "effect_observed is not true"
+      ],
+      "secondary": [],
+      "state": "UNOBSERVED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 3
+      },
+      "fields": {
+        "authority_boundary": "Strong review signal only. Still run tests/security checks; human approval required.",
+        "binding_basis": {
+          "kind": "none",
+          "value": null
+        },
+        "claim_scope": "a 90+ score authorizes merge",
+        "effect_observed": true,
+        "evidence_refs": [
+          "scripts/verify-public.sh"
+        ],
+        "freshness_basis": {
+          "reference_point": "the reviewed change",
+          "relation": "unknown"
+        },
+        "observed_at": null,
+        "subject_ref": "a HyoDo score of 90.0%"
+      },
+      "id": "SW-05",
+      "notes": [
+        "binding_basis does not bind the evidence to the subject",
+        "freshness_basis relation is unknown"
+      ],
+      "secondary": [],
+      "state": "AMBIGUOUS"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 2
+      },
+      "fields": {
+        "authority_boundary": "caller claim is quarantined; the measured decision is null",
+        "binding_basis": {
+          "kind": "none",
+          "value": null
+        },
+        "claim_scope": "a caller-asserted ASK is an authoritative policy decision",
+        "effect_observed": true,
+        "evidence_refs": [
+          "tests/test_policy_self_report_boundary.py"
+        ],
+        "freshness_basis": {
+          "reference_point": "the tool call",
+          "relation": "at_or_after"
+        },
+        "observed_at": null,
+        "subject_ref": "a tool call whose caller asserted policy decision ASK"
+      },
+      "id": "SW-06",
+      "notes": [
+        "binding_basis does not bind the evidence to the subject"
+      ],
+      "secondary": [],
+      "state": "AMBIGUOUS"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 2
+      },
+      "fields": {
+        "authority_boundary": "graph structure is evidence, not a decision",
+        "binding_basis": {
+          "kind": "id_match",
+          "value": "does-not-exist"
+        },
+        "claim_scope": "node A's provenance chain is complete",
+        "effect_observed": true,
+        "evidence_refs": [
+          "tests/fixtures/graph-v2-join/unresolved-parent.json"
+        ],
+        "freshness_basis": {
+          "reference_point": "the parent node",
+          "relation": "unknown"
+        },
+        "observed_at": null,
+        "subject_ref": "node A and its declared parent"
+      },
+      "id": "SW-07",
+      "notes": [
+        "freshness_basis relation is unknown"
+      ],
+      "secondary": [],
+      "state": "AMBIGUOUS"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 1
+      },
+      "display_unit": {
+        "Evidence": [
+          "tests/fixtures/dashboard-truth-cases.json"
+        ],
+        "Limitations": "bounded to the stated claim; establishes no general software quality and no authorization",
+        "Observed at": "see fixture evidence",
+        "Scope": "the decision for this case is ALLOW",
+        "Support": "SUPPORTED"
+      },
+      "fields": {
+        "authority_boundary": "a dashboard renders evidence; it does not decide",
+        "binding_basis": {
+          "kind": "id_match",
+          "value": "withheld_allow"
+        },
+        "claim_scope": "the decision for this case is ALLOW",
+        "effect_observed": true,
+        "evidence_refs": [
+          "tests/fixtures/dashboard-truth-cases.json"
+        ],
+        "freshness_basis": {
+          "reference_point": "the recorded decision",
+          "relation": "at_or_after"
+        },
+        "observed_at": null,
+        "subject_ref": "the withheld_allow dashboard case"
+      },
+      "id": "SW-08",
+      "notes": [],
+      "secondary": [],
+      "state": "SUPPORTED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 2,
+        "unresolved_required_fields": 1
+      },
+      "fields": {
+        "authority_boundary": "ASK explicitly defers to an operator decision",
+        "binding_basis": {
+          "kind": "id_match",
+          "value": "queue item csv-export"
+        },
+        "claim_scope": "the item may proceed without a separate operator decision",
+        "effect_observed": false,
+        "evidence_refs": [
+          "tests/test_cli_policy_check.py",
+          "examples/factory-loop/factory-loop.sh"
+        ],
+        "freshness_basis": {
+          "reference_point": "the policy ASK",
+          "relation": "at_or_after"
+        },
+        "observed_at": null,
+        "subject_ref": "a queue item whose policy check returned ASK"
+      },
+      "id": "SW-09",
+      "notes": [
+        "effect_observed is not true"
+      ],
+      "secondary": [],
+      "state": "UNOBSERVED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 1
+      },
+      "display_unit": {
+        "Evidence": [
+          "examples/factory-loop/factory-loop.sh"
+        ],
+        "Limitations": "bounded to the stated claim; establishes no general software quality and no authorization",
+        "Observed at": "see fixture evidence",
+        "Scope": "every configured surface was observed for this item",
+        "Support": "SUPPORTED"
+      },
+      "fields": {
+        "authority_boundary": "reaching PR stage is not merge; a person merges",
+        "binding_basis": {
+          "kind": "id_match",
+          "value": "queue item csv-export"
+        },
+        "claim_scope": "every configured surface was observed for this item",
+        "effect_observed": true,
+        "evidence_refs": [
+          "examples/factory-loop/factory-loop.sh"
+        ],
+        "freshness_basis": {
+          "reference_point": "this dry run",
+          "relation": "at_or_after"
+        },
+        "observed_at": null,
+        "subject_ref": "the csv-export queue item in a dry run"
+      },
+      "id": "SW-10",
+      "notes": [],
+      "secondary": [],
+      "state": "SUPPORTED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 1
+      },
+      "display_unit": {
+        "Evidence": [
+          "scripts/verify-public.sh"
+        ],
+        "Limitations": "bounded to the stated claim; establishes no general software quality and no authorization",
+        "Observed at": "see fixture evidence",
+        "Scope": "the gates that ran passed",
+        "Support": "SUPPORTED"
+      },
+      "fields": {
+        "authority_boundary": "Gates support review readiness. Human approval still required.",
+        "binding_basis": {
+          "kind": "path_identity",
+          "value": "this checkout"
+        },
+        "claim_scope": "the gates that ran passed",
+        "effect_observed": true,
+        "evidence_refs": [
+          "scripts/verify-public.sh"
+        ],
+        "freshness_basis": {
+          "reference_point": "this checkout",
+          "relation": "at_or_after"
+        },
+        "observed_at": null,
+        "subject_ref": "this HyoDo checkout under hyodo check"
+      },
+      "id": "SW-11",
+      "notes": [],
+      "secondary": [],
+      "state": "SUPPORTED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 3
+      },
+      "fields": {
+        "authority_boundary": "running a command grants nothing",
+        "binding_basis": {
+          "kind": "none",
+          "value": null
+        },
+        "claim_scope": "the project was validated because the check ran",
+        "effect_observed": false,
+        "evidence_refs": [
+          "scripts/verify-public.sh"
+        ],
+        "freshness_basis": {
+          "reference_point": "the target tree",
+          "relation": "unknown"
+        },
+        "observed_at": null,
+        "subject_ref": "an empty directory under hyodo check"
+      },
+      "id": "SW-12",
+      "notes": [
+        "effect_observed is not true",
+        "binding_basis does not bind the evidence to the subject",
+        "freshness_basis relation is unknown"
+      ],
+      "secondary": [
+        "AMBIGUOUS"
+      ],
+      "state": "UNOBSERVED"
+    }
+  ],
+  "schema": "hyodo.portability-v0-arm/v1"
+}

@@ -1,7 +1,12 @@
 # Portability Research v0 — Source Inventory
 
-Status: **initial inventory / no fixture results yet**  
+Status: **Software slice executed and closed; Portability overall
+`PARTIAL / WAITING_FOR_INDEPENDENT_DOMAINS`**  
 Snapshot basis: `origin/main` after HyoDo 4.20.2 research-doc reconciliation
+
+The Software run is sealed in
+[`PORTABILITY_SOFTWARE_V0_RECEIPT.md`](./PORTABILITY_SOFTWARE_V0_RECEIPT.md).
+The `UNOBSERVED` states for Professional and Creative below are unchanged by it.
 
 This inventory records what source material is actually available for the
 three-domain falsification pilot. It does not treat filenames, profile labels,

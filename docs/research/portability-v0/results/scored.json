@@ -1,0 +1,180 @@
+{
+  "arms": {
+    "baseline": {
+      "ambiguity": 1,
+      "counter_totals": {
+        "adapter_exception_cost": 12,
+        "instrumentation_steps": 4,
+        "required_context_boundaries": 13,
+        "required_cross_checks": 8,
+        "required_source_lookups": 13,
+        "unresolved_required_fields": 0
+      },
+      "false_block": 0,
+      "false_green": 0,
+      "rows": [
+        {
+          "arm": "BLOCKED",
+          "id": "SW-01",
+          "oracle": "BLOCKED",
+          "verdict": "match"
+        },
+        {
+          "arm": "BLOCKED",
+          "id": "SW-02",
+          "oracle": "BLOCKED",
+          "verdict": "match"
+        },
+        {
+          "arm": "BLOCKED",
+          "id": "SW-03",
+          "oracle": "BLOCKED",
+          "verdict": "match"
+        },
+        {
+          "arm": "UNOBSERVED",
+          "id": "SW-04",
+          "oracle": "UNOBSERVED",
+          "verdict": "match"
+        },
+        {
+          "arm": "BLOCKED",
+          "id": "SW-05",
+          "oracle": "BLOCKED",
+          "verdict": "match"
+        },
+        {
+          "arm": "AMBIGUOUS",
+          "id": "SW-06",
+          "oracle": "AMBIGUOUS",
+          "verdict": "match"
+        },
+        {
+          "arm": "BLOCKED",
+          "id": "SW-07",
+          "oracle": "BLOCKED",
+          "verdict": "match"
+        },
+        {
+          "arm": "BLOCKED",
+          "id": "SW-08",
+          "oracle": "BLOCKED",
+          "verdict": "match"
+        },
+        {
+          "arm": "AMBIGUOUS",
+          "id": "SW-09",
+          "oracle": "UNOBSERVED",
+          "verdict": "mismatch"
+        },
+        {
+          "arm": "SUPPORTED",
+          "id": "SW-10",
+          "oracle": "SUPPORTED",
+          "verdict": "match"
+        },
+        {
+          "arm": "SUPPORTED",
+          "id": "SW-11",
+          "oracle": "SUPPORTED",
+          "verdict": "match"
+        },
+        {
+          "arm": "UNOBSERVED",
+          "id": "SW-12",
+          "oracle": "UNOBSERVED",
+          "verdict": "match"
+        }
+      ]
+    },
+    "candidate": {
+      "ambiguity": 3,
+      "counter_totals": {
+        "adapter_exception_cost": 0,
+        "instrumentation_steps": 12,
+        "required_context_boundaries": 12,
+        "required_cross_checks": 12,
+        "required_source_lookups": 13,
+        "unresolved_required_fields": 17
+      },
+      "false_block": 0,
+      "false_green": 2,
+      "rows": [
+        {
+          "arm": "BLOCKED",
+          "id": "SW-01",
+          "oracle": "BLOCKED",
+          "verdict": "match"
+        },
+        {
+          "arm": "AMBIGUOUS",
+          "id": "SW-02",
+          "oracle": "BLOCKED",
+          "verdict": "mismatch"
+        },
+        {
+          "arm": "SUPPORTED",
+          "id": "SW-03",
+          "oracle": "BLOCKED",
+          "verdict": "false_green"
+        },
+        {
+          "arm": "UNOBSERVED",
+          "id": "SW-04",
+          "oracle": "UNOBSERVED",
+          "verdict": "match"
+        },
+        {
+          "arm": "AMBIGUOUS",
+          "id": "SW-05",
+          "oracle": "BLOCKED",
+          "verdict": "mismatch"
+        },
+        {
+          "arm": "AMBIGUOUS",
+          "id": "SW-06",
+          "oracle": "AMBIGUOUS",
+          "verdict": "match"
+        },
+        {
+          "arm": "AMBIGUOUS",
+          "id": "SW-07",
+          "oracle": "BLOCKED",
+          "verdict": "mismatch"
+        },
+        {
+          "arm": "SUPPORTED",
+          "id": "SW-08",
+          "oracle": "BLOCKED",
+          "verdict": "false_green"
+        },
+        {
+          "arm": "UNOBSERVED",
+          "id": "SW-09",
+          "oracle": "UNOBSERVED",
+          "verdict": "match"
+        },
+        {
+          "arm": "SUPPORTED",
+          "id": "SW-10",
+          "oracle": "SUPPORTED",
+          "verdict": "match"
+        },
+        {
+          "arm": "SUPPORTED",
+          "id": "SW-11",
+          "oracle": "SUPPORTED",
+          "verdict": "match"
+        },
+        {
+          "arm": "UNOBSERVED",
+          "id": "SW-12",
+          "oracle": "UNOBSERVED",
+          "verdict": "match"
+        }
+      ]
+    }
+  },
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "schema": "hyodo.portability-v0-score/v1"
+}

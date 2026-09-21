@@ -1,0 +1,28 @@
+{
+  "bounded_claim": "node A's provenance chain is complete",
+  "evidence": {
+    "acyclic": true,
+    "edges": [
+      {
+        "child": "A",
+        "parent": "does-not-exist"
+      }
+    ],
+    "fixture": "unresolved-parent",
+    "nodes": [
+      "A"
+    ],
+    "unresolved_refs": [
+      "does-not-exist"
+    ]
+  },
+  "family": "incomplete provenance",
+  "id": "SW-07",
+  "sources": [
+    {
+      "path": "tests/fixtures/graph-v2-join/unresolved-parent.json",
+      "sha256": "8d9feb714b5d3fa38d285c87a102f6768af11f11bb39ceab56a8c5230b70943e"
+    }
+  ],
+  "subject": "node A and its declared parent"
+}

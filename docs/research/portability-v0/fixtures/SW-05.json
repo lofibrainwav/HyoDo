@@ -1,0 +1,21 @@
+{
+  "bounded_claim": "a 90+ score authorizes merge",
+  "evidence": {
+    "authorizes_merge": false,
+    "contract_line": "grep -q \"REVIEW_SIGNAL\" \"$VERIFY_DIR/score.out\"",
+    "observed_command": "hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9",
+    "observed_exit_code": 0,
+    "observed_qualifier": "Strong review signal only. Still run tests/security checks; human approval required.",
+    "observed_signal": "REVIEW_SIGNAL_STRONG (90+)",
+    "observed_total": "90.0%"
+  },
+  "family": "unsupported conclusion beyond the evidence scope",
+  "id": "SW-05",
+  "sources": [
+    {
+      "path": "scripts/verify-public.sh",
+      "sha256": "c483d284b15ac8c90f1053323ab95a0306366563eeb7795f6ccdaeba54d7f9e9"
+    }
+  ],
+  "subject": "a HyoDo score of 90.0%"
+}

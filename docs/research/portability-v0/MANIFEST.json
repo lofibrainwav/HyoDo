@@ -1,0 +1,49 @@
+{
+  "advisory_at_freeze": {
+    "check": "Mutation Evidence - Core Full Run (advisory)",
+    "completed_at": "2026-09-21T19:37:34Z",
+    "conclusion": "failure",
+    "failed_step": "Build full-core mutation evidence",
+    "main_check_totals": {
+      "failure": 1,
+      "skipped": 2,
+      "success": 20
+    },
+    "note": "mutation execution completed; evidence export failed. Advisory is not a release blocker and is recorded, not treated as a gate.",
+    "required_failures": 0,
+    "run_id": 35622037855,
+    "started_at": "2026-09-21T15:53:56Z",
+    "status": "completed"
+  },
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "fixture_digests": {
+    "SW-01.json": "5628ce1e9618ea01562b3c8b582da34fa0fd35a678d4871b704b06528a5182cf",
+    "SW-02.json": "867d3489266c60ffe1e3caf6986ed98ab3226201c9705e5690d556313dd25d85",
+    "SW-03.json": "546dc3f41e799d7272e4f42fc04133a8f044721960f0c1787edcc2e07e79bf52",
+    "SW-04.json": "782e4d5da3db8da9a0d23d7603461fb6448b2aebc25a0b5364d60bef3596a792",
+    "SW-05.json": "3b2e58018b684b770e2385023a1b5b20c26c6cb4ff3b7129ba0ae47a58c0844a",
+    "SW-06.json": "746676cc350566d39f034f15eb7eda173e0e428600afdabda0f0251621dda24a",
+    "SW-07.json": "7eb4b73d303c42a902e76a397b4e47249882167f1df44d8c12bfed341bafde55",
+    "SW-08.json": "b82d8e9560174d6fe4187b6197691e4a4ed12b9b9d76b9c40684b312af23300e",
+    "SW-09.json": "83bae88bb2806e43ea98d31a0af623e29ff2b2b0e5695eee02f70db405d61b95",
+    "SW-10.json": "9a65d1cedef821eb86244e40b2a94d2376060debdae139464237bbca6b428109",
+    "SW-11.json": "08ac50d52fb9f59f67ddcbab384e744178719d4ec48b226355fd108c825e7ae9",
+    "SW-12.json": "52ba667e3e4dae807a94eedf404d1d18c62fb5068cfcfd543364eb8599851dbe"
+  },
+  "limitations": [
+    "CLI-derived fixtures (SW-05, SW-10, SW-11, SW-12) freeze the observed command output; --verify checks the frozen fixture digest and does not re-execute the CLI, whose output embeds absolute paths."
+  ],
+  "schema": "hyodo.portability-v0-manifest/v1",
+  "source_digests": {
+    "docs/CURRENT_STATE.md": "d7b681c1ee0a7aa3649f6b775f87b788823e4b6ea7c24c72b8640bb4704ad876",
+    "docs/research/EVIDENCE_RECONCILIATION_2026-09-20.md": "863ffab3a8c757ef23e639f501b20f478d31669a6a8528f3a58135190db6f23c",
+    "docs/research/M1_STAGE_OBSERVATION_LIVE_READBACK_2026-09-11.md": "5ef1382d12493a14a79fdc5a1fe46b4b7b3533b4ba278819b924ce14657fa469",
+    "examples/factory-loop/factory-loop.sh": "ce1bfc297ef21d5fc79ed0499a459801229f84a7f28ebded3f39b1ff691f687a",
+    "scripts/verify-public.sh": "c483d284b15ac8c90f1053323ab95a0306366563eeb7795f6ccdaeba54d7f9e9",
+    "tests/fixtures/acceptance-join-live-mismatch.json": "9d55d858f451b7bb7c774204108bf340a407f0826575297d5b276a3680019796",
+    "tests/fixtures/dashboard-truth-cases.json": "a386ed8ec604e9b65c33e895fe44b2474ec8a9f265c55272fd7fc265fc71e069",
+    "tests/fixtures/graph-v2-join/unresolved-parent.json": "8d9feb714b5d3fa38d285c87a102f6768af11f11bb39ceab56a8c5230b70943e",
+    "tests/test_cli_policy_check.py": "884eb854e72abd09d296673d033e12188c7486b97e13179f8a065b4fb0e464a9",
+    "tests/test_policy_self_report_boundary.py": "07a90a6ff10175da698521771c92ca7ade3e17caa3fa209b0bda88bac2403021"
+  }
+}

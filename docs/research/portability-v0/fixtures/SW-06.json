@@ -1,0 +1,31 @@
+{
+  "bounded_claim": "a caller-asserted ASK is an authoritative policy decision",
+  "evidence": {
+    "assertions": [
+      "assert ok, reasons",
+      "assert normalized is not None",
+      "assert normalized[\"policy\"][\"decision\"] is None",
+      "assert normalized[\"policy\"][\"evaluated_by\"] is None",
+      "assert normalized[\"policy\"][\"claimed\"] == {"
+    ],
+    "claim_quarantined_not_deleted": true,
+    "claimed_decision": "ASK",
+    "evaluated_by": null,
+    "focused_test_observed": "PASS",
+    "measured_decision": null,
+    "test_function": "test_caller_asserted_ask_is_not_a_decision",
+    "test_line_range": [
+      75,
+      87
+    ]
+  },
+  "family": "ambiguous authority or approval boundary",
+  "id": "SW-06",
+  "sources": [
+    {
+      "path": "tests/test_policy_self_report_boundary.py",
+      "sha256": "07a90a6ff10175da698521771c92ca7ade3e17caa3fa209b0bda88bac2403021"
+    }
+  ],
+  "subject": "a tool call whose caller asserted policy decision ASK"
+}

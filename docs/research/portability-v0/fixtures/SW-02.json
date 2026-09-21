@@ -1,0 +1,22 @@
+{
+  "bounded_claim": "the recorded measurement describes this checkout's runtime",
+  "evidence": {
+    "ledger_events": 8990,
+    "ledger_state": "OBSERVED",
+    "measurer_source_commit": "cd6052a1c97203f6382a52b262a836cff561e2d6",
+    "measurer_source_dirty": true,
+    "measurer_tool_version": "4.20.0",
+    "observed_at": "2026-09-20T13:31:13.439905+00:00",
+    "provenance_relation": "SELF_OTHER_CHECKOUT",
+    "provenance_validity": "MISMATCH"
+  },
+  "family": "wrong subject binding",
+  "id": "SW-02",
+  "sources": [
+    {
+      "path": "tests/fixtures/acceptance-join-live-mismatch.json",
+      "sha256": "9d55d858f451b7bb7c774204108bf340a407f0826575297d5b276a3680019796"
+    }
+  ],
+  "subject": "the running HyoDo process described by the acceptance join"
+}

@@ -1,0 +1,85 @@
+{
+  "schema": "hyodo.portability-v0-candidate/v1",
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "frozen_before_arms": true,
+  "purpose": "A pre-registered minimal projection, tested against a no-envelope baseline. Registering it before any result exists is what prevents fitting the primitive to whichever arm wins.",
+  "fields": [
+    {
+      "name": "subject_ref",
+      "protocol_question": 1,
+      "question": "Can we identify the subject?"
+    },
+    {
+      "name": "claim_scope",
+      "protocol_question": 2,
+      "question": "What exact claim is being supported?"
+    },
+    {
+      "name": "evidence_refs",
+      "protocol_question": 3,
+      "question": "What evidence supports only that claim?"
+    },
+    {
+      "name": "binding_basis",
+      "protocol_question": 4,
+      "question": "What binds evidence to this subject?",
+      "shape": "{kind: digest_match | id_match | path_identity | none, value: <matched value>}",
+      "note": "Given its own carrier because SW-02 attacks binding directly. A five-field version omitted this question entirely."
+    },
+    {
+      "name": "observed_at",
+      "protocol_question": 5,
+      "question": "How fresh is it? (timestamp component)"
+    },
+    {
+      "name": "freshness_basis",
+      "protocol_question": 5,
+      "question": "How fresh is it? (relation component)",
+      "shape": "{reference_point: <what it must be fresh against>, relation: at_or_after | before | unknown}",
+      "note": "Freshness is a relation, not a timestamp. A bare observed_at cannot decide staleness, and SW-01 attacks freshness directly."
+    },
+    {
+      "name": "effect_observed",
+      "protocol_question": 6,
+      "question": "Was the claimed effect observed?"
+    },
+    {
+      "name": "authority_boundary",
+      "protocol_question": 7,
+      "question": "Where does authority stop?",
+      "descriptive_only": true,
+      "note": "Records a boundary; never grants, withholds, or decides one. The host decides authorization separately and nothing downstream may read this field as permission."
+    }
+  ],
+  "excluded": {
+    "protocol_question_8": "What human burden remained? - measured in the structural proxies, not carried in the record."
+  },
+  "instrumentation_note": "Eight fields cost more instrumentation than five. That cost is charged honestly to instrumentation_steps and adapter_exception_cost. Field count is not the result; PORTABILITY_RESEARCH_V0.md:141-144 states that a small core with large domain-specific exception code is a failed abstraction.",
+  "counting_rubric": {
+    "required_source_lookups": "DISTINCT artifacts by path+digest. Opening the same file twice counts once.",
+    "required_cross_checks": "DISTINCT unordered fact PAIRS reconciled. A vs B and B vs A count once; three facts pairwise count three.",
+    "required_context_boundaries": "DISTINCT evidence contexts spanned, a context being one (artifact kind, run/session identity) pair.",
+    "unresolved_required_fields": "FIELD SLOTS left unfilled per fixture out of the eight candidate fields. The baseline counts against the same eight so the arms stay comparable.",
+    "instrumentation_steps": "DISTINCT transformation steps needed to make a source machine-readable (parse, extract, decode). Reading a file as-is is zero.",
+    "adapter_exception_cost": "Named domain-specific branches in runner code, one per branch, each recorded with file:line."
+  },
+  "decision_rule": {
+    "id": "software-signal-v0",
+    "frozen_before_arms": true,
+    "outcome_if_all_hold": "SOFTWARE_SIGNAL_FOUND",
+    "outcome_otherwise": "NO_SOFTWARE_SIGNAL_EARNED",
+    "conditions": [
+      "candidate false_green <= baseline false_green",
+      "candidate false_block <= baseline false_block",
+      "candidate ambiguity <= baseline ambiguity",
+      "at least one observed burden metric strictly improves",
+      "no observed burden metric worsens",
+      "adapter_exception_cost does not increase",
+      "HARD FLOOR: candidate false_green == 0"
+    ]
+  },
+  "core_promotion": {
+    "state": "NOT_ELIGIBLE",
+    "reason": "Survival rule #1 requires the primitive to be independently needed in all three domains. Professional and Creative are UNOBSERVED, so this is structural and was decided before the run. It is separate from the Software arm outcome, which is decided only by measurement."
+  }
+}

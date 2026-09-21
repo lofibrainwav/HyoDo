@@ -1,0 +1,23 @@
+{
+  "bounded_claim": "every configured surface was observed for this item",
+  "evidence": {
+    "contract_file": "examples/factory-loop/factory-loop.sh",
+    "merge_left_to_a_person": true,
+    "observed_closing_line": "done      : csv-export reached PR stage; queue item stays [ ] until a person merges",
+    "observed_command": "bash factory-loop.sh --dry-run",
+    "observed_exit_code": 0,
+    "observed_gate_line": "HYODO ALLOW - 3/3 surfaces observed, trust=1, policy checks allow",
+    "observed_policy_line": "policy    : ALLOW (fence readable)",
+    "surfaces_observed": 3,
+    "surfaces_total": 3
+  },
+  "family": "valid bounded support",
+  "id": "SW-10",
+  "sources": [
+    {
+      "path": "examples/factory-loop/factory-loop.sh",
+      "sha256": "ce1bfc297ef21d5fc79ed0499a459801229f84a7f28ebded3f39b1ff691f687a"
+    }
+  ],
+  "subject": "the csv-export queue item in a dry run"
+}

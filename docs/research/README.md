@@ -33,6 +33,15 @@ Start the first evidence gate with the
 It records observed Software material and preserves `UNOBSERVED` for
 Professional and Creative until independent source packages exist.
 
+The Software slice was then executed and sealed. The
+[`PORTABILITY_SOFTWARE_V0_RECEIPT.md`](./PORTABILITY_SOFTWARE_V0_RECEIPT.md)
+records the frozen 12-fixture run: `NO_SOFTWARE_SIGNAL_EARNED` on the
+pre-registered candidate, with the independent judge's
+[`PORTABILITY_JUDGE_RECEIPT_V0.md`](./PORTABILITY_JUDGE_RECEIPT_V0.md) verdict
+`SOFTWARE_V0_PARTIAL` and two open findings preserved. Portability overall is
+`PARTIAL / WAITING_FOR_INDEPENDENT_DOMAINS`, and Core promotion stays
+`NOT_ELIGIBLE`.
+
 ## 0. Top-level technical roadmap — what belongs where and when
 
 [`HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md`](./HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md)

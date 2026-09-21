@@ -1,0 +1,20 @@
+{
+  "bounded_claim": "the capability snapshot describes the current public package",
+  "evidence": {
+    "current_package": "4.20.2",
+    "document_states_latest_package": "- Latest public package: HyoDo `4.20.2`",
+    "snapshot_dated": "2026-09-13",
+    "snapshot_heading": "## Runtime capability snapshot (2026-09-13 PT)",
+    "snapshot_package_column": "4.19.5",
+    "snapshot_table_header": "| Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |"
+  },
+  "family": "stale evidence",
+  "id": "SW-01",
+  "sources": [
+    {
+      "path": "docs/CURRENT_STATE.md",
+      "sha256": "d7b681c1ee0a7aa3649f6b775f87b788823e4b6ea7c24c72b8640bb4704ad876"
+    }
+  ],
+  "subject": "the runtime capability table in docs/CURRENT_STATE.md"
+}
