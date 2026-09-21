@@ -12,9 +12,11 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.20.0 is the current release target and source-tree release baseline.
-Its publication and installed-artifact readback are verified in
-`docs/releases/4.20.0.md`. This does not establish every host integration.
+HyoDo 4.20.1 is the current release target and source-tree release baseline.
+Its publication and installed-artifact readback are not measured yet; the
+candidate receipt is in `docs/releases/4.20.1.md`. The published baseline
+remains 4.20.0 until an authorized release chain is completed. This does not
+establish every host integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
@@ -47,6 +49,15 @@ evidence is not converted into a pass.
 - Show bounded, host-supplied intent comparisons with evidence references.
 - Keep temporal storage expansion and automatic intent extraction unimplemented.
 - Verify publication and installation separately from source and site delivery.
+
+### 4.20.1 (candidate prepared 2026-09-20)
+
+- Preserve host-supplied Codex model and tool-result observations without
+  inferring terminal outcomes or authority.
+- Keep evidence-graph, verification-view, public-boundary, and release claims
+  aligned with measured source and host evidence.
+- Publication, provenance, and installed-artifact evidence remain `UNOBSERVED`
+  until an authorized release chain is run.
 
 ### External adoption
 

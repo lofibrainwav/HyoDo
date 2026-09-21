@@ -5,6 +5,43 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.1] - 2026-09-20
+
+Evidence-preserving follow-up after the 4.20.0 publication. This candidate
+contains the post-release Codex adapter, evidence-graph, public-surface, and
+release-truth reconciliations from `main`; publication evidence is intentionally
+not claimed until a separately authorized release chain is measured.
+
+### Added
+
+- Codex host events preserve the host-named model field when it is a valid
+  string, and link a `tool_result` to its corresponding `tool_call` when the
+  host supplies a shared tool-use identifier.
+- Verification and evidence-graph views preserve participant identity,
+  explicit endpoints, timestamp ordering, and intent-review provenance.
+
+### Changed
+
+- Public documentation and site surfaces now state the current HyoDo boundary,
+  release version, privacy scope, and evidence limitations consistently.
+- Secret-scan workflow scope and development dependency metadata are aligned
+  with the current repository contracts.
+
+### Fixed
+
+- Codex adapters read the installed host's `tool_response` field instead of
+  assuming `output` or `result_json`, so observed result digests are retained
+  when the host actually sends them.
+- Terminal outcome remains `UNOBSERVED` when the producer exposes no structured
+  terminal mode; result text is not promoted into success, failure, or
+  authorization evidence.
+
+### Evidence
+
+- Candidate verification is local-only. GitHub Release, PyPI publication,
+  provenance, tag, and install receipt remain `UNOBSERVED` until authorized
+  publication and readback.
+
 ## [4.20.0] - 2026-09-19
 
 ### Added
