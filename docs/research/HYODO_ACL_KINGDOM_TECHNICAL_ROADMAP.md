@@ -4,6 +4,12 @@ Status: working roadmap
 Date: 2026-09-08
 Last measured update: 2026-09-10 PT (Phase-0 readback against the public 4.19.2 line)
 
+Freshness: **historical measured roadmap snapshot**. References to `current`,
+`now`, `remaining`, or priority in this file describe the 2026-09-10
+research state unless a later dated note explicitly says otherwise. Current
+product/release truth is owned by `docs/CURRENT_STATE.md`; the current
+post-4.20.2 research gate is indexed in `docs/research/README.md`.
+
 Purpose: preserve the agreed system boundaries, sequencing, and promotion gates so new research ideas do not silently turn HyoDo into a monolithic orchestrator or move unmeasured hypotheses into production.
 
 This roadmap is intentionally conservative. It records **where a capability belongs**, **what must be measured first**, **what may proceed in parallel**, and **what must remain serial**.
@@ -39,13 +45,13 @@ wisdom/population evidence -> recommendation               allowed
 wisdom/population evidence -> policy/Evidence Gate bypass  forbidden
 ```
 
-## 2. Current gate: complete Evidence Pack v1 before expansion
+## 2. Historical Phase-0 gate: complete Evidence Pack v1 before expansion
 
 The immediate objective is not IFC enforcement, autonomous skill evolution, RL training, dynamic topology deployment, or zero-knowledge circuits.
 
 The immediate objective is **Evidence Pack v1**: a small but attributable set of real KINGDOM executions that proves what HyoDo can and cannot observe across materially different outcomes.
 
-Measured progress is now:
+Measured progress at the 2026-09-10 snapshot was:
 
 ```text
 research-source snapshot boundary defined
@@ -197,7 +203,12 @@ This is the first measured evidence that HyoDo can classify a real KINGDOM failu
 
 Run #2b also exposed the remaining attribution problem: unrelated processes shared the same `kingdom:events` stream, so the measurement contained both new-code target runs and unrelated old-code runs. Schema differences made them distinguishable after the fact, but that is not a durable attribution contract.
 
-### Remaining Phase-0 work
+### Historical Phase-0 work list
+
+This list records what was still open while the phase was being measured. It is
+superseded for current-state purposes by
+[`PHASE_0_CLOSEOUT_2026-09-10.md`](./PHASE_0_CLOSEOUT_2026-09-10.md), which
+closed Phase 0 with named residuals rather than reconstructing missing history.
 
 1. **Target-run attribution isolation**
    - filter the observation bridge by an explicit target KINGDOM run before privacy mapping;
@@ -498,7 +509,7 @@ Every new technical layer must answer four questions before production promotion
 
 If one answer is missing, the capability remains research/shadow/adaptor status.
 
-## 11. Current priority order
+## 11. Historical priority order — 2026-09-10 snapshot
 
 ```text
 OBSERVED / SEALED
@@ -517,14 +528,14 @@ Codex live host callback reaching the ledger
 target-run isolation capability (KINGDOM #779)
 sensor coverage matrix, read from producer code
 
-SERIAL P0 — REMAINING
+SERIAL P0 — REMAINING AT THIS SNAPSHOT
 Run #2 / #2b standalone receipts            MISSING
         ↓
 Run #3 use of the #779 target-run filter    UNOBSERVED
         ↓
 Phase 0 COMPLETE                            authority decision
 
-PARALLEL P1 — NOW
+PARALLEL P1 — NEXT AT THIS SNAPSHOT
 live host canary: an installed Cursor/Codex process reaching the ledger
 (the 4.19.2 canary fed a synthetic payload to the CLI; no host was observed)
 

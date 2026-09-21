@@ -1,6 +1,6 @@
 # Information Flow Attestation v0
 
-Status: **observer-side contract + fixture implementation**.
+Status: **SHIPPED observer-side contract + implementation**.
 
 HyoDo IFA records observed information lineage. It does not authorize, block,
 or schedule execution.
@@ -69,6 +69,7 @@ turn that observation into a DENY.
 
 ## Promotion boundary
 
-This v0 contract may merge independently of Graph v2 because it does not mutate
-`hyodo.agent-event/v1` or the production evidence graph. Production graph
-integration waits for the Graph v2 contract freeze and its causal identities.
+This v0 contract originally merged independently of Graph v2 because it does
+not mutate `hyodo.agent-event/v1` or grant authority. The Graph v2 prerequisite
+and shipped integration have since landed; that does not imply that every host
+emits IFA observations. Fresh host/runtime wiring remains separate evidence.

@@ -1,5 +1,16 @@
 # Sensor coverage matrix
 
+Status: **HISTORICAL PRODUCER SNAPSHOT — measured 2026-09-10**.
+
+This matrix preserves the producer/bridge coverage that was read during Phase 0.
+Its exact KINGDOM source SHA was not recorded in this file, so these rows must
+not be promoted to current producer truth. Stage-observation capability was
+subsequently measured on 2026-09-11 in
+[`M1 receipt`](./M1_STAGE_OBSERVATION_LIVE_READBACK_2026-09-11.md)
+against exact HyoDo/KINGDOM mains. That receipt supersedes this matrix for the
+question “can HyoDo observe a producer-declared stage execution mode?” while
+this file remains the Phase-0 canonical-event coverage snapshot.
+
 Phase 0 asks for a per-signal matrix that marks each desired signal
 `OBSERVED`, `PARTIAL` or `UNOBSERVED`, and that keeps a **missing producer
 vocabulary** apart from a **deliberately excluded channel**. That distinction

@@ -2,6 +2,9 @@
 
 Status: working research execution contract
 Date: 2026-09-08
+Freshness: the operating invariants remain reusable, but §18 is a historical
+2026-09-08 operational snapshot, not current work authorization. Current
+post-4.20.2 research action is indexed in `docs/research/README.md`.
 
 Purpose: define what may be parallelized, what must remain serial, and where evidence barriers are required while auditing the KINGDOM 86 Strategy Canon and testing the Wisdom Reflex hypothesis.
 
@@ -386,9 +389,9 @@ the experimental object must be frozen for reproducibility
 results from parallel lanes must be reconciled
 ```
 
-## 18. Operational application to the current project
+## 18. Historical operational application — 2026-09-08 snapshot
 
-Run these lanes together now:
+At that snapshot, the planned parallel lanes were:
 
 ```text
 PARALLEL LANE A — 86/86 source audit

@@ -65,7 +65,9 @@ understands professional correctness, creative quality, or software quality.
 ## Oracle and outcomes
 
 The oracle records the expected bounded result independently of the candidate
-representation. Every fixture receives one of:
+representation. These are local `PortabilityOracleState` labels only:
+`BLOCKED` here is not a KINGDOM/HyoDo action gate and must not be promoted
+outside the research receipt. Every fixture receives one of:
 
 ```text
 SUPPORTED       evidence supports only the stated bounded claim
@@ -85,7 +87,7 @@ The primary error measures are:
 - **adapter exception cost**: domain-specific branches, translations, and
   special cases required to use a candidate primitive.
 
-`EVIDENCE_SUPPORTED` must never appear alone in a result summary. The minimum
+`SUPPORTED` must never appear alone in a result summary. The minimum
 display unit is:
 
 ```text
