@@ -28,6 +28,11 @@ Research Envelope as a question list rather than a required schema and tests
 It measures false-green, false-block, ambiguity, verification burden, and
 adapter exception cost before allowing any Core Candidate proposal.
 
+Start the first evidence gate with the
+[`PORTABILITY_SOURCE_INVENTORY_V0.md`](./PORTABILITY_SOURCE_INVENTORY_V0.md).
+It records observed Software material and preserves `UNOBSERVED` for
+Professional and Creative until independent source packages exist.
+
 ## 0. Top-level technical roadmap — what belongs where and when
 
 [`HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md`](./HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md)
