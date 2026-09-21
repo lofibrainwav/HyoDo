@@ -31,8 +31,8 @@ Evidence-correctness patch for the post-4.20.1 source line. The immutable
 - Canonical reconciliation reports 8 `MAPPED`, 5,200
   `INSUFFICIENT_MEASUREMENT`, 4,413 `SEMANTICS_UNOBSERVED`, and 0
   `MAPPING_GAP`.
-- Publication, provenance, and installed-artifact evidence for 4.20.2 remain
-  `UNOBSERVED` until the authorized release chain is completed and read back.
+- Signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+  recorded in `docs/releases/4.20.2.md`.
 
 ## [4.20.1] - 2026-09-20
 
