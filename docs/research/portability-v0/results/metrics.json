@@ -1,0 +1,63 @@
+{
+  "core_promotion": "NOT_ELIGIBLE - survival rule #1 cannot hold while Professional and Creative are UNOBSERVED",
+  "decision_rule_conditions": {
+    "ambiguity_not_worse": false,
+    "at_least_one_burden_improves": true,
+    "exception_cost_not_increased": true,
+    "false_block_not_worse": true,
+    "false_green_not_worse": false,
+    "hard_floor_candidate_false_green_zero": false,
+    "no_burden_worsens": false
+  },
+  "decision_rule_id": "software-signal-v0",
+  "error_measures": {
+    "baseline": {
+      "ambiguity": 1,
+      "false_block": 0,
+      "false_green": 0
+    },
+    "candidate": {
+      "ambiguity": 3,
+      "false_block": 0,
+      "false_green": 2
+    },
+    "delta": {
+      "ambiguity": 2,
+      "false_block": 0,
+      "false_green": 2
+    }
+  },
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "schema": "hyodo.portability-v0-metrics/v1",
+  "software_arm_outcome": "NO_SOFTWARE_SIGNAL_EARNED",
+  "structural_verification_proxies": {
+    "baseline": {
+      "adapter_exception_cost": 12,
+      "instrumentation_steps": 4,
+      "required_context_boundaries": 13,
+      "required_cross_checks": 8,
+      "required_source_lookups": 13,
+      "unresolved_required_fields": 0
+    },
+    "candidate": {
+      "adapter_exception_cost": 0,
+      "instrumentation_steps": 12,
+      "required_context_boundaries": 12,
+      "required_cross_checks": 12,
+      "required_source_lookups": 13,
+      "unresolved_required_fields": 17
+    },
+    "improved": [
+      "required_context_boundaries"
+    ],
+    "worsened": [
+      "required_cross_checks",
+      "unresolved_required_fields",
+      "instrumentation_steps"
+    ]
+  },
+  "unobserved": {
+    "human_verification_time": "UNOBSERVED - order effects and AI-operator execution are not human study data",
+    "wrong_reliance_events": "UNOBSERVED - reliance is a human behavior; this run has no human subject"
+  }
+}

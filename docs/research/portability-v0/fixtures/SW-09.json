@@ -1,0 +1,29 @@
+{
+  "bounded_claim": "the item may proceed without a separate operator decision",
+  "evidence": {
+    "ask_written_to_ledger": true,
+    "cli_exit_code_for_ask": 3,
+    "focused_tests_observed": "PASS",
+    "loop_halts_on_ask": true,
+    "loop_policy_line": "3) say \"policy    : ASK — the fence wants an operator decision; nobody is here at night\"; exit 3 ;;",
+    "loop_record_line": "3) say \"record    : ASK — operator decision required before this evidence counts\"; exit 3 ;;",
+    "operator_decision_recorded": false,
+    "test_functions": [
+      "test_policy_check_ask_exits_three_and_serializes_measurement",
+      "test_event_record_ask_exits_three_but_records_audit_event"
+    ]
+  },
+  "family": "missing human decision",
+  "id": "SW-09",
+  "sources": [
+    {
+      "path": "tests/test_cli_policy_check.py",
+      "sha256": "884eb854e72abd09d296673d033e12188c7486b97e13179f8a065b4fb0e464a9"
+    },
+    {
+      "path": "examples/factory-loop/factory-loop.sh",
+      "sha256": "ce1bfc297ef21d5fc79ed0499a459801229f84a7f28ebded3f39b1ff691f687a"
+    }
+  ],
+  "subject": "a queue item whose policy check returned ASK"
+}

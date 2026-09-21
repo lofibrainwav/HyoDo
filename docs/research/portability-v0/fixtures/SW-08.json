@@ -1,0 +1,25 @@
+{
+  "bounded_claim": "the decision for this case is ALLOW",
+  "evidence": {
+    "case": "withheld_allow",
+    "presentable": "UNOBSERVED",
+    "rail": {
+      "action": "OBSERVED",
+      "decision": "UNOBSERVED",
+      "evidence": "UNOBSERVED",
+      "intent": "OBSERVED",
+      "result": "OBSERVED"
+    },
+    "recorded": "ALLOW",
+    "recorded_equals_presentable": false
+  },
+  "family": "conflicting evidence",
+  "id": "SW-08",
+  "sources": [
+    {
+      "path": "tests/fixtures/dashboard-truth-cases.json",
+      "sha256": "a386ed8ec604e9b65c33e895fe44b2474ec8a9f265c55272fd7fc265fc71e069"
+    }
+  ],
+  "subject": "the withheld_allow dashboard case"
+}

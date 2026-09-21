@@ -1,0 +1,49 @@
+{
+  "schema": "hyodo.portability-v0-burden/v1",
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "naming_rule": "Every counter is named for the structure of the verification task, never for what a person did. No counter in this file or in the receipt is described as human behavior.",
+  "why": "One operator running baseline then candidate learns the evidence on the first pass, so the second pass is faster for reasons unrelated to the primitive. And the operator here was an AI agent, so nothing it did is human behavior at all. Measuring elapsed time and calling it verification burden would make HyoDo's burden-aware thesis its weakest claim.",
+  "counted_by": "scripts/research/portability_v0.py, computed from the run. No value is estimated, so --verify reproduces them exactly.",
+  "rubric_source": "candidate.json:counting_rubric, frozen before either arm ran",
+  "observed": {
+    "required_source_lookups": {
+      "baseline": 13,
+      "candidate": 13
+    },
+    "required_cross_checks": {
+      "baseline": 8,
+      "candidate": 12
+    },
+    "required_context_boundaries": {
+      "baseline": 13,
+      "candidate": 12
+    },
+    "unresolved_required_fields": {
+      "baseline": 0,
+      "candidate": 17
+    },
+    "instrumentation_steps": {
+      "baseline": 4,
+      "candidate": 12
+    },
+    "adapter_exception_cost": {
+      "baseline": 12,
+      "candidate": 0
+    }
+  },
+  "reading": "The candidate removes every domain-specific branch (12 to 0) and spends that saving on unresolved fields (0 to 17) and instrumentation (4 to 12). Only required_context_boundaries improved. This is the trade-off the protocol warns about, measured rather than argued.",
+  "unobserved": {
+    "human_verification_time": {
+      "state": "UNOBSERVED",
+      "reason": "Order effects and AI-operator execution are not human study data. A real result needs a counterbalanced human study, which is out of scope for this run."
+    },
+    "wrong_reliance_events": {
+      "state": "UNOBSERVED",
+      "reason": "Reliance is a human behavior and this run has no human subject. Nothing was relied upon by a person, correctly or otherwise."
+    }
+  },
+  "operator_execution_time": {
+    "state": "NOT_RECORDED_AS_BURDEN",
+    "reason": "Recorded nowhere as a burden claim. Arm execution is sub-second and carries no information about verification effort."
+  }
+}

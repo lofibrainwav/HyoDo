@@ -1,0 +1,112 @@
+{
+  "schema": "hyodo.portability-v0-oracle/v1",
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "frozen_before_arms": true,
+  "label_scope": "These are local PortabilityOracleState research labels. BLOCKED here is not a HyoDo or KINGDOM action gate and must not be promoted outside this research receipt.",
+  "precedence_ladder": [
+    "UNOBSERVED - the claimed effect was not measured",
+    "AMBIGUOUS - authority or approval boundary cannot be resolved",
+    "BLOCKED - evidence stale, misbound, replayed, or contradictory",
+    "SUPPORTED - evidence supports only the stated bounded claim"
+  ],
+  "precedence_note": "The ladder selects the scored state; it does not discard the others. Every additional condition observed on a fixture is preserved in secondary_findings with the rank it lost to.",
+  "derivation_rule": "Each state is derived from the fixture's own recorded evidence, not from why the fixture was constructed.",
+  "fixtures": [
+    {
+      "id": "SW-01",
+      "bounded_claim": "the capability snapshot describes the current public package",
+      "primary_state": "BLOCKED",
+      "justification": "The snapshot column names 4.19.5 and is dated 2026-09-13, while the same document records 4.20.2 as the latest public package. The evidence predates the subject it is offered for.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-02",
+      "bounded_claim": "the recorded measurement describes this checkout's runtime",
+      "primary_state": "BLOCKED",
+      "justification": "provenance.validity is MISMATCH and the relation is SELF_OTHER_CHECKOUT; the measurer reports source_commit cd6052a1 with source_dirty true. The measurement is bound to a different checkout than the subject.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-03",
+      "bounded_claim": "six sidecar rows represent six independent observations",
+      "primary_state": "BLOCKED",
+      "justification": "Six rows carry three distinct observation_id values. A consumer reading rows directly must dedupe by observation_id; row count is not evidence of independent observation.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-04",
+      "bounded_claim": "those calls completed successfully",
+      "primary_state": "UNOBSERVED",
+      "justification": "316 tool calls carry no recorded terminal result, and the producer's measured hook payload exposes no structured terminal-mode field. No success, error, cancellation, or timeout was measured, and none is inferred after the fact.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-05",
+      "bounded_claim": "a 90+ score authorizes merge",
+      "primary_state": "BLOCKED",
+      "justification": "The observed output states REVIEW_SIGNAL_STRONG together with 'Strong review signal only. Still run tests/security checks; human approval required.' The evidence supports a review signal and does not reach an authorization conclusion.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-06",
+      "bounded_claim": "a caller-asserted ASK is an authoritative policy decision",
+      "primary_state": "AMBIGUOUS",
+      "justification": "The caller claimed ASK; the measured decision and evaluated_by are both null. Nothing in the evidence establishes who, if anyone, decided this call, so the authority boundary is unresolved on the evidence.",
+      "secondary_findings": [
+        {
+          "state": "BLOCKED",
+          "lost_to": "AMBIGUOUS",
+          "justification": "The claim is also unsupported: a quarantined caller assertion is not evidence of a measured decision."
+        }
+      ]
+    },
+    {
+      "id": "SW-07",
+      "bounded_claim": "node A's provenance chain is complete",
+      "primary_state": "BLOCKED",
+      "justification": "Node A declares a parent 'does-not-exist' that resolves to nothing. The provenance chain terminates in an unresolved reference.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-08",
+      "bounded_claim": "the decision for this case is ALLOW",
+      "primary_state": "BLOCKED",
+      "justification": "The case records ALLOW while the presentable value is UNOBSERVED. Two recorded facts about the same subject disagree, so neither supports the claim on its own.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-09",
+      "bounded_claim": "the item may proceed without a separate operator decision",
+      "primary_state": "UNOBSERVED",
+      "justification": "The policy returned ASK and the loop halted at exit 3. No operator decision was recorded, so the claimed effect - the item proceeding - was never measured.",
+      "secondary_findings": [
+        {
+          "state": "AMBIGUOUS",
+          "lost_to": "UNOBSERVED",
+          "justification": "ASK explicitly defers to an operator, and no operator acted, so the approval boundary is also unresolved."
+        }
+      ]
+    },
+    {
+      "id": "SW-10",
+      "bounded_claim": "every configured surface was observed for this item",
+      "primary_state": "SUPPORTED",
+      "justification": "The dry run reports 3/3 surfaces observed with a readable policy fence and exits 0. The evidence supports this bounded claim and nothing wider: reaching PR stage is not merge, and the queue item stays open until a person merges.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-11",
+      "bounded_claim": "the gates that ran passed",
+      "primary_state": "SUPPORTED",
+      "justification": "hyodo check reports 'All executed gates passed (4/4 gates ran)' and exits 0, with the measurement stated as self-measured from this checkout. The claim is scoped to gates that ran and the evidence matches that scope exactly.",
+      "secondary_findings": []
+    },
+    {
+      "id": "SW-12",
+      "bounded_claim": "the project was validated because the check ran",
+      "primary_state": "UNOBSERVED",
+      "justification": "The command executed and exited 2 with 0/0 gates observed, printing 'No project gates were executed' and 'This is not a validation pass.' Execution of the command is not measurement of the project.",
+      "secondary_findings": []
+    }
+  ]
+}

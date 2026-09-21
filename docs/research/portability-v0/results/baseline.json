@@ -1,0 +1,210 @@
+{
+  "arm": "baseline",
+  "counter_totals": {
+    "adapter_exception_cost": 12,
+    "instrumentation_steps": 4,
+    "required_context_boundaries": 13,
+    "required_cross_checks": 8,
+    "required_source_lookups": 13,
+    "unresolved_required_fields": 0
+  },
+  "evidence_source_sha": "0dbe5ec3bdb02f133b9d33f3ba7b0ed9c0ed4c87",
+  "oracle_consulted": false,
+  "results": [
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-01",
+      "notes": [
+        "snapshot package column does not match the current package"
+      ],
+      "secondary": [],
+      "state": "BLOCKED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-02",
+      "notes": [
+        "provenance validity is MISMATCH"
+      ],
+      "secondary": [],
+      "state": "BLOCKED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-03",
+      "notes": [
+        "row count exceeds distinct observation ids"
+      ],
+      "secondary": [],
+      "state": "BLOCKED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 0,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-04",
+      "notes": [
+        "terminal result was never measured for 316 calls"
+      ],
+      "secondary": [],
+      "state": "UNOBSERVED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 0,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-05",
+      "notes": [
+        "the score is a review signal and does not authorize merge"
+      ],
+      "secondary": [],
+      "state": "BLOCKED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-06",
+      "notes": [
+        "a decision is claimed but none was measured"
+      ],
+      "secondary": [],
+      "state": "AMBIGUOUS"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 0,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-07",
+      "notes": [
+        "an edge references a parent that does not exist"
+      ],
+      "secondary": [],
+      "state": "BLOCKED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-08",
+      "notes": [
+        "recorded and presentable decisions disagree"
+      ],
+      "secondary": [],
+      "state": "BLOCKED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 1,
+        "required_context_boundaries": 2,
+        "required_cross_checks": 1,
+        "required_source_lookups": 2,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-09",
+      "notes": [
+        "ASK was recorded and no operator decision followed"
+      ],
+      "secondary": [],
+      "state": "AMBIGUOUS"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "display_unit": {
+        "Evidence": [
+          "examples/factory-loop/factory-loop.sh"
+        ],
+        "Limitations": "bounded to the stated claim; establishes no general software quality and no authorization",
+        "Observed at": "see fixture evidence",
+        "Scope": "every configured surface was observed for this item",
+        "Support": "SUPPORTED"
+      },
+      "id": "SW-10",
+      "notes": [],
+      "secondary": [],
+      "state": "SUPPORTED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 1,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "display_unit": {
+        "Evidence": [
+          "scripts/verify-public.sh"
+        ],
+        "Limitations": "bounded to the stated claim; establishes no general software quality and no authorization",
+        "Observed at": "see fixture evidence",
+        "Scope": "the gates that ran passed",
+        "Support": "SUPPORTED"
+      },
+      "id": "SW-11",
+      "notes": [],
+      "secondary": [],
+      "state": "SUPPORTED"
+    },
+    {
+      "counters": {
+        "instrumentation_steps": 0,
+        "required_context_boundaries": 1,
+        "required_cross_checks": 0,
+        "required_source_lookups": 1,
+        "unresolved_required_fields": 0
+      },
+      "id": "SW-12",
+      "notes": [
+        "the command ran and no gate was executed"
+      ],
+      "secondary": [],
+      "state": "UNOBSERVED"
+    }
+  ],
+  "schema": "hyodo.portability-v0-arm/v1"
+}

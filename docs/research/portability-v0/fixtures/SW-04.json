@@ -1,0 +1,20 @@
+{
+  "bounded_claim": "those calls completed successfully",
+  "evidence": {
+    "inferred_after_the_fact": false,
+    "producer_terminal_field_exposed": false,
+    "tool_calls": 4965,
+    "tool_calls_line": "- Tool calls: **4,965**",
+    "unobserved_calls": 316,
+    "unobserved_line": "- `UNOBSERVED`: **316**"
+  },
+  "family": "missing claimed effect",
+  "id": "SW-04",
+  "sources": [
+    {
+      "path": "docs/research/EVIDENCE_RECONCILIATION_2026-09-20.md",
+      "sha256": "863ffab3a8c757ef23e639f501b20f478d31669a6a8528f3a58135190db6f23c"
+    }
+  ],
+  "subject": "the 316 tool calls with no recorded terminal result"
+}

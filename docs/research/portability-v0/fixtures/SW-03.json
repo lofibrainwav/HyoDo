@@ -1,0 +1,19 @@
+{
+  "bounded_claim": "six sidecar rows represent six independent observations",
+  "evidence": {
+    "dedupe_key": "observation_id",
+    "distinct_observation_ids": 3,
+    "measured_note": "the bridge a second time over the same stream re-attempted all 8 events and left the ledger's sha256 unchanged. The same second pass appended 3 more observation rows, so the file held 6 rows for 3 distinct `observation_id`s.  This does not corrupt the graph. `join_adapter_events` reports each repeat as `duplicate_observation_event_id` and the first occurrence wins. But a consumer reading the file directly must dedupe by `observation_id`; row count is not a count of observations.",
+    "row_count_is_not_evidence": true,
+    "rows_after_second_pass": 6
+  },
+  "family": "replayed or duplicated evidence",
+  "id": "SW-03",
+  "sources": [
+    {
+      "path": "docs/research/M1_STAGE_OBSERVATION_LIVE_READBACK_2026-09-11.md",
+      "sha256": "5ef1382d12493a14a79fdc5a1fe46b4b7b3533b4ba278819b924ce14657fa469"
+    }
+  ],
+  "subject": "the stage observation sidecar after a second collection pass"
+}

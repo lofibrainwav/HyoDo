@@ -1,0 +1,23 @@
+{
+  "bounded_claim": "the gates that ran passed",
+  "evidence": {
+    "claims_all_gates": false,
+    "contract_line": "grep -q \"All executed gates passed\" \"$VERIFY_DIR/check.out\"",
+    "gates_ran": 4,
+    "gates_total": 4,
+    "observed_command": "hyodo check .",
+    "observed_exit_code": 0,
+    "observed_measurement": "self-measured from this checkout (source)",
+    "observed_qualifier": "Gates support review readiness. Human approval still required.",
+    "observed_summary": "All executed gates passed (4/4 gates ran)"
+  },
+  "family": "valid support with an explicit limitation",
+  "id": "SW-11",
+  "sources": [
+    {
+      "path": "scripts/verify-public.sh",
+      "sha256": "c483d284b15ac8c90f1053323ab95a0306366563eeb7795f6ccdaeba54d7f9e9"
+    }
+  ],
+  "subject": "this HyoDo checkout under hyodo check"
+}
