@@ -57,18 +57,21 @@ fields. The 236 result events with no measured output remain explicitly
 The legacy viewer still exposes its compatibility columns. Reconciliation is
 stricter: a tool name or metadata tag alone is not lens evidence.
 
-- `MAPPED`: **39**
+- `MAPPED`: **8**
 - `INSUFFICIENT_MEASUREMENT`: **5,200**
-- `SEMANTICS_UNOBSERVED`: **4,382**
+- `SEMANTICS_UNOBSERVED`: **4,413**
 - `NOT_APPLICABLE`: **0**
 - `MAPPING_GAP`: **0**
 
 The difference between the legacy 5,161 unmeasured count and the stricter
-5,200 insufficient-measurement count is deliberate: compatibility columns had
-accepted some tool-name-only assignments. Reconciliation does not.
+5,200 insufficient-measurement count is deliberate: 39 compatibility-column
+tool-call assignments were driven by a tool label without measured lens
+semantics. Reconciliation does not accept those labels as evidence.
 
-All 4,382 formerly unclassified events carry an output digest but no explicit
-lens-semantic field. They are therefore `SEMANTICS_UNOBSERVED`, not evidence
+The legacy 4,382 unclassified result events carry an output digest but no
+explicit lens-semantic field. Reconciliation also finds 31 result events that
+legacy compatibility columns placed from a tool label despite the same semantic
+absence. The combined 4,413 therefore stay `SEMANTICS_UNOBSERVED`, not evidence
 that the lens engine is broken and not candidates for heuristic classification.
 
 ## Intent provenance

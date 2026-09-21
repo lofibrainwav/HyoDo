@@ -310,18 +310,32 @@ def _recording_disposition(node: dict[str, Any]) -> str:
     return "MEASUREMENT_UNOBSERVED"
 
 
+def _explicit_lens_semantics(node: dict[str, Any]) -> bool:
+    """Whether a tool event carries evidence with explicit lens semantics.
+
+    Tool names and metadata tags are labels, not measurements. An output digest
+    proves that output bytes were observed, but by itself says nothing about
+    which virtue lens applies.
+    """
+    tool = _field(node, "tool")
+    policy = _field(node, "policy")
+    return bool(
+        tool.get("paths") or tool.get("urls") or tool.get("method") or policy.get("rule_id")
+    )
+
+
 def _lens_mapping_disposition(node: dict[str, Any], columns: list[str]) -> str:
     """Separate semantic mapping gaps from absent measurement."""
-    if node.get("kind") in ("tool_call", "tool_result") and not carries_measured_evidence(node):
-        return "INSUFFICIENT_MEASUREMENT"
+    kind = node.get("kind")
+    if kind in ("tool_call", "tool_result"):
+        if not carries_measured_evidence(node):
+            return "INSUFFICIENT_MEASUREMENT"
+        if not _explicit_lens_semantics(node):
+            return "SEMANTICS_UNOBSERVED"
     if columns == [UNMEASURED]:
         return "INSUFFICIENT_MEASUREMENT"
     if columns == [UNCLASSIFIED]:
-        tool = _field(node, "tool")
-        policy = _field(node, "policy")
-        if tool.get("paths") or tool.get("urls") or tool.get("method") or policy.get("rule_id"):
-            return "MAPPING_GAP"
-        return "SEMANTICS_UNOBSERVED"
+        return "MAPPING_GAP" if _explicit_lens_semantics(node) else "SEMANTICS_UNOBSERVED"
     if not columns:
         return "NOT_APPLICABLE"
     return "MAPPED"
