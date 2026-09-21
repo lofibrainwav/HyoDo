@@ -65,6 +65,31 @@ def test_output_digest_without_semantics_stays_semantics_unobserved(tmp_path: Pa
     assert view["reconciliation"]["lens_mapping"]["mapping_gaps"] == 0
 
 
+def test_legacy_tool_name_mapping_does_not_become_reconciliation_evidence(
+    tmp_path: Path,
+) -> None:
+    view = _view(
+        tmp_path,
+        [
+            _event(event_id="p", kind="prompt", actor="human"),
+            _event(
+                event_id="r",
+                kind="tool_result",
+                actor="agent",
+                step_index=1,
+                parent_event_id="p",
+                tool={"name": "pytest"},
+                io={"output_digest": "abc123456789"},
+            ),
+        ],
+    )
+    # The legacy compatibility column still recognizes the tool label.
+    assert view["events"]["r"]["columns"] == ["jin"]
+    # Reconciliation refuses to treat that label as measured lens semantics.
+    assert view["events"]["r"]["lens_mapping_disposition"] == "SEMANTICS_UNOBSERVED"
+    assert view["reconciliation"]["lens_mapping"]["mapping_gaps"] == 0
+
+
 def test_explicit_unmapped_semantics_are_a_mapping_gap(tmp_path: Path) -> None:
     view = _view(
         tmp_path,
