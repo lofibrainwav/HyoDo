@@ -1665,14 +1665,19 @@ _MISSING_BUCKET_MEANING: tuple[tuple[str, str, str], ...] = (
         "A causal parent exists, but in another run, so the chain is not local.",
     ),
     (
-        "calls_without_result",
-        "Tool calls without a recorded causal child",
-        "No causal child references this call in the observed ledger. It may be pending, unpaired, or unrecorded; this does not prove execution failed.",
+        "calls_without_terminal_outcome",
+        "Tool calls without an observed terminal callback",
+        "No terminal result or error child was recorded. The outcome remains UNOBSERVED; this does not prove execution failed, timed out, or was cancelled.",
+    ),
+    (
+        "duplicate_terminal_outcomes",
+        "Tool calls with multiple terminal children",
+        "More than one terminal child was recorded for one call. Treat the lifecycle as contradicted until the producer is reconciled.",
     ),
     (
         "runs_without_intent",
-        "Runs with no recorded human intent",
-        "Work was recorded without the request it answers. Fix the recording.",
+        "Runs with no recorded human-intent receipt",
+        "The ledger has no human-intent/admission receipt for this run. That is an observation gap, not proof of unauthorized execution.",
     ),
     (
         "unmeasured_events",
@@ -1739,7 +1744,12 @@ def _verification_stage_state(view: dict[str, Any], stage: str) -> str:
     if stage == "result":
         if "tool_result" not in kinds:
             return "UNOBSERVED"
-        return "PARTIAL" if missing.get("calls_without_result") else "OBSERVED"
+        return (
+            "PARTIAL"
+            if missing.get("calls_without_terminal_outcome")
+            or missing.get("duplicate_terminal_outcomes")
+            else "OBSERVED"
+        )
     if stage == "evidence":
         return "OBSERVED" if view.get("edges_evidence") else "UNOBSERVED"
     if stage == "decision":
@@ -1770,7 +1780,11 @@ def _render_verification_header(view: dict[str, Any]) -> str:
     ]
     raw_missing = view.get("missing")
     missing: dict[str, Any] = raw_missing if isinstance(raw_missing, dict) else {}
-    gap_count = sum(len(entries) for entries in missing.values() if isinstance(entries, list))
+    gap_count = sum(
+        len(entries)
+        for key, entries in missing.items()
+        if key != "calls_without_result" and isinstance(entries, list)
+    )
     status = str(view.get("status") or "UNOBSERVED")
     authority = str(view.get("authority") or "UNOBSERVED")
     return (
@@ -1843,7 +1857,8 @@ def _render_run_overview(nodes: list[dict[str, Any]], view: dict[str, Any]) -> s
         )
         gap_count = sum(
             1
-            for bucket in missing.values()
+            for key, bucket in missing.items()
+            if key != "calls_without_result"
             if isinstance(bucket, list)
             for entry in bucket
             if (

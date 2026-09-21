@@ -41,6 +41,7 @@ from hyodo.graph_view import (
     UNCLASSIFIED,
     UNMEASURED,
     assign_columns,
+    carries_measured_evidence,
     column_coverage,
     hyo_chain,
 )
@@ -224,23 +225,121 @@ def _decisions_by_run(
     return grouped
 
 
+_TERMINAL_STATES = (
+    "RETURNED",
+    "ERROR",
+    "CANCELLED",
+    "TIMEOUT",
+    "ABORTED",
+    "UNOBSERVED",
+    "CONTRADICTED",
+)
+
+
+def _terminal_dispositions(
+    nodes: list[dict[str, Any]], causal_edges: list[dict[str, Any]]
+) -> dict[str, dict[str, Any]]:
+    """Derive one evidence-bounded terminal disposition per tool call.
+
+    A recorded ``tool_result`` proves only that a terminal callback returned;
+    it does not prove semantic success. Explicit error/cancel/timeout/abort
+    states require direct host evidence. The current Codex producer exposes no
+    such structured terminal fields, so missing callbacks remain UNOBSERVED.
+    """
+    node_by_id = {str(node["id"]): node for node in nodes if isinstance(node.get("id"), str)}
+    observed_by_call: dict[str, list[tuple[str, str]]] = {}
+    for edge in causal_edges:
+        source = edge.get("source")
+        target = edge.get("target")
+        if not isinstance(source, str) or not isinstance(target, str):
+            continue
+        child = node_by_id.get(target)
+        if child is None:
+            continue
+        state = "RETURNED" if child.get("kind") == "tool_result" else None
+        if child.get("kind") == "error":
+            state = "ERROR"
+        if state is not None:
+            observed_by_call.setdefault(source, []).append((target, state))
+
+    dispositions: dict[str, dict[str, Any]] = {}
+    for node in nodes:
+        call_id = node.get("id")
+        if node.get("kind") != "tool_call" or not isinstance(call_id, str):
+            continue
+        observed = sorted(observed_by_call.get(call_id, []))
+        if not observed:
+            state = "UNOBSERVED"
+            source = None
+        elif len(observed) == 1:
+            state = observed[0][1]
+            source = "tool_result" if state == "RETURNED" else "error_event"
+        else:
+            state = "CONTRADICTED"
+            source = "duplicate_terminal"
+        dispositions[call_id] = {
+            "state": state,
+            "cardinality": len(observed),
+            "evidence_source": source,
+            "event_ids": [event_id for event_id, _ in observed],
+        }
+    return dispositions
+
+
 def _calls_without_result(
     nodes: list[dict[str, Any]], causal_edges: list[dict[str, Any]]
 ) -> list[str]:
-    """Tool calls that no later event ever cited as a causal parent.
+    """Compatibility alias for tool calls with no observed terminal child."""
+    terminal = _terminal_dispositions(nodes, causal_edges)
+    return sorted(call_id for call_id, row in terminal.items() if row["state"] == "UNOBSERVED")
 
-    A call with no recorded effect is the plainest form of "claimed, not
-    observed". This reads only the causal edge list; it does not assert the
-    call failed, only that nothing downstream was recorded.
-    """
-    cited_as_parent = {edge.get("source") for edge in causal_edges}
-    return sorted(
-        str(node["id"])
-        for node in nodes
-        if node.get("kind") == "tool_call"
-        and isinstance(node.get("id"), str)
-        and node["id"] not in cited_as_parent
-    )
+
+def _recording_disposition(node: dict[str, Any]) -> str:
+    """Describe recording sufficiency without manufacturing payload fields."""
+    if carries_measured_evidence(node):
+        return "MEASURED"
+    kind = node.get("kind")
+    if kind == "decision" and _text(node.get("decision")):
+        return "MEASURED"
+    if kind == "error":
+        return "MEASURED"
+    if kind == "tool_call":
+        return "INTENTIONALLY_MINIMAL"
+    if kind == "prompt":
+        return "STRUCTURAL_CONTEXT"
+    return "MEASUREMENT_UNOBSERVED"
+
+
+def _lens_mapping_disposition(node: dict[str, Any], columns: list[str]) -> str:
+    """Separate semantic mapping gaps from absent measurement."""
+    if node.get("kind") in ("tool_call", "tool_result") and not carries_measured_evidence(node):
+        return "INSUFFICIENT_MEASUREMENT"
+    if columns == [UNMEASURED]:
+        return "INSUFFICIENT_MEASUREMENT"
+    if columns == [UNCLASSIFIED]:
+        tool = _field(node, "tool")
+        policy = _field(node, "policy")
+        if tool.get("paths") or tool.get("urls") or tool.get("method") or policy.get("rule_id"):
+            return "MAPPING_GAP"
+        return "SEMANTICS_UNOBSERVED"
+    if not columns:
+        return "NOT_APPLICABLE"
+    return "MAPPED"
+
+
+def _count_states(values: list[str], vocabulary: tuple[str, ...]) -> dict[str, int]:
+    counts = dict.fromkeys(vocabulary, 0)
+    for value in values:
+        counts[value] = counts.get(value, 0) + 1
+    return counts
+
+
+def _intent_provenance(missions: dict[str, Any]) -> dict[str, str]:
+    """Classify recorded intent presence without inferring authorization."""
+    return {
+        run_id: "RECORDED_INTENT" if mission else "ADMISSION_UNOBSERVED"
+        for run_id, mission in sorted(missions.items())
+    }
 
 
 def _evidence_edges(
@@ -304,6 +403,14 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
     assignments = {node_id: assign_columns(node, root) for node_id, node in node_by_id.items()}
     chained = hyo_chain(ordered_nodes, edges)
     parents = parent_sets(edges)
+    terminal_by_call = _terminal_dispositions(ordered_nodes, causal_edges)
+    recording_by_event = {
+        node_id: _recording_disposition(node) for node_id, node in node_by_id.items()
+    }
+    lens_by_event = {
+        node_id: _lens_mapping_disposition(node, assignments[node_id])
+        for node_id, node in node_by_id.items()
+    }
 
     status = _text(graph.get("status"))
     # A graph that could not resolve its own references has not earned an
@@ -332,10 +439,35 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
         )
         entry["hyo_chained"] = bool(chained.get(node_id))
         entry["causal_parents"] = list(parents.get(node_id, ()))
+        entry["terminal"] = terminal_by_call.get(node_id)
+        entry["recording_disposition"] = recording_by_event[node_id]
+        entry["lens_mapping_disposition"] = lens_by_event[node_id]
         events[node_id] = entry
 
     topology = _field(graph, "topology")
     missions = _field(graph, "missions")
+    intent_by_run = _intent_provenance(missions)
+    terminal_counts = _count_states(
+        [row["state"] for row in terminal_by_call.values()], _TERMINAL_STATES
+    )
+    recording_counts = _count_states(
+        list(recording_by_event.values()),
+        ("MEASURED", "INTENTIONALLY_MINIMAL", "STRUCTURAL_CONTEXT", "MEASUREMENT_UNOBSERVED"),
+    )
+    lens_counts = _count_states(
+        list(lens_by_event.values()),
+        (
+            "MAPPED",
+            "NOT_APPLICABLE",
+            "INSUFFICIENT_MEASUREMENT",
+            "SEMANTICS_UNOBSERVED",
+            "MAPPING_GAP",
+        ),
+    )
+    intent_counts = _count_states(
+        list(intent_by_run.values()),
+        ("RECORDED_INTENT", "ADMISSION_UNOBSERVED", "EXPLICIT_NO_INTENT"),
+    )
 
     return {
         "schema_version": VERIFICATION_VIEW_SCHEMA_VERSION,
@@ -348,6 +480,28 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
         "reason": graph.get("reason"),
         "root": graph.get("root"),
         "authority": "UNOBSERVED",
+        "reconciliation": {
+            "terminal_outcomes": {
+                "counts": terminal_counts,
+                "terminal_outcome_unobserved": terminal_counts["UNOBSERVED"],
+                "duplicate_terminal": terminal_counts["CONTRADICTED"],
+                "undispositioned_calls": 0,
+            },
+            "recording": {
+                "counts": recording_counts,
+                "unexplained_required_gaps": 0,
+            },
+            "lens_mapping": {
+                "counts": lens_counts,
+                "mapping_gaps": lens_counts["MAPPING_GAP"],
+            },
+            "intent_provenance": {
+                "counts": intent_counts,
+                "by_run": intent_by_run,
+                "undispositioned_runs": 0,
+                "unauthorized_executions": "NOT_PROVEN",
+            },
+        },
         "time_axis": {
             "direction": TIME_DIRECTION,
             "continuity_lens": CONTINUITY_LENS,
@@ -368,6 +522,14 @@ def build_verification_view(graph: dict[str, Any], *, root: Path | None = None) 
             "cross_run_refs": list(topology.get("cross_run_refs") or []),
             "unclassified_events": sorted(unclassified),
             "unmeasured_events": sorted(unmeasured),
+            "calls_without_terminal_outcome": sorted(
+                call_id for call_id, row in terminal_by_call.items() if row["state"] == "UNOBSERVED"
+            ),
+            "duplicate_terminal_outcomes": sorted(
+                call_id
+                for call_id, row in terminal_by_call.items()
+                if row["state"] == "CONTRADICTED"
+            ),
             "calls_without_result": _calls_without_result(ordered_nodes, causal_edges),
             "runs_without_intent": sorted(
                 run_id for run_id, mission in missions.items() if not mission

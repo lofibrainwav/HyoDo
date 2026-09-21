@@ -5,7 +5,7 @@
   "description": "Read-only presentation projection of one hyodo.evidence-graph/v1 payload. Carries no score, confidence, or aggregate, and grants no authority.",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schema_version", "status", "reason", "root", "authority", "presentation", "time_axis", "lanes", "event_order", "events", "edges_causal", "edges_evidence", "decisions_by_run", "missing", "coverage", "topology"],
+  "required": ["schema_version", "status", "reason", "root", "authority", "presentation", "reconciliation", "time_axis", "lanes", "event_order", "events", "edges_causal", "edges_evidence", "decisions_by_run", "missing", "coverage", "topology"],
   "properties": {
     "acceptance_join": {"type": "object", "additionalProperties": false, "required": ["status", "state", "criteria"], "properties": {"status": {"enum": ["COMPLETE", "NOT_COMPLETE", "HOLD", "CONFLICTING"]}, "state": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}, "criteria": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "text", "state", "comparisons"], "properties": {"id": {"type": "string"}, "text": {"type": "string"}, "state": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}, "comparisons": {"type": "array", "items": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}}}}}, "invariants": {"type": "array", "items": {"type": "object", "additionalProperties": false, "required": ["id", "text", "state", "comparisons"], "properties": {"id": {"type": "string"}, "text": {"type": "string"}, "state": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}, "comparisons": {"type": "array", "items": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}}}}}, "guards": {"type": "object", "additionalProperties": false, "properties": {"verification_observed": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}, "identity_correlation": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}, "visible_readback": {"enum": ["PASS", "FAIL", "UNOBSERVED", "CONFLICTING"]}}}, "contract_id": {"type": ["string", "null"]}, "revision": {"type": ["integer", "null"]}, "origin": {"type": ["string", "null"]}, "criteria_count": {"type": "integer", "minimum": 0}, "contract_digest": {"type": "string", "pattern": "^[0-9a-f]{64}$"}, "reason": {"type": "string"}, "boundary": {"type": "string"}}},
     "schema_version": {"const": "hyodo.verification-view/v0"},
@@ -20,6 +20,17 @@
       "properties": {
         "allow_withheld": {"type": "boolean"},
         "reason": {"type": ["string", "null"]}
+      }
+    },
+    "reconciliation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["terminal_outcomes", "recording", "lens_mapping", "intent_provenance"],
+      "properties": {
+        "terminal_outcomes": {"type": "object", "additionalProperties": false, "required": ["counts", "terminal_outcome_unobserved", "duplicate_terminal", "undispositioned_calls"], "properties": {"counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}, "terminal_outcome_unobserved": {"type": "integer", "minimum": 0}, "duplicate_terminal": {"type": "integer", "minimum": 0}, "undispositioned_calls": {"type": "integer", "minimum": 0}}},
+        "recording": {"type": "object", "additionalProperties": false, "required": ["counts", "unexplained_required_gaps"], "properties": {"counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}, "unexplained_required_gaps": {"type": "integer", "minimum": 0}}},
+        "lens_mapping": {"type": "object", "additionalProperties": false, "required": ["counts", "mapping_gaps"], "properties": {"counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}, "mapping_gaps": {"type": "integer", "minimum": 0}}},
+        "intent_provenance": {"type": "object", "additionalProperties": false, "required": ["counts", "by_run", "undispositioned_runs", "unauthorized_executions"], "properties": {"counts": {"type": "object", "additionalProperties": {"type": "integer", "minimum": 0}}, "by_run": {"type": "object", "additionalProperties": {"enum": ["RECORDED_INTENT", "ADMISSION_UNOBSERVED", "EXPLICIT_NO_INTENT"]}}, "undispositioned_runs": {"type": "integer", "minimum": 0}, "unauthorized_executions": {"const": "NOT_PROVEN"}}}
       }
     },
     "time_axis": {
@@ -83,12 +94,14 @@
     "missing": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["unresolved_refs", "cross_run_refs", "unclassified_events", "unmeasured_events", "calls_without_result", "runs_without_intent"],
+      "required": ["unresolved_refs", "cross_run_refs", "unclassified_events", "unmeasured_events", "calls_without_terminal_outcome", "duplicate_terminal_outcomes", "calls_without_result", "runs_without_intent"],
       "properties": {
         "unresolved_refs": {"type": "array"},
         "cross_run_refs": {"type": "array"},
         "unclassified_events": {"type": "array", "items": {"type": "string"}},
         "unmeasured_events": {"type": "array", "items": {"type": "string"}},
+        "calls_without_terminal_outcome": {"type": "array", "items": {"type": "string"}},
+        "duplicate_terminal_outcomes": {"type": "array", "items": {"type": "string"}},
         "calls_without_result": {"type": "array", "items": {"type": "string"}},
         "runs_without_intent": {"type": "array", "items": {"type": "string"}}
       }
