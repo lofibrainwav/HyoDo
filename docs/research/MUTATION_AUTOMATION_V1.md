@@ -1,15 +1,22 @@
 # Mutation Automation V1
 
+Status: **workflow-backed advisory contract, verified 2026-09-20 PT**.
+
+The owning workflow is `.github/workflows/mutation.yml`. Current trigger truth
+comes from that workflow, not from this note.
+
 ## Goal
 
 Turn the manual mutation receipt into repeatable CI evidence without inventing a
 blocking threshold before a real baseline exists.
 
-## Tier 1 — pull-request scoring evidence
+## Tier 1 — manual scoring evidence
 
 `cosmic-ray.scoring.toml` mutates the scoring core in `hyodo/__init__.py` and
-runs the focused scoring suites. Pull requests that touch mutation-relevant
-surfaces execute this lane automatically.
+runs the focused scoring suites. The current workflow runs this lane only from
+`workflow_dispatch` with `scope=scoring` or `scope=both`; it is **not** a
+pull-request-triggered gate. A future PR trigger would be a separate workflow
+change and must not be inferred from this research note.
 
 The lane records:
 

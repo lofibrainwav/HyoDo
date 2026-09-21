@@ -6,9 +6,15 @@ This directory is the durable roadmap and protocol surface for the HyoDo / ACL /
 
 For the cross-cutting readback of the latest public package versus current
 `main`, start with [`../CURRENT_STATE.md`](../CURRENT_STATE.md). Phase 0 is
-closed and HyoDo 4.19.6 is the latest published baseline. The
-remaining matched KINGDOM/ACL and live-host work is downstream research and
+closed and HyoDo 4.20.2 is the latest published baseline. The remaining
+KINGDOM/ACL, portability, and live-host work is downstream research and
 integration, not unfinished HyoDo product capability.
+
+Freshness rule: dated receipts preserve what was observed then. A research note
+that says `current`, `now`, or `remaining` inside a dated snapshot does not
+override `../CURRENT_STATE.md`, the latest release receipt, or fresh runtime
+readback. Historical evidence is preserved; current-state claims are refreshed
+at their owning surface.
 
 Read them in this order.
 
@@ -26,7 +32,11 @@ adapter exception cost before allowing any Core Candidate proposal.
 
 [`HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md`](./HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md)
 
-This is the top-level roadmap. Start here before adopting a new framework, paper, controller, skill system, privacy mechanism, or orchestration feature.
+This is the historical evidence-first roadmap and phase-sequencing reference.
+Its ownership boundaries and promotion discipline remain active, but its
+`Current` / `NOW` sections are a 2026-09-10 snapshot. For the current
+post-4.20.2 research action, start with
+[`PORTABILITY_RESEARCH_V0.md`](./PORTABILITY_RESEARCH_V0.md).
 
 It defines:
 
@@ -137,7 +147,7 @@ SERIAL: promotion decision
 
 The Measured Run #1 runtime freeze is separate. It pins the exact merged runtime immediately before the real execution receipt and must not silently redefine the already frozen canon/source object being audited.
 
-Current parallel lanes after the initial research-source freeze:
+Historical parallel lanes from the 2026-09-08/10 research snapshot:
 
 ```text
 A — 86/86 historical/source audit
@@ -171,8 +181,9 @@ wisdom / history / population evidence → Evidence Gate override  forbidden
 
 ## Immediate roadmap gate
 
-HyoDo 4.19.6 is the verified public baseline. Do not rewrite its sealed evidence
-when later KINGDOM experiments run.
+HyoDo 4.20.2 is the verified public baseline. Prior release receipts remain
+immutable historical evidence and must not be rewritten when later KINGDOM or
+research experiments run.
 
 The downstream gate is:
 

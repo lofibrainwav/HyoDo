@@ -1,6 +1,6 @@
 # HyoDo current state
 
-Public release readback: 2026-09-19 PT
+Public release readback: 2026-09-20 PT
 Runtime capability matrix below: measured 2026-09-13 PT, before 4.19.6.
 
 This file separates shipped product capability from live/runtime observation. Exact
@@ -8,27 +8,35 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package: HyoDo `4.20.0`
-- Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC provenance, and install smoke verified in [`releases/4.20.0.md`](./releases/4.20.0.md).
+- Latest public package: HyoDo `4.20.2`
+- Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
+  provenance, and install smoke verified in
+  [`releases/4.20.2.md`](./releases/4.20.2.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: the recorded 4.20.0 release is closed. Later source
-  changes and public-surface verification have separate completion criteria
-  in [Remaining work and handoff](./REMAINING_WORK.md). Live-host and
+- HyoDo product status: the recorded 4.20.2 release is closed. Post-release
+  research and integration have separate evidence and promotion criteria;
+  they do not silently reopen the sealed public artifact. Live-host and
   orchestration experiments remain downstream integration/research work.
 
 The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
 
-## 4.20.0 release update
+## 4.20.2 release update
 
-HyoDo 4.20.0 preserves distinct graph participants and explicit From/To
-endpoints, and adds bounded opt-in comparisons of host-supplied requirements.
-The measured release chain is recorded in
-[`releases/4.20.0.md`](./releases/4.20.0.md).
-Natural-language intent extraction and separately stored occurrence,
-observation, and recording timestamps are not implemented. Fresh Codex or
-Cursor host observations remain `UNOBSERVED`; the matrix below is historical.
+HyoDo 4.20.2 publishes the lens-reconciliation correctness fix from #441:
+tool names, metadata tags, and an `output_digest` alone are not treated as
+measured lens semantics. The frozen 9,621-event reconciliation therefore keeps
+unsupported semantics visible rather than promoting compatibility placement to
+evidence. The measured release chain is recorded in
+[`releases/4.20.2.md`](./releases/4.20.2.md), and the reconciliation receipt is
+[`reconciliation receipt`](research/EVIDENCE_RECONCILIATION_2026-09-20.md).
+
+Graph v2, bounded host-supplied requirement comparison, and the prior release
+capabilities remain available. Natural-language intent extraction and
+separately stored occurrence, observation, and recording timestamps are not
+implemented. Fresh Codex or Cursor host observations remain deployment-specific;
+the matrix below is historical.
 
 ## Runtime capability snapshot (2026-09-13 PT)
 
@@ -64,9 +72,9 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 The runtime matrix above compares public 4.19.5 with the source state measured
 on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
-4.20.0. The 4.20.0 release-chain receipt is recorded separately above. Do not infer runtime
-identity from this page alone; use the signed release, CI receipt, or runtime
-identity receipt. Fresh
+4.20.2. The 4.20.2 release-chain receipt is recorded separately above. Do not
+infer runtime identity from this page alone; use the signed release, CI receipt,
+or runtime identity receipt. Fresh
 Codex/Cursor host observations,
 QMD/Neo4j closed-loop memory, and matched support-allocation/host shadow experiments are
 downstream integration/research work and must not silently reopen HyoDo product

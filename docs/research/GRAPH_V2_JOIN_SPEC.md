@@ -1,7 +1,10 @@
 # Graph v2 multi-parent contract
 
-Status: **contract + normalization implementation**. Public `hyodo.event_graph`
-and the dashboard remain v1 until the integration gate lands separately.
+Status: **SHIPPED contract + normalization + runtime/viewer integration**.
+The original contract freeze preceded integration; HyoDo 4.20.2 includes the
+multi-parent runtime/viewer path with v1 compatibility. This document preserves
+the contract boundary and frozen acceptance cases, not a current deployment
+receipt for every host.
 
 ## Purpose
 
@@ -106,6 +109,8 @@ The contract suite covers at least:
 ## Boundary
 
 This contract does not grant execution authority, change EROS, route agents,
-or reinterpret citations as causal flow. Production viewer/report integration,
-ledger writer support for v2, and v1/v2 migration readback are separate serial
-promotion gates under #222.
+or reinterpret citations as causal flow. The viewer/report integration gate
+described by the original freeze has since landed. Producer-specific v2
+emission,
+host wiring, and fresh runtime observation remain separate evidence and must not
+be inferred from the shipped graph capability.
