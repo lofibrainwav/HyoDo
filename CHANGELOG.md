@@ -5,12 +5,40 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.20.2] - 2026-09-20
+
+Evidence-correctness patch for the post-4.20.1 source line. The immutable
+4.20.1 artifacts are not replaced.
+
+### Fixed
+
+- Lens reconciliation no longer treats a historical tool-name compatibility
+  mapping as measured lens evidence. Tool names, metadata tags, and an
+  `output_digest` alone remain `SEMANTICS_UNOBSERVED`.
+- A tool event is counted as `MAPPED` only when explicit lens-semantic evidence
+  is present through paths, URLs, method, or a policy `rule_id`.
+
+### Changed
+
+- The 4.20.1 release receipt is reconciled to the already-observed signed tag,
+  GitHub Release/SBOM, PyPI provenance, and install smoke without changing the
+  published 4.20.1 artifacts.
+
+### Evidence
+
+- Frozen 9,621-event ledger remains byte-identical
+  (`05b4dc6b6fddb1fda9b45ec221e4e1b21a0aeb957c8f00e37743acf9bca120c7`).
+- Canonical reconciliation reports 8 `MAPPED`, 5,200
+  `INSUFFICIENT_MEASUREMENT`, 4,413 `SEMANTICS_UNOBSERVED`, and 0
+  `MAPPING_GAP`.
+- Publication, provenance, and installed-artifact evidence for 4.20.2 remain
+  `UNOBSERVED` until the authorized release chain is completed and read back.
+
 ## [4.20.1] - 2026-09-20
 
-Evidence-preserving follow-up after the 4.20.0 publication. This candidate
+Evidence-preserving follow-up after the 4.20.0 publication. This release
 contains the post-release Codex adapter, evidence-graph, public-surface, and
-release-truth reconciliations from `main`; publication evidence is intentionally
-not claimed until a separately authorized release chain is measured.
+release-truth reconciliations from `main`.
 
 ### Added
 
@@ -38,9 +66,8 @@ not claimed until a separately authorized release chain is measured.
 
 ### Evidence
 
-- Candidate verification is local-only. GitHub Release, PyPI publication,
-  provenance, tag, and install receipt remain `UNOBSERVED` until authorized
-  publication and readback.
+- Signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+  recorded in `docs/releases/4.20.1.md`.
 
 ## [4.20.0] - 2026-09-19
 

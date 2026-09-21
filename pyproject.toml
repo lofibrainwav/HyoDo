@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "hyodo"
-version = "4.20.1"
+version = "4.20.2"
 description = "Local evidence verification for AI-assisted work. See what ran, what the evidence supports, and what remains unknown. HyoDo does not run or authorize agents."
 # The published description is built by hatch_build.py so its links are absolute:
 # PyPI has no repository around the text, so relative links 404 there while
