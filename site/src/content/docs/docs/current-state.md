@@ -8,16 +8,16 @@ description: Public release, current main, and measured HyoDo state separated by
 Public release readback: **2026-09-19 PT**. Runtime capability matrix below
 was measured 2026-09-13 PT, before 4.19.6; it is a historical snapshot.
 
-HyoDo **4.20.0** is the current public package. Product capability and live
+HyoDo **4.20.1** is the current public package. Product capability and live
 host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Latest public package: **4.20.0**
+- Latest public package: **4.20.1**
 - Release chain: **CLOSED** — signed tag, GitHub Release + SBOM, PyPI provenance,
-  and install smoke verified in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.20.0.md).
+  and install smoke verified in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.20.1.md).
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
 
-HyoDo 4.20.0 preserves distinct graph participants and explicit From/To
+HyoDo 4.20.1 preserves distinct graph participants and explicit From/To
 endpoints, and adds opt-in comparisons of host-supplied scalar requirements.
 Evidence references, missing observations, and changed requirements are shown
 without claiming automatic intent understanding or execution authority.
@@ -58,4 +58,4 @@ HyoDo                  observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/host experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.20.0 public artifact released and verified.
+prerequisites for calling the HyoDo 4.20.1 public artifact released and verified.
