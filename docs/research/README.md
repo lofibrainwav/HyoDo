@@ -12,6 +12,16 @@ integration, not unfinished HyoDo product capability.
 
 Read them in this order.
 
+## Portability falsification pilot
+
+[`PORTABILITY_RESEARCH_V0.md`](./PORTABILITY_RESEARCH_V0.md)
+
+This is the current next-step research gate after HyoDo 4.20.2. It treats the
+Research Envelope as a question list rather than a required schema and tests
+36 adversarial fixtures across Software, Professional, and Creative domains.
+It measures false-green, false-block, ambiguity, verification burden, and
+adapter exception cost before allowing any Core Candidate proposal.
+
 ## 0. Top-level technical roadmap — what belongs where and when
 
 [`HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md`](./HYODO_ACL_KINGDOM_TECHNICAL_ROADMAP.md)
