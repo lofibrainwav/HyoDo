@@ -20,11 +20,14 @@ owner's queue and does not make their work wait on HyoDo — see "KINGDOM handof
 boundary" for why ordering and ownership are separate questions here.
 
 **Current state (2026-09-20, after the 4.20.0 release).** HyoDo 4.20.0 is
-published; `main` is `b86931f`. All six audited storefront items are closed on
-the surface a visitor actually meets, and the 4.19.9 `project_urls` residual is
-closed too: the published 4.20.0 page reads Homepage `https://hyodo.app` and
-Documentation `https://hyodo.app/docs/quickstart/`. The register items below
-each carry a dated disposition; none is left silently `UNOBSERVED`.
+published; the evidence-reconciliation baseline starts from `main` `daa7b237`.
+All six audited storefront items are closed on the surface a visitor actually
+meets, and the 4.19.9 `project_urls` residual is closed too. A separate local
+ledger reconciliation is recorded as H9 below: the 9,621-event ledger is
+reproducible and fully dispositioned, while 316 Codex tool calls remain
+`UNOBSERVED` at the terminal-outcome level because the measured host payload
+does not expose a terminal mode. That limitation does not reopen the sealed
+4.20.0 release and is not evidence of execution failure or unauthorized work.
 
 See "Public readiness" for each item and the evidence behind it.
 
@@ -297,28 +300,31 @@ Roles below identify responsibility; no individual assignee is designated.
 | H6 | P2 / CLOSED (2026-09-20) | Dependency PR #418 reviewed and merged (2026-09-20T18:35Z); the merge commit is an ancestor of `main`, `site/package-lock.json` carries `@types/three` 0.186.0, and `main` CI is green after it (20 success + 1 expected skip). | HyoDo dependency maintainer | GitHub API readback 2026-09-20 recorded above. |
 | H7 | P2 / CLOSED (2026-09-20) | `docs/EXTERNAL_CLAIM_AUDIT.md` now carries a dated 2026-09-20 scope-supersession note marking the 2026-07-21 audit as historical and recording the current `check` scope (BYOG gates in any project; sampled language-agnostic gates as the no-config default; HyoDo self-verification a separate checkout-scoped path), with dependency/MCP findings re-observed unchanged. Landed with this register update. | HyoDo documentation maintainer | Dated note in the audit document itself. |
 | H8 | P2 / DISPOSITIONED (2026-09-20) | `07fdc0f` and `1b9b3f3` were verified to carry no model-attribution trailer; both predate the recorded convention. History is not rewritten. The repository convention (CLAUDE.md) requires model attribution via `Co-Authored-By` going forward and recent history shows it in use. No additive correction record is owed beyond this entry. | HyoDo repository maintainer | This register entry is the disposition record. |
+| H9 | P0 / RECONCILIATION_REQUIRED at producer boundary (2026-09-20) | Replayed the frozen 9,621-event ledger through `build_report_graph -> build_verification_view` without mutation. Terminal lifecycle: 4,649 `RETURNED`, 316 `UNOBSERVED`, 0 explicit error/cancel/timeout/abort, 0 duplicate terminal children; all 316 gaps are Codex and the measured Codex payload exposes no structured terminal-mode field. Recording: 4,415 measured, 4,964 intentionally minimal, 6 structural-context, 236 measurement-unobserved, with 0 unexplained required recording gaps. Lens reconciliation: 39 mapped, 5,200 insufficient measurement, 4,382 semantics-unobserved, 0 mapping gaps. Intent provenance: 3 recorded-intent runs and 12 admission-unobserved runs; unauthorized execution remains `NOT_PROVEN`. Do not backfill historical outcomes or wrap execution to manufacture them. Revisit only if the host contract gains direct terminal evidence. | HyoDo evidence maintainer | `docs/research/EVIDENCE_RECONCILIATION_2026-09-20.md`; ledger SHA-256 `05b4dc6b6fddb1fda9b45ec221e4e1b21a0aeb957c8f00e37743acf9bca120c7`; reconciliation regression tests. |
 
 <!-- markdownlint-enable MD013 -->
 
 H2, H3, H5, H6, and H7 now carry dated 2026-09-20 dispositions in the rows
 above. The 2026-09-19 note that H2–H5 "carry forward reported public-surface
 concerns" was true then and is superseded by those rows. H8 is dispositioned
-without history rewrite.
+without history rewrite. H9 is different: the repository-side reconciliation
+is complete, but the terminal mode for 316 historical Codex calls remains
+`UNOBSERVED` because the measured producer contract does not expose that fact.
+That named producer boundary is not converted into a release failure.
 
 ## Order of work and closure rule
 
 1. A returning HyoDo maintainer refreshes main, open PRs, the public version,
    and evidence for the affected surfaces; then assigns owners.
-2. Resolve H2-H5 and H7 within an explicit public-product scope. A finding can
-   close through a verified fix or an honest, documented scope limitation.
-   Storefront work done in September 2026 touched adjacent ground — a
-   data-boundary statement near H3, a keyboard walk near H4 — but neither is the
-   audit those items ask for, and neither closes them.
-3. H1 is closed for 4.19.9 and 4.20.0. A further release is a new instance of
-   H1 and needs its own authorization and verification gates. The
-   `project_urls` residual closed with 4.20.0 and no longer rides along.
-4. Handle H6 and H8 independently; neither automatically expands release
-   scope or authorizes rewriting history.
+2. H2-H8 are closed or dispositioned within their dated scopes. Preserve those
+   observations rather than reopening them from unrelated local evidence.
+3. H9 is repository-side reconciled but remains `RECONCILIATION_REQUIRED` at
+   the measured Codex producer boundary. Revisit it only when direct terminal
+   evidence becomes available; absence must not be rewritten as failure,
+   cancellation, timeout, abort, or unauthorized execution.
+4. H1 is closed for 4.19.9 and 4.20.0. H9 does not by itself authorize or
+   require another package release; a future release is a new H1 instance with
+   its own authorization and verification gates.
 5. Record each item's evidence link, observed date, final state, and owner
    disposition here when it changes. Do not replace UNOBSERVED with PASS
    merely because source tests pass, and keep a superseded observation in place

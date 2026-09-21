@@ -1113,7 +1113,7 @@ def test_missing_panel_names_each_gap_and_what_to_fix(tmp_path: Path) -> None:
 
     assert 'aria-label="what is missing"' in html
     # A call nothing ever cited as a parent, and a run with no stated intent.
-    assert 'data-missing-bucket="calls_without_result" data-missing-count="1"' in html
+    assert 'data-missing-bucket="calls_without_terminal_outcome" data-missing-count="1"' in html
     assert 'data-missing-bucket="runs_without_intent" data-missing-count="1"' in html
     assert "c1" in html
     # A gap is reported, never scored or ranked.
@@ -1137,7 +1137,7 @@ def test_missing_panel_separates_a_recording_gap_from_a_mapping_gap() -> None:
     )
     assert 'data-missing-bucket="unmeasured_events" data-missing-count="1"' in html
     assert 'data-missing-bucket="unclassified_events" data-missing-count="1"' in html
-    assert "Fix the recording." in html
+    assert "Inspect the recording before adding fields." in html
     assert "never classify by tool name" in html
 
 
@@ -1385,11 +1385,15 @@ def test_missing_panel_can_project_one_run_without_erasing_global_gaps() -> None
             "b": {"why": {"run_id": "two"}, "what": {"kind": "tool_call"}},
         },
         "event_order": ["a", "b"],
-        "missing": {"calls_without_result": ["a", "b"], "runs_without_intent": ["one", "two"]},
+        "missing": {
+            "calls_without_terminal_outcome": ["a", "b"],
+            "calls_without_result": ["a", "b"],
+            "runs_without_intent": ["one", "two"],
+        },
     }
     scoped = _scoped_verification_view(view, "one")
     html = _render_missing_panel({}, view=scoped, scope="Selected run: one")
-    assert 'data-missing-bucket="calls_without_result" data-missing-count="1"' in html
+    assert 'data-missing-bucket="calls_without_terminal_outcome" data-missing-count="1"' in html
     assert "Selected run: one" in html
     assert view["missing"]["calls_without_result"] == ["a", "b"]
     assert "does not prove execution failed" in html

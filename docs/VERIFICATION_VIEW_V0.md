@@ -237,6 +237,25 @@ instead of re-deciding it in its own language.
   the drift this contract removes from lane
 assignment.
 
+## Reading `reconciliation`
+
+`reconciliation` is a read-only disposition layer over the same graph. It does
+not add events, fill missing payloads, or grant authority. It separates four
+questions that the legacy gutter counts mixed together:
+
+- `terminal_outcomes`: whether each tool call has exactly one observed terminal
+  child; `RETURNED` is callback observation, not semantic success.
+- `recording`: whether an event is measured, intentionally minimal structural
+  context, or still measurement-unobserved.
+- `lens_mapping`: whether measured evidence is mapped, semantically
+  insufficient, not applicable, or a genuine mapping gap.
+- `intent_provenance`: whether a human-intent/admission receipt is recorded for
+  each run. Missing admission evidence is never relabeled as unauthorized work.
+
+The historical ledger stays byte-for-byte unchanged. The reconciliation states
+exist only in this projection and can therefore be recomputed from the frozen
+input.
+
 ## Reading `missing`
 
 `missing` is the point of the view. Against a real local ledger it is
@@ -250,8 +269,18 @@ proved.
 | `cross_run_refs` | a parent recorded under a different run |
 | `unclassified_events` | evidence was recorded, but the table has no row |
 | `unmeasured_events` | the event recorded nothing classification could read |
-| `calls_without_result` | a tool call no later event cited as a causal parent |
-| `runs_without_intent` | a run with no recorded human intent |
+| `calls_without_terminal_outcome` | a tool call with no observed terminal callback; its disposition stays `UNOBSERVED` |
+| `duplicate_terminal_outcomes` | a tool call with more than one recorded terminal child; the lifecycle is `CONTRADICTED` |
+| `calls_without_result` | compatibility alias for `calls_without_terminal_outcome` |
+| `runs_without_intent` | a run with no recorded human-intent/admission receipt; this is not proof of unauthorized execution |
+
+The reconciliation projection uses `RETURNED` for one recorded `tool_result`.
+`RETURNED` means only that the terminal callback was observed; it is **not** a
+semantic `SUCCESS` claim. `ERROR`, `CANCELLED`, `TIMEOUT`, and `ABORTED` are
+reserved for direct producer evidence. For the measured Codex payload, no
+`exit_code`, `status`, `success`, `outcome`, or structured error receipt is
+available. Missing Codex callbacks therefore remain `UNOBSERVED` with producer
+capability `UNSUPPORTED_BY_HOST`; absence alone is not a proven failure.
 
 `unclassified` and `unmeasured` stay separate on purpose. The first says fix
 the table; the second says fix the recording. Reporting them as one number
