@@ -5,26 +5,25 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.20.1 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.20.2 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.20.1.md`. Prior release receipts remain preserved under
+`docs/releases/4.20.2.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
 HyoDo 4.20.2 is the current release target and source-tree release baseline.
-Its publication and installed-artifact readback are not measured yet; the
-candidate receipt is in `docs/releases/4.20.2.md`. The published baseline
-remains 4.20.1 until an authorized release chain is completed. This does not
-establish every host integration.
+Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+measured in `docs/releases/4.20.2.md`. This does not establish every host
+integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
 
-Live Cursor and Codex callback observation remains `UNOBSERVED`. The host
-adapters are fixture-verified and the two-event recording path is measured on
-the published artifact, but no installed host has been observed emitting into
-a ledger.
+Public release evidence does not imply that any particular Codex or Cursor host
+is connected right now. Host observation is deployment-specific; adapter
+fixtures, local ledgers, and package publication remain separate evidence
+axes.
 
 Landed and released:
 
@@ -59,15 +58,17 @@ evidence is not converted into a pass.
 - Release chain measured: verified tag, GitHub Release + SBOM, PyPI provenance,
   and install smoke are recorded in `docs/releases/4.20.1.md`.
 
-### 4.20.2 (candidate prepared 2026-09-20)
+### 4.20.2 (released 2026-09-20)
 
 - Tighten lens reconciliation so tool names, metadata tags, and an output digest
   alone never count as measured lens semantics.
 - Require explicit paths, URLs, method, or policy-rule evidence before a tool
   event can be counted as `MAPPED`; preserve legacy viewer placement only as
   compatibility presentation.
-- Preserve the immutable 4.20.1 artifacts; publish this correction only under a
-  new version after the release chain is independently measured.
+- Preserve the immutable 4.20.1 artifacts; this correction is published only
+  under 4.20.2.
+- Release chain measured: verified tag, GitHub Release + SBOM, PyPI provenance,
+  and install smoke are recorded in `docs/releases/4.20.2.md`.
 
 ### External adoption
 
