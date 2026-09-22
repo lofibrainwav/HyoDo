@@ -7,6 +7,11 @@
 # Primary trigger: publishing a GitHub Release after durable SBOM evidence is
 # attached to its draft. Manual dispatch is recovery-only and enforces the same
 # published-release evidence gate.
+#
+# Pipeline states: publish -> PYPI_PUBLISHED, verify -> PROVENANCE_VERIFIED.
+# The Release is published only by `scripts/release/pipeline.py --publication`,
+# from DRAFT_VERIFIED. Publishing it by hand is how v4.21.2 became an immutable
+# Release without SBOM evidence that this workflow then had to refuse.
 
 name: Publish to PyPI
 

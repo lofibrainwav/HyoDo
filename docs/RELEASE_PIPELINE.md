@@ -66,6 +66,39 @@ it is not a merge authority. The merge adapter passes the current expected SHA
 to GitHub, so a changed head cannot be merged under an old CI or human
 authorization.
 
+## Publication
+
+Merging the release candidate ends at `MERGED`. Everything after it is also
+owned by the pipeline, never by hand:
+
+```bash
+# Rehearsal: reads GitHub for real, plans every mutation, changes nothing.
+python scripts/release/pipeline.py 4.21.3 --publication
+
+# Execution: stops at DRAFT_VERIFIED unless a human authorizes the exact SHA.
+python scripts/release/pipeline.py 4.21.3 --publication --execute \
+  --authorize-ref <human-approval-ref> --authorize-sha <merged-main-sha>
+```
+
+```text
+MERGED -> TAGGED -> DRAFT_CREATED -> EVIDENCE_BUILT -> EVIDENCE_ATTACHED
+-> DRAFT_VERIFIED -> PUBLISHED -> PYPI_PUBLISHED -> PROVENANCE_VERIFIED
+-> INSTALL_VERIFIED -> READBACK_VERIFIED
+```
+
+- Each transition is one step; `release_state.py` rejects skips.
+- `EVIDENCE_BUILT` and `EVIDENCE_ATTACHED` come from the `build-evidence` and
+  `attach-assets` jobs of `release-evidence.yml`; `PYPI_PUBLISHED` and
+  `PROVENANCE_VERIFIED` come from the `publish` and `verify` jobs of
+  `publish.yml`.
+- `PUBLISHED` is irreversible (this repository uses immutable releases). It is
+  reached only from `DRAFT_VERIFIED`, with human authority bound to the merged
+  SHA, after re-observing that the Release is still a draft carrying both SBOM
+  assets.
+- An already published Release blocks the run before any mutation. v4.21.2 is
+  that case: published by hand before its evidence, it can never take the SBOM
+  and never reached PyPI (`docs/releases/4.21.2.md`).
+
 ## Pipeline contract
 
 ```text
