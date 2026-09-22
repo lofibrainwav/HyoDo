@@ -108,8 +108,7 @@ evidence is not converted into a pass.
 - Keep unchanged release-chain readback zero-write instead of churning receipt time.
 - Run the built-artifact description check in public verification, and make the
   public-language gate reject bare virtue-syllable prose and require the canonical
-  trilingual label form (one accepted lexical residual: a label-form token used
-  as a sentence subject).
+  trilingual label form.
 - Preserve all 4.21.0/4.21.1 status, exit-code, coverage, trust, and provenance
   semantics.
 
