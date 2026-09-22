@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 from typer.testing import CliRunner
 
+from hyodo.check_honesty import gate_coverage
 from hyodo.cli.main import app
 from hyodo.gates import (
     GATES_CONFIG_RELATIVE_PATH,
@@ -383,3 +384,24 @@ def test_source_unobserved_keeps_its_4_20_status_semantics(
     assert exit_code == 0
     assert payload["status"] == "PASS"
     assert payload["effective"] == "UNOBSERVED"
+
+
+# --------------------------------------------------------------------------
+# Coverage equality
+# --------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("observed", "expected", "want"),
+    [
+        (2, 2, "FULL"),
+        (1, 2, "PARTIAL"),
+        (0, 2, "NONE"),
+        (0, 0, "NONE"),
+        (3, 2, "NONE"),
+    ],
+)
+def test_gate_coverage_is_full_only_on_equality(observed: int, expected: int, want: str) -> None:
+    """FULL iff `expected > 0 and observed == expected`; a count above the
+    declared set is not coverage, so it never reads as FULL."""
+    assert gate_coverage(observed, expected) == want

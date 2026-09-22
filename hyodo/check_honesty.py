@@ -42,8 +42,10 @@ def gate_coverage(observed: int, expected: int) -> str:
     """
     if expected <= 0 or observed <= 0:
         return COVERAGE_NONE
-    if observed >= expected:
+    if observed == expected:
         return COVERAGE_FULL
+    if observed > expected:
+        return COVERAGE_NONE
     return COVERAGE_PARTIAL
 
 
