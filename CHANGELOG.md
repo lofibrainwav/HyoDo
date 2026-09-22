@@ -5,7 +5,7 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [4.21.0] - 2026-09-21
+## [4.21.0] - 2026-09-22
 
 Honesty release for `hyodo check`. The 4.20 machine contract is unchanged:
 exit codes and the existing JSON keys keep their meanings, and everything new
