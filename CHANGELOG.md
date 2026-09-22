@@ -34,8 +34,9 @@ contracts are unchanged.
   bare-syllable prose is now rejected, and a syllable passes only in the
   canonical trilingual label form (its hanja glued to it, an English name
   nearby). Research docs and test strings that the stricter gate flagged were
-  corrected. Accepted lexical residual: the check is character-level, so a
-  label-form token used as the subject of a sentence still passes.
+  corrected. A complete label mentioned inside an English sentence (for example
+  `Hyo (<hanja> / <syllable>) is one of the six axes`) is label usage, which the
+  policy allows, not Korean prose.
 - The `public-language` CI job now judges commit messages, PR title, and PR body
   with the same function as the tracked-file test
   (`find_public_language_offenses`). It had kept its own copy of the old rule,
