@@ -62,6 +62,12 @@ from hyodo.audience import (
 from hyodo.audience import (
     write_config as write_audience_config,
 )
+from hyodo.check_honesty import (
+    COVERAGE_FULL,
+    coverage_detail,
+    effective_status,
+    gate_coverage,
+)
 from hyodo.connect import (
     ALL_TARGETS,
     UNOBSERVED_MESSAGE,
@@ -122,9 +128,11 @@ from hyodo.gates import (
     SCHEMA_ID,
     GatesConfigError,
     detect_project_gates,
+    detect_project_markers,
+    format_gate_command,
     load_gates_config,
     render_gates_toml,
-    run_user_gates,
+    run_user_gates_with_trust,
 )
 from hyodo.graph_export import build_graph_export
 from hyodo.graph_view import build_actor_rings
@@ -222,7 +230,7 @@ from hyodo.verification_view import build_verification_view
 
 app = typer.Typer(
     name="hyodo",
-    help="HyoDo - model-agnostic AI code quality gates",
+    help="HyoDo - Local evidence verification for AI-assisted work.",
     add_completion=True,
 )
 event_app = typer.Typer(
@@ -769,7 +777,7 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         if gates_config is not None:
             gates = {
                 result.name: GateResult(GateStatus(result.status), result.message)
-                for result in run_user_gates(gates_config, root)
+                for result in run_user_gates_with_trust(gates_config, root)[1]
             }
         else:
             gates = {
@@ -1347,15 +1355,16 @@ def dashboard(
 @app.command()
 def version():
     """Print HyoDo version."""
-    console.print(f"HyoDo v{__version__} - model-agnostic quality gates")
+    console.print(f"HyoDo v{__version__} - Local evidence verification for AI-assisted work.")
 
 
 _GATES_INIT_EMPTY_TEMPLATE = f"""schema = "{SCHEMA_ID}"
 
-# HyoDo Bring-Your-Own-Gates: no existing tool footprint was detected in this
-# checkout (no pyproject.toml/package.json/tsconfig.json/go.mod/Cargo.toml, and
-# no Makefile test:/lint: target). Absorb your own commands here -- each
-# becomes a first-class gate for `hyodo check`. Uncomment and edit:
+# HyoDo Bring-Your-Own-Gates: no supported tool was recognised in this checkout.
+# A project file may well be present -- a pyproject.toml, package.json,
+# tsconfig.json, go.mod, Cargo.toml or Makefile on its own is not a detected
+# tool, only a place one could be declared. Absorb your own commands here --
+# each becomes a first-class gate for `hyodo check`. Uncomment and edit:
 #
 # [gates.tests]
 # pillar = "goodness"
@@ -1417,9 +1426,32 @@ def init(
         console.print(table)
         rendered = render_gates_toml(detected)
     else:
-        console.print("[yellow]No existing tooling detected in this checkout.[/yellow]")
-        console.print("[dim]Writing a starter .hyodo/gates.toml with commented-out examples.[/dim]")
-        rendered = _GATES_INIT_EMPTY_TEMPLATE
+        # Zero detections must not produce a live `.hyodo/gates.toml`. Its mere
+        # presence switches `hyodo check` onto the BYOG branch, where a gate set
+        # with nothing in it reports "no gates executed" (exit 2) instead of
+        # falling back to the built-in sampled gates. Writing an inert example
+        # keeps the starter content without taking that fallback away.
+        markers = detect_project_markers(root)
+        console.print("[yellow]No supported tool was detected in this checkout.[/yellow]")
+        if markers:
+            console.print(
+                f"[dim]Project file(s) present: {', '.join(markers)} — a project file "
+                "on its own is not a detected tool.[/dim]"
+            )
+        example_path = gates_path.with_suffix(".toml.example")
+        example_path.parent.mkdir(parents=True, exist_ok=True)
+        example_path.write_text(_GATES_INIT_EMPTY_TEMPLATE, encoding="utf-8")
+        console.print(f"[green]Wrote {example_path}[/green]")
+        console.print(
+            f"[dim]No live {GATES_CONFIG_RELATIVE_PATH} was created, so `hyodo check` "
+            "keeps its built-in sampled fallback instead of reporting zero executed "
+            "gates.[/dim]"
+        )
+        console.print("\n[bold cyan]Next steps:[/bold cyan]")
+        console.print(f"  1. Add your commands to {example_path.name}")
+        console.print(f"  2. Rename it to {GATES_CONFIG_RELATIVE_PATH.name} to activate them")
+        console.print("  3. hyodo check              # runs the absorbed gates")
+        raise typer.Exit(0)
 
     gates_path.parent.mkdir(parents=True, exist_ok=True)
     gates_path.write_text(rendered, encoding="utf-8")
@@ -1846,10 +1878,42 @@ def _verdict_output(
     if provenance is not None and provenance.validity == "MISMATCH" and decision == "PASS":
         decision = "UNOBSERVED"
         detail = provenance.summary()
+
+    # 4.21 honesty axis. `decision` above stays exactly what 4.20 computed --
+    # it is what the JSON `status` key and the exit code mean, and callers
+    # pinned to those keep working. `effective` answers the other question
+    # ("may a reader conclude this checkout is verified?") and is what the
+    # human verdict line renders, so one PASS beside one SKIP can no longer
+    # print `HYODO PASS`. See hyodo/check_honesty.py.
+    observed_count = state.get("observed", 0)
+    expected_count = state.get("expected", 0)
+    effective = decision
+    if command == "check":
+        coverage = gate_coverage(
+            observed_count if isinstance(observed_count, int) else 0,
+            expected_count if isinstance(expected_count, int) else 0,
+        )
+        effective = effective_status(
+            decision, coverage, provenance.validity if provenance is not None else None
+        )
+        state["coverage"] = coverage
+        state["complete"] = coverage == COVERAGE_FULL
+        state["effective"] = effective
+        if effective != decision:
+            downgrade_detail = coverage_detail(
+                observed_count if isinstance(observed_count, int) else 0,
+                expected_count if isinstance(expected_count, int) else 0,
+                coverage,
+            )
+            if provenance is not None and provenance.validity != "OBSERVED":
+                downgrade_detail = provenance.summary()
+            if downgrade_detail:
+                detail = downgrade_detail
+
     verdict_args = (
-        decision,
-        state.get("observed", 0),
-        state.get("expected", 0),
+        effective,
+        observed_count,
+        expected_count,
         state["unit"],
         detail,
     )
@@ -1887,6 +1951,13 @@ def _verdict_output(
                 payload["test_integrity"] = state["test_integrity"]
             if "dx_signals" in state:
                 payload["dx_signals"] = state["dx_signals"]
+            # Additive 4.21 truths. `status`, `gates_ran`, `gates_total`,
+            # `failed` and `exit_code` above are untouched 4.20 keys.
+            payload["coverage"] = state["coverage"]
+            payload["complete"] = state["complete"]
+            payload["effective"] = state["effective"]
+            if "trust" in state:
+                payload["trust"] = state["trust"]
             if provenance is not None:
                 # the portable form: commit ids and digests, never a home
                 # directory, because --json output travels into issues
@@ -1914,7 +1985,7 @@ def _verdict_output(
                 "Explanation: "
                 + explain_decision(
                     command,
-                    decision,
+                    effective,
                     state.get("rule_id"),
                     audience=profile.profile,
                     domain=profile.domain,
@@ -2050,12 +2121,41 @@ def check(
 
         if gates_config is not None:
             console.print(f"[cyan]User gates: {check_root / GATES_CONFIG_RELATIVE_PATH}[/cyan]")
-            user_results = run_user_gates(gates_config, check_root, verbose=verbose)
+            trust, user_results = run_user_gates_with_trust(
+                gates_config, check_root, verbose=verbose
+            )
             verdict_state.update(
                 observed=sum(r.status in {"PASS", "FAIL"} for r in user_results),
                 expected=len(user_results),
                 failed=[r.name for r in user_results if r.status == "FAIL"],
+                trust={
+                    "via": trust.via,
+                    "persistence": trust.persistence,
+                    "previous_command_set": trust.previous,
+                    "fingerprint": trust.fingerprint,
+                },
             )
+            if not trust.approved:
+                # Show what *would* run. A refusal that names no commands asks
+                # the operator to approve something they cannot see, and the
+                # approved set they are being compared against is UNOBSERVED.
+                console.print(
+                    "[yellow]Command set not approved — these commands were not executed:[/yellow]"
+                )
+                for gate in gates_config.gates:
+                    console.print(
+                        f"  [dim][{gate.pillar}] {gate.name}:[/dim] {format_gate_command(gate)}"
+                    )
+                console.print(f"  [dim]fingerprint: {trust.fingerprint}[/dim]")
+                console.print(f"  [dim]previously approved command set: {trust.previous}[/dim]")
+            elif trust.persistence != "OBSERVED":
+                # The gates ran and their results stand; only the receipt for
+                # next time is missing. Never restate a gate outcome for this.
+                console.print(
+                    "[yellow]Trust receipt not persisted "
+                    "(trust.persistence UNOBSERVED) — gate results below are "
+                    "unaffected; this checkout will ask again next run.[/yellow]"
+                )
             user_styles = {"PASS": "green", "FAIL": "red", "SKIP": "yellow"}
             for user_result in user_results:
                 style = user_styles.get(user_result.status, "yellow")
@@ -5041,7 +5141,7 @@ def connect(
 _START_GUIDE = """
 [bold blue]HyoDo quick start[/bold blue]
 
-[b]HyoDo is a model-agnostic quality-gate kit for AI-assisted development.[/b]
+[b]Local evidence verification for AI-assisted work.[/b]
 Model-agnostic means independent of the AI model or agent UI — not language-agnostic.
 
 Any caller can record events and evaluate policy. Hook wiring

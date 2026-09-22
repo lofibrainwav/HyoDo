@@ -74,6 +74,26 @@ GATES_TRUST_SCHEMA_ID = "hyodo.gates-trust/v1"
 GATES_TRUST_ENV_VAR = "HYODO_GATES_TRUST_ALL"
 _TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 
+# How a command set came to be approved, recorded so a reader can tell an
+# operator who looked at the commands apart from automation that pre-approved
+# them out-of-band. These are observations of what happened, not instructions.
+TRUST_VIA_PREVIOUSLY_APPROVED = "previously-approved"
+TRUST_VIA_ENV = f"env:{GATES_TRUST_ENV_VAR}"
+TRUST_VIA_PROMPT = "prompt"
+TRUST_VIA_NONE = "none"
+
+# Whether the trust receipt for this decision is actually on disk. A read-only
+# or full checkout still runs the gates it was told to run; it just cannot
+# remember the approval, and saying so beats silently re-prompting next time.
+TRUST_PERSISTENCE_OBSERVED = "OBSERVED"
+TRUST_PERSISTENCE_UNOBSERVED = "UNOBSERVED"
+
+# What the previously approved command set was. The store records digests, not
+# argv, so a differing fingerprint proves *that* the set changed and can never
+# show *what* it was -- naming the old commands would be fabrication.
+TRUST_PREVIOUS_NONE = "NONE"
+TRUST_PREVIOUS_UNOBSERVED = "UNOBSERVED"
+
 # A leading token shaped like ``KEY=VALUE`` (POSIX env-prefix assignment) that
 # must be separated from the executable when running with shell=False.
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -224,6 +244,9 @@ class GateTrustDecision:
     approved: bool
     fingerprint: str
     reason: str
+    via: str = TRUST_VIA_NONE
+    persistence: str = TRUST_PERSISTENCE_UNOBSERVED
+    previous: str = TRUST_PREVIOUS_NONE
 
 
 def _fingerprint_payload(config: GatesConfig) -> list[dict[str, list[str]]]:
@@ -278,24 +301,40 @@ def _load_gate_trust_store(root: Path) -> dict[str, Any]:
     return {"schema": GATES_TRUST_SCHEMA_ID, "approved": {}}
 
 
-def _save_gate_trust_store(root: Path, store: dict[str, Any]) -> None:
+def _save_gate_trust_store(root: Path, store: dict[str, Any], fingerprint: str) -> str:
+    """Write the trust receipt and report whether it can be read back.
+
+    A read-only checkout still gets the approval it just made for *this* run;
+    it simply cannot remember it for the next one. That is reported as
+    `TRUST_PERSISTENCE_UNOBSERVED` rather than swallowed, because "approved,
+    and the receipt is on disk" and "approved, and nothing was recorded" are
+    different facts for anyone reading the run afterwards. Confirmed by
+    re-reading the file, not by the write returning without raising.
+    """
     path = root / GATES_TRUST_RELATIVE_PATH
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(json.dumps(store, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     except OSError:
-        # Best-effort receipt only: a read-only checkout still gets the
-        # already-decided approval for this run, it just cannot remember it
-        # for the next one.
-        pass
+        return TRUST_PERSISTENCE_UNOBSERVED
+    readback = _load_gate_trust_store(root)
+    if fingerprint in readback["approved"]:
+        return TRUST_PERSISTENCE_OBSERVED
+    return TRUST_PERSISTENCE_UNOBSERVED
 
 
-def _remember_gate_trust(root: Path, store: dict[str, Any], fingerprint: str, *, via: str) -> None:
+def _remember_gate_trust(root: Path, store: dict[str, Any], fingerprint: str, *, via: str) -> str:
     store["approved"][fingerprint] = {
         "approved_at": datetime.now(timezone.utc).isoformat(),
         "via": via,
     }
-    _save_gate_trust_store(root, store)
+    return _save_gate_trust_store(root, store, fingerprint)
+
+
+def format_gate_command(gate: UserGate) -> str:
+    """Render the exact argv (with any env prefix) a gate would execute."""
+    env_prefix = " ".join(gate.env) + " " if gate.env else ""
+    return f"{env_prefix}{' '.join(gate.command)}"
 
 
 def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
@@ -306,8 +345,7 @@ def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
     """
     print("HyoDo Bring-Your-Own-Gates: .hyodo/gates.toml command set changed or is new.")
     for gate in config.gates:
-        env_prefix = " ".join(gate.env) + " " if gate.env else ""
-        print(f"  [{gate.pillar}] {gate.name}: {env_prefix}{' '.join(gate.command)}")
+        print(f"  [{gate.pillar}] {gate.name}: {format_gate_command(gate)}")
     print(f"  fingerprint: {fingerprint}")
     try:
         answer = input("Trust and run this command set now? [y/N] ")
@@ -328,28 +366,71 @@ def resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
     fingerprint = compute_gate_set_fingerprint(config)
     store = _load_gate_trust_store(root)
     approved = store["approved"]
+    # The store holds digests, never argv. When some other set was approved
+    # before, that set can be proven to differ and can never be displayed.
+    previous = TRUST_PREVIOUS_UNOBSERVED if approved else TRUST_PREVIOUS_NONE
 
     if fingerprint in approved:
-        return GateTrustDecision(True, fingerprint, "previously approved command set")
+        return GateTrustDecision(
+            True,
+            fingerprint,
+            "previously approved command set",
+            via=TRUST_VIA_PREVIOUSLY_APPROVED,
+            persistence=TRUST_PERSISTENCE_OBSERVED,
+            previous=previous,
+        )
 
     if _env_truthy(GATES_TRUST_ENV_VAR):
-        _remember_gate_trust(root, store, fingerprint, via=f"env:{GATES_TRUST_ENV_VAR}")
-        return GateTrustDecision(True, fingerprint, f"pre-approved via {GATES_TRUST_ENV_VAR}")
+        persistence = _remember_gate_trust(root, store, fingerprint, via=TRUST_VIA_ENV)
+        return GateTrustDecision(
+            True,
+            fingerprint,
+            f"pre-approved via {GATES_TRUST_ENV_VAR}",
+            via=TRUST_VIA_ENV,
+            persistence=persistence,
+            previous=previous,
+        )
 
     if _is_noninteractive():
+        # Deliberately does not name the environment variable that would skip
+        # this refusal: an error message is read by whoever is blocked, and a
+        # ready-made bypass printed next to a security decision gets pasted.
+        # The variable stays documented for operators who choose it on purpose.
+        unapproved = (
+            "no command set has been approved for this checkout yet"
+            if previous == TRUST_PREVIOUS_NONE
+            else "this command set differs from the approved one, whose commands are "
+            "UNOBSERVED (only its fingerprint was recorded)"
+        )
         return GateTrustDecision(
             False,
             fingerprint,
-            "gates.toml command set is new or unapproved in a non-interactive "
-            f"environment -- set {GATES_TRUST_ENV_VAR}=1 to pre-approve or run "
-            "`hyodo check` interactively once to review and record trust",
+            f"gates.toml command set is not approved -- {unapproved}; run "
+            "`hyodo check` in a terminal to review the exact commands and record approval",
+            via=TRUST_VIA_NONE,
+            persistence=TRUST_PERSISTENCE_UNOBSERVED,
+            previous=previous,
         )
 
     if _prompt_gate_trust(config, fingerprint):
-        _remember_gate_trust(root, store, fingerprint, via="prompt")
-        return GateTrustDecision(True, fingerprint, "approved interactively")
+        persistence = _remember_gate_trust(root, store, fingerprint, via=TRUST_VIA_PROMPT)
+        return GateTrustDecision(
+            True,
+            fingerprint,
+            "approved interactively",
+            via=TRUST_VIA_PROMPT,
+            persistence=persistence,
+            previous=previous,
+        )
 
-    return GateTrustDecision(False, fingerprint, "declined interactively")
+    return GateTrustDecision(
+        False,
+        fingerprint,
+        "declined interactively",
+        via=TRUST_VIA_NONE,
+        persistence=TRUST_PERSISTENCE_UNOBSERVED,
+        previous=previous,
+    )
 
 
 def run_user_gates(config: GatesConfig, root: Path, verbose: bool = False) -> list[UserGateResult]:
@@ -359,12 +440,25 @@ def run_user_gates(config: GatesConfig, root: Path, verbose: bool = False) -> li
     (new-drifted) set never reaches `subprocess.run`; every gate in *config*
     is reported ``SKIP`` with the trust reason instead, never ``PASS``.
     """
+    return run_user_gates_with_trust(config, root, verbose=verbose)[1]
+
+
+def run_user_gates_with_trust(
+    config: GatesConfig, root: Path, verbose: bool = False
+) -> tuple[GateTrustDecision, list[UserGateResult]]:
+    """Same as `run_user_gates`, also returning how the command set was trusted.
+
+    Callers that report on a run (the CLI) need the trust decision itself --
+    how approval was obtained, whether the receipt persisted, and the exact
+    commands that were refused -- none of which survives being flattened into
+    a per-gate message.
+    """
     trust = resolve_gate_trust(config, root)
     if not trust.approved:
-        return [
+        return trust, [
             UserGateResult(gate.name, gate.pillar, "SKIP", trust.reason) for gate in config.gates
         ]
-    return [_run_one_gate(gate, root, verbose=verbose) for gate in config.gates]
+    return trust, [_run_one_gate(gate, root, verbose=verbose) for gate in config.gates]
 
 
 def _expand_glob_args(args: tuple[str, ...], root: Path) -> list[str]:
@@ -794,6 +888,31 @@ def _detect_nested_project_gates(root: Path) -> dict[str, dict[str, str]]:
         detected.update(_detect_nested_tsconfig_gates(project_dir, rel))
         detected.update(_detect_nested_makefile_gates(project_dir, rel))
     return detected
+
+
+#: Files whose presence marks "this is a project", which is a different claim
+#: from "HyoDo recognised a tool here". Kept beside the detectors so the two
+#: questions cannot drift apart.
+PROJECT_MARKER_FILES = (
+    "pyproject.toml",
+    "package.json",
+    "tsconfig.json",
+    "go.mod",
+    "Cargo.toml",
+    "Makefile",
+    "makefile",
+    "GNUmakefile",
+)
+
+
+def detect_project_markers(root: Path) -> tuple[str, ...]:
+    """Return the project marker files that exist directly under *root*.
+
+    Answers only "what project files are here?" -- never "what will run?".
+    `detect_project_gates` answers the second question, and a marker with no
+    recognised tool inside it must not be reported as a detected gate.
+    """
+    return tuple(name for name in PROJECT_MARKER_FILES if (root / name).is_file())
 
 
 def detect_project_gates(root: Path) -> dict[str, dict[str, str]]:

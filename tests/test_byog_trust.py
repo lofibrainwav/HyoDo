@@ -115,7 +115,14 @@ def test_resolve_gate_trust_first_use_is_not_approved_without_prompt(
 
     assert isinstance(decision, GateTrustDecision)
     assert decision.approved is False
-    assert GATES_TRUST_ENV_VAR in decision.reason
+    # 4.21: the refusal must not hand the reader the variable that skips it --
+    # a bypass printed beside a security decision is a bypass that gets used.
+    assert GATES_TRUST_ENV_VAR not in decision.reason
+    # It still says what is wrong and how to approve legitimately.
+    assert "not approved" in decision.reason
+    assert "no command set has been approved" in decision.reason
+    assert decision.via == "none"
+    assert decision.previous == "NONE"
 
 
 def test_first_use_noninteractive_without_env_var_skips_without_executing(
@@ -159,7 +166,10 @@ def test_drift_noninteractive_skips_without_executing(
     # (b) that state is reported as SKIP, never PASS.
     assert results[0].status == "SKIP"
     assert results[0].status != "PASS"
-    assert GATES_TRUST_ENV_VAR in results[0].message
+    assert GATES_TRUST_ENV_VAR not in results[0].message
+    # (c) the previously approved argv was never recorded, so it is reported
+    # as UNOBSERVED rather than guessed at.
+    assert "UNOBSERVED" in results[0].message
 
 
 def test_drift_is_detected_via_resolve_gate_trust(
