@@ -13,10 +13,11 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 ## Current release
 
 HyoDo 4.21.2 is the current release target and source-tree release baseline.
-Its publication chain is not measured yet; `docs/releases/4.21.2.md` therefore
-keeps every release step UNOBSERVED until the tag, Release/SBOM, PyPI provenance,
-and install smoke are read back. HyoDo 4.21.1 remains the latest published, fully
-measured release until that chain completes. This does not establish every host
+Its release chain is incomplete and sealed as such: the signed tag and an
+immutable GitHub Release exist, but the Release was published without SBOM
+evidence and 4.21.2 never reached PyPI (`docs/releases/4.21.2.md`). HyoDo 4.21.1
+remains the latest published, fully measured release. The same code will ship
+in a later version only after the release pipeline owns the publication states. This does not establish every host
 integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable

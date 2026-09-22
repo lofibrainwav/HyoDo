@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.21.2] - 2026-09-22
 
+Not published to PyPI. The GitHub Release was published before its SBOM
+evidence was attached and is immutable; see `docs/releases/4.21.2.md`.
+
 Verification-plumbing honesty patch. The 4.21 check status, coverage, and exit-code
 contracts are unchanged.
 
