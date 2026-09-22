@@ -5,19 +5,18 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.1 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.21.3 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.21.1.md`. Prior release receipts remain preserved under
+`docs/releases/4.21.3.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
 HyoDo 4.21.3 is the current release target and source-tree release baseline.
-Its release chain is incomplete and sealed as such: the signed tag and an
-immutable GitHub Release exist, but the Release was published without SBOM
-evidence and 4.21.2 never reached PyPI (`docs/releases/4.21.2.md`). HyoDo 4.21.1
-remains the latest published, fully measured release. The same code will ship
-in a later version only after the release pipeline owns the publication states.
+Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+measured in `docs/releases/4.21.3.md`. HyoDo 4.21.2 remains an incomplete
+immutable historical release whose GitHub Release was published without SBOM
+evidence and never reached PyPI (`docs/releases/4.21.2.md`).
 This does not establish every host integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
@@ -101,14 +100,15 @@ evidence is not converted into a pass.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
 
-### 4.21.3 (release preparation)
+### 4.21.3 (released 2026-09-22)
 
 - Republishes the 4.21.2 content plus the publication-order fix from #463
   through the corrected pipeline; the release pipeline owns publication as a
   strictly linear state chain and refuses wrong order.
 - Changes no product or CLI semantics beyond #463; 4.21 status, coverage, and
   exit-code contracts are unchanged.
-- Publication steps remain `UNOBSERVED` until the 4.21.3 release chain runs.
+- Publication steps measured and sealed in `docs/releases/4.21.3.md`
+  (9/9 OBSERVED, 2026-09-22).
 
 ### 4.21.2 (incomplete immutable historical release)
 

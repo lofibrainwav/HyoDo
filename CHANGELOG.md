@@ -42,7 +42,8 @@ are unchanged.
 ### Evidence
 
 - Pre-release source verification is recorded in the release-preparation PR.
-- Publication evidence remains UNOBSERVED until the 4.21.3 release chain runs.
+- Publication measured and sealed in `docs/releases/4.21.3.md`: 9/9 OBSERVED
+  (release-evidence run 35796483911, PyPI publish run 35796591943).
 
 ## [4.21.2] - 2026-09-22
 
