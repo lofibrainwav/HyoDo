@@ -5,6 +5,45 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.3] - 2026-09-22
+
+Republished release: the same code as 4.21.2 plus the publication-order fix
+merged in #463. 4.21.2 itself remains an incomplete immutable historical
+release — its GitHub Release was published before its SBOM evidence existed and
+cannot be amended — so this version exists to publish that content through the
+corrected pipeline. The 4.21 check status, coverage, and exit-code contracts
+are unchanged.
+
+### Added
+
+- The release pipeline owns publication as a strictly linear state chain
+  (`MERGED -> TAGGED -> DRAFT_CREATED -> EVIDENCE_BUILT -> EVIDENCE_ATTACHED ->
+  DRAFT_VERIFIED -> PUBLISHED -> PYPI_PUBLISHED -> PROVENANCE_VERIFIED ->
+  INSTALL_VERIFIED -> READBACK_VERIFIED`). Wrong order is refused: `PUBLISHED`
+  is reachable only from `DRAFT_VERIFIED`, after the pipeline re-observes the
+  draft Release and both SBOM assets, and publication requires human authority
+  bound to the merged SHA. A Release that is already published blocks any
+  further mutation.
+- `scripts/release/pipeline.py --publication` drives the post-merge stages with
+  a dry run by default. The release workflows are mapped to pipeline states;
+  renaming or reordering their jobs fails a test.
+
+### Changed
+
+- None beyond #463. All other content is identical to 4.21.2 and is described
+  in that entry.
+
+### Fixed
+
+- The publication sequence is owned by the release pipeline instead of manual
+  operator steps, so the 4.21.2 failure mode (a Release published before its
+  SBOM evidence) is refused rather than merely discouraged.
+
+### Evidence
+
+- Pre-release source verification is recorded in the release-preparation PR.
+- Publication evidence remains UNOBSERVED until the 4.21.3 release chain runs.
+
 ## [4.21.2] - 2026-09-22
 
 Not published to PyPI. The GitHub Release was published before its SBOM

@@ -12,7 +12,7 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.2 is the current release target and source-tree release baseline.
+HyoDo 4.21.3 is the current release target and source-tree release baseline.
 Its release chain is incomplete and sealed as such: the signed tag and an
 immutable GitHub Release exist, but the Release was published without SBOM
 evidence and 4.21.2 never reached PyPI (`docs/releases/4.21.2.md`). HyoDo 4.21.1
@@ -101,7 +101,16 @@ evidence is not converted into a pass.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
 
-### 4.21.2 (release preparation)
+### 4.21.3 (release preparation)
+
+- Republishes the 4.21.2 content plus the publication-order fix from #463
+  through the corrected pipeline; the release pipeline owns publication as a
+  strictly linear state chain and refuses wrong order.
+- Changes no product or CLI semantics beyond #463; 4.21 status, coverage, and
+  exit-code contracts are unchanged.
+- Publication steps remain `UNOBSERVED` until the 4.21.3 release chain runs.
+
+### 4.21.2 (incomplete immutable historical release)
 
 - Make the documented public verifier work from a pipless uv-created project venv.
 - Bound test-integrity language to syntax the AST heuristic actually recognizes.
