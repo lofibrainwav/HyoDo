@@ -5,7 +5,7 @@ if a pattern fails to catch what it claims, no shell command can compensate.
 These tests verify the *boundary invariants* of each regex: the exact
 character that separates match from no-match.
 
-This is Truth (진): measurement grounded in the actual pattern source, not
+This is Truth (眞 / 진): measurement grounded in the actual pattern source, not
 guesswork.  Every strategy generates near-miss strings at the regex boundary,
 proving that one character more or fewer flips the detection result.
 """

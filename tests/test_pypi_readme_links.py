@@ -13,6 +13,7 @@ evidence that the artifact is correct.
 
 from __future__ import annotations
 
+import os
 import re
 import sys
 import tarfile
@@ -166,15 +167,28 @@ def _description(archive: Path) -> tuple[str, str | None]:
 
 
 def _built_artifacts() -> list[Path]:
-    outdir = Path(__import__("os").environ.get("HYODO_DIST_DIR", REPO_ROOT / "dist"))
+    outdir = Path(os.environ.get("HYODO_DIST_DIR", REPO_ROOT / "dist"))
     if not outdir.is_dir():
         return []
     return sorted([*outdir.glob("hyodo-*.tar.gz"), *outdir.glob("hyodo-*.whl")])
 
 
+def _artifacts_required() -> bool:
+    # A source-only run may honestly lack artifacts and reports UNOBSERVED. A
+    # lane that has just built them sets this so that absence becomes a failure:
+    # otherwise the one check of what users actually download never runs.
+    return os.environ.get("HYODO_REQUIRE_BUILT_ARTIFACTS") == "1"
+
+
 def test_built_artifacts_publish_the_rewritten_description(published: str) -> None:
     """Check the real artifacts, or report UNOBSERVED -- never a silent skip."""
     artifacts = _built_artifacts()
+    if _artifacts_required():
+        kinds = {"sdist" if a.name.endswith(".tar.gz") else "wheel" for a in artifacts}
+        assert kinds == {"sdist", "wheel"}, (
+            "HYODO_REQUIRE_BUILT_ARTIFACTS=1 but HYODO_DIST_DIR does not hold both a "
+            f"wheel and an sdist: {[a.name for a in artifacts]}"
+        )
     if not artifacts:
         pytest.skip(
             "UNOBSERVED: no built artifacts found. Run `python -m build --outdir <dir>` "
@@ -194,3 +208,26 @@ def test_built_artifacts_publish_the_rewritten_description(published: str) -> No
         f"sdist and wheel ship different descriptions: {sorted(descriptions)}"
     )
     assert next(iter(descriptions.values())) == published.strip()
+
+
+def test_required_lane_fails_instead_of_skipping_when_artifacts_are_absent(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    # Guard the guard: the canonical lane must not be able to report a skip here.
+    monkeypatch.setenv("HYODO_DIST_DIR", str(tmp_path))
+    monkeypatch.setenv("HYODO_REQUIRE_BUILT_ARTIFACTS", "1")
+    with pytest.raises(AssertionError, match="both a wheel and an sdist"):
+        test_built_artifacts_publish_the_rewritten_description("")
+
+    (tmp_path / "hyodo-0.0.0-py3-none-any.whl").write_bytes(b"")
+    with pytest.raises(AssertionError, match="both a wheel and an sdist"):
+        test_built_artifacts_publish_the_rewritten_description("")
+
+
+def test_source_only_run_still_reports_unobserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setenv("HYODO_DIST_DIR", str(tmp_path))
+    monkeypatch.delenv("HYODO_REQUIRE_BUILT_ARTIFACTS", raising=False)
+    with pytest.raises(pytest.skip.Exception, match="UNOBSERVED"):
+        test_built_artifacts_publish_the_rewritten_description("")
