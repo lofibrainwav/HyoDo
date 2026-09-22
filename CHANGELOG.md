@@ -36,6 +36,12 @@ contracts are unchanged.
   nearby). Research docs and test strings that the stricter gate flagged were
   corrected. Accepted lexical residual: the check is character-level, so a
   label-form token used as the subject of a sentence still passes.
+- The `public-language` CI job now judges commit messages, PR title, and PR body
+  with the same function as the tracked-file test
+  (`find_public_language_offenses`). It had kept its own copy of the old rule,
+  so bare virtue-syllable prose still passed in commit and PR text after the
+  file gate was tightened. A regression test fails if any tracked file or the
+  workflow re-implements the rule.
 
 ### Fixed
 
