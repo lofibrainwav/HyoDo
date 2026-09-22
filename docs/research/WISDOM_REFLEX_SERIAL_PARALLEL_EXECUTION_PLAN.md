@@ -237,12 +237,12 @@ Do not choose `k` after seeing which value makes the Wisdom condition look best 
 Canonical KINGDOM virtue vocabulary is:
 
 ```text
-진 = truth
-선 = goodness
-미 = beauty
-인 = benevolence
-효 = filialPiety
-영 = eternity
+眞 / 진 = truth
+善 / 선 = goodness
+美 / 미 = beauty
+仁 / 인 = benevolence
+孝 / 효 = filialPiety
+永 / 영 = eternity
 ```
 
 KINGDOM already uses a governed weighted geometric-mean EROS system. The research question is whether an EROS-aligned evaluation is useful for ranking competing interpretations.

@@ -7,7 +7,14 @@ nothing verifies is not a rule — it is a comment about one.
 
 The single deliberate exception is the six virtue labels, which ship as
 hanja/Hangul/English together because the trilingual form *is* the label. Only
-those six syllables are allowed, and only as labels — never as prose.
+those six syllables are allowed, and only as labels — never as prose. "As a
+label" is enforced, not assumed: a virtue syllable passes only when its own
+canonical hanja sits directly beside it (separated by nothing but spacing,
+slashes, brackets, quotes, or commas) and one of its English names is nearby.
+An earlier version allowed the six syllables anywhere, so a sentence could use
+them as bare Korean words and still pass; the policy said one thing and the
+gate checked a weaker one. Mere co-occurrence is not enough either: "Truth
+(<hanja>) ... honestly <syllable>" is still prose.
 
 This file writes every Hangul character as an escape rather than a literal, so it
 holds itself to the rule it enforces. That is not cosmetic: the first version
@@ -26,9 +33,28 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 HANGUL = re.compile("[\uac00-\ud7a3]")  # the modern Hangul syllable block
 
-# The trilingual virtue labels: Truth, Goodness, Beauty, Benevolence,
-# Filial Piety, Eternity — each shipped as hanja/Hangul/English together.
-ALLOWED_SYLLABLES = frozenset("\uc9c4\uc120\ubbf8\uc778\ud6a8\uc601")
+# The trilingual virtue labels. Each Hangul syllable is allowed only next to its
+# own canonical hanja and one of the English names the public surfaces use for
+# it (hyodo/virtues.py, docs/VIRTUE_CONTRACT.md, the dashboard short labels).
+VIRTUE_LABELS: dict[str, tuple[str, tuple[str, ...]]] = {
+    "\uc9c4": ("\u771e", ("Truth",)),
+    "\uc120": ("\u5584", ("Goodness", "Good")),
+    "\ubbf8": ("\u7f8e", ("Beauty",)),
+    "\uc778": ("\u4ec1", ("Benevolence", "Humanity")),
+    "\ud6a8": ("\u5b5d", ("Hyo", "Filial Piety", "filialPiety")),
+    "\uc601": ("\u6c38", ("Eternity", "Yeong", "Longevity")),
+}
+ALLOWED_SYLLABLES = frozenset(VIRTUE_LABELS)
+
+# The hanja must be glued to the syllable: only separator characters between
+# them, at most LABEL_GAP of them. That admits "<hanja> / <syllable>",
+# "<syllable>(<hanja>)", and the multi-line tuple in hyodo/virtues.py, whose
+# gap is a quote, comma, newline, indentation, and quote.
+LABEL_SEPARATORS = "[\\s/(),\"'`]"
+LABEL_GAP = 16
+# The English name only has to be nearby (either side), because real labels put
+# markup between them, e.g. the dashboard's "<hanja> <syllable></span> Truth".
+LABEL_WINDOW = 40
 
 SCANNED_SUFFIXES = (".py", ".md")
 
@@ -51,17 +77,38 @@ def _tracked_files() -> list[Path]:
     return [REPO_ROOT / name for name in listing.stdout.split("\0") if name]
 
 
+def _is_label(text: str, index: int) -> bool:
+    hanja, names = VIRTUE_LABELS[text[index]]
+    glued = rf"{LABEL_SEPARATORS}{{0,{LABEL_GAP}}}"
+    after = re.match(glued + re.escape(hanja), text[index + 1 :])
+    before = re.search(
+        re.escape(hanja) + glued + r"\Z", text[max(0, index - LABEL_GAP - 1) : index]
+    )
+    if not (after or before):
+        return False
+    window = text[max(0, index - LABEL_WINDOW) : index + LABEL_WINDOW + 1]
+    return any(
+        re.search(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", window, re.I) for name in names
+    )
+
+
 def _offending_lines(path: Path) -> list[tuple[int, str]]:
     try:
         text = path.read_text(encoding="utf-8")
     except (OSError, UnicodeDecodeError):
         # Unreadable is not clean. Surface it rather than counting it as a pass.
         return [(0, f"<could not read {path}>")]
+    lines = text.splitlines(keepends=True)
     offences = []
-    for number, line in enumerate(text.splitlines(), start=1):
-        found = set(HANGUL.findall(line))
-        if found - ALLOWED_SYLLABLES:
+    offset = 0
+    for number, line in enumerate(lines, start=1):
+        for match in HANGUL.finditer(line):
+            char = match.group()
+            if char in ALLOWED_SYLLABLES and _is_label(text, offset + match.start()):
+                continue
             offences.append((number, line.strip()))
+            break
+        offset += len(line)
     return offences
 
 
@@ -82,7 +129,8 @@ def test_tracked_text_is_english_apart_from_the_virtue_labels():
     assert not offences, (
         "This repository is public and its tracked text is English "
         "(CLAUDE.md, 'Public language: English only'). Korean is allowed only as "
-        "the six trilingual virtue syllables, and only as labels.\n  " + "\n  ".join(offences)
+        "the six virtue syllables, and only beside their own hanja and English name.\n  "
+        + "\n  ".join(offences)
     )
 
 
@@ -110,3 +158,34 @@ def test_the_scan_would_actually_catch_korean_prose(tmp_path):
     label = tmp_path / "label.py"
     label.write_text('PILLARS = ("jin", "\u771e", "\uc9c4", "Truth")\n', encoding="utf-8")
     assert not _offending_lines(label), "the virtue-label exception regressed"
+
+
+def _flags(tmp_path: Path, text: str) -> bool:
+    sample = tmp_path / "sample.md"
+    sample.write_text(text, encoding="utf-8")
+    return bool(_offending_lines(sample))
+
+
+def test_a_virtue_syllable_used_as_a_word_is_prose(tmp_path):
+    # The loophole this gate closes: the six syllables used as bare Korean
+    # nouns inside an English sentence used to pass.
+    hyo, yeong = "\ud6a8", "\uc601"
+    assert _flags(tmp_path, f"describe {hyo} as alignment, and {yeong} as record\n")
+    # English name alone, hanja alone, or another virtue's hanja is not a label.
+    assert _flags(tmp_path, "- \uc9c4 \u2014 `truth`\n")
+    assert _flags(tmp_path, "\uc9c4(\u771e) \u2014 measured claims\n")
+    assert _flags(tmp_path, "Truth \u5584 \uc9c4\n")
+    # A label elsewhere in the paragraph cannot be borrowed by a later sentence.
+    far = "Truth / \u771e / \uc9c4.\n" + "x" * (LABEL_WINDOW + 5) + " then \uc9c4 again\n"
+    assert _flags(tmp_path, far)
+    # Co-occurrence inside the window is not a label: the hanja must be glued on.
+    assert _flags(tmp_path, "The Truth \u771e team calls this \uc9c4 vibes check.\n")
+    assert _flags(tmp_path, "Truth (\u771e) as a concept, and honestly \uc9c4 is how I feel\n")
+
+
+def test_real_virtue_labels_still_pass(tmp_path):
+    # Table cell, inline label, and the multi-line tuple shape of hyodo/virtues.py.
+    assert not _flags(tmp_path, "| Hyo | \ud6a8 / \u5b5d | Consent |\n")
+    assert not _flags(tmp_path, "FAIL pytest (\u5584 \uc120 Good): no module\n")
+    tuple_shape = '(\n    "truth",\n    "Truth",\n    "\uc9c4",\n    "\u771e",\n)\n'
+    assert not _flags(tmp_path, tuple_shape)

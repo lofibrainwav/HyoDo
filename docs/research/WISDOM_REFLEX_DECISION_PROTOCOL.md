@@ -14,7 +14,7 @@ Existing KINGDOM state includes:
 - a declared 7-source strategy ROOT;
 - strategy ↔ EROS mappings;
 - a doctrine of one primary principle plus one checking/counter principle;
-- the canonical EROS six axes 진·선·미·인·효·영;
+- the canonical EROS six axes (`truth`, `goodness`, `beauty`, `benevolence`, `filialPiety`, `eternity`);
 - a weighted geometric-mean EROS calculation in the current governance system.
 
 Proposed research additions from the 2026-09-08 discussion include:
@@ -44,7 +44,7 @@ multiple interpretation candidates
         ↓
 contrast / counter-reading / failure-condition check
         ↓
-EROS-aligned evaluation using 진·선·미·인·효·영
+EROS-aligned evaluation using the six canonical virtue axes
         ↓
 weighted geometric-mean ranking experiment
         ↓
@@ -99,14 +99,14 @@ This Top-3 setting is a research design choice, not a validated optimum. It must
 
 Use the current KINGDOM canonical virtue names rather than inventing alternate English glosses:
 
-- 진 — `truth`
-- 선 — `goodness`
-- 미 — `beauty`
-- 인 — `benevolence`
-- 효 — `filialPiety`
-- 영 — `eternity`
+- 眞 / 진 — `truth`
+- 善 / 선 — `goodness`
+- 美 / 미 — `beauty`
+- 仁 / 인 — `benevolence`
+- 孝 / 효 — `filialPiety`
+- 永 / 영 — `eternity`
 
-Current KINGDOM glosses further describe 효 as alignment with the human commander's real purpose and peace rather than literal obedience, and 영 as record/reproduction/inheritance across future sessions or generations.
+Current KINGDOM glosses further describe `filialPiety` as alignment with the human commander's real purpose and peace rather than literal obedience, and `eternity` as record/reproduction/inheritance across future sessions or generations.
 
 These meanings are project governance semantics. They are not historical definitions of the classical sources.
 
