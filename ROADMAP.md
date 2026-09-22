@@ -5,17 +5,17 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.0 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.21.1 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.21.0.md`. Prior release receipts remain preserved under
+`docs/releases/4.21.1.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
 HyoDo 4.21.1 is the current release target and source-tree release baseline.
-HyoDo 4.21.0 remains the latest published release; its signed tag, GitHub
-Release + SBOM, PyPI provenance, and install smoke are measured in
-`docs/releases/4.21.0.md`. This does not establish every host integration.
+Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+measured in `docs/releases/4.21.1.md`. This does not establish every host
+integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
@@ -90,7 +90,7 @@ evidence is not converted into a pass.
   stop writing a live `.hyodo/gates.toml` when nothing was detected, so the
   built-in sampled fallback survives a zero-detection `hyodo init`.
 
-### 4.21.1 (release preparation)
+### 4.21.1 (released 2026-09-22)
 
 - Align top-level `hyodo --version` with the canonical public product identity.
 - Make the post-publish install verifier reject stale identity wording instead
