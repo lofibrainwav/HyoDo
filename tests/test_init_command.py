@@ -56,11 +56,11 @@ def test_init_shows_trilingual_pillar_labels(tmp_path: Path) -> None:
     assert result.exit_code == 0
     # pytest -> goodness (善/선/Good)
     assert "善" in result.output
-    assert "선" in result.output
+    assert "\uc120" in result.output
     assert "Good" in result.output
     # mypy -> truth (眞/진/Truth)
     assert "眞" in result.output
-    assert "진" in result.output
+    assert "\uc9c4" in result.output
     assert "Truth" in result.output
 
 

@@ -9,10 +9,12 @@ The single deliberate exception is the six virtue labels, which ship as
 hanja/Hangul/English together because the trilingual form *is* the label. Only
 those six syllables are allowed, and only as labels — never as prose. "As a
 label" is enforced, not assumed: a virtue syllable passes only when its own
-canonical hanja and one of its English names sit within a few characters of it.
+canonical hanja sits directly beside it (separated by nothing but spacing,
+slashes, brackets, quotes, or commas) and one of its English names is nearby.
 An earlier version allowed the six syllables anywhere, so a sentence could use
 them as bare Korean words and still pass; the policy said one thing and the
-gate checked a weaker one.
+gate checked a weaker one. Mere co-occurrence is not enough either: "Truth
+(<hanja>) ... honestly <syllable>" is still prose.
 
 This file writes every Hangul character as an escape rather than a literal, so it
 holds itself to the rule it enforces. That is not cosmetic: the first version
@@ -44,10 +46,14 @@ VIRTUE_LABELS: dict[str, tuple[str, tuple[str, ...]]] = {
 }
 ALLOWED_SYLLABLES = frozenset(VIRTUE_LABELS)
 
-# How far (in characters, either side) the hanja and English may sit from the
-# syllable. Wide enough for a table cell or a multi-line tuple such as
-# ("truth", "Truth", "<syllable>", "<hanja>"); narrow enough that a sentence
-# cannot borrow a label from elsewhere in the paragraph.
+# The hanja must be glued to the syllable: only separator characters between
+# them, at most LABEL_GAP of them. That admits "<hanja> / <syllable>",
+# "<syllable>(<hanja>)", and the multi-line tuple in hyodo/virtues.py, whose
+# gap is a quote, comma, newline, indentation, and quote.
+LABEL_SEPARATORS = "[\\s/(),\"'`]"
+LABEL_GAP = 16
+# The English name only has to be nearby (either side), because real labels put
+# markup between them, e.g. the dashboard's "<hanja> <syllable></span> Truth".
 LABEL_WINDOW = 40
 
 SCANNED_SUFFIXES = (".py", ".md")
@@ -73,9 +79,14 @@ def _tracked_files() -> list[Path]:
 
 def _is_label(text: str, index: int) -> bool:
     hanja, names = VIRTUE_LABELS[text[index]]
-    window = text[max(0, index - LABEL_WINDOW) : index + LABEL_WINDOW + 1]
-    if hanja not in window:
+    glued = rf"{LABEL_SEPARATORS}{{0,{LABEL_GAP}}}"
+    after = re.match(glued + re.escape(hanja), text[index + 1 :])
+    before = re.search(
+        re.escape(hanja) + glued + r"\Z", text[max(0, index - LABEL_GAP - 1) : index]
+    )
+    if not (after or before):
         return False
+    window = text[max(0, index - LABEL_WINDOW) : index + LABEL_WINDOW + 1]
     return any(
         re.search(rf"(?<![A-Za-z]){re.escape(name)}(?![A-Za-z])", window, re.I) for name in names
     )
@@ -167,6 +178,9 @@ def test_a_virtue_syllable_used_as_a_word_is_prose(tmp_path):
     # A label elsewhere in the paragraph cannot be borrowed by a later sentence.
     far = "Truth / \u771e / \uc9c4.\n" + "x" * (LABEL_WINDOW + 5) + " then \uc9c4 again\n"
     assert _flags(tmp_path, far)
+    # Co-occurrence inside the window is not a label: the hanja must be glued on.
+    assert _flags(tmp_path, "The Truth \u771e team calls this \uc9c4 vibes check.\n")
+    assert _flags(tmp_path, "Truth (\u771e) as a concept, and honestly \uc9c4 is how I feel\n")
 
 
 def test_real_virtue_labels_still_pass(tmp_path):
