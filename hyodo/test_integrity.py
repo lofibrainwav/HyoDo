@@ -6,10 +6,12 @@ report: it walks every discovered test file, flags test functions that execute
 but never observe anything, and cites the anti-gaming rule ids
 (HYO-SAFE-010/011/012) where its own findings overlap with that visitor's.
 
-Zero model calls, zero judgment about intent. The only claim made here is
-about the AST: a test function with no assertion in it cannot have caught a
-regression no matter what it asserts about the code under test, because it
-asserts nothing. A project with no discoverable tests is UNOBSERVED (see
+Zero model calls, zero judgment about intent. The claim is deliberately
+limited to syntax the scanner can recognize: a test function with no explicit
+assertion-shaped construct is flagged for review. Exception-only validators
+and other fail-by-raising APIs can be legitimate tests even when this bounded
+AST heuristic cannot prove their observation semantics. A project with no
+discoverable tests is UNOBSERVED (see
 `scanned_files`/`total_tests` both `0`), never treated as a failure by this
 module — `hyodo check --strict-tests` is what turns a positive count of
 vacuous tests into a failing Truth gate; this module only counts.
@@ -54,7 +56,7 @@ _ASSERT_LIKE_CALL_NAMES = {"raises", "warns"}
 
 @dataclass(frozen=True)
 class VacuousTestFinding:
-    """One test function whose AST shows it cannot have observed a regression."""
+    """One test function whose AST triggers a bounded integrity heuristic."""
 
     path: str
     line: int
@@ -304,7 +306,7 @@ def _scan_file(path: Path, root: Path) -> tuple[int, list[VacuousTestFinding]]:
                     line=node.lineno,
                     function=node.name,
                     category="no_assertion",
-                    detail=f"'{node.name}' asserts nothing observable{citation}",
+                    detail=f"'{node.name}' has no recognized explicit assertion construct{citation}",
                 )
             )
         else:

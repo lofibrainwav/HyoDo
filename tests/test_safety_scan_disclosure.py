@@ -206,3 +206,32 @@ def test_empty_corpus_never_prints_zero_over_zero(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     output = runner.invoke(app, ["safe", "--quiet"])
     assert "0/unknown files observed" in output.output
+
+
+def test_unlimited_directory_scan_does_not_claim_max_files_can_cover_binary_gap(tmp_path: Path):
+    (tmp_path / "code.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "image.png").write_bytes(b"\x00binary")
+
+    direct = run_safety_scan(path=str(tmp_path), max_files=0, cwd=tmp_path)
+    assert direct["coverage"] == "PARTIAL"
+    assert direct["scanned_files"] == 1
+    assert direct["total_scannable"] == 2  # legacy corpus-size field
+    assert direct["text_scannable_files"] == 1
+
+    result = runner.invoke(app, ["safe", str(tmp_path), "--max-files", "0"])
+    assert result.exit_code == 0
+    normalized = " ".join(result.output.split())
+    assert "non-text/binary" in normalized
+    assert "--max-files does not change this" in normalized
+    verdict_line = result.output.splitlines()[-1]
+    assert "pass --max-files 0" not in verdict_line
+
+
+def test_safe_json_discloses_text_scannable_count(tmp_path: Path):
+    (tmp_path / "code.py").write_text("value = 1\n", encoding="utf-8")
+    (tmp_path / "image.png").write_bytes(b"\x00binary")
+    result = runner.invoke(app, ["safe", "--json", str(tmp_path), "--max-files", "0"])
+    payload = json.loads(result.output)
+    assert payload["scanned_files"] == 1
+    assert payload["total_scannable"] == 2
+    assert payload["text_scannable_files"] == 1
