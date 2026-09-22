@@ -92,16 +92,18 @@ def _is_label(text: str, index: int) -> bool:
     )
 
 
-def _offending_lines(path: Path) -> list[tuple[int, str]]:
-    try:
-        text = path.read_text(encoding="utf-8")
-    except (OSError, UnicodeDecodeError):
-        # Unreadable is not clean. Surface it rather than counting it as a pass.
-        return [(0, f"<could not read {path}>")]
-    lines = text.splitlines(keepends=True)
+def find_public_language_offenses(text: str | None) -> list[tuple[int, str]]:
+    """Return ``(line number, line)`` for every line with Hangul that is not a label.
+
+    This is the single implementation of the public-language rule. Tracked files
+    (below) and commit messages / PR title / PR body (the ``public-language`` CI
+    job) both call it, so the two surfaces cannot drift apart again. It is pure:
+    text in, offences out, no file or git access.
+    """
+    text = text or ""
     offences = []
     offset = 0
-    for number, line in enumerate(lines, start=1):
+    for number, line in enumerate(text.splitlines(keepends=True), start=1):
         for match in HANGUL.finditer(line):
             char = match.group()
             if char in ALLOWED_SYLLABLES and _is_label(text, offset + match.start()):
@@ -110,6 +112,15 @@ def _offending_lines(path: Path) -> list[tuple[int, str]]:
             break
         offset += len(line)
     return offences
+
+
+def _offending_lines(path: Path) -> list[tuple[int, str]]:
+    try:
+        text = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        # Unreadable is not clean. Surface it rather than counting it as a pass.
+        return [(0, f"<could not read {path}>")]
+    return find_public_language_offenses(text)
 
 
 def test_tracked_text_is_english_apart_from_the_virtue_labels():
@@ -189,3 +200,31 @@ def test_real_virtue_labels_still_pass(tmp_path):
     assert not _flags(tmp_path, "FAIL pytest (\u5584 \uc120 Good): no module\n")
     tuple_shape = '(\n    "truth",\n    "Truth",\n    "\uc9c4",\n    "\u771e",\n)\n'
     assert not _flags(tmp_path, tuple_shape)
+
+
+def test_commit_and_pr_text_use_the_same_rule():
+    # The CI job feeds commit messages and PR text through this exact function.
+    assert find_public_language_offenses("fix: normal English") == []
+    assert find_public_language_offenses(None) == []
+    assert find_public_language_offenses("Truth / \u771e / \uc9c4 label update") == []
+    assert find_public_language_offenses("describe \ud6a8 as alignment")
+    assert find_public_language_offenses("\uc601 validation")
+
+
+def test_no_surface_reimplements_the_rule():
+    # Guard the consumers: the CI job must call the shared predicate, and no
+    # tracked file may rebuild the old "subtract the allowed syllables" check.
+    # That second copy is exactly how commit/PR text kept the weaker rule after
+    # the file gate was tightened.
+    workflow = (REPO_ROOT / ".github/workflows/ci.yml").read_text(encoding="utf-8")
+    assert "tests/test_public_language.py" in workflow
+    assert "module.find_public_language_offenses" in workflow
+
+    copies = []
+    for path in [*_tracked_files(), REPO_ROOT / ".github/workflows/ci.yml"]:
+        if path.name == Path(__file__).name:
+            continue
+        source = path.read_text(encoding="utf-8", errors="replace")
+        if "ALLOWED_SYLLABLES" in source or "ALLOWED = module." in source:
+            copies.append(str(path.relative_to(REPO_ROOT)))
+    assert not copies, f"the public-language rule is re-implemented in {copies}"

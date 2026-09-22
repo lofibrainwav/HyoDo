@@ -391,18 +391,16 @@ jobs:
           import subprocess
           import sys
 
-          # Import the pattern and the allowed syllables from the test module so
-          # files and prose are judged by one definition. Two copies of a rule is
-          # how the drift this gate exists to stop got started in the first place.
+          # Call the same predicate the tracked-file test uses, so files and
+          # commit/PR text are judged by one implementation. An earlier copy here
+          # rebuilt the rule from the allowed syllables and kept the weaker rule
+          # after the file gate was tightened.
           spec = importlib.util.spec_from_file_location(
               "public_language", "tests/test_public_language.py"
           )
           module = importlib.util.module_from_spec(spec)
           spec.loader.exec_module(module)
-          HANGUL, ALLOWED = module.HANGUL, module.ALLOWED_SYLLABLES
-
-          def offending(text):
-              return sorted(set(HANGUL.findall(text or "")) - ALLOWED)
+          offending = module.find_public_language_offenses
 
           failures = []
 
@@ -428,7 +426,8 @@ jobs:
 
           if failures:
               print("::error::Commit and PR text in this repository are English "
-                    "(CLAUDE.md). Only the trilingual virtue syllables are allowed.")
+                    "(CLAUDE.md). Korean is allowed only as the six trilingual "
+                    "virtue labels.")
               for line in failures:
                   print(f"  {line}")
               sys.exit(1)

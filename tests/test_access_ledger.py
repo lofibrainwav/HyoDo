@@ -353,15 +353,10 @@ def test_mcp_access_log_without_mcp_exits_2(monkeypatch):
 
 def test_access_ledger_public_language():
     """The access_ledger module contains no Korean prose (only English)."""
-    import re
+    from test_public_language import find_public_language_offenses
 
     import hyodo.access_ledger as mod
 
     source = Path(mod.__file__).read_text(encoding="utf-8")
-    # Hangul syllable block — the same pattern the project's own scanner uses
-    HANGUL = re.compile(r"[\uac00-\ud7a3]")
-    # The six allowed virtue-label syllables
-    ALLOWED_SYLLABLES = frozenset("\uc9c4\uc120\ubbf8\uc778\ud6a8\uc601")
-    found = set(HANGUL.findall(source))
-    offending = found - ALLOWED_SYLLABLES
+    offending = find_public_language_offenses(source)
     assert not offending, f"Korean prose found in access_ledger.py: {offending}"
