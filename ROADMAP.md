@@ -106,6 +106,8 @@ evidence is not converted into a pass.
 - Bound test-integrity language to syntax the AST heuristic actually recognizes.
 - Separate `--max-files` cap gaps from non-text/binary safety-scan gaps.
 - Keep unchanged release-chain readback zero-write instead of churning receipt time.
+- Run the built-artifact description check in public verification, and make the
+  public-language gate enforce the virtue-label exception as written.
 - Preserve all 4.21.0/4.21.1 status, exit-code, coverage, trust, and provenance
   semantics.
 

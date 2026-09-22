@@ -25,6 +25,15 @@ contracts are unchanged.
 - Safety output recommends `--max-files 0` only for files omitted by the file cap;
   non-text/binary files are reported separately because removing the cap cannot
   make the built-in text scanner observe them.
+- `scripts/verify-public.sh` re-runs the published-description check against the
+  wheel and sdist it just built, with `HYODO_REQUIRE_BUILT_ARTIFACTS=1`, and
+  requires exactly one pass. Previously every automated lane skipped that check
+  because no lane built artifacts before pytest. Source-only runs still report it
+  as UNOBSERVED.
+- The public-language test now allows a virtue syllable only when its canonical
+  hanja is glued to it and an English name is nearby, matching the written
+  policy; it previously allowed the six syllables anywhere. Research docs and
+  test strings that the stricter gate flagged were corrected.
 
 ### Fixed
 
@@ -35,8 +44,9 @@ contracts are unchanged.
 ### Evidence
 
 - Pre-release source verification: ruff/format clean, pyright 0 errors, focused
-  regression 74/74, full public verify PASS with 1,879 tests passed / 1 skipped,
-  package/Twine/sdist/wheel smoke PASS.
+  regression 74/74, full public verify PASS with 1,883 tests passed / 1 skipped
+  (the skip is the source-only UNOBSERVED artifact case), built-artifact README
+  check 1 passed, package/Twine/sdist/wheel smoke PASS.
 - Publication evidence remains UNOBSERVED until the 4.21.2 release chain runs.
 
 ## [4.21.1] - 2026-09-22
