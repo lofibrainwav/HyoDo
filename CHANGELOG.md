@@ -30,10 +30,12 @@ contracts are unchanged.
   requires exactly one pass. Previously every automated lane skipped that check
   because no lane built artifacts before pytest. Source-only runs still report it
   as UNOBSERVED.
-- The public-language test now allows a virtue syllable only when its canonical
-  hanja is glued to it and an English name is nearby, matching the written
-  policy; it previously allowed the six syllables anywhere. Research docs and
-  test strings that the stricter gate flagged were corrected.
+- The public-language test no longer allows the six virtue syllables anywhere:
+  bare-syllable prose is now rejected, and a syllable passes only in the
+  canonical trilingual label form (its hanja glued to it, an English name
+  nearby). Research docs and test strings that the stricter gate flagged were
+  corrected. Accepted lexical residual: the check is character-level, so a
+  label-form token used as the subject of a sentence still passes.
 
 ### Fixed
 
