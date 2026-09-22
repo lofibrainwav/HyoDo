@@ -143,17 +143,31 @@ def test_general_modes(monkeypatch, tmp_path, status, code):
     assert_modes(["check", str(tmp_path), "--general"], code)
 
 
+class _StubGatesConfig:
+    """Minimal stand-in for a parsed gates.toml.
+
+    `check` now also reports the command set it refused to run, so the stub
+    needs a `gates` attribute; an approved decision means it is never read.
+    """
+
+    gates: tuple[object, ...] = ()
+
+
 @pytest.mark.parametrize(("status", "code"), [("PASS", 0), ("FAIL", 1), ("SKIP", 2)])
 def test_user_gate_modes(monkeypatch, tmp_path, status, code):
-    from hyodo.gates import UserGateResult
+    from hyodo.gates import GateTrustDecision, UserGateResult
 
-    monkeypatch.setattr(cli, "load_gates_config", lambda *args: object())
+    trusted = GateTrustDecision(
+        approved=True, fingerprint="f" * 64, reason="test", via="prompt", persistence="OBSERVED"
+    )
+    monkeypatch.setattr(cli, "load_gates_config", lambda *args: _StubGatesConfig())
     monkeypatch.setattr(
         cli,
-        "run_user_gates",
-        lambda *args, **kwargs: [
-            UserGateResult(name="custom", pillar="truth", status=status, message="test")
-        ],
+        "run_user_gates_with_trust",
+        lambda *args, **kwargs: (
+            trusted,
+            [UserGateResult(name="custom", pillar="truth", status=status, message="test")],
+        ),
     )
     assert_modes(["check", str(tmp_path)], code)
 

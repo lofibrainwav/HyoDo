@@ -12,8 +12,9 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.20.2 is the current release target and source-tree release baseline.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+HyoDo 4.21.0 is the current release target and source-tree release baseline.
+Its release chain is not measured yet; 4.20.2 remains the latest release whose
+signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
 measured in `docs/releases/4.20.2.md`. This does not establish every host
 integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
@@ -69,6 +70,26 @@ evidence is not converted into a pass.
   under 4.20.2.
 - Release chain measured: verified tag, GitHub Release + SBOM, PyPI provenance,
   and install smoke are recorded in `docs/releases/4.20.2.md`.
+
+### 4.21.0 (unreleased)
+
+- Report gate coverage beside the gate verdict: `hyodo check` now emits
+  `coverage` (FULL/PARTIAL/NONE), `complete`, and `effective` so one passing
+  gate beside one skipped gate no longer reads as `HYODO PASS`.
+- Preserve the 4.20 machine contract exactly: exit codes and the existing JSON
+  keys (`status`, `gates_ran`, `gates_total`, `failed`) are unchanged, and the
+  new keys are additive.
+- Downgrade `effective` to UNOBSERVED when measurement provenance is MISMATCH
+  or UNOBSERVED, without altering the 4.20 `status` semantics for either case.
+- Report how a BYOG command set came to be trusted (`trust.via`) and whether
+  its receipt persisted (`trust.persistence`); a receipt that cannot be stored
+  is surfaced instead of being charged to a gate result.
+- Stop printing the trust-bypass environment variable in the refusal text, show
+  the exact commands that were refused, and report an unrecorded previous
+  command set as UNOBSERVED rather than describing it.
+- Separate "a project file exists" from "a supported tool was detected", and
+  stop writing a live `.hyodo/gates.toml` when nothing was detected, so the
+  built-in sampled fallback survives a zero-detection `hyodo init`.
 
 ### External adoption
 

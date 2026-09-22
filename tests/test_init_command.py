@@ -100,20 +100,36 @@ def test_init_force_overwrites_existing_config(tmp_path: Path) -> None:
     assert "pytest" in names
 
 
-def test_init_zero_detection_writes_honest_starter_template(tmp_path: Path) -> None:
+def test_init_zero_detection_writes_an_inert_example_not_a_live_config(tmp_path: Path) -> None:
+    """4.21: zero detections must not switch `hyodo check` onto the BYOG branch.
+
+    Until 4.20 the starter template was written to `.hyodo/gates.toml` itself.
+    Its mere presence is what selects BYOG, and a config with no active gate
+    table makes `hyodo check` report "no gates executed" (exit 2) instead of
+    falling back to the built-in sampled gates. The starter content is still
+    written -- to an inert `.example` name the operator renames on purpose.
+    """
     result = runner.invoke(app, ["init", str(tmp_path)])
 
     assert result.exit_code == 0
-    assert "No existing tooling detected" in result.output
+    assert "No supported tool was detected" in result.output
 
-    gates_path = _gates_path(tmp_path)
-    assert gates_path.exists()
-    rendered = gates_path.read_text(encoding="utf-8")
+    assert not _gates_path(tmp_path).exists()
+    # Nothing to load means `hyodo check` keeps its sampled fallback.
+    assert load_gates_config(tmp_path) is None
+
+    example_path = tmp_path / ".hyodo" / "gates.toml.example"
+    rendered = example_path.read_text(encoding="utf-8")
     assert f'schema = "{SCHEMA_ID}"' in rendered
     assert "# [gates.tests]" in rendered  # commented-out example, not an active gate
-    # A commented template has no active [gates.<name>] table: loading it must
-    # raise (not silently return None, which would look identical to "no
-    # config file at all" and could mask the empty-detection case).
+
+
+def test_init_renamed_example_still_refuses_to_load_silently(tmp_path: Path) -> None:
+    """Activating the untouched example must fail loudly, not run zero gates."""
+    runner.invoke(app, ["init", str(tmp_path)])
+    example_path = tmp_path / ".hyodo" / "gates.toml.example"
+    example_path.rename(_gates_path(tmp_path))
+
     with pytest.raises(GatesConfigError, match="no gates"):
         load_gates_config(tmp_path)
 
@@ -125,7 +141,17 @@ def test_init_missing_path_exits_2(tmp_path: Path) -> None:
 
 
 def test_init_prints_next_steps(tmp_path: Path) -> None:
+    (tmp_path / "pyproject.toml").write_text(
+        '[project.optional-dependencies]\ndev = ["pytest"]\n', encoding="utf-8"
+    )
     result = runner.invoke(app, ["init", str(tmp_path)])
     assert result.exit_code == 0
     assert "hyodo check" in result.output
     assert "hyodo dashboard" in result.output
+
+
+def test_init_zero_detection_next_steps_point_at_the_example(tmp_path: Path) -> None:
+    result = runner.invoke(app, ["init", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "gates.toml.example" in result.output
+    assert "hyodo check" in result.output

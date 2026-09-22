@@ -5,6 +5,43 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.0] - unreleased
+
+Honesty release for `hyodo check`. The 4.20 machine contract is unchanged:
+exit codes and the existing JSON keys keep their meanings, and everything new
+is additive.
+
+### Added
+
+- `hyodo check` reports `coverage` (`FULL` / `PARTIAL` / `NONE`), `complete`,
+  and `effective` beside the legacy `status`, so a declared-but-unexecuted gate
+  is visible instead of being absorbed into a pass.
+- BYOG runs report `trust.via` (how the command set came to be approved) and
+  `trust.persistence` (whether the approval receipt could actually be stored).
+
+### Changed
+
+- The human verdict line now renders `effective`. One passing gate beside one
+  skipped gate prints `HYODO UNOBSERVED`, not `HYODO PASS`; the exit code and
+  the JSON `status` for that run are still `0` / `PASS`.
+- Measurement provenance of `MISMATCH` or `UNOBSERVED` downgrades `effective`
+  to `UNOBSERVED`. The 4.20 `status` semantics for both cases are preserved.
+- A refused BYOG command set now lists the exact commands it did not run and
+  no longer prints the environment variable that would skip the refusal.
+- `hyodo init` with nothing detected writes `.hyodo/gates.toml.example` instead
+  of a live, empty `.hyodo/gates.toml`, so `hyodo check` keeps its built-in
+  sampled fallback rather than reporting zero executed gates.
+- Product wording across `--help`, `version`, and `start` is now
+  "Local evidence verification for AI-assisted work."
+
+### Fixed
+
+- A trust receipt that cannot be written is reported as
+  `trust.persistence: UNOBSERVED` rather than silently swallowed, and never
+  rewrites a gate result.
+- `hyodo init` no longer implies that the presence of a project file is itself
+  a detected tool.
+
 ## [4.20.2] - 2026-09-20
 
 Evidence-correctness patch for the post-4.20.1 source line. The immutable
