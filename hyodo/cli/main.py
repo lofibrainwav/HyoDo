@@ -683,8 +683,8 @@ def _print_test_integrity_line(report: TestIntegrityReport) -> None:
         console.print("\n[dim]Test integrity: UNOBSERVED (no pytest-convention tests found)[/dim]")
         return
     console.print(
-        f"\nTest integrity: {report.vacuous_tests}/{report.total_tests} tests assert "
-        "nothing -- see `hyodo check --json`"
+        f"\nTest integrity: {report.vacuous_tests}/{report.total_tests} tests have no "
+        "recognized explicit assertion construct -- see `hyodo check --json`"
     )
 
 
@@ -2297,7 +2297,7 @@ def check(
             pyright_result = GateResult(
                 GateStatus.FAIL,
                 f"pyright: pass; test-integrity: {test_integrity_report.vacuous_tests}/"
-                f"{test_integrity_report.total_tests} tests assert nothing",
+                f"{test_integrity_report.total_tests} tests have no recognized explicit assertion construct",
             )
             results[0] = pyright_result
             # The live "[1/4] Truth" line above already said PASS; say plainly
@@ -2305,7 +2305,7 @@ def check(
             console.print(
                 "[bold red][1/4] Truth - amended to FAIL by --strict-tests:[/bold red] "
                 f"{test_integrity_report.vacuous_tests}/{test_integrity_report.total_tests} "
-                "tests assert nothing"
+                "tests have no recognized explicit assertion construct"
             )
         _print_test_integrity_line(test_integrity_report)
         verdict_state["test_integrity"] = _test_integrity_payload(test_integrity_report)
@@ -2859,12 +2859,25 @@ def safe(
         total = result.get("total_scannable")
         coverage = result.get("coverage", "UNOBSERVED")
         partial_note = ""
+        text_scannable = result.get("text_scannable_files")
         if coverage == "PARTIAL" and isinstance(scanned, int) and isinstance(total, int):
-            unscanned = total - scanned
-            partial_note = (
-                f"; {unscanned} file(s) unscanned (coverage PARTIAL — pass --max-files 0 "
-                "to scan all)"
-            )
+            notes: list[str] = []
+            if isinstance(text_scannable, int):
+                capped = max(text_scannable - scanned, 0)
+                non_text = max(total - text_scannable, 0)
+                if capped:
+                    notes.append(
+                        f"{capped} text file(s) unscanned by the file cap — pass --max-files 0 "
+                        "to remove the cap"
+                    )
+                if non_text:
+                    notes.append(
+                        f"{non_text} non-text/binary file(s) remain unobserved by the built-in "
+                        "text scanner; --max-files does not change this"
+                    )
+            if not notes:
+                notes.append(f"{total - scanned} file(s) remain unobserved")
+            partial_note = "; " + "; ".join(notes) + " (coverage PARTIAL)"
         verdict_state.update(
             observed=scanned if isinstance(scanned, int) else 0,
             expected=total if isinstance(total, int) and total else "unknown",
@@ -2904,6 +2917,7 @@ def safe(
                 "exceptions_applied": int(result.get("exceptions_applied", 0)),
                 "scanned_files": result.get("scanned_files"),
                 "total_scannable": result.get("total_scannable"),
+                "text_scannable_files": result.get("text_scannable_files"),
             }
             console.print_json(json.dumps(payload))
             raise typer.Exit(exit_code)
@@ -2962,16 +2976,29 @@ def safe(
         scanned_files = result.get("scanned_files")
         total_scannable = result.get("total_scannable")
         if isinstance(scanned_files, int) and isinstance(total_scannable, int):
-            if (
-                source.startswith("dir:")
-                and max_files > 0
-                and scanned_files >= max_files
-                and total_scannable > scanned_files
-            ):
-                coverage_note = (
-                    f"Directory scan cap: scanned {scanned_files} of {total_scannable} files "
-                    f"(cap {max_files}); raise --max-files to scan all. "
-                )
+            text_scannable = result.get("text_scannable_files")
+            if source.startswith("dir:") and isinstance(text_scannable, int):
+                capped = max(text_scannable - scanned_files, 0)
+                non_text = max(total_scannable - text_scannable, 0)
+                if non_text == 0 and capped:
+                    coverage_note = (
+                        f"Directory scan cap: scanned {scanned_files} of {total_scannable} files "
+                        f"(cap {max_files}); raise --max-files to scan all. "
+                    )
+                elif non_text == 0:
+                    coverage_note = f"Scanned {scanned_files} of {total_scannable} files. "
+                else:
+                    parts = [f"Scanned {scanned_files} of {total_scannable} corpus files."]
+                    if capped:
+                        parts.append(
+                            f"{capped} text file(s) were omitted by the cap {max_files}; "
+                            "pass --max-files 0 to remove the cap."
+                        )
+                    parts.append(
+                        f"{non_text} non-text/binary file(s) are outside the built-in text scan; "
+                        "--max-files does not change this."
+                    )
+                    coverage_note = " ".join(parts) + " "
             elif total_scannable > scanned_files:
                 coverage_note = (
                     f"Scanned {scanned_files} of {total_scannable} files; "

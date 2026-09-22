@@ -246,7 +246,7 @@ def test_check_strict_tests_fails_truth_gate_when_pyright_passes_and_tests_vacuo
                 line=1,
                 function="test_x",
                 category="no_assertion",
-                detail="asserts nothing",
+                detail="has no recognized explicit assertion construct",
             ),
         ),
     )
@@ -261,7 +261,8 @@ def test_check_strict_tests_fails_truth_gate_when_pyright_passes_and_tests_vacuo
         result = runner.invoke(app, ["check", str(hyodo_root), "--strict-tests"])
 
     assert result.exit_code == 1
-    assert "test-integrity: 1/2 tests assert nothing" in result.output
+    normalized = " ".join(result.output.split())
+    assert "test-integrity: 1/2 tests have no recognized explicit assertion construct" in normalized
 
 
 def test_check_without_strict_tests_ignores_vacuous_tests_for_exit_code() -> None:
@@ -286,7 +287,8 @@ def test_check_without_strict_tests_ignores_vacuous_tests_for_exit_code() -> Non
         result = runner.invoke(app, ["check", str(hyodo_root)])
 
     assert result.exit_code == 0
-    assert "Test integrity: 1/2 tests assert nothing" in result.output
+    normalized = " ".join(result.output.split())
+    assert "Test integrity: 1/2 tests have no recognized explicit assertion construct" in normalized
 
 
 def test_check_json_includes_test_integrity_object() -> None:

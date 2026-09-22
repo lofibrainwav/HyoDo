@@ -114,3 +114,10 @@ def test_workflow_checkouts_do_not_persist_github_credentials() -> None:
                     assert step.get("with", {}).get("persist-credentials") is False, (
                         f"{path.name}:{job_name}:{step.get('name', '<unnamed>')}"
                     )
+
+
+def test_verify_public_bootstraps_a_pipless_uv_venv() -> None:
+    script = (ROOT / "scripts" / "verify-public.sh").read_text(encoding="utf-8")
+    assert '"$PYTHON" -m pip --version' in script
+    assert 'uv pip install --python "$PYTHON" -e ".[dev]"' in script
+    assert "has no pip and uv is unavailable" in script

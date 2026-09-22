@@ -48,8 +48,24 @@ fi
 
 echo "python: $PYTHON ($($PYTHON --version 2>&1))"
 
-# ensure editable install for CLI
-$PYTHON -m pip install -e ".[dev]" -q
+# Ensure the editable dev install exists. `uv venv` intentionally does not seed
+# pip, so a perfectly standard project venv may make `python -m pip` unavailable.
+# Prefer the existing pip path when present; otherwise use uv as the bootstrap
+# installer for this interpreter. The dev extra includes pip, so later package
+# build/install checks can continue using `python -m pip` without a second path.
+if "$PYTHON" -m pip --version >/dev/null 2>&1; then
+  "$PYTHON" -m pip install -e ".[dev]" -q
+elif command -v uv >/dev/null 2>&1; then
+  echo "pip not present in $PYTHON; bootstrapping dev dependencies with uv"
+  uv pip install --python "$PYTHON" -e ".[dev]" -q
+else
+  echo "ERROR: $PYTHON has no pip and uv is unavailable; cannot install verification dependencies" >&2
+  exit 1
+fi
+"$PYTHON" -m pip --version >/dev/null 2>&1 || {
+  echo "ERROR: verification environment still has no pip after dependency bootstrap" >&2
+  exit 1
+}
 
 if [[ -n "$BINDIR" && -x "$BINDIR/hyodo" ]]; then
   HYODO=("$BINDIR/hyodo")

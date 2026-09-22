@@ -23,6 +23,7 @@ from scripts.release.verify_release_chain import (
     install_smoke_step,
     matching_run,
     receipt_drift,
+    receipt_matches_measurement,
     render_receipt,
     tag_step,
 )
@@ -245,3 +246,22 @@ def test_install_smoke_is_unobserved_when_the_version_is_absent() -> None:
     step = install_smoke_step("9.9.9", wheel_sha256=None)
     assert step.state == "UNOBSERVED"
     assert step.evidence is None
+
+
+def test_identical_measured_receipt_is_zero_write_eligible() -> None:
+    measured = [_observed("Signed verified tag", "`v4.21.1` -> `06c57bd`, signature verified")]
+    document = render_receipt(measured, measured_at="2026-09-22T15:07:26Z")
+    assert receipt_matches_measurement(document, measured) is True
+
+
+def test_unmeasured_template_is_not_zero_write_even_when_states_match() -> None:
+    measured = [_unobserved("Signed verified tag")]
+    document = render_receipt(measured, measured_at=None)
+    assert receipt_matches_measurement(document, measured) is False
+
+
+def test_changed_evidence_is_not_zero_write_eligible() -> None:
+    old = [_observed("PyPI publish", "run `1`")]
+    new = [_observed("PyPI publish", "run `2`")]
+    document = render_receipt(old, measured_at="2026-09-22T15:07:26Z")
+    assert receipt_matches_measurement(document, new) is False

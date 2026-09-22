@@ -731,7 +731,7 @@ def _apply_safety_exceptions(
 
 def _scan_directory(
     target: Path, root: Path, config: ScanExceptionsConfig, max_files: int = 40
-) -> tuple[list[Finding], str, str, int, int, int]:
+) -> tuple[list[Finding], str, str, int, int, int, int]:
     """Per-file scan for directories (path attached).
 
     Caps at *max_files* files; ``max_files <= 0`` means unlimited.
@@ -749,7 +749,13 @@ def _scan_directory(
         and not any(part.startswith(".git") or part in _SKIPPED_DIR_NAMES for part in p.parts)
     ]
     scannable_paths = [p for p in corpus_paths if is_scannable_file(p)]
+    # `total_scannable` is a legacy/public result key whose existing semantics are
+    # the selected corpus size, including files the built-in text scanner cannot
+    # read (for example PNG/ICO). Keep that contract stable and expose the actual
+    # text-eligible count separately so the CLI can distinguish a file-cap gap
+    # from a non-text/binary gap.
     total_scannable = len(corpus_paths)
+    text_scannable_files = len(scannable_paths)
     scan_targets = scannable_paths if max_files <= 0 else scannable_paths[:max_files]
 
     findings: list[Finding] = []
@@ -767,6 +773,7 @@ def _scan_directory(
                 suppressed_count,
                 count,
                 total_scannable,
+                text_scannable_files,
             )
         scanned, suppressed = _apply_safety_exceptions(
             scan_text(text, path=str(file_path)), root, config
@@ -778,7 +785,15 @@ def _scan_directory(
     corpus = "\n".join(chunks)
     findings.append(assess_rollback_signal(corpus))
     source = f"dir:{target} ({count} files)"
-    return findings, corpus, source, suppressed_count, count, total_scannable
+    return (
+        findings,
+        corpus,
+        source,
+        suppressed_count,
+        count,
+        total_scannable,
+        text_scannable_files,
+    )
 
 
 def _risk_level_action(score: int) -> tuple[str, str]:
@@ -821,6 +836,7 @@ def _result_payload(
     exceptions_applied: int = 0,
     scanned_files: int | None = None,
     total_scannable: int | None = None,
+    text_scannable_files: int | None = None,
     *,
     scope: str,
 ) -> dict:
@@ -855,6 +871,7 @@ def _result_payload(
         "exceptions_applied": exceptions_applied,
         "scanned_files": scanned_files,
         "total_scannable": total_scannable,
+        "text_scannable_files": text_scannable_files,
     }
 
 
@@ -934,6 +951,7 @@ def run_safety_scan(
     exceptions_applied = 0
     scanned_files: int | None = None
     total_scannable: int | None = None
+    text_scannable_files: int | None = None
     scope: str
 
     if path:
@@ -951,9 +969,11 @@ def run_safety_scan(
                         strict,
                         scanned_files=0,
                         total_scannable=1,
+                        text_scannable_files=0,
                         scope="file",
                     )
                 text = _read_text_file(target)
+                text_scannable_files = 1
             except OSError:
                 findings = []
                 source = f"error:read:{target}"
@@ -973,6 +993,7 @@ def run_safety_scan(
                 exceptions_applied,
                 scanned_files,
                 total_scannable,
+                text_scannable_files,
             ) = _scan_directory(target, root, exceptions, max_files=max_files)
         else:
             scope = "none"
@@ -999,5 +1020,6 @@ def run_safety_scan(
         exceptions_applied,
         scanned_files=scanned_files,
         total_scannable=total_scannable,
+        text_scannable_files=text_scannable_files,
         scope=scope,
     )

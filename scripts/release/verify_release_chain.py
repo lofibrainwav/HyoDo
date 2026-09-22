@@ -117,6 +117,22 @@ def parse_receipt(document: str) -> dict[str, ChainStep]:
     return found
 
 
+def receipt_matches_measurement(document: str, measured: list[ChainStep]) -> bool:
+    """True when a previously measured receipt already carries this exact evidence.
+
+    Re-running verification is a readback operation. If states and durable evidence
+    are unchanged, rewriting only the ``Measured`` timestamp dirties the very
+    artifact being verified. A prepared ``Not measured yet`` receipt is *not* a
+    match even when every step remains UNOBSERVED: the first real measurement still
+    needs to record that somebody looked.
+    """
+    section = document.split(RECEIPT_HEADING, 1)[-1].split("\n## ", 1)[0]
+    if not any(line.startswith("Measured ") for line in section.splitlines()):
+        return False
+    written = parse_receipt(document)
+    return all(written.get(step.name) == step for step in measured)
+
+
 def receipt_drift(document: str, measured: list[ChainStep]) -> list[str]:
     """Where the written receipt disagrees with a fresh measurement.
 
@@ -385,6 +401,14 @@ def main(argv: list[str] | None = None) -> int:
         for line in drift:
             print(line)
         return 1 if drift else 0
+
+    # A fresh measurement with identical states *and evidence* is a readback, not
+    # a new release event. Preserve the original measurement timestamp and keep the
+    # checkout clean instead of manufacturing document churn.
+    if receipt_matches_measurement(document, measured):
+        for step in measured:
+            print(step.render())
+        return 0
 
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     note.write_text(
