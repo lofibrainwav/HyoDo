@@ -1011,11 +1011,12 @@ def run_publication(
     """
     tag = f"v{version}"
     dry_run = not execute
-    main_state = remote.observe_main()
-    main_sha = main_state.get("sha") or ""
     try:
+        main_state = remote.observe_main()
+        main_sha = main_state.get("sha") or ""
         receipt = start_publication_receipt(version, main_sha, f"origin/main @ {main_sha}")
-    except ValueError as exc:
+    except Exception as exc:
+        # Nothing has been mutated yet; still answer with a receipt.
         return {
             "schema": "hyodo.release-receipt/v1",
             "phase": "publication",
@@ -1023,7 +1024,9 @@ def run_publication(
             "state": None,
             "stage": "BLOCKED",
             "result": "BLOCK",
-            "residuals": [str(exc)],
+            "residuals": [f"{type(exc).__name__}: {exc}"],
+            "mutations": [],
+            "external_mutation": False,
         }
     receipt["history"][0]["simulated"] = False
     receipt.update(

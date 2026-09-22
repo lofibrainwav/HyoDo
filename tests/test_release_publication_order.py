@@ -478,3 +478,18 @@ def test_a_crash_after_publishing_still_returns_the_receipt() -> None:
     assert [m["kind"] for m in receipt["mutations"]][-1] == "publish_release"
     assert "TimeoutExpired" in receipt["residuals"][0]
     assert "outcome after PUBLISHED is unknown" in receipt["residuals"][0]
+
+
+def test_a_crash_while_observing_main_still_returns_a_receipt() -> None:
+    import subprocess
+
+    remote = FakeRemote()
+
+    def hang() -> dict[str, str]:
+        raise subprocess.TimeoutExpired(["git", "fetch"], 120)
+
+    remote.observe_main = hang  # type: ignore[method-assign]
+    receipt = _run(remote, **_authorized())
+    assert receipt["result"] == "BLOCK"
+    assert "TimeoutExpired" in receipt["residuals"][0]
+    assert remote.mutations() == []
