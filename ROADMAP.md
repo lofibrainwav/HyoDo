@@ -12,9 +12,11 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.1 is the current release target and source-tree release baseline.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-measured in `docs/releases/4.21.1.md`. This does not establish every host
+HyoDo 4.21.2 is the current release target and source-tree release baseline.
+Its publication chain is not measured yet; `docs/releases/4.21.2.md` therefore
+keeps every release step UNOBSERVED until the tag, Release/SBOM, PyPI provenance,
+and install smoke are read back. HyoDo 4.21.1 remains the latest published, fully
+measured release until that chain completes. This does not establish every host
 integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
@@ -97,6 +99,19 @@ evidence is not converted into a pass.
   of accepting any output that merely contains the expected version number.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
+
+### 4.21.2 (release preparation)
+
+- Make the documented public verifier work from a pipless uv-created project venv.
+- Bound test-integrity language to syntax the AST heuristic actually recognizes.
+- Separate `--max-files` cap gaps from non-text/binary safety-scan gaps.
+- Keep unchanged release-chain readback zero-write instead of churning receipt time.
+- Run the built-artifact description check in public verification, and make the
+  public-language gate reject bare virtue-syllable prose and require the canonical
+  trilingual label form (one accepted lexical residual: a label-form token used
+  as a sentence subject).
+- Preserve all 4.21.0/4.21.1 status, exit-code, coverage, trust, and provenance
+  semantics.
 
 ### External adoption
 

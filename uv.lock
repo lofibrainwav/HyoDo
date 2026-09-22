@@ -1227,7 +1227,7 @@ wheels = [
 
 [[package]]
 name = "hyodo"
-version = "4.21.1"
+version = "4.21.2"
 source = { editable = "." }
 dependencies = [
     { name = "jsonschema" },
