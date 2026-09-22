@@ -17,8 +17,8 @@ Its release chain is incomplete and sealed as such: the signed tag and an
 immutable GitHub Release exist, but the Release was published without SBOM
 evidence and 4.21.2 never reached PyPI (`docs/releases/4.21.2.md`). HyoDo 4.21.1
 remains the latest published, fully measured release. The same code will ship
-in a later version only after the release pipeline owns the publication states. This does not establish every host
-integration.
+in a later version only after the release pipeline owns the publication states.
+This does not establish every host integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
