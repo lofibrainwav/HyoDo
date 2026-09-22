@@ -113,6 +113,19 @@ $PYTHON -m build --outdir "$VERIFY_DIR/dist"
 # that it can validate as uploadable package files.
 $PYTHON -m twine check "$VERIFY_DIR"/dist/*.whl "$VERIFY_DIR"/dist/*.tar.gz
 
+echo "-- built-artifact README links --"
+# The source-only pytest run above cannot see these artifacts and reports this
+# check as UNOBSERVED. Re-run it against the files just built, and require them,
+# so the description users actually download is observed on every verify.
+HYODO_DIST_DIR="$VERIFY_DIR/dist" HYODO_REQUIRE_BUILT_ARTIFACTS=1 \
+  $PYTHON -m pytest tests/test_pypi_readme_links.py -q --tb=short \
+  -k test_built_artifacts_publish_the_rewritten_description -rs -p no:cacheprovider \
+  | tee "$VERIFY_DIR/readme-artifact-pytest.log"
+if ! grep -Eq '^=* ?1 passed, [0-9]+ deselected in ' "$VERIFY_DIR/readme-artifact-pytest.log"; then
+  echo "ERROR: built-artifact README check did not pass exactly once (see above)" >&2
+  exit 1
+fi
+
 echo "-- sdist must not ship afo_core --"
 "$PYTHON" scripts/release/verify_sdist_scope.py "$VERIFY_DIR"/dist/*.tar.gz
 $PYTHON - "$VERIFY_DIR/dist" <<'PY'

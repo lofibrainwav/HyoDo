@@ -126,7 +126,7 @@ It separates existing KINGDOM behavior from proposed research, including:
 - multiple attributed interpretation candidates;
 - Top-3 as an initial, unvalidated experimental setting;
 - counter-readings and failure conditions;
-- canonical EROS vocabulary: 진·선·미·인·효·영 = truth / goodness / beauty / benevolence / filialPiety / eternity;
+- canonical EROS vocabulary: truth / goodness / beauty / benevolence / filialPiety / eternity;
 - testing an EROS-aligned weighted-geometric interpretation ranking without creating shadow authority;
 - HyoDo evidence-updated confidence;
 - hostile null baselines against task heuristics, generic semantic routing, modern generic principles, and corrupted controls.

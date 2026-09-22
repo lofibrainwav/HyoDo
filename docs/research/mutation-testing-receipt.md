@@ -94,7 +94,7 @@ They are not presented as three production-code bugs.
 - **Assumption**: Boundedness assertion assumed exact scorer bounds.
 - **Correction**: fifth-root floating-point rounding can produce a tiny epsilon above 10.
 - **Fix**: assertions use epsilon tolerance and explicit all-zero/all-one examples.
-- **Philosophy mapping**: 미(美) — mathematical claims include floating-point limits.
+- **Philosophy mapping**: Beauty / 미(美) — mathematical claims include floating-point limits.
 
 ### H2: AWS access key regex has no end anchor
 
@@ -102,7 +102,7 @@ They are not presented as three production-code bugs.
 - **Assumption**: the test expected `AKIA[0-9A-Z]{16}` to reject a longer suffix.
 - **Correction**: the regex intentionally prefix-matches 16 or more suffix characters.
 - **Fix**: boundary expectations now match the shipped pattern behavior.
-- **Philosophy mapping**: 진(眞) — tests measure actual contracts, not assumptions.
+- **Philosophy mapping**: Truth / 진(眞) — tests measure actual contracts, not assumptions.
 
 ### H3: GitHub token charset excludes hyphens
 
@@ -110,7 +110,7 @@ They are not presented as three production-code bugs.
 - **Assumption**: the generator included hyphens in the token body.
 - **Correction**: the regex body is `[A-Za-z0-9_]{20,}`.
 - **Fix**: the property generator uses the actual invariant charset.
-- **Philosophy mapping**: 진(眞) — generators match the contract they exercise.
+- **Philosophy mapping**: Truth / 진(眞) — generators match the contract they exercise.
 
 ## Cosmic Ray Status
 

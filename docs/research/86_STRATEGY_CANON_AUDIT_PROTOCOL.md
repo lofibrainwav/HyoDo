@@ -133,7 +133,7 @@ If a canonical entry is later found to have weak provenance, mistranslation, dup
 
 ## 8. Relationship to EROS and authority
 
-The current KINGDOM canon maps strategies to the six canonical EROS virtues: `truth`, `goodness`, `beauty`, `benevolence`, `filialPiety`, and `eternity` (진·선·미·인·효·영).
+The current KINGDOM canon maps strategies to the six canonical EROS virtues: `truth`, `goodness`, `beauty`, `benevolence`, `filialPiety`, and `eternity`.
 
 Those mappings are part of the current project state and should be audited separately from historical provenance.
 
