@@ -5,17 +5,16 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.20.2 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.21.0 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.20.2.md`. Prior release receipts remain preserved under
+`docs/releases/4.21.0.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
 HyoDo 4.21.0 is the current release target and source-tree release baseline.
-Its release chain is not measured yet; 4.20.2 remains the latest release whose
-signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-measured in `docs/releases/4.20.2.md`. This does not establish every host
+Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+measured in `docs/releases/4.21.0.md`. This does not establish every host
 integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
@@ -71,7 +70,7 @@ evidence is not converted into a pass.
 - Release chain measured: verified tag, GitHub Release + SBOM, PyPI provenance,
   and install smoke are recorded in `docs/releases/4.20.2.md`.
 
-### 4.21.0 (unreleased)
+### 4.21.0 (released 2026-09-22)
 
 - Report gate coverage beside the gate verdict: `hyodo check` now emits
   `coverage` (FULL/PARTIAL/NONE), `complete`, and `effective` so one passing
