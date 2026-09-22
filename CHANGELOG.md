@@ -5,6 +5,40 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.2] - 2026-09-22
+
+Verification-plumbing honesty patch. The 4.21 check status, coverage, and exit-code
+contracts are unchanged.
+
+### Added
+
+- Safety JSON includes additive `text_scannable_files`, separating text files that
+  are eligible for the built-in scanner from the wider selected corpus.
+
+### Changed
+
+- `scripts/verify-public.sh` bootstraps a standard pipless uv project environment
+  with `uv pip` before continuing through the existing locked verification path.
+- Test-integrity output now says a test has no *recognized explicit assertion
+  construct* instead of claiming that every such test "asserts nothing"; finding
+  categories and strict-test behavior are unchanged.
+- Safety output recommends `--max-files 0` only for files omitted by the file cap;
+  non-text/binary files are reported separately because removing the cap cannot
+  make the built-in text scanner observe them.
+
+### Fixed
+
+- Re-running the release-chain verifier with identical states and durable evidence
+  no longer rewrites only the receipt measurement timestamp and dirties the
+  checkout. First measurement and changed evidence still update the receipt.
+
+### Evidence
+
+- Pre-release source verification: ruff/format clean, pyright 0 errors, focused
+  regression 74/74, full public verify PASS with 1,879 tests passed / 1 skipped,
+  package/Twine/sdist/wheel smoke PASS.
+- Publication evidence remains UNOBSERVED until the 4.21.2 release chain runs.
+
 ## [4.21.1] - 2026-09-22
 
 Public CLI identity readback patch. The 4.21 verification-honesty semantics and
