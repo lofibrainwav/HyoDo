@@ -17,22 +17,32 @@ RELEASE_STATES = (
     "PR_OPEN",
     "REMOTE_GATED",
     "MERGED",
+    # Publication. v4.21.2 went MERGED -> tag -> published Release by hand, with
+    # no draft and no evidence, and immutable releases made that permanent. Each
+    # step now has its own state, and PUBLISHED is reachable only from a draft
+    # whose SBOM evidence was attached and verified.
+    "TAGGED",
+    "DRAFT_CREATED",
+    "EVIDENCE_BUILT",
+    "EVIDENCE_ATTACHED",
+    "DRAFT_VERIFIED",
     "PUBLISHED",
+    "PYPI_PUBLISHED",
+    "PROVENANCE_VERIFIED",
+    "INSTALL_VERIFIED",
     "READBACK_VERIFIED",
 )
 
-ALLOWED_TRANSITIONS: dict[str, str] = {
-    "OBSERVED": "PLANNED",
-    "PLANNED": "AUTHORIZED",
-    "AUTHORIZED": "APPLIED",
-    "APPLIED": "VERIFIED",
-    "VERIFIED": "PUSHED",
-    "PUSHED": "PR_OPEN",
-    "PR_OPEN": "REMOTE_GATED",
-    "REMOTE_GATED": "MERGED",
-    "MERGED": "PUBLISHED",
-    "PUBLISHED": "READBACK_VERIFIED",
-}
+# Strictly linear: every state has exactly one successor, so no stage can be
+# skipped and no irreversible step can be reached early.
+ALLOWED_TRANSITIONS: dict[str, str] = dict(pairwise(RELEASE_STATES))
+
+# A publication receipt starts from an already merged release candidate.
+RECEIPT_START_STATES = ("OBSERVED", "MERGED")
+
+
+class ReleaseOrderError(ValueError):
+    """Raised when a release action is attempted from the wrong state."""
 
 
 def _now() -> str:
@@ -66,6 +76,30 @@ def start_receipt(plan: dict[str, Any]) -> dict[str, Any]:
     return receipt
 
 
+def start_publication_receipt(version: str, merged_sha: str, evidence: str) -> dict[str, Any]:
+    """Start the publication half of a release at MERGED, bound to one main SHA."""
+    if not merged_sha or len(merged_sha) != 40:
+        raise ValueError("publication requires the full merged main SHA")
+    return {
+        "schema": "hyodo.release-receipt/v1",
+        "phase": "publication",
+        "version": version,
+        "tag": f"v{version}",
+        "merged_sha": merged_sha,
+        "state": "MERGED",
+        "final_state": "MERGED",
+        "history": [_entry("MERGED", evidence)],
+        "residuals": [],
+    }
+
+
+def require_state(receipt: dict[str, Any], expected: str, action: str) -> None:
+    """Refuse an action unless the receipt is exactly in ``expected``."""
+    current = receipt.get("state")
+    if current != expected:
+        raise ReleaseOrderError(f"{action} requires {expected}; receipt is at {current}")
+
+
 def transition(receipt: dict[str, Any], target: str, evidence: str) -> dict[str, Any]:
     """Advance exactly one allowed state, requiring target-bound evidence."""
     current = receipt.get("state")
@@ -89,8 +123,8 @@ def validate_receipt(receipt: dict[str, Any]) -> None:
     if not isinstance(history, list) or not history:
         raise ValueError("release receipt history is required")
     states = [entry.get("state") for entry in history]
-    if states[0] != "OBSERVED":
-        raise ValueError("release receipt must begin at OBSERVED")
+    if states[0] not in RECEIPT_START_STATES:
+        raise ValueError("release receipt must begin at OBSERVED or, for publication, MERGED")
     for previous, current in pairwise(states):
         if ALLOWED_TRANSITIONS.get(previous) != current:
             raise ValueError(f"invalid release history transition: {previous} -> {current}")

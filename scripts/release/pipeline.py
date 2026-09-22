@@ -20,8 +20,20 @@ from typing import Any
 
 try:
     from scripts.release.plan_release import ReleasePlanError, plan_release
+    from scripts.release.release_state import (
+        ReleaseOrderError,
+        require_state,
+        start_publication_receipt,
+        transition,
+    )
 except ModuleNotFoundError:  # pragma: no cover - direct script execution path
     from plan_release import ReleasePlanError, plan_release
+    from release_state import (
+        ReleaseOrderError,
+        require_state,
+        start_publication_receipt,
+        transition,
+    )
 
 
 def _now() -> str:
@@ -372,6 +384,15 @@ def readback_main(root: Path, *, expected_sha: str) -> dict[str, Any]:
     }
 
 
+def post_merge_stage(readback: dict[str, Any]) -> str:
+    """Name the stage reached after merge.
+
+    Only main has been read back here. READBACK_VERIFIED is reserved for the
+    publication chain read back end to end, so a merge must not claim it.
+    """
+    return "MERGED" if readback.get("result") == "PASS" else "BLOCKED"
+
+
 def closeout_receipt(receipt: dict[str, Any]) -> dict[str, Any]:
     """Add a compact human/agent handoff without inventing missing evidence."""
     return {
@@ -657,7 +678,7 @@ def run_pipeline(
         readback = readback_main(root, expected_sha=merged["sha"])
         receipt["main_readback"] = readback
         receipt["stages"]["readback_main"] = readback["result"]
-        receipt["stage"] = "READBACK_VERIFIED" if readback["result"] == "PASS" else "BLOCKED"
+        receipt["stage"] = post_merge_stage(readback)
         receipt["result"] = readback["result"]
         receipt["residuals"] = [] if readback["result"] == "PASS" else ["main SHA mismatch"]
         receipt["closeout"] = closeout_receipt(receipt)
@@ -671,6 +692,450 @@ def run_pipeline(
                 "result": "BLOCK",
                 "residuals": [str(exc)],
                 "next_action": "reconcile remote state before retrying; merge outcome is unknown",
+            }
+        )
+    return receipt
+
+
+# ---------------------------------------------------------------------------
+# Publication: MERGED -> ... -> READBACK_VERIFIED
+#
+# v4.21.2 was tagged and its Release published by hand before the SBOM was
+# attached; immutable releases made that permanent. The workflows guarded PyPI,
+# but nothing owned the irreversible step. This stage owns it: every external
+# mutation goes through ``_mutate`` (planned, not called, in a dry run), and
+# ``publish_release`` runs only from DRAFT_VERIFIED, under human authority bound
+# to the merged SHA, after re-observing the draft and its evidence.
+# ---------------------------------------------------------------------------
+
+SBOM_ASSETS = ("sbom.cyclonedx.json", "sbom.cyclonedx.json.sha256")
+
+# Workflow jobs whose success is the evidence for a publication state. Keyed by
+# job id; tests fail if a workflow renames or reorders one of these jobs.
+WORKFLOW_STATES: dict[str, dict[str, str]] = {
+    "release-evidence.yml": {
+        "build-evidence": "EVIDENCE_BUILT",
+        "attach-assets": "EVIDENCE_ATTACHED",
+    },
+    "publish.yml": {
+        "publish": "PYPI_PUBLISHED",
+        "verify": "PROVENANCE_VERIFIED",
+    },
+}
+
+
+class _PublicationBlocked(Exception):
+    def __init__(self, reason: str, stage: str = "BLOCKED", result: str = "BLOCK") -> None:
+        super().__init__(reason)
+        self.reason = reason
+        self.stage = stage
+        self.result = result
+
+
+def _has_evidence(release: dict[str, Any] | None) -> bool:
+    return release is not None and set(SBOM_ASSETS) <= set(release.get("assets") or [])
+
+
+class GitHubRemote:
+    """Real GitHub/PyPI adapter for ``run_publication``.
+
+    Reads reuse the existing release scripts. Each mutation is one gh/git call
+    and is only reached through ``run_publication``'s gates.
+    """
+
+    def __init__(self, root: Path, *, poll_seconds: int = 15, timeout_seconds: int = 3600) -> None:
+        self.root = root.resolve()
+        self.repo = _repo_slug(self.root)
+        self.poll_seconds = poll_seconds
+        self.timeout_seconds = timeout_seconds
+
+    def _cmd(self, *args: str, timeout: int = 120) -> subprocess.CompletedProcess[str]:
+        return subprocess.run(
+            list(args), cwd=self.root, capture_output=True, text=True, check=False, timeout=timeout
+        )
+
+    def _ok(self, *args: str, timeout: int = 120) -> str:
+        done = self._cmd(*args, timeout=timeout)
+        if done.returncode != 0:
+            raise PipelineExternalError(
+                done.stderr.strip() or done.stdout.strip() or f"{args[0]} failed"
+            )
+        return done.stdout.strip()
+
+    # -- observations -------------------------------------------------------
+    def observe_main(self) -> dict[str, str]:
+        self._ok("git", "fetch", "--quiet", "origin", "main")
+        sha = self._ok("git", "rev-parse", "origin/main")
+        version = self._ok("git", "show", f"{sha}:VERSION").strip()
+        return {"sha": sha, "version": version}
+
+    def observe_tag(self, tag: str) -> dict[str, Any] | None:
+        if not self._ok("git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}"):
+            return None
+        try:
+            from scripts.release.verify_git_tag import verify_remote_tag
+        except ModuleNotFoundError:  # pragma: no cover - direct script execution path
+            from verify_git_tag import verify_remote_tag
+        ok, _detail, commit = verify_remote_tag(
+            repository=self.repo,
+            tag=tag,
+            token=self._ok("gh", "auth", "token"),
+            api_url="https://api.github.com",
+            expected_commit=None,
+        )
+        return {"commit": commit, "verified": ok}
+
+    def observe_release(self, tag: str) -> dict[str, Any] | None:
+        done = self._cmd(
+            "gh", "release", "view", tag, "--repo", self.repo, "--json", "isDraft,assets"
+        )
+        if done.returncode != 0:
+            if "not found" in (done.stderr + done.stdout).lower():
+                return None
+            raise PipelineExternalError(done.stderr.strip() or "gh release view failed")
+        data = json.loads(done.stdout)
+        return {"draft": data["isDraft"], "assets": [a["name"] for a in data["assets"]]}
+
+    def verify_release_assets(self, tag: str) -> dict[str, Any]:
+        import hashlib
+        import tempfile
+
+        with tempfile.TemporaryDirectory() as tmp:
+            self._ok(
+                "gh",
+                "release",
+                "download",
+                tag,
+                "--repo",
+                self.repo,
+                "--pattern",
+                "sbom.cyclonedx.json*",
+                "--dir",
+                tmp,
+            )
+            sbom = Path(tmp, SBOM_ASSETS[0]).read_bytes()
+            recorded = Path(tmp, SBOM_ASSETS[1]).read_text(encoding="utf-8").split()[0]
+        actual = hashlib.sha256(sbom).hexdigest()
+        return {"ok": actual == recorded, "detail": f"sha256 {actual[:16]} vs {recorded[:16]}"}
+
+    # -- mutations ----------------------------------------------------------
+    def create_tag(self, tag: str, commit: str) -> None:
+        self._ok("git", "tag", "-s", tag, commit, "-m", f"HyoDo {tag}")
+        self._ok("git", "push", "origin", f"refs/tags/{tag}")
+
+    def create_draft_release(self, tag: str, notes: Path) -> None:
+        self._ok(
+            "gh",
+            "release",
+            "create",
+            tag,
+            "--repo",
+            self.repo,
+            "--verify-tag",
+            "--draft",
+            "--title",
+            f"HyoDo {tag}",
+            "--notes-file",
+            str(notes),
+        )
+
+    def publish_release(self, tag: str) -> None:
+        self._ok("gh", "release", "edit", tag, "--repo", self.repo, "--draft=false", "--latest")
+
+    def _job_names(self, workflow: str) -> dict[str, str]:
+        import yaml
+
+        path = self.root / ".github" / "workflows" / workflow
+        jobs = yaml.safe_load(path.read_text(encoding="utf-8"))["jobs"]
+        return {spec.get("name", job): job for job, spec in jobs.items()}
+
+    def _wait_run(self, workflow: str, *, event: str, since: str, branch: str | None) -> dict:
+        deadline = time.monotonic() + self.timeout_seconds
+        run_id = None
+        while run_id is None:
+            listing = json.loads(
+                self._ok(
+                    "gh",
+                    "run",
+                    "list",
+                    "--repo",
+                    self.repo,
+                    "--workflow",
+                    workflow,
+                    "--event",
+                    event,
+                    "--limit",
+                    "10",
+                    "--json",
+                    "databaseId,createdAt,headBranch",
+                )
+            )
+            fresh = [
+                r
+                for r in listing
+                if r["createdAt"] >= since and (branch is None or r["headBranch"] == branch)
+            ]
+            if fresh:
+                run_id = str(fresh[0]["databaseId"])
+            elif time.monotonic() > deadline:
+                raise PipelineExternalError(f"no {workflow} run appeared")
+            else:
+                time.sleep(self.poll_seconds)
+        while True:
+            view = json.loads(
+                self._ok("gh", "run", "view", run_id, "--repo", self.repo, "--json", "status,jobs")
+            )
+            if view["status"] == "completed":
+                break
+            if time.monotonic() > deadline:
+                raise PipelineExternalError(f"{workflow} run {run_id} did not finish")
+            time.sleep(self.poll_seconds)
+        names = self._job_names(workflow)
+        jobs = {names.get(j["name"], j["name"]): j["conclusion"] for j in view["jobs"]}
+        return {"run_id": run_id, "jobs": jobs}
+
+    def run_release_evidence(self, tag: str) -> dict[str, Any]:
+        since = _now()
+        self._ok(
+            "gh", "workflow", "run", "release-evidence.yml", "--repo", self.repo, "-f", f"tag={tag}"
+        )
+        return self._wait_run(
+            "release-evidence.yml", event="workflow_dispatch", since=since, branch=None
+        )
+
+    def wait_publish_workflow(self, tag: str) -> dict[str, Any]:
+        return self._wait_run("publish.yml", event="release", since="", branch=tag)
+
+    def verify_pypi(self, version: str) -> dict[str, Any]:
+        done = self._cmd(
+            "python3",
+            "scripts/release/verify-pypi-release.py",
+            "--version",
+            version,
+            "--require-provenance",
+            "--install-smoke",
+            timeout=1800,
+        )
+        ok = done.returncode == 0
+        return {"provenance": ok, "install": ok, "detail": done.stdout[-300:]}
+
+    def verify_release_chain(self, version: str) -> dict[str, Any]:
+        try:
+            from scripts.release.verify_release_chain import measure_chain
+        except ModuleNotFoundError:  # pragma: no cover - direct script execution path
+            from verify_release_chain import measure_chain
+        self._ok("git", "fetch", "--quiet", "--tags", "origin")
+        steps = measure_chain(version, repo=self.repo, root=self.root)
+        missing = [step.name for step in steps if step.state != "OBSERVED"]
+        return {
+            "ok": not missing,
+            "detail": f"{len(steps) - len(missing)}/{len(steps)} OBSERVED"
+            + (f"; missing {missing}" if missing else ""),
+        }
+
+
+def run_publication(
+    version: str,
+    remote: Any,
+    *,
+    notes: Path,
+    execute: bool = False,
+    authorize_ref: str | None = None,
+    authorize_sha: str | None = None,
+) -> dict[str, Any]:
+    """Drive one merged version from MERGED to READBACK_VERIFIED, fail-closed.
+
+    Without ``execute`` this is a dry run: remote state is read for real, every
+    mutation is recorded in ``planned_mutations`` instead of being called, and
+    the run stops at DRAFT_VERIFIED because publication is irreversible.
+    """
+    tag = f"v{version}"
+    dry_run = not execute
+    main_state = remote.observe_main()
+    main_sha = main_state.get("sha") or ""
+    try:
+        receipt = start_publication_receipt(version, main_sha, f"origin/main @ {main_sha}")
+    except ValueError as exc:
+        return {
+            "schema": "hyodo.release-receipt/v1",
+            "phase": "publication",
+            "version": version,
+            "state": None,
+            "stage": "BLOCKED",
+            "result": "BLOCK",
+            "residuals": [str(exc)],
+        }
+    receipt["history"][0]["simulated"] = False
+    receipt.update(
+        {
+            "mode": "dry-run" if dry_run else "execute",
+            "stage": "MERGED",
+            "result": "PASS",
+            "planned_mutations": [],
+            "mutations": [],
+            "external_mutation": False,
+        }
+    )
+    # What a dry run has simulated so far, so later reads see its own effects.
+    simulated: dict[str, Any] = {}
+
+    def advance(state: str, evidence: str, *, was_simulated: bool) -> None:
+        nonlocal receipt
+        receipt = transition(receipt, state, evidence)
+        receipt["history"][-1]["simulated"] = was_simulated
+        receipt["stage"] = state
+
+    def mutate(kind: str, call: Any, *args: Any) -> Any:
+        record = {"kind": kind, "tag": tag, "observed_at": _now()}
+        if dry_run:
+            receipt["planned_mutations"].append(record)
+            return None
+        receipt["mutations"].append(record)
+        receipt["external_mutation"] = True
+        return call(*args)
+
+    def observe_tag() -> dict[str, Any] | None:
+        return simulated.get("tag") if "tag" in simulated else remote.observe_tag(tag)
+
+    def observe_release() -> dict[str, Any] | None:
+        return simulated.get("release") if "release" in simulated else remote.observe_release(tag)
+
+    try:
+        if main_state.get("version") != version:
+            raise _PublicationBlocked(
+                f"origin/main VERSION is {main_state.get('version')!r}, not {version!r}"
+            )
+
+        # TAGGED ------------------------------------------------------------
+        current_tag = observe_tag()
+        if current_tag is None:
+            mutate("create_tag", remote.create_tag, tag, main_sha)
+            if dry_run:
+                simulated["tag"] = {"commit": main_sha, "verified": True}
+            current_tag = observe_tag()
+        if current_tag is None or current_tag.get("commit") != main_sha:
+            found = None if current_tag is None else current_tag.get("commit")
+            raise _PublicationBlocked(f"{tag} targets {found}, not merged main {main_sha}")
+        if not current_tag.get("verified"):
+            raise _PublicationBlocked(f"{tag} is not a GitHub-verified signed tag")
+        advance("TAGGED", f"{tag} -> {main_sha} verified", was_simulated="tag" in simulated)
+
+        # DRAFT_CREATED -----------------------------------------------------
+        release = observe_release()
+        if release is not None and not release.get("draft"):
+            raise _PublicationBlocked(
+                f"GitHub Release {tag} is already published; immutable releases cannot "
+                "take SBOM evidence afterwards (the v4.21.2 failure). Nothing was changed; "
+                "release a new version instead."
+            )
+        if release is None:
+            mutate("create_draft_release", remote.create_draft_release, tag, notes)
+            if dry_run:
+                simulated["release"] = {"draft": True, "assets": []}
+            release = observe_release()
+        if release is None or not release.get("draft"):
+            raise _PublicationBlocked(f"draft Release {tag} was not observed after creation")
+        advance("DRAFT_CREATED", f"draft Release {tag}", was_simulated="release" in simulated)
+
+        # EVIDENCE_BUILT / EVIDENCE_ATTACHED (release-evidence.yml) ------------
+        require_state(receipt, "DRAFT_CREATED", "release evidence")
+        if not _has_evidence(release):
+            run = mutate("run_release_evidence", remote.run_release_evidence, tag)
+            if dry_run:
+                run = {
+                    "run_id": "SIMULATED",
+                    "jobs": dict.fromkeys(WORKFLOW_STATES["release-evidence.yml"], "success"),
+                }
+                simulated["release"] = {"draft": True, "assets": list(SBOM_ASSETS)}
+        else:
+            run = {
+                "run_id": "already-attached",
+                "jobs": dict.fromkeys(WORKFLOW_STATES["release-evidence.yml"], "success"),
+            }
+        for job, state in WORKFLOW_STATES["release-evidence.yml"].items():
+            if run["jobs"].get(job) != "success":
+                raise _PublicationBlocked(
+                    f"release-evidence.yml job {job} ended {run['jobs'].get(job)!r} "
+                    f"(run {run['run_id']})"
+                )
+            advance(state, f"release-evidence.yml {job} run {run['run_id']}", was_simulated=dry_run)
+
+        # DRAFT_VERIFIED ------------------------------------------------------
+        release = observe_release()
+        if release is None or not release.get("draft") or not _has_evidence(release):
+            raise _PublicationBlocked(f"{tag} is not a draft carrying both SBOM assets")
+        if dry_run:
+            verified = {"ok": True, "detail": "SIMULATED digest check"}
+        else:
+            verified = remote.verify_release_assets(tag)
+        if not verified.get("ok"):
+            raise _PublicationBlocked(f"SBOM digest did not verify: {verified.get('detail')}")
+        advance("DRAFT_VERIFIED", f"draft {tag} SBOM digest verified", was_simulated=dry_run)
+
+        if dry_run:
+            receipt["next_action"] = (
+                "rehearsal complete; publication is irreversible and requires "
+                "--execute with --authorize-ref and --authorize-sha bound to the merged SHA"
+            )
+            return receipt
+
+        # PUBLISHED (irreversible) --------------------------------------------
+        if not _provided_reference(authorize_ref):
+            raise _PublicationBlocked(
+                "publishing is irreversible and needs human authority", "WAITING_APPROVAL", "WAIT"
+            )
+        if authorize_sha != main_sha:
+            raise _PublicationBlocked(
+                f"authority covers {authorize_sha}, not merged main {main_sha}",
+                "RECONCILIATION_REQUIRED",
+            )
+        require_state(receipt, "DRAFT_VERIFIED", "publish release")
+        release = remote.observe_release(tag)
+        if release is None or not release.get("draft") or not _has_evidence(release):
+            raise _PublicationBlocked(f"{tag} changed after verification; refusing to publish")
+        mutate("publish_release", remote.publish_release, tag)
+        release = remote.observe_release(tag)
+        if release is None or release.get("draft"):
+            raise _PublicationBlocked(f"{tag} was not observed as published")
+        advance(
+            "PUBLISHED", f"Release {tag} published with SBOM ({authorize_ref})", was_simulated=False
+        )
+
+        # PYPI_PUBLISHED / PROVENANCE_VERIFIED (publish.yml) -------------------
+        run = remote.wait_publish_workflow(tag)
+        if run["jobs"].get("build") != "success":
+            raise _PublicationBlocked(f"publish.yml build ended {run['jobs'].get('build')!r}")
+        for job, state in WORKFLOW_STATES["publish.yml"].items():
+            if run["jobs"].get(job) != "success":
+                raise _PublicationBlocked(
+                    f"publish.yml job {job} ended {run['jobs'].get(job)!r} (run {run['run_id']})"
+                )
+            advance(state, f"publish.yml {job} run {run['run_id']}", was_simulated=False)
+
+        # INSTALL_VERIFIED / READBACK_VERIFIED ---------------------------------
+        pypi = remote.verify_pypi(version)
+        if not (pypi.get("provenance") and pypi.get("install")):
+            raise _PublicationBlocked(f"PyPI readback failed: {pypi.get('detail')}")
+        advance(
+            "INSTALL_VERIFIED", f"PyPI {version} cold install + provenance", was_simulated=False
+        )
+        chain = remote.verify_release_chain(version)
+        if not chain.get("ok"):
+            raise _PublicationBlocked(f"release chain readback incomplete: {chain.get('detail')}")
+        advance(
+            "READBACK_VERIFIED",
+            f"release chain {version}: {chain.get('detail')}",
+            was_simulated=False,
+        )
+        receipt["next_action"] = "closed; seal the measured receipt in docs/releases"
+    except (_PublicationBlocked, ReleaseOrderError, PipelineExternalError) as exc:
+        blocked = exc if isinstance(exc, _PublicationBlocked) else _PublicationBlocked(str(exc))
+        receipt.update(
+            {
+                "stage": blocked.stage,
+                "result": blocked.result,
+                "residuals": [blocked.reason],
+                "next_action": "resolve the measured block; no later step was attempted",
             }
         )
     return receipt
@@ -702,7 +1167,32 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--pr-title", help="PR title when creating a candidate PR")
     parser.add_argument("--pr-body", default="", help="PR body when creating a candidate PR")
+    parser.add_argument(
+        "--publication",
+        action="store_true",
+        help=(
+            "Drive a merged version through tag, draft, evidence, publication and "
+            "readback. Dry run unless --execute; publishing also needs --authorize-ref "
+            "and --authorize-sha bound to the merged main SHA"
+        ),
+    )
+    parser.add_argument("--notes", help="Release notes file (default docs/releases/<v>.md)")
     args = parser.parse_args(argv)
+    if args.publication:
+        root = Path(args.root)
+        notes = (
+            Path(args.notes) if args.notes else root / "docs" / "releases" / f"{args.version}.md"
+        )
+        receipt = run_publication(
+            args.version,
+            GitHubRemote(root),
+            notes=notes,
+            execute=args.execute,
+            authorize_ref=args.authorize_ref,
+            authorize_sha=args.authorize_sha,
+        )
+        print(json.dumps(receipt, ensure_ascii=False, indent=2, sort_keys=True))
+        return 0 if receipt["result"] == "PASS" else 1
     receipt = run_pipeline(
         Path(args.root),
         args.version,

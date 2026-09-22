@@ -178,4 +178,8 @@ jobs:
             echo "ERROR: evidence preparation expects an unpublished draft Release"
             exit 1
           fi
-          echo "Draft Release evidence is sealed for $TAG; publish the Release to start PyPI"
+          # Pipeline states: build-evidence -> EVIDENCE_BUILT, attach-assets ->
+          # EVIDENCE_ATTACHED. Publication is owned by the release pipeline, which
+          # re-verifies this draft before the irreversible publish.
+          echo "Draft Release evidence is sealed for $TAG (EVIDENCE_ATTACHED)."
+          echo "Publish only through: python scripts/release/pipeline.py <version> --publication --execute --authorize-ref <ref> --authorize-sha <merged-sha>"
