@@ -6082,9 +6082,9 @@ def main(
     ctx: typer.Context,
     version_flag: bool = typer.Option(False, "--version", "-v", help="Show version"),
 ):
-    """HyoDo - model-agnostic quality gates for AI-assisted development."""
+    """HyoDo - Local evidence verification for AI-assisted work."""
     if version_flag:
-        console.print(f"HyoDo v{__version__} - model-agnostic quality gates")
+        console.print(f"HyoDo v{__version__} - Local evidence verification for AI-assisted work.")
         raise typer.Exit()
 
     if ctx.invoked_subcommand is None:

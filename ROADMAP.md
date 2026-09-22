@@ -12,10 +12,10 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.0 is the current release target and source-tree release baseline.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-measured in `docs/releases/4.21.0.md`. This does not establish every host
-integration.
+HyoDo 4.21.1 is the current release target and source-tree release baseline.
+HyoDo 4.21.0 remains the latest published release; its signed tag, GitHub
+Release + SBOM, PyPI provenance, and install smoke are measured in
+`docs/releases/4.21.0.md`. This does not establish every host integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
 releases.
@@ -89,6 +89,14 @@ evidence is not converted into a pass.
 - Separate "a project file exists" from "a supported tool was detected", and
   stop writing a live `.hyodo/gates.toml` when nothing was detected, so the
   built-in sampled fallback survives a zero-detection `hyodo init`.
+
+### 4.21.1 (release preparation)
+
+- Align top-level `hyodo --version` with the canonical public product identity.
+- Make the post-publish install verifier reject stale identity wording instead
+  of accepting any output that merely contains the expected version number.
+- Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
+  semantics unchanged.
 
 ### External adoption
 

@@ -5,6 +5,19 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.1] - 2026-09-22
+
+Public CLI identity readback patch. The 4.21 verification-honesty semantics and
+machine contracts are unchanged.
+
+### Fixed
+
+- Top-level `hyodo --version` now uses the same canonical product identity as
+  `hyodo --help`, `hyodo version`, and `hyodo start`.
+- The post-publish cold-install verifier now requires the exact canonical
+  `hyodo --version` line, so stale public identity wording cannot pass release
+  verification merely because the version number is present.
+
 ## [4.21.0] - 2026-09-22
 
 Honesty release for `hyodo check`. The 4.20 machine contract is unchanged:

@@ -223,6 +223,7 @@ def test_version_flag_callback():
     assert result.exit_code == 0
     assert "HyoDo" in result.output
     assert __version__ in result.output
+    assert "Local evidence verification for AI-assisted work." in result.output
 
 
 # --------------------------------------------------------------------------- #
