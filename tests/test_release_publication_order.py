@@ -397,7 +397,7 @@ def test_evidence_run_discovery_is_bound_to_the_tag(monkeypatch: pytest.MonkeyPa
     run = remote._wait_run(
         "release-evidence.yml",
         event="workflow_dispatch",
-        since="2000-01-01T00:00:00Z",
+        since=pipeline._parse_utc("2000-01-01T00:00:00Z"),
         branch=None,
         title=f"HyoDo Release Evidence {TAG}",
     )
@@ -425,7 +425,7 @@ def test_publish_run_discovery_ignores_runs_before_publication(
         jobs={"111": stale},
     )
     remote = _remote_with(monkeypatch, stub)
-    remote.publish_started_at = "2999-01-01T00:00:00Z"
+    remote.publish_started_at = pipeline._parse_utc("2999-01-01T00:00:00Z")
     with pytest.raises(pipeline.PipelineExternalError, match=r"no publish\.yml run"):
         remote.wait_publish_workflow(TAG)
 
@@ -434,3 +434,47 @@ def test_release_evidence_run_name_carries_the_tag() -> None:
     text = (REPO_ROOT / ".github" / "workflows" / "release-evidence.yml").read_text()
     assert yaml.safe_load(text)["run-name"] == "HyoDo Release Evidence ${{ inputs.tag }}"
     assert pipeline.EVIDENCE_RUN_TITLE.format(tag=TAG) == f"HyoDo Release Evidence {TAG}"
+
+
+# --- second review: timestamp precision and crash after publication --------
+
+
+def test_run_freshness_is_exact_at_github_second_precision() -> None:
+    # GitHub truncates createdAt to whole seconds. A boundary is always a whole
+    # second at or after the action, so a run from earlier in that second can
+    # never look fresh, and a run created by the action always does.
+    boundary = pipeline._parse_utc("2026-09-22T21:40:53Z")
+    assert not pipeline._created_since("2026-09-22T21:40:52Z", boundary)
+    assert pipeline._created_since("2026-09-22T21:40:53Z", boundary)
+    with pytest.raises(ValueError, match="whole-second boundary"):
+        pipeline._created_since("2026-09-22T21:40:52.500000Z", boundary.replace(microsecond=1))
+
+
+def test_action_boundary_is_a_whole_second_in_the_future(monkeypatch: pytest.MonkeyPatch) -> None:
+    from datetime import UTC, datetime
+
+    slept: list[float] = []
+    now = datetime(2026, 9, 22, 21, 40, 52, 500000, tzinfo=UTC)
+    monkeypatch.setattr(pipeline, "_utcnow", lambda: now)
+    monkeypatch.setattr(pipeline.time, "sleep", slept.append)
+    boundary = pipeline._action_boundary()
+    assert boundary == datetime(2026, 9, 22, 21, 40, 53, tzinfo=UTC)
+    assert slept
+    assert slept[0] >= 0.5
+
+
+def test_a_crash_after_publishing_still_returns_the_receipt() -> None:
+    import subprocess
+
+    remote = FakeRemote()
+
+    def hang(tag: str) -> dict[str, Any]:
+        raise subprocess.TimeoutExpired(["gh", "run", "view"], 120)
+
+    remote.wait_publish_workflow = hang  # type: ignore[method-assign]
+    receipt = _run(remote, **_authorized())
+    assert receipt["result"] == "BLOCK"
+    assert receipt["state"] == "PUBLISHED"
+    assert [m["kind"] for m in receipt["mutations"]][-1] == "publish_release"
+    assert "TimeoutExpired" in receipt["residuals"][0]
+    assert "outcome after PUBLISHED is unknown" in receipt["residuals"][0]

@@ -14,7 +14,7 @@ import os
 import re
 import subprocess
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -728,6 +728,33 @@ WORKFLOW_STATES: dict[str, dict[str, str]] = {
 }
 
 
+def _utcnow() -> datetime:
+    return datetime.now(UTC)
+
+
+def _parse_utc(value: str) -> datetime:
+    return datetime.fromisoformat(value.replace("Z", "+00:00"))
+
+
+def _action_boundary() -> datetime:
+    """Wait for the next whole UTC second and return it.
+
+    GitHub reports run ``createdAt`` truncated to whole seconds. Acting only
+    after a whole-second boundary makes "created at or after the boundary" an
+    exact test: an earlier run in the same second can never look fresh.
+    """
+    now = _utcnow()
+    boundary = now.replace(microsecond=0) + timedelta(seconds=1)
+    time.sleep((boundary - now).total_seconds())
+    return boundary
+
+
+def _created_since(created_at: str, boundary: datetime) -> bool:
+    if boundary.microsecond:
+        raise ValueError("run freshness needs a whole-second boundary from _action_boundary()")
+    return _parse_utc(created_at) >= boundary
+
+
 class _PublicationBlocked(Exception):
     def __init__(self, reason: str, stage: str = "BLOCKED", result: str = "BLOCK") -> None:
         super().__init__(reason)
@@ -844,8 +871,8 @@ class GitHubRemote:
         )
 
     def publish_release(self, tag: str) -> None:
-        # Only publish.yml runs created after this moment are evidence for it.
-        self.publish_started_at = _now()
+        # Only publish.yml runs created at or after this boundary are evidence for it.
+        self.publish_started_at = _action_boundary()
         self._ok("gh", "release", "edit", tag, "--repo", self.repo, "--draft=false", "--latest")
 
     def _job_names(self, workflow: str) -> dict[str, str]:
@@ -860,7 +887,7 @@ class GitHubRemote:
         workflow: str,
         *,
         event: str,
-        since: str,
+        since: datetime | None,
         branch: str | None,
         title: str | None = None,
     ) -> dict:
@@ -895,7 +922,7 @@ class GitHubRemote:
             fresh = [
                 r
                 for r in listing
-                if r["createdAt"] >= since
+                if _created_since(r["createdAt"], since)
                 and (branch is None or r["headBranch"] == branch)
                 and (title is None or r.get("displayTitle") == title)
             ]
@@ -923,7 +950,7 @@ class GitHubRemote:
         return {"run_id": run_id, "jobs": jobs}
 
     def run_release_evidence(self, tag: str) -> dict[str, Any]:
-        since = _now()
+        since = _action_boundary()
         self._ok(
             "gh", "workflow", "run", "release-evidence.yml", "--repo", self.repo, "-f", f"tag={tag}"
         )
@@ -936,7 +963,7 @@ class GitHubRemote:
         )
 
     def wait_publish_workflow(self, tag: str) -> dict[str, Any]:
-        since = getattr(self, "publish_started_at", "")
+        since = getattr(self, "publish_started_at", None)
         return self._wait_run("publish.yml", event="release", since=since, branch=tag)
 
     def verify_pypi(self, version: str) -> dict[str, Any]:
@@ -1179,6 +1206,21 @@ def run_publication(
                 "result": blocked.result,
                 "residuals": [blocked.reason],
                 "next_action": "resolve the measured block; no later step was attempted",
+            }
+        )
+    except Exception as exc:
+        # Anything unexpected (a timeout, malformed gh output) still returns the
+        # receipt, so a mutation that already happened, above all an
+        # irreversible publish, stays on record.
+        receipt.update(
+            {
+                "stage": "BLOCKED",
+                "result": "BLOCK",
+                "residuals": [
+                    f"{type(exc).__name__}: {exc}; outcome after {receipt['state']} is "
+                    "unknown, reconcile remote state before any retry"
+                ],
+                "next_action": "reconcile remote state; see mutations for what already ran",
             }
         )
     return receipt
