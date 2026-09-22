@@ -286,8 +286,13 @@ def install_smoke(version: str, retries: int = 12, sleep_seconds: float = 10.0) 
                     # instead of the wheel we just installed — the release verifier was
                     # measuring the code in hand rather than the code being shipped.
                     out = subprocess.check_output([str(hyodo), "--version"], text=True, cwd=tmp)
-                    if version not in out:
-                        raise SystemExit(f"hyodo --version mismatch: {out!r}")
+                    expected_version_line = (
+                        f"HyoDo v{version} - Local evidence verification for AI-assisted work."
+                    )
+                    if out.strip() != expected_version_line:
+                        raise SystemExit(
+                            f"hyodo --version mismatch: expected {expected_version_line!r}, got {out.strip()!r}"
+                        )
                     code = subprocess.check_output(
                         [str(python), "-c", "import hyodo; print(hyodo.__version__)"],
                         text=True,

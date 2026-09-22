@@ -238,7 +238,7 @@ def test_install_smoke_never_imports_from_the_callers_cwd(
         cwd = kwargs.get("cwd")
         seen_cwds.append(cwd)
         if cmd[-1] == "--version":
-            return "HyoDo v9.9.9 - test\n"
+            return "HyoDo v9.9.9 - Local evidence verification for AI-assisted work.\n"
         # Stand in for the interpreter honouring sys.path: a cwd holding a `hyodo`
         # package wins over site-packages, which is exactly the bug.
         effective = Path(cwd) if cwd is not None else Path.cwd()
@@ -254,6 +254,25 @@ def test_install_smoke_never_imports_from_the_callers_cwd(
     for cwd in seen_cwds:
         assert cwd is not None, "verification subprocess inherited the caller's cwd"
         assert not (Path(cwd) / "hyodo").exists(), "verification cwd can shadow the wheel"
+
+
+def test_install_smoke_rejects_stale_product_identity(
+    verify: ModuleType, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A correct version number with stale public identity must not pass release verification."""
+
+    monkeypatch.setattr(verify.subprocess, "run", lambda *a, **k: None)
+    monkeypatch.setattr(
+        verify.subprocess,
+        "check_output",
+        lambda cmd, **kwargs: (
+            "HyoDo v9.9.9 - model-agnostic quality gates\n" if cmd[-1] == "--version" else "9.9.9\n"
+        ),
+    )
+    monkeypatch.setattr(verify, "version_payload", lambda _v: {"urls": []})
+
+    with pytest.raises(SystemExit, match="hyodo --version mismatch"):
+        verify.install_smoke("9.9.9", retries=1, sleep_seconds=0)
 
 
 def test_description_links_accepts_a_pinned_published_description(

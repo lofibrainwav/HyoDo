@@ -304,6 +304,7 @@ def test_product_identity_wording_is_aligned() -> None:
     sentence = "Local evidence verification for AI-assisted work."
     assert sentence in _flat(runner.invoke(app, ["--help"]).output)
     assert sentence in _flat(runner.invoke(app, ["version"]).output)
+    assert sentence in _flat(runner.invoke(app, ["--version"]).output)
 
 
 # --------------------------------------------------------------------------
