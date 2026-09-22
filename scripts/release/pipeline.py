@@ -710,6 +710,10 @@ def run_pipeline(
 
 SBOM_ASSETS = ("sbom.cyclonedx.json", "sbom.cyclonedx.json.sha256")
 
+# release-evidence.yml names each run after its tag input (``run-name``), so the
+# pipeline can bind the run it waits on to the tag it dispatched.
+EVIDENCE_RUN_TITLE = "HyoDo Release Evidence {tag}"
+
 # Workflow jobs whose success is the evidence for a publication state. Keyed by
 # job id; tests fail if a workflow renames or reorders one of these jobs.
 WORKFLOW_STATES: dict[str, dict[str, str]] = {
@@ -840,6 +844,8 @@ class GitHubRemote:
         )
 
     def publish_release(self, tag: str) -> None:
+        # Only publish.yml runs created after this moment are evidence for it.
+        self.publish_started_at = _now()
         self._ok("gh", "release", "edit", tag, "--repo", self.repo, "--draft=false", "--latest")
 
     def _job_names(self, workflow: str) -> dict[str, str]:
@@ -849,7 +855,23 @@ class GitHubRemote:
         jobs = yaml.safe_load(path.read_text(encoding="utf-8"))["jobs"]
         return {spec.get("name", job): job for job, spec in jobs.items()}
 
-    def _wait_run(self, workflow: str, *, event: str, since: str, branch: str | None) -> dict:
+    def _wait_run(
+        self,
+        workflow: str,
+        *,
+        event: str,
+        since: str,
+        branch: str | None,
+        title: str | None = None,
+    ) -> dict:
+        """Wait for the run this invocation caused, and return its job outcomes.
+
+        A run counts only if it was created at or after ``since`` and matches the
+        branch and/or run title given. Picking "the newest run" instead can bind
+        evidence to another release or to a run from before the action.
+        """
+        if not since:
+            raise PipelineExternalError(f"{workflow}: refusing to match runs without a start time")
         deadline = time.monotonic() + self.timeout_seconds
         run_id = None
         while run_id is None:
@@ -865,20 +887,26 @@ class GitHubRemote:
                     "--event",
                     event,
                     "--limit",
-                    "10",
+                    "20",
                     "--json",
-                    "databaseId,createdAt,headBranch",
+                    "databaseId,createdAt,headBranch,displayTitle",
                 )
             )
             fresh = [
                 r
                 for r in listing
-                if r["createdAt"] >= since and (branch is None or r["headBranch"] == branch)
+                if r["createdAt"] >= since
+                and (branch is None or r["headBranch"] == branch)
+                and (title is None or r.get("displayTitle") == title)
             ]
+            if len(fresh) > 1:
+                raise PipelineExternalError(
+                    f"{len(fresh)} {workflow} runs match; refusing to guess which is ours"
+                )
             if fresh:
                 run_id = str(fresh[0]["databaseId"])
             elif time.monotonic() > deadline:
-                raise PipelineExternalError(f"no {workflow} run appeared")
+                raise PipelineExternalError(f"no {workflow} run appeared for this action")
             else:
                 time.sleep(self.poll_seconds)
         while True:
@@ -900,11 +928,16 @@ class GitHubRemote:
             "gh", "workflow", "run", "release-evidence.yml", "--repo", self.repo, "-f", f"tag={tag}"
         )
         return self._wait_run(
-            "release-evidence.yml", event="workflow_dispatch", since=since, branch=None
+            "release-evidence.yml",
+            event="workflow_dispatch",
+            since=since,
+            branch=None,
+            title=EVIDENCE_RUN_TITLE.format(tag=tag),
         )
 
     def wait_publish_workflow(self, tag: str) -> dict[str, Any]:
-        return self._wait_run("publish.yml", event="release", since="", branch=tag)
+        since = getattr(self, "publish_started_at", "")
+        return self._wait_run("publish.yml", event="release", since=since, branch=tag)
 
     def verify_pypi(self, version: str) -> dict[str, Any]:
         done = self._cmd(
@@ -1039,19 +1072,20 @@ def run_publication(
 
         # EVIDENCE_BUILT / EVIDENCE_ATTACHED (release-evidence.yml) ------------
         require_state(receipt, "DRAFT_CREATED", "release evidence")
-        if not _has_evidence(release):
-            run = mutate("run_release_evidence", remote.run_release_evidence, tag)
-            if dry_run:
-                run = {
-                    "run_id": "SIMULATED",
-                    "jobs": dict.fromkeys(WORKFLOW_STATES["release-evidence.yml"], "success"),
-                }
-                simulated["release"] = {"draft": True, "assets": list(SBOM_ASSETS)}
-        else:
+        if release.get("assets"):
+            # Evidence this run did not watch being attached cannot be bound to
+            # the tag. Drafts are mutable: delete this one and rerun.
+            raise _PublicationBlocked(
+                f"draft {tag} already carries assets {release['assets']} from a run "
+                "this invocation did not observe; delete the draft and rerun"
+            )
+        run = mutate("run_release_evidence", remote.run_release_evidence, tag)
+        if dry_run:
             run = {
-                "run_id": "already-attached",
+                "run_id": "SIMULATED",
                 "jobs": dict.fromkeys(WORKFLOW_STATES["release-evidence.yml"], "success"),
             }
+            simulated["release"] = {"draft": True, "assets": list(SBOM_ASSETS)}
         for job, state in WORKFLOW_STATES["release-evidence.yml"].items():
             if run["jobs"].get(job) != "success":
                 raise _PublicationBlocked(
@@ -1090,6 +1124,15 @@ def run_publication(
                 "RECONCILIATION_REQUIRED",
             )
         require_state(receipt, "DRAFT_VERIFIED", "publish release")
+        final_tag = remote.observe_tag(tag)
+        if (
+            final_tag is None
+            or final_tag.get("commit") != main_sha
+            or not final_tag.get("verified")
+        ):
+            raise _PublicationBlocked(
+                f"{tag} no longer verifies at {main_sha}; refusing to publish"
+            )
         release = remote.observe_release(tag)
         if release is None or not release.get("draft") or not _has_evidence(release):
             raise _PublicationBlocked(f"{tag} changed after verification; refusing to publish")

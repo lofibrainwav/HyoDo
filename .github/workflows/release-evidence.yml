@@ -1,4 +1,6 @@
 name: HyoDo Release Evidence
+# The release pipeline binds the run it waits on by this exact title.
+run-name: HyoDo Release Evidence ${{ inputs.tag }}
 
 "on":
   workflow_dispatch:

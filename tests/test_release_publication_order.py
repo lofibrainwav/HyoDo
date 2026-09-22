@@ -308,3 +308,129 @@ def test_workflow_jobs_map_onto_the_publication_states() -> None:
     publish = _jobs("publish.yml")
     assert publish["publish"]["needs"] == "build"
     assert set(publish["verify"]["needs"]) == {"build", "publish"}
+
+
+# --- review findings: evidence must be bound to this run, tag and moment ----
+
+
+def test_a_draft_that_already_carries_unobserved_evidence_is_refused() -> None:
+    # Assets this invocation did not watch being attached cannot be bound to
+    # the tag; the draft must be recreated rather than trusted.
+    remote = FakeRemote(release={"draft": True, "assets": list(SBOM_ASSETS)})
+    receipt = _run(remote, **_authorized())
+    assert receipt["result"] == "BLOCK"
+    assert receipt["state"] == "DRAFT_CREATED"
+    assert "publish_release" not in remote.calls
+    assert "run_release_evidence" not in remote.calls
+
+
+def test_the_tag_is_reobserved_immediately_before_publishing() -> None:
+    remote = FakeRemote()
+    original = remote.verify_release_assets
+
+    def verify_then_move_tag(tag: str) -> dict[str, Any]:
+        result = original(tag)
+        remote.tag = {"commit": "d" * 40, "verified": True}
+        return result
+
+    remote.verify_release_assets = verify_then_move_tag  # type: ignore[method-assign]
+    receipt = _run(remote, **_authorized())
+    assert receipt["state"] == "DRAFT_VERIFIED"
+    assert receipt["result"] == "BLOCK"
+    assert "publish_release" not in remote.calls
+
+
+class _GhStub:
+    """Answers the gh calls GitHubRemote._wait_run makes, from canned data."""
+
+    def __init__(self, runs: list[dict[str, Any]], jobs: dict[str, list[dict[str, str]]]):
+        self.runs = runs
+        self.jobs = jobs
+
+    def __call__(self, args: list[str], **kwargs: Any) -> Any:
+        import json
+        import subprocess
+
+        if args[:3] == ["gh", "run", "list"]:
+            out = json.dumps(self.runs)
+        elif args[:3] == ["gh", "run", "view"]:
+            out = json.dumps({"status": "completed", "jobs": self.jobs[args[3]]})
+        else:
+            out = ""
+        return subprocess.CompletedProcess(args, 0, out, "")
+
+
+def _remote_with(monkeypatch: pytest.MonkeyPatch, stub: _GhStub) -> Any:
+    monkeypatch.setattr(pipeline, "_repo_slug", lambda root: "owner/repo")
+    monkeypatch.setattr(pipeline.subprocess, "run", stub)
+    monkeypatch.setattr(pipeline.time, "sleep", lambda seconds: None)
+    return pipeline.GitHubRemote(REPO_ROOT, poll_seconds=0, timeout_seconds=0)
+
+
+def test_evidence_run_discovery_is_bound_to_the_tag(monkeypatch: pytest.MonkeyPatch) -> None:
+    ok = [
+        {"name": "Build exact-tag SBOM evidence", "conclusion": "success"},
+        {"name": "Attach and verify draft Release SBOM assets", "conclusion": "success"},
+    ]
+    bad = [
+        {"name": "Build exact-tag SBOM evidence", "conclusion": "success"},
+        {"name": "Attach and verify draft Release SBOM assets", "conclusion": "failure"},
+    ]
+    stub = _GhStub(
+        runs=[
+            {
+                "databaseId": 999,
+                "createdAt": "2999-01-01T00:00:00Z",
+                "headBranch": "main",
+                "displayTitle": "HyoDo Release Evidence v1.2.3",
+            },
+            {
+                "databaseId": 1,
+                "createdAt": "2999-01-01T00:00:00Z",
+                "headBranch": "main",
+                "displayTitle": f"HyoDo Release Evidence {TAG}",
+            },
+        ],
+        jobs={"999": ok, "1": bad},
+    )
+    remote = _remote_with(monkeypatch, stub)
+    run = remote._wait_run(
+        "release-evidence.yml",
+        event="workflow_dispatch",
+        since="2000-01-01T00:00:00Z",
+        branch=None,
+        title=f"HyoDo Release Evidence {TAG}",
+    )
+    assert run["run_id"] == "1"
+    assert run["jobs"]["attach-assets"] == "failure"
+
+
+def test_publish_run_discovery_ignores_runs_before_publication(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    stale = [
+        {"name": "Build release artifacts", "conclusion": "success"},
+        {"name": "Publish to PyPI (OIDC)", "conclusion": "success"},
+        {"name": "Post-publish readback", "conclusion": "success"},
+    ]
+    stub = _GhStub(
+        runs=[
+            {
+                "databaseId": 111,
+                "createdAt": "2020-01-01T00:00:00Z",
+                "headBranch": TAG,
+                "displayTitle": f"HyoDo {TAG}",
+            }
+        ],
+        jobs={"111": stale},
+    )
+    remote = _remote_with(monkeypatch, stub)
+    remote.publish_started_at = "2999-01-01T00:00:00Z"
+    with pytest.raises(pipeline.PipelineExternalError, match=r"no publish\.yml run"):
+        remote.wait_publish_workflow(TAG)
+
+
+def test_release_evidence_run_name_carries_the_tag() -> None:
+    text = (REPO_ROOT / ".github" / "workflows" / "release-evidence.yml").read_text()
+    assert yaml.safe_load(text)["run-name"] == "HyoDo Release Evidence ${{ inputs.tag }}"
+    assert pipeline.EVIDENCE_RUN_TITLE.format(tag=TAG) == f"HyoDo Release Evidence {TAG}"
