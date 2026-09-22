@@ -1166,6 +1166,14 @@ def run_publication(
         release = remote.observe_release(tag)
         if release is None or not release.get("draft") or not _has_evidence(release):
             raise _PublicationBlocked(f"{tag} changed after verification; refusing to publish")
+        # Draft Release assets are mutable until publication. Re-download and
+        # verify the digest at the irreversible boundary so same-named assets
+        # cannot be replaced after DRAFT_VERIFIED and still get published.
+        final_verified = remote.verify_release_assets(tag)
+        if not final_verified.get("ok"):
+            raise _PublicationBlocked(
+                f"SBOM digest changed before publish: {final_verified.get('detail')}"
+            )
         mutate("publish_release", remote.publish_release, tag)
         release = remote.observe_release(tag)
         if release is None or release.get("draft"):

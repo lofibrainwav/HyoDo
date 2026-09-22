@@ -221,6 +221,26 @@ def test_publish_reobserves_the_draft_immediately_before_publishing() -> None:
     assert "publish_release" not in remote.calls
 
 
+def test_publish_reverifies_asset_digest_immediately_before_publishing() -> None:
+    remote = FakeRemote()
+    original = remote.verify_release_assets
+
+    def verify_then_corrupt(tag: str) -> dict[str, Any]:
+        result = original(tag)
+        if remote.calls.count("verify_release_assets") == 1:
+            # Same asset names remain, but their bytes are no longer the ones
+            # that passed DRAFT_VERIFIED. The publish boundary must catch this.
+            remote.assets_verify = False
+        return result
+
+    remote.verify_release_assets = verify_then_corrupt  # type: ignore[method-assign]
+    receipt = _run(remote, **_authorized())
+    assert receipt["state"] == "DRAFT_VERIFIED"
+    assert receipt["result"] == "BLOCK"
+    assert remote.calls.count("verify_release_assets") == 2
+    assert "publish_release" not in remote.calls
+
+
 def test_publish_waits_for_human_authority() -> None:
     remote = FakeRemote()
     receipt = _run(remote, execute=True)
