@@ -22,8 +22,11 @@ hyodo init     # detects pytest, Ruff, mypy, Pyright, npm scripts, Go, Cargo, Ma
 hyodo check    # runs the detected gates; exit 2 when nothing measurable ran
 ```
 
-`init` writes `.hyodo/gates.toml`. `check` exits `0` only when executed gates
-passed. An empty or malformed gate file exits `2`, not `0`.
+When `init` detects supported tooling it writes `.hyodo/gates.toml`. With zero
+detections it writes `.hyodo/gates.toml.example` instead, creates no live gates
+file, and `check` keeps the built-in sampled fallback. `check` exits `0` only
+when executed gates passed. An empty or malformed live gate file exits `2`, not
+`0`.
 
 ## 3. Optional review score
 

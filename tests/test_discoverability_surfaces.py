@@ -33,6 +33,8 @@ HOOKS_PATH = REPO_ROOT / ".pre-commit-hooks.yaml"
 ACTION_PATH = REPO_ROOT / ".github" / "actions" / "hyodo" / "action.yml"
 DISCOVERABILITY_WORKFLOW_PATH = REPO_ROOT / ".github" / "workflows" / "discoverability-smoke.yml"
 README_PATH = REPO_ROOT / "README.md"
+QUICK_START_PATH = REPO_ROOT / "QUICK_START.md"
+BASIC_USAGE_PATH = REPO_ROOT / "examples" / "basic_usage.md"
 SARIF_SCHEMA_PATH = Path(__file__).parent / "fixtures" / "sarif-schema-2.1.0.json"
 
 runner = CliRunner()
@@ -117,6 +119,26 @@ def test_new_surfaces_do_not_claim_they_exist_in_v4_11_0() -> None:
     hooks = HOOKS_PATH.read_text(encoding="utf-8")
     assert ".github/actions/hyodo@v4.11.0" not in readme
     assert "rev: v4.11.0" not in hooks
+
+
+def test_init_zero_detection_docs_match_the_runtime_contract() -> None:
+    """Public init docs must describe the inert-example fallback, not the old contract."""
+    old_claims = {
+        README_PATH: (
+            "`init` is optional: it detects tools you already use and writes "
+            "`.hyodo/gates.toml`; `check` then runs those gates."
+        ),
+        QUICK_START_PATH: (
+            "`init` detects supported test and lint tools and writes `.hyodo/gates.toml`."
+        ),
+        BASIC_USAGE_PATH: "`init` writes `.hyodo/gates.toml`.",
+    }
+    for path, old_claim in old_claims.items():
+        text = path.read_text(encoding="utf-8")
+        normalized = " ".join(text.split())
+        assert ".hyodo/gates.toml.example" in text, path
+        assert "sampled fallback" in text, path
+        assert old_claim not in normalized, path
 
 
 def test_discoverability_workflow_exercises_quality_hook_trust_boundary() -> None:
