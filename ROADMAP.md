@@ -12,11 +12,12 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.4 is the current release target and source-tree release baseline.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-measured in `docs/releases/4.21.4.md`. HyoDo 4.21.2 remains an incomplete
-immutable historical release whose GitHub Release was published without SBOM
-evidence and never reached PyPI (`docs/releases/4.21.2.md`).
+HyoDo 4.21.5 is the current release target and source-tree release baseline.
+Its release chain remains `UNOBSERVED` until publication is read back into
+`docs/releases/4.21.5.md`. HyoDo 4.21.4 remains the current public baseline
+until that chain is complete. HyoDo 4.21.2 remains an incomplete immutable
+historical release whose GitHub Release was published without SBOM evidence
+and never reached PyPI (`docs/releases/4.21.2.md`).
 This does not establish every host integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
@@ -99,6 +100,17 @@ evidence is not converted into a pass.
   of accepting any output that merely contains the expected version number.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
+
+### 4.21.5 (release candidate)
+
+- Make runtime promotion observable: MCP readers self-register and
+  `hyodo mcp census` reports `PROMOTION_COMPLETE` only when no stale or
+  unregistered reader is live.
+- Stale readers (moved root, replaced or unreadable code) refuse measurement
+  tools with `STALE_RUNTIME_RECONNECT_REQUIRED`; HyoDo still never restarts or
+  kills a reader, and the host keeps promotion authority.
+- Release-chain evidence remains UNOBSERVED until publication is read back into
+  `docs/releases/4.21.5.md`.
 
 ### 4.21.4 (release candidate)
 
