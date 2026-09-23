@@ -17,10 +17,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `GIT_WORK_TREE`, and `git update-index --skip-worktree` or
   `--assume-unchanged` on an edited file. Apart from the target directory
   measuring itself, `SELF_SAME_CHECKOUT` now requires the measuring package's
-  `hyodo/` files to equal the target's (the `__pycache__/` cache and
-  `.DS_Store` / editor swap files aside; a `.pyc` beside the sources is code
-  and is compared); different files
-  are `SELF_OTHER_CHECKOUT` (`MISMATCH`) and unreadable ones are
+  `hyodo/` files to equal the target's (the `__pycache__/` cache, hidden
+  paths, and editor leftovers aside; a `.pyc` beside the sources is code and
+  is compared); different files are `SELF_OTHER_CHECKOUT` (`MISMATCH`) and
+  unreadable ones are
   `SOURCE_UNOBSERVED`. Relations, validities, and the runtime-identity schema
   are unchanged.
 - `tool_commit` is reported only for a checkout's own repository, never for a
@@ -34,6 +34,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   toward self-measurement. A target holding the `hyodo` package whose
   `pyproject.toml` is missing or not a file (a partial copy) also stays
   self-measurement instead of becoming an evidence-free `EXTERNAL_TARGET`.
+- Normal developer setups running the same code stay `OBSERVED`: hidden
+  paths under `hyodo/` (`.idea/`, `.vscode/`, `.mypy_cache/`, `.DS_Store`,
+  lock files), editor and merge leftovers (`*.swp`, `*~`, `*.orig`, `*.rej`),
+  and CRLF line endings from a `core.autocrlf` checkout are not code
+  differences; one directory reached through a symlink or a different letter
+  case on macOS or Windows is the same directory. A mismatch now names the
+  first `hyodo/` path that differs.
+- `install_mode` reports `editable` for editable installs. The marker check
+  stripped spaces from `direct_url.json` but not from the text it searched
+  for, so it never matched and editable installs were reported as `source`.
+- The dashboard banner names an installed-copy mismatch and an equal-commit
+  mismatch for what they are instead of "commit unknown" or two equal commits.
 - Behavior changes to expect: a wheel outside any git repository measuring a
   byte-identical checkout is now `OBSERVED` instead of `SOURCE_UNOBSERVED`,
   and two checkouts at the same commit whose `hyodo/` trees differ in a way
@@ -44,10 +56,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and keeps its evidence honest. It is not a defense against a hostile
   execution environment — whoever controls `PATH` or the interpreter can
   replace HyoDo itself, and whoever can write `__pycache__/` or `sys.modules`
-  can change what runs without changing a compared file. On a
-  case-insensitive filesystem, one directory spelled two ways is not
-  recognized as the same path; it is then compared by content, which costs a
-  hash but never produces a false green.
+  can change what runs without changing a compared file.
 
 ### Documentation
 

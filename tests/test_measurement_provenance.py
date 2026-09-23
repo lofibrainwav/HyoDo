@@ -964,3 +964,99 @@ def test_a_tree_larger_than_the_hash_limit_is_unobserved_not_green(
 
     assert provenance.relation == "SOURCE_UNOBSERVED"
     assert provenance.is_green_allowed is False
+
+
+# --------------------------------------------------------------------------
+# Benevolence: a normal developer setup running the same code is not a mismatch
+# --------------------------------------------------------------------------
+
+
+@requires_git
+@pytest.mark.parametrize(
+    "litter",
+    [
+        ".idea/workspace.xml",
+        ".vscode/settings.json",
+        ".mypy_cache/3.12/hyodo.json",
+        ".pytest_cache/v/cache/nodeids",
+        ".ruff_cache/0.1/cache",
+        "gates.py.orig",
+        "gates.py.rej",
+        ".~lock.notes.odt#",
+    ],
+)
+def test_tool_and_editor_directories_are_not_source(tmp_path: Path, litter: str) -> None:
+    """Hidden paths cannot be imported as modules, and merge leftovers are not code."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    stray = target / "hyodo" / litter
+    stray.parent.mkdir(parents=True, exist_ok=True)
+    stray.write_bytes(b"not code")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+    assert provenance.validity == "OBSERVED"
+
+
+@requires_git
+def test_windows_line_endings_are_the_same_code(tmp_path: Path) -> None:
+    """A `core.autocrlf=true` checkout holds CRLF; Python reads it as the same source."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    source = target / "hyodo" / "__init__.py"
+    source.write_bytes(source.read_bytes().replace(b"\n", b"\r\n"))
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+    assert provenance.validity == "OBSERVED"
+
+
+@requires_git
+def test_a_mismatch_names_the_file_that_differs(tmp_path: Path) -> None:
+    """ "Content differs" alone sends a reader hunting; the first differing path does not."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    (target / "hyodo" / "notes.txt").write_text("scratch\n", encoding="utf-8")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert "notes.txt" in provenance.summary()
+    assert "only in this checkout" in provenance.summary()
+
+
+def test_one_directory_spelled_two_ways_is_the_same_directory(tmp_path: Path) -> None:
+    """A symlinked (or, on macOS, differently cased) path to the target is the target.
+
+    Boundary guard: symlinks already resolved to the same path. The case
+    spelling this protects cannot be built portably in a test, so the guard
+    pins the shared `_same_directory` path both use.
+    """
+    target = _write_checkout(tmp_path / "HyoDo")
+    alias = tmp_path / "alias"
+    alias.symlink_to(target)
+    (target / "hyodo" / "untracked_scratch.py").write_text("# local\n", encoding="utf-8")
+
+    provenance = resolve_provenance(target, package_root=alias, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+
+
+def test_an_editable_install_is_reported_as_editable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """uv writes `"editable":true` with no space; the marker check stripped spaces from one side only."""
+    import hyodo.provenance as provenance_module
+
+    class _Dist:
+        def read_text(self, name: str) -> str:
+            return '{"dir_info":{"editable":true},"url":"file:///x"}'
+
+    monkeypatch.setattr(
+        "importlib.metadata.Distribution.from_name", staticmethod(lambda _name: _Dist())
+    )
+
+    assert provenance_module._has_editable_marker() is True

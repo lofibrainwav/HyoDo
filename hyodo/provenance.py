@@ -69,7 +69,7 @@ import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from typing import Any, Literal
 
 try:
@@ -164,7 +164,7 @@ def _own_checkout_commit(root: Path) -> str | None:
     nothing about the code at `root`, so it is not reported.
     """
     toplevel = _run_git(root, "rev-parse", "--show-toplevel")
-    if not toplevel or Path(toplevel).resolve() != root.resolve():
+    if not toplevel or not _same_directory(Path(toplevel), root):
         return None
     return git_commit(root)
 
@@ -174,27 +174,29 @@ def _own_checkout_commit(root: Path) -> str | None:
 _MAX_SOURCE_FILES = 5000
 
 
-#: Files an OS or editor leaves beside code. Python never imports them, so a
-#: stray one must not turn identical code into a mismatch. Only bytecode in
-#: `__pycache__/` is skipped: a `.pyc` sitting beside the sources imports as a
-#: module on its own, so it is code and is compared.
-_LITTER_NAMES = frozenset({".DS_Store"})
-_LITTER_SUFFIXES = (".swp", ".swo", "~")
+#: Leftovers that are never code: editor swap and backup files and merge
+#: rejects. Hidden paths (`.idea/`, `.mypy_cache/`, `.DS_Store`, ...) are
+#: skipped by name, because a module name cannot start with a dot and so
+#: nothing under them can be imported. Bytecode is skipped only inside
+#: `__pycache__/`: a `.pyc` beside the sources imports as a module on its own.
+_LITTER_SUFFIXES = (".swp", ".swo", "~", ".orig", ".rej")
 
 
-def _is_not_source(path: Path) -> bool:
+def _is_not_source(relative: PurePosixPath) -> bool:
     return (
-        "__pycache__" in path.parts
-        or path.name in _LITTER_NAMES
-        or path.name.endswith(_LITTER_SUFFIXES)
+        "__pycache__" in relative.parts
+        or any(part.startswith(".") for part in relative.parts)
+        or relative.name.endswith(_LITTER_SUFFIXES)
     )
 
 
 def _source_digests(package_dir: Path) -> dict[str, str] | None:
     """sha256 of every source file under `package_dir`, keyed by relative path.
 
-    The `__pycache__/` bytecode cache and OS or editor litter are skipped
-    (`_is_not_source`); everything else under the package is compared.
+    Paths are judged relative to the package, so a checkout that happens to
+    live under a hidden directory is still read. Line endings are normalized
+    in files without NUL bytes: Python reads CRLF source as the same code, and
+    a `core.autocrlf` checkout must not look different from an LF wheel.
     None when the tree cannot be read.
     """
     if not package_dir.is_dir():
@@ -202,12 +204,15 @@ def _source_digests(package_dir: Path) -> dict[str, str] | None:
     digests: dict[str, str] = {}
     try:
         for path in package_dir.rglob("*"):
-            if not path.is_file() or _is_not_source(path):
+            relative = PurePosixPath(path.relative_to(package_dir).as_posix())
+            if not path.is_file() or _is_not_source(relative):
                 continue
             if len(digests) >= _MAX_SOURCE_FILES:
                 return None
-            relative = path.relative_to(package_dir).as_posix()
-            digests[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+            data = path.read_bytes()
+            if b"\0" not in data:
+                data = data.replace(b"\r\n", b"\n")
+            digests[str(relative)] = hashlib.sha256(data).hexdigest()
     except OSError:
         return None
     return digests
@@ -224,6 +229,28 @@ def _package_matches_source(package_root: Path, target_root: Path) -> bool | Non
     if not installed or source is None:
         return None
     return installed == source
+
+
+def _first_difference(package_root: Path, target_root: Path) -> str | None:
+    """The first `hyodo/` path that differs, phrased for the person reading it."""
+    installed = _source_digests(package_root / "hyodo") or {}
+    source = _source_digests(target_root / "hyodo") or {}
+    for relative in sorted(installed.keys() | source.keys()):
+        if relative not in installed:
+            return f"hyodo/{relative} only in this checkout"
+        if relative not in source:
+            return f"hyodo/{relative} only in the measuring package"
+        if installed[relative] != source[relative]:
+            return f"hyodo/{relative} differs"
+    return None
+
+
+def _same_directory(first: Path, second: Path) -> bool:
+    """One directory however it is spelled: symlinks, and case on macOS or Windows."""
+    try:
+        return first.samefile(second)
+    except OSError:
+        return first.resolve() == second.resolve()
 
 
 def git_is_dirty(root: Path) -> bool | None:
@@ -301,7 +328,7 @@ def _has_editable_marker() -> bool:
         return False
     if not direct_url:
         return False
-    return '"editable": true' in direct_url.replace(" ", "")
+    return '"editable":true' in direct_url.replace(" ", "")
 
 
 def _default_package_root() -> Path | None:
@@ -329,6 +356,9 @@ class MeasurementProvenance:
     target_dirty: bool | None
     install_mode: InstallMode
     relation: Relation
+    #: First differing `hyodo/` path when the files decided a mismatch. Shown
+    #: in `summary()` only; receipts keep their pinned schema.
+    content_difference: str | None = None
 
     @property
     def validity(self) -> Validity:
@@ -353,22 +383,26 @@ class MeasurementProvenance:
             return f"self-measured from this checkout ({self.install_mode})"
         if self.relation == "SELF_OTHER_CHECKOUT":
             if self.tool_commit is None:
-                return (
+                message = (
                     f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
                     f"{self.tool_name} from {self.package_root} — installed package content "
                     "differs from this checkout's hyodo/ source"
                 )
-            if self.tool_commit == self.target_commit:
-                return (
+            elif self.tool_commit == self.target_commit:
+                message = (
                     f"MEASUREMENT MISMATCH: commits match ({_short(self.target_commit)}) but "
                     f"the hyodo/ files of {self.package_root} differ from this checkout's — "
                     "edits git status does not show, or a git that does not describe these files"
                 )
-            return (
-                f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
-                f"{self.tool_name} from {self.package_root} at {_short(self.tool_commit)} — "
-                "same version string, different code"
-            )
+            else:
+                message = (
+                    f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
+                    f"{self.tool_name} from {self.package_root} at {_short(self.tool_commit)} — "
+                    "same version string, different code"
+                )
+            if self.content_difference:
+                message += f" (first difference: {self.content_difference})"
+            return message
         return (
             "measurement source UNOBSERVED: cannot prove the measuring code matches this "
             f"checkout ({self.install_mode})"
@@ -458,7 +492,7 @@ def _classify(
     if package_root is None:
         return "SOURCE_UNOBSERVED"
     # Only the very same directory is the same code without comparison.
-    if package_root.resolve() == target_root.resolve():
+    if _same_directory(package_root, target_root):
         return "SELF_SAME_CHECKOUT"
     if not is_hyodo_checkout(package_root):
         # An installed copy has no commit of its own and its location proves
@@ -534,4 +568,9 @@ def resolve_provenance(
         target_dirty=target_dirty,
         install_mode=_detect_install_mode(package),
         relation=relation,
+        content_difference=(
+            _first_difference(package, target)
+            if relation == "SELF_OTHER_CHECKOUT" and package is not None
+            else None
+        ),
     )
