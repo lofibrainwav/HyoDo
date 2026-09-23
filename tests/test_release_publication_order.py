@@ -333,15 +333,78 @@ def test_workflow_jobs_map_onto_the_publication_states() -> None:
 # --- review findings: evidence must be bound to this run, tag and moment ----
 
 
-def test_a_draft_that_already_carries_unobserved_evidence_is_refused() -> None:
+def test_a_draft_with_extra_unobserved_evidence_is_refused() -> None:
     # Assets this invocation did not watch being attached cannot be bound to
     # the tag; the draft must be recreated rather than trusted.
-    remote = FakeRemote(release={"draft": True, "assets": list(SBOM_ASSETS)})
+    remote = FakeRemote(
+        tag={"commit": MAIN_SHA, "verified": True},
+        release={"draft": True, "assets": [*SBOM_ASSETS, "unobserved-asset.json"]},
+    )
     receipt = _run(remote, **_authorized())
     assert receipt["result"] == "BLOCK"
     assert receipt["state"] == "DRAFT_CREATED"
+    assert "already carries assets" in " ".join(receipt["residuals"])
+    assert remote.mutations() == []
     assert "publish_release" not in remote.calls
     assert "run_release_evidence" not in remote.calls
+
+
+def test_a_draft_with_exact_verified_evidence_can_resume() -> None:
+    # A fresh invocation can resume from reached DRAFT_VERIFIED evidence only
+    # after re-observing the exact SBOM pair and verifying its digest.
+    remote = FakeRemote(
+        tag={"commit": MAIN_SHA, "verified": True},
+        release={"draft": True, "assets": list(SBOM_ASSETS)},
+    )
+    receipt = _run(remote)
+
+    assert receipt["result"] == "PASS"
+    assert receipt["state"] == "DRAFT_VERIFIED"
+    assert remote.mutations() == []
+    assert remote.calls.count("verify_release_assets") == 1
+    assert [entry["state"] for entry in receipt["history"]] == [
+        "MERGED",
+        "TAGGED",
+        "DRAFT_CREATED",
+        "EVIDENCE_BUILT",
+        "EVIDENCE_ATTACHED",
+        "DRAFT_VERIFIED",
+    ]
+    assert [entry["simulated"] for entry in receipt["history"][1:]] == [
+        False,
+        False,
+        False,
+        False,
+        False,
+    ]
+
+
+def test_a_draft_with_exact_verified_evidence_can_publish_without_rebuilding() -> None:
+    remote = FakeRemote(
+        tag={"commit": MAIN_SHA, "verified": True},
+        release={"draft": True, "assets": list(SBOM_ASSETS)},
+    )
+    receipt = _run(remote, **_authorized())
+
+    assert receipt["result"] == "PASS"
+    assert [entry["state"] for entry in receipt["history"]] == PUBLICATION_ORDER
+    assert "run_release_evidence" not in remote.calls
+    assert remote.mutations() == ["publish_release"]
+
+
+def test_a_draft_with_a_bad_digest_cannot_resume() -> None:
+    remote = FakeRemote(
+        tag={"commit": MAIN_SHA, "verified": True},
+        release={"draft": True, "assets": list(SBOM_ASSETS)},
+    )
+    remote.assets_verify = False
+    receipt = _run(remote, **_authorized())
+
+    assert receipt["result"] == "BLOCK"
+    assert receipt["state"] == "EVIDENCE_ATTACHED"
+    assert "SBOM digest did not verify" in " ".join(receipt["residuals"])
+    assert remote.mutations() == []
+    assert "publish_release" not in remote.calls
 
 
 def test_the_tag_is_reobserved_immediately_before_publishing() -> None:

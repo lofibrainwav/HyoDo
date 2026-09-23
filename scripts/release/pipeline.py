@@ -767,6 +767,10 @@ def _has_evidence(release: dict[str, Any] | None) -> bool:
     return release is not None and set(SBOM_ASSETS) <= set(release.get("assets") or [])
 
 
+def _has_exact_evidence(release: dict[str, Any] | None) -> bool:
+    return release is not None and set(release.get("assets") or []) == set(SBOM_ASSETS)
+
+
 class GitHubRemote:
     """Real GitHub/PyPI adapter for ``run_publication``.
 
@@ -1041,6 +1045,7 @@ def run_publication(
     )
     # What a dry run has simulated so far, so later reads see its own effects.
     simulated: dict[str, Any] = {}
+    resumed_existing_evidence = False
 
     def advance(state: str, evidence: str, *, was_simulated: bool) -> None:
         nonlocal receipt
@@ -1103,38 +1108,60 @@ def run_publication(
         # EVIDENCE_BUILT / EVIDENCE_ATTACHED (release-evidence.yml) ------------
         require_state(receipt, "DRAFT_CREATED", "release evidence")
         if release.get("assets"):
-            # Evidence this run did not watch being attached cannot be bound to
-            # the tag. Drafts are mutable: delete this one and rerun.
-            raise _PublicationBlocked(
-                f"draft {tag} already carries assets {release['assets']} from a run "
-                "this invocation did not observe; delete the draft and rerun"
-            )
-        run = mutate("run_release_evidence", remote.run_release_evidence, tag)
-        if dry_run:
-            run = {
-                "run_id": "SIMULATED",
-                "jobs": dict.fromkeys(WORKFLOW_STATES["release-evidence.yml"], "success"),
-            }
-            simulated["release"] = {"draft": True, "assets": list(SBOM_ASSETS)}
-        for job, state in WORKFLOW_STATES["release-evidence.yml"].items():
-            if run["jobs"].get(job) != "success":
+            # This is the #465 resume path. Drafts are mutable, so bind existing
+            # evidence only when it is exactly the expected SBOM pair and the
+            # digest verifies now; the publish boundary verifies it again.
+            resumed_existing_evidence = True
+            if not _has_exact_evidence(release):
                 raise _PublicationBlocked(
-                    f"release-evidence.yml job {job} ended {run['jobs'].get(job)!r} "
-                    f"(run {run['run_id']})"
+                    f"draft {tag} already carries assets {release['assets']} from a run "
+                    "this invocation did not observe; delete the draft and rerun"
                 )
-            advance(state, f"release-evidence.yml {job} run {run['run_id']}", was_simulated=dry_run)
+            advance(
+                "EVIDENCE_BUILT",
+                f"existing draft {tag} SBOM assets observed",
+                was_simulated=False,
+            )
+            advance(
+                "EVIDENCE_ATTACHED",
+                f"existing draft {tag} SBOM assets observed",
+                was_simulated=False,
+            )
+        else:
+            run = mutate("run_release_evidence", remote.run_release_evidence, tag)
+            if dry_run:
+                run = {
+                    "run_id": "SIMULATED",
+                    "jobs": dict.fromkeys(WORKFLOW_STATES["release-evidence.yml"], "success"),
+                }
+                simulated["release"] = {"draft": True, "assets": list(SBOM_ASSETS)}
+            for job, state in WORKFLOW_STATES["release-evidence.yml"].items():
+                if run["jobs"].get(job) != "success":
+                    raise _PublicationBlocked(
+                        f"release-evidence.yml job {job} ended {run['jobs'].get(job)!r} "
+                        f"(run {run['run_id']})"
+                    )
+                advance(
+                    state,
+                    f"release-evidence.yml {job} run {run['run_id']}",
+                    was_simulated=dry_run,
+                )
 
         # DRAFT_VERIFIED ------------------------------------------------------
         release = observe_release()
         if release is None or not release.get("draft") or not _has_evidence(release):
             raise _PublicationBlocked(f"{tag} is not a draft carrying both SBOM assets")
-        if dry_run:
+        if dry_run and not resumed_existing_evidence:
             verified = {"ok": True, "detail": "SIMULATED digest check"}
         else:
             verified = remote.verify_release_assets(tag)
         if not verified.get("ok"):
             raise _PublicationBlocked(f"SBOM digest did not verify: {verified.get('detail')}")
-        advance("DRAFT_VERIFIED", f"draft {tag} SBOM digest verified", was_simulated=dry_run)
+        advance(
+            "DRAFT_VERIFIED",
+            f"draft {tag} SBOM digest verified",
+            was_simulated=dry_run and not resumed_existing_evidence,
+        )
 
         if dry_run:
             receipt["next_action"] = (
