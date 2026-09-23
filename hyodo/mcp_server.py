@@ -24,6 +24,7 @@ from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
     http_app_accepts_options,  # pyright: ignore[reportAttributeAccessIssue]
 )
 from hyodo.access_ledger import AccessEntry, record_access_result
+from hyodo.mcp_readers import STALE, STALE_RUNTIME_ERROR, ReaderPin, registered_reader
 from hyodo.pairing import PairingState, load_pairing, touch_last_seen, verify_token
 
 _CLI_TIMEOUT_SECONDS = 120
@@ -102,6 +103,7 @@ def _record_access(
     exit_code: int,
     duration_ms: int,
     caller_id: str | None = None,
+    pin: ReaderPin | None = None,
 ) -> dict[str, str | None]:
     """Record one MCP invocation while keeping audit loss fail-visible.
 
@@ -119,6 +121,10 @@ def _record_access(
         exit_code=exit_code,
         duration_ms=duration_ms,
         caller_id=caller_id,
+        server_pid=os.getpid(),
+        server_version=__version__,
+        server_started_at=pin.process_start if pin is not None else None,
+        runtime_commit=pin.runtime_commit if pin is not None else None,
     )
     try:
         observation = record_access_result(entry, root=root)
@@ -163,6 +169,7 @@ def create_server(
     bearer token itself.
     """
     workspace = resolve_workspace_root(root)
+    pin = ReaderPin.at_startup(root, workspace)
 
     def _record(tool_name: str, exit_code: int, duration_ms: int) -> dict[str, str | None]:
         return _record_access(
@@ -171,7 +178,27 @@ def create_server(
             exit_code,
             duration_ms,
             caller_id=caller_id,
+            pin=pin,
         )
+
+    def _stale(tool_name: str, started_at: float) -> dict[str, Any] | None:
+        """Refuse to measure once this reader's pin no longer holds.
+
+        A stale reader would otherwise keep answering for a retired runtime (or
+        with replaced code) as if it were current.  ``exit_code`` 2 keeps the
+        UNOBSERVED contract; the diagnostic ``get_local_context`` still works.
+        """
+        reader = pin.status()
+        if reader["state"] != STALE:
+            return None
+        result = {
+            "exit_code": 2,
+            "stdout": "",
+            "stderr": "",
+            "error": STALE_RUNTIME_ERROR,
+            "reader": reader,
+        }
+        return _finish(tool_name, result, started_at)
 
     def _finish(tool_name: str, result: dict[str, Any], started_at: float) -> dict[str, Any]:
         elapsed_ms = int((time.monotonic() - started_at) * 1000)
@@ -219,6 +246,7 @@ def create_server(
             "git_status": status.splitlines() if status_ok else [],
             "git_diff_stat": diff.strip() if diff_ok else "",
             "git_observed": status_ok and diff_ok,
+            "reader": pin.status(),
         }
         return _finish("get_local_context", result, t0)
 
@@ -231,10 +259,12 @@ def create_server(
         files — in sorted order — is simply never looked at. The client had no way to
         ask for a full scan before this parameter existed.
         """
+        t0 = time.monotonic()
+        if (refused := _stale("hyodo_safe", t0)) is not None:
+            return refused
         args = ["safe", "--json", str(workspace)]
         if max_files is not None:
             args.extend(["--max-files", str(max_files)])
-        t0 = time.monotonic()
         result = _run_cli(workspace, args)
         return _finish("hyodo_safe", result, t0)
 
@@ -242,6 +272,8 @@ def create_server(
     def hyodo_check() -> dict[str, Any]:
         """Run ``hyodo check`` against the configured host workspace."""
         t0 = time.monotonic()
+        if (refused := _stale("hyodo_check", t0)) is not None:
+            return refused
         result = _run_cli(workspace, ["check", str(workspace)])
         return _finish("hyodo_check", result, t0)
 
@@ -262,6 +294,8 @@ def create_server(
         does not already carry one. HyoDo never derives identity from it.
         """
         t0 = time.monotonic()
+        if (refused := _stale("hyodo_event_record", t0)) is not None:
+            return refused
         args = ["event", "record", "--stdin", "--root", str(workspace), "--json"]
         if policy_path is not None:
             try:
@@ -296,6 +330,8 @@ def create_server(
         policy decision.
         """
         t0 = time.monotonic()
+        if (refused := _stale("hyodo_policy_check", t0)) is not None:
+            return refused
         try:
             config = _resolve_workspace_path(workspace, policy_path)
         except ValueError as exc:
@@ -314,6 +350,8 @@ def create_server(
         from hyodo.agent_rules import DEFAULT_RULES, load_agent_rules
 
         t0 = time.monotonic()
+        if (refused := _stale("hyodo_agent_rules", t0)) is not None:
+            return refused
         rules = load_agent_rules(workspace)
         if not rules:
             rules = list(DEFAULT_RULES)
@@ -325,7 +363,9 @@ def create_server(
 
 def run_stdio(root: Path, *, allow_full_body: bool = False) -> None:
     """Start the M1 local stdio transport. No network listener is created."""
-    create_server(root, allow_full_body=allow_full_body).run(transport="stdio")
+    server = create_server(root, allow_full_body=allow_full_body)
+    with registered_reader(root, "stdio"):
+        server.run(transport="stdio")
 
 
 class _BearerTokenMiddleware:
@@ -429,21 +469,15 @@ def run_loopback(root: Path, *, port: int, token: str | None, paired: bool = Fal
     """Serve MCP streamable HTTP only on the local IPv4 loopback interface."""
     import uvicorn
 
-    uvicorn.run(
-        create_loopback_app(root, token, port=port, paired=paired),
-        host=_LOOPBACK_HOST,
-        port=port,
-        log_level="warning",
-    )
+    app = create_loopback_app(root, token, port=port, paired=paired)
+    with registered_reader(root, "serve"):
+        uvicorn.run(app, host=_LOOPBACK_HOST, port=port, log_level="warning")
 
 
 def run_tailscale(root: Path, *, host: str, port: int, token: str, paired: bool = False) -> None:
     """Serve authenticated MCP only on one caller-validated Tailscale address."""
     import uvicorn
 
-    uvicorn.run(
-        _create_http_app(root, host, token, port=port, paired=paired),
-        host=host,
-        port=port,
-        log_level="warning",
-    )
+    app = _create_http_app(root, host, token, port=port, paired=paired)
+    with registered_reader(root, "serve"):
+        uvicorn.run(app, host=host, port=port, log_level="warning")

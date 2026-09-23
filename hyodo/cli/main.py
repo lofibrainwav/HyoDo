@@ -3323,6 +3323,67 @@ def mcp_stdio(
         raise typer.Exit(2) from exc
 
 
+@mcp_app.command("census")
+def mcp_census(
+    expect_root: str = typer.Option(
+        ...,
+        "--expect-root",
+        help="Slot every reader should now measure (a symlink such as .../current is resolved)",
+    ),
+    promotion_from: str | None = typer.Option(
+        None, "--from", help="Slot being retired, recorded in the receipt"
+    ),
+    expect_version: str | None = typer.Option(
+        None, "--expect-version", help="Also require readers to report this HyoDo version"
+    ),
+    registry: str | None = typer.Option(
+        None, "--registry", help="Reader registry directory (default: ~/.hyodo/runtime/mcp-readers)"
+    ),
+    receipt: str | None = typer.Option(None, "--receipt", help="Also write the receipt JSON here"),
+    json_output: bool = typer.Option(False, "--json", help="Print the receipt as JSON"),
+):
+    """Check whether every live MCP reader moved to a promoted runtime slot.
+
+    Exit 0 PROMOTION_COMPLETE, 1 PROMOTION_INCOMPLETE (a stale or unregistered
+    reader is still live), 2 UNOBSERVED (the process table could not be read).
+    The result is evidence for the host's promotion decision, not the decision.
+    """
+    from hyodo.mcp_readers import PROMOTION_COMPLETE, PROMOTION_INCOMPLETE, run_census
+
+    result = run_census(
+        Path(expect_root),
+        promotion_from=promotion_from,
+        expect_version=expect_version,
+        directory=Path(registry) if registry else None,
+    )
+    payload = json.dumps(result, indent=2, sort_keys=True) + "\n"
+    if receipt:
+        receipt_path = Path(receipt)
+        receipt_path.parent.mkdir(parents=True, exist_ok=True)
+        receipt_path.write_text(payload, encoding="utf-8")
+    if json_output:
+        typer.echo(payload, nl=False)
+    else:
+        status = result["cutover_status"]
+        console.print(f"cutover_status: {status}")
+        console.print(f"  promotion_to:   {result['promotion_to']}")
+        console.print(
+            f"  readers:        fresh={result['fresh_reader_count']} "
+            f"old={result['old_reader_count']} unknown={result['unknown_reader_count']}"
+        )
+        for reader in result["readers"]:
+            console.print(
+                f"  pid {reader['reader_pid']} ({reader['parent_host'] or '?'}) "
+                f"{reader['reader_status']} version={reader['server_version'] or '?'} "
+                f"root={reader['resolved_root'] or '?'} {','.join(reader['reasons'])}",
+                markup=False,
+            )
+    status = result["cutover_status"]
+    if status == PROMOTION_COMPLETE:
+        return
+    raise typer.Exit(1 if status == PROMOTION_INCOMPLETE else 2)
+
+
 @mcp_app.command("serve")
 def mcp_serve(
     bind: str = typer.Option("loopback", "--bind", help="loopback or tailscale"),

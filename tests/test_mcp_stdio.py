@@ -321,6 +321,8 @@ def test_mcp_stdio_protocol_lists_the_m1_tools(tmp_path):
         params = StdioServerParameters(
             command=sys.executable,
             args=["-m", "hyodo.cli.main", "mcp", "stdio", "--root", str(tmp_path)],
+            # Keep the reader registration out of the real per-user registry.
+            env={"HYODO_MCP_READER_DIR": str(tmp_path / "mcp-readers")},
         )
         async with (
             stdio_client(params) as (read_stream, write_stream),

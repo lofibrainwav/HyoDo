@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- MCP readers register themselves (PID plus process start time, versions,
+  resolved root, runtime commit) and `hyodo mcp census` reports whether every
+  live reader converged on a promoted runtime slot: `PROMOTION_COMPLETE` only
+  when no stale or unregistered reader is live. See
+  `docs/MCP_READER_CUTOVER.md`.
+- A reader whose pinned root no longer matches its configured root, or whose
+  package code was replaced (or can no longer be read) on disk, now refuses measurement tools with
+  `STALE_RUNTIME_RECONNECT_REQUIRED` (exit code 2) instead of answering for a
+  retired runtime. `get_local_context` reports the reader state.
+- MCP access rows record `server_pid`, `server_started_at`, `server_version`,
+  and `runtime_commit`.
+
 ### Fixed
 
 - The local publication pipeline now runs the PyPI provenance/install readback
