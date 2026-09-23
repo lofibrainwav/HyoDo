@@ -7,6 +7,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Measurement provenance no longer calls a self-measurement green on the word
+  of a path or of git. Against the public 4.21.3 wheel, a clean, committed
+  edit to `hyodo/` still produced `SELF_SAME_CHECKOUT` / `effective=PASS`
+  when the virtualenv lived inside the target, and review reached the same
+  false green through a copy nested in the target, inherited `GIT_DIR` /
+  `GIT_WORK_TREE`, `git update-index --skip-worktree` or `--assume-unchanged`,
+  and a target whose `pyproject.toml` was reformatted (`name="hyodo"`),
+  missing, or not a file, which made it look like an external project.
+
+  Apart from the target directory measuring itself, `SELF_SAME_CHECKOUT` now
+  requires the measuring package's `hyodo/` files to equal the target's;
+  different files are `SELF_OTHER_CHECKOUT` (`MISMATCH`) and a mismatch names
+  the first path that differs, and unreadable files are `SOURCE_UNOBSERVED`.
+  Commits still prove two checkouts differ, and a missing commit or a dirty
+  tree still means no claim is made; they never prove equality. `tool_commit`
+  comes only from a checkout's own repository, and git queries no longer
+  inherit repository-relocating variables (`git rev-parse --local-env-vars`).
+  A target is recognized as HyoDo by its parsed `[project] name`, and a
+  partial copy of the `hyodo` package stays on the evidence path.
+
+  The comparison ignores what is not code, so normal setups running the same
+  code stay `OBSERVED`: the `__pycache__/` cache, named tool and cache paths
+  (`.idea/`, `.vscode/`, `.mypy_cache/`, `.pytest_cache/`, `.ruff_cache/`,
+  `.DS_Store`, office lock files), editor and merge leftovers (`*.swp`, `*~`,
+  `*.orig`, `*.rej`), and CRLF line endings in text files (known text suffix,
+  valid UTF-8) from a `core.autocrlf` checkout. Any other path, dotted or not,
+  is compared, and binary files are compared byte for byte. A `.pyc` beside
+  the sources imports on its own and is compared. One directory reached through a symlink or a different letter
+  case is the same directory. The dashboard banner names each kind of
+  mismatch instead of "commit unknown".
+
+  One verdict relaxes: a wheel outside any git repository measuring a
+  byte-identical checkout is now `OBSERVED` instead of `SOURCE_UNOBSERVED`,
+  because equal files are the evidence the commit check could not obtain.
+  Relations, validities, and the runtime-identity schema are unchanged.
+
+  Scope: provenance guards against measuring with the wrong code by accident
+  and keeps its evidence honest. It is not a defense against a hostile
+  execution environment — whoever controls `PATH` or the interpreter can
+  replace HyoDo itself, and whoever can write `__pycache__/` or `sys.modules`
+  can change what runs without changing a compared file.
+- `install_mode` reports `editable` for editable installs. The marker check
+  stripped spaces from `direct_url.json` but not from the text it searched
+  for, so editable installs were always reported as `source`.
+
 ### Documentation
 
 - Clarify `hyodo init` zero-detection behavior across the README, Quick Start,

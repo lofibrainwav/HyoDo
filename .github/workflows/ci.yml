@@ -99,6 +99,12 @@ jobs:
           pyright hyodo
           echo "Public package type check passed"
 
+      - name: Provenance Tests - Every Supported Python
+        # The only pytest job runs on one Python; provenance carries a
+        # Python 3.10 path (the tomli fallback) that must not go CI-blind.
+        run: |
+          pytest tests/test_measurement_provenance.py -q
+
       - name: Validate JSON
         run: |
           set -euo pipefail
