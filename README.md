@@ -138,53 +138,18 @@ the latest published package.
 `init` detects existing test and lint tooling. Empty or malformed gate
 configuration exits **2**, not **0**. See the [gate configuration reference](./docs/GATES_SYNTAX.md).
 
-## Hooks and SARIF
+## Advanced integrations
 
-Pin a signed release containing the hooks (`v4.11.0` predates them):
+Hooks, SARIF, agent evidence, policy, and MCP are optional. Start with local
+verification and add these surfaces only when you need them:
 
-```yaml
-- repo: https://github.com/lofibrainwav/HyoDo
-  rev: vX.Y.Z
-  hooks: [{id: hyodo-check}, {id: hyodo-safe-strict}]
-```
+- Hooks, pre-commit, GitHub Actions, and shadow mode: [`docs/CONNECT.md`](./docs/CONNECT.md)
+- Agent evidence and policy trust: [`docs/POLICY_TRUST.md`](./docs/POLICY_TRUST.md)
+- MCP and host onboarding: [`docs/ONBOARDING.md`](./docs/ONBOARDING.md)
+- Example event and host-policy inputs: [`examples/`](./examples/)
 
-`hyodo report --format sarif` writes a SARIF 2.1.0 visibility report.
-Measured DENY and unreadable-ledger conditions become alerts; `hyodo check`
-remains the fail-closed gate for missing or unmeasured quality evidence.
-
-## Optional agent evidence
-
-```bash
-hyodo event validate --file step.json
-hyodo event record --file step.json --root . --policy .hyodo/policy.toml
-hyodo policy check --file step.json --config .hyodo/policy.toml
-hyodo schema check --schema agent.schema.json --payload step.json --json
-```
-
-Default event storage is digest-only. See
-[`examples/fde-evidence-spine/`](./examples/fde-evidence-spine/) for a demo
-event and [`examples/host-policies/`](./examples/host-policies/) for a
-dual-host `allowed_tools` list (not a Cursor hook). Policy trust:
-[docs/POLICY_TRUST.md](docs/POLICY_TRUST.md). For an unattended feature queue
-that calls these gates from a host loop, see
-[`examples/factory-loop/`](./examples/factory-loop/).
-
-## Optional MCP
-
-```bash
-pip install 'hyodo[mcp]'                       # pipx: pipx install --force 'hyodo[mcp]'
-hyodo mcp stdio --root .                       # local stdio
-hyodo mcp serve --bind tailscale --bind-ip 100.99.88.77 \
-  --token "$HYODO_MCP_TOKEN" --root .          # private-network connector
-```
-
-The extra has to land in the same environment that runs `hyodo`; a pipx
-install is isolated, so `pip install 'hyodo[mcp]'` after `pipx install hyodo`
-installs into a different interpreter and the SDK stays missing.
-
-The MCP adapter uses the same CLI contracts rather than a second engine. It is
-not an MCP gateway, traffic proxy, or central authorization layer, and
-`mcp.hyodo.app` is contract-only, not this path.
+For MCP, install the optional extra into the same environment that runs
+`hyodo` (`pipx install --force 'hyodo[mcp]'` for a pipx install).
 
 ## Install and support
 
