@@ -5,21 +5,34 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [4.21.5] - 2026-09-23
+
+MCP reader cutover patch. A runtime promotion is no longer complete when a
+pointer moves; it is complete when every live MCP reader has converged on the
+new slot, and a reader that has not converged refuses to measure.
 
 ### Added
 
-- MCP readers register themselves (PID plus process start time, versions,
-  resolved root, runtime commit) and `hyodo mcp census` reports whether every
-  live reader converged on a promoted runtime slot: `PROMOTION_COMPLETE` only
-  when no stale or unregistered reader is live. See
-  `docs/MCP_READER_CUTOVER.md`.
-- A reader whose pinned root no longer matches its configured root, or whose
-  package code was replaced (or can no longer be read) on disk, now refuses measurement tools with
-  `STALE_RUNTIME_RECONNECT_REQUIRED` (exit code 2) instead of answering for a
-  retired runtime. `get_local_context` reports the reader state.
+- MCP readers register themselves (PID plus process start time, parent host,
+  server and Python version, configured and resolved root, runtime commit) in
+  `~/.hyodo/runtime/mcp-readers/` and remove the record on exit.
+- `hyodo mcp census --expect-root PATH` joins those registrations with the
+  live process table and classifies readers as `CURRENT`, `STALE`, `UNKNOWN`
+  (live but unregistered, for example started before this release), or
+  `RETIRED`. `PROMOTION_COMPLETE` (exit 0) only when no stale or unknown reader
+  is live; otherwise `PROMOTION_INCOMPLETE` (exit 1); `UNOBSERVED` (exit 2)
+  when the process table cannot be read. The census is evidence for the host's
+  promotion decision, not the decision. See `docs/MCP_READER_CUTOVER.md`.
 - MCP access rows record `server_pid`, `server_started_at`, `server_version`,
-  and `runtime_commit`.
+  and `runtime_commit`; older rows read back as `null`.
+
+### Changed
+
+- A reader whose pinned root no longer matches its configured root, or whose
+  package code was replaced (or can no longer be read) on disk, now refuses
+  measurement tools with `STALE_RUNTIME_RECONNECT_REQUIRED` (exit code 2)
+  instead of answering for a retired runtime. `get_local_context` keeps
+  working and reports the reader state. The public MCP tool list is unchanged.
 
 ### Fixed
 
@@ -27,6 +40,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   with the same Python interpreter that launched the pipeline instead of an
   ambient `python3`. This prevents a host Python below HyoDo's supported
   range from producing a false release-block after PyPI publication succeeds.
+
+### Evidence
+
+- Reader-census suite (including a live stdio reader re-pointed through a
+  symlink), public-package verification, and exact-head remote CI passed
+  before publication. Release-chain evidence remains UNOBSERVED until
+  publication is read back into `docs/releases/4.21.5.md`.
 
 ## [4.21.4] - 2026-09-23
 
