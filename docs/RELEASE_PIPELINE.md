@@ -10,6 +10,13 @@ The default command is a zero-write intake. It observes the checkout, creates a
 release plan, and emits one JSON receipt. It does not edit files, create a
 branch, push, open a pull request, or merge.
 
+The planner accepts exactly two coherent candidate states. `UNPREPARED` means
+the source still names the published baseline and the new release note/changelog
+section do not exist yet. `PREPARED` means version sources already equal the
+requested version and the matching release note/changelog section exist. This
+lets the same pipeline plan before preparation and then verify/execute the
+prepared candidate without contradictory validations.
+
 After explicit human authorization, run the same pipeline with local
 verification:
 

@@ -17,7 +17,10 @@ kept answering as though it were current.
 - **Registers itself at startup** in `~/.hyodo/runtime/mcp-readers/<pid>.json`
   (override with `HYODO_MCP_READER_DIR`). The record holds PID, process start
   time, parent PID and host, server and Python version, configured and resolved
-  root, and runtime commit. It is removed when the reader exits.
+  root, and runtime commit. Normal exit removes the record. Before a new reader
+  registers, startup GC also removes records whose PID/process-start identity
+  is provably retired, covering SIGTERM, SIGKILL, crash, and reboot residue
+  without treating an unobservable process identity as dead.
 - **Checks its pin on every call.** If the configured root now resolves
   elsewhere (`root_moved`), no longer resolves (`configured_root_unresolvable`),
   the package file it imported now carries a different version

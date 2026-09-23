@@ -7,6 +7,7 @@ from pathlib import Path
 from test_release_prepare import write_minimal_repo
 
 from scripts.release.plan_release import plan_release
+from scripts.release.prepare_release import prepare_release
 from scripts.release.release_state import start_receipt, transition, validate_receipt
 
 
@@ -91,3 +92,38 @@ def test_passing_plan_enters_planned_state_and_transitions_fail_closed(tmp_path:
     assert receipt["state"] == "PLANNED"
     assert verified["state"] == "AUTHORIZED"
     validate_receipt(verified)
+
+
+def test_plan_passes_for_fully_prepared_candidate(tmp_path: Path) -> None:
+    write_minimal_repo(tmp_path)
+    init_checkout(tmp_path, "release/4.12.0")
+    prepare_release(tmp_path, "4.12.0", today="2026-09-23")
+    roadmap = tmp_path / "ROADMAP.md"
+    roadmap.write_text(
+        roadmap.read_text() + "\n### 4.12.0\n\n- Prepared candidate.\n",
+        encoding="utf-8",
+    )
+    subprocess.run(["git", "-C", str(tmp_path), "add", "."], check=True)
+    subprocess.run(
+        [
+            "git",
+            "-C",
+            str(tmp_path),
+            "-c",
+            "user.name=HyoDo test",
+            "-c",
+            "user.email=test@hyodo.invalid",
+            "commit",
+            "-m",
+            "prepare candidate",
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    plan = plan_release(tmp_path, "4.12.0", base_ref="origin/main")
+
+    assert plan["result"] == "PASS"
+    assert plan["candidate_state"] == "PREPARED"
+    assert plan["expected_version_delta"] == {"from": "4.11.0", "to": "4.12.0"}

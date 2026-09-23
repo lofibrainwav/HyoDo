@@ -25,6 +25,7 @@ from hyodo.mcp_readers import (
     ReaderProcess,
     load_registrations,
     process_start,
+    prune_retired_registrations,
     reader_transport,
     run_census,
 )
@@ -438,3 +439,64 @@ def test_pre_attribution_rows_read_back_as_none(tmp_path):
     assert entry.server_pid is None
     assert entry.server_started_at is None
     assert entry.runtime_commit is None
+
+
+def test_startup_gc_removes_only_provably_retired_records(tmp_path):
+    _old, new, _current = _slots(tmp_path)
+    registry = tmp_path / "registry"
+    _write(registry, _record(4201, new, start="old-start"))
+    _write(registry, _record(4202, new, start="live-start"))
+    _write(registry, _record(4203, new, start="uncertain-start"))
+
+    removed = prune_retired_registrations(
+        directory=registry,
+        exists_lookup=lambda pid: pid != 4201,
+        start_lookup=lambda pid: "live-start" if pid == 4202 else None,
+    )
+
+    assert removed == 1
+    assert not (registry / "4201.json").exists()
+    assert (registry / "4202.json").exists()
+    assert (registry / "4203.json").exists()
+
+
+def test_startup_gc_removes_reused_pid_record(tmp_path):
+    _old, new, _current = _slots(tmp_path)
+    registry = tmp_path / "registry"
+    _write(registry, _record(4301, new, start="previous-process"))
+
+    removed = prune_retired_registrations(
+        directory=registry,
+        exists_lookup=lambda pid: True,
+        start_lookup=lambda pid: "new-process",
+    )
+
+    assert removed == 1
+    assert not (registry / "4301.json").exists()
+
+
+def test_reader_start_prunes_dead_registration(tmp_path):
+    _old, new, _current = _slots(tmp_path)
+    current = tmp_path / "current-startup-gc"
+    current.symlink_to(new)
+    registry = tmp_path / "registry"
+    _write(registry, _record(999999, new, start="dead-process"))
+    env = {**os.environ, mcp_readers.READER_DIR_ENV: str(registry)}
+    proc = subprocess.Popen(
+        [sys.executable, "-m", "hyodo.cli.main", "mcp", "stdio", "--root", str(current)],
+        stdin=subprocess.PIPE,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.PIPE,
+        env=env,
+    )
+    try:
+        live_path = registry / f"{proc.pid}.json"
+        deadline = time.monotonic() + 30
+        while not live_path.exists() and time.monotonic() < deadline:
+            time.sleep(0.1)
+        assert live_path.exists()
+        assert not (registry / "999999.json").exists()
+    finally:
+        assert proc.stdin is not None
+        proc.stdin.close()
+        proc.wait(timeout=30)
