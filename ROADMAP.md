@@ -5,19 +5,18 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.3 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.21.4 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.21.3.md`. Prior release receipts remain preserved under
+`docs/releases/4.21.4.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
 HyoDo 4.21.4 is the current release target and source-tree release baseline.
-Its release chain remains `UNOBSERVED` until publication is read back into
-`docs/releases/4.21.4.md`. HyoDo 4.21.3 remains the current public baseline
-until that chain is complete. HyoDo 4.21.2 remains an incomplete immutable
-historical release whose GitHub Release was published without SBOM evidence
-and never reached PyPI (`docs/releases/4.21.2.md`).
+Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+measured in `docs/releases/4.21.4.md`. HyoDo 4.21.2 remains an incomplete
+immutable historical release whose GitHub Release was published without SBOM
+evidence and never reached PyPI (`docs/releases/4.21.2.md`).
 This does not establish every host integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable

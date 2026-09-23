@@ -450,6 +450,25 @@ def _remote_with(monkeypatch: pytest.MonkeyPatch, stub: _GhStub) -> Any:
     return pipeline.GitHubRemote(REPO_ROOT, poll_seconds=0, timeout_seconds=0)
 
 
+def test_verify_pypi_uses_the_pipeline_interpreter(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(pipeline, "_repo_slug", lambda root: "owner/repo")
+    remote = pipeline.GitHubRemote(REPO_ROOT)
+    calls: list[tuple[str, ...]] = []
+
+    def fake_cmd(*args: str, timeout: int = 120):
+        calls.append(args)
+        return pipeline.subprocess.CompletedProcess(args, 0, "PASS", "")
+
+    monkeypatch.setattr(remote, "_cmd", fake_cmd)
+    result = remote.verify_pypi(VERSION)
+
+    assert result["provenance"] is True
+    assert result["install"] is True
+    assert calls
+    assert calls[0][0] == pipeline.sys.executable
+    assert calls[0][1] == "scripts/release/verify-pypi-release.py"
+
+
 def test_evidence_run_discovery_is_bound_to_the_tag(monkeypatch: pytest.MonkeyPatch) -> None:
     ok = [
         {"name": "Build exact-tag SBOM evidence", "conclusion": "success"},
