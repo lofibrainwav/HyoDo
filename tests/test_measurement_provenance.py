@@ -633,7 +633,6 @@ def test_fixture_f_bytecode_caches_are_not_source(tmp_path: Path) -> None:
     cache = site / "hyodo" / "__pycache__"
     cache.mkdir()
     (cache / "__init__.cpython-312.pyc").write_bytes(b"\x00compiled")
-    (site / "hyodo" / "stray.pyc").write_bytes(b"\x00compiled")
 
     provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
 
@@ -769,6 +768,9 @@ def test_index_bits_that_hide_an_edit_cannot_make_two_trees_equal(
     assert provenance.tool_dirty is False
     assert provenance.relation == "SELF_OTHER_CHECKOUT"
     assert provenance.validity == "MISMATCH"
+    summary = provenance.summary()
+    assert "commits match" in summary
+    assert "same version string" not in summary
 
 
 @requires_git
@@ -801,3 +803,80 @@ def test_a_git_that_lies_cannot_produce_a_green(
 
     assert provenance.tool_commit == provenance.target_commit
     assert provenance.is_green_allowed is False
+
+
+@pytest.mark.parametrize(
+    "name_line",
+    ['name="hyodo"', "name   =   'hyodo'", 'name = "HyoDo"', 'name = "hyodo"  # the package'],
+)
+def test_a_reformatted_project_name_is_still_a_hyodo_checkout(
+    tmp_path: Path, name_line: str
+) -> None:
+    """Found by red-team review: `name="hyodo"` (no spaces) was read as another project.
+
+    That moved a HyoDo target onto EXTERNAL_TARGET, the one relation that is
+    green without any comparison, so a different tool's code measured it
+    green. The name is now read as TOML and normalized.
+    """
+    root = tmp_path / "HyoDo"
+    (root / "hyodo").mkdir(parents=True)
+    (root / "hyodo" / "__init__.py").write_text("", encoding="utf-8")
+    (root / "pyproject.toml").write_text(f"[project]\n{name_line}\n", encoding="utf-8")
+
+    assert is_hyodo_checkout(root) is True
+
+
+def test_an_unreadable_project_file_next_to_the_package_is_not_external(tmp_path: Path) -> None:
+    """A pyproject that cannot be parsed must not buy the evidence-free green."""
+    root = tmp_path / "HyoDo"
+    (root / "hyodo").mkdir(parents=True)
+    (root / "hyodo" / "__init__.py").write_text("", encoding="utf-8")
+    (root / "pyproject.toml").write_text('[project\nname = "hyodo"\n', encoding="utf-8")
+
+    assert is_hyodo_checkout(root) is True
+
+
+@requires_git
+def test_a_reformatted_target_is_still_compared(tmp_path: Path) -> None:
+    target = tmp_path / "HyoDo"
+    (target / "hyodo").mkdir(parents=True)
+    (target / "hyodo" / "__init__.py").write_text('__version__ = "4.19.0"\n', encoding="utf-8")
+    (target / "pyproject.toml").write_text('[project]\nname="hyodo"\n', encoding="utf-8")
+    _git_init(target, "target")
+    measurer = _write_checkout(tmp_path / "other")
+    (measurer / "hyodo" / "gates.py").write_text("# different code\n", encoding="utf-8")
+    _git_init(measurer, "other")
+
+    provenance = resolve_provenance(target, package_root=measurer, tool_version=SAME_VERSION)
+
+    assert provenance.relation != "EXTERNAL_TARGET"
+    assert provenance.is_green_allowed is False
+
+
+@requires_git
+@pytest.mark.parametrize("cruft", [".DS_Store", ".gates.py.swp", "gates.py.swo", "gates.py~"])
+def test_operating_system_and_editor_litter_is_not_source(tmp_path: Path, cruft: str) -> None:
+    """A Finder or editor file beside the code is not code; it must not fail a match."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    (target / "hyodo" / cruft).write_bytes(b"\x00litter")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+    assert provenance.validity == "OBSERVED"
+
+
+@requires_git
+def test_a_sourceless_module_beside_the_package_is_code(tmp_path: Path) -> None:
+    """`hyodo/extra.pyc` outside `__pycache__/` imports as `hyodo.extra`."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    (site / "hyodo" / "extra.pyc").write_bytes(b"\x00compiled")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"

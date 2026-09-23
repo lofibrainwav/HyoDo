@@ -9,36 +9,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Measurement provenance no longer reports a false green when an installed
-  HyoDo (a wheel in site-packages) measures a HyoDo checkout. A virtualenv
-  living inside the target used to make the wheel count as the same code
-  without any comparison; a committed edit to `hyodo/` still produced
-  `SELF_SAME_CHECKOUT` / `effective=PASS`. An installed copy is now compared by
-  content against the target's `hyodo/` source (bytecode excluded): equal is
-  `SELF_SAME_CHECKOUT`, different is `SELF_OTHER_CHECKOUT` (`MISMATCH`), and
-  unreadable is `SOURCE_UNOBSERVED`. This also means a wheel outside any git
-  repository measuring a byte-identical checkout is now `SELF_SAME_CHECKOUT`
-  (`OBSERVED`) instead of `SOURCE_UNOBSERVED`: equal content is the evidence
-  the old commit check could not obtain.
-- A checkout-shaped copy nested inside the target no longer counts as the
-  target by path containment. Only the target directory itself is accepted
-  without comparison; a nested copy goes through the commit comparison, so a
-  nested repository at another commit is `SELF_OTHER_CHECKOUT` and a nested
-  copy with no repository of its own is `SOURCE_UNOBSERVED`.
-- Provenance git queries no longer inherit repository-relocating variables
-  (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, and the rest of
-  `git rev-parse --local-env-vars`). Set by a caller, they overrode
-  `git -C <root>` and let the target report the measurer's commit, so two
-  different trees compared equal and came out `OBSERVED`.
-- `SELF_SAME_CHECKOUT` between two checkouts now also requires equal
-  `hyodo/` files. Equal commits and a clean `git status` were accepted on
-  git's word alone, and `git update-index --skip-worktree` or
-  `--assume-unchanged` on an edited file (or a different `git` earlier on
-  PATH) produced a full `hyodo check` PASS for code that differed from the
-  target.
-- `tool_commit` is reported only for a checkout's own repository. A wheel or
-  vendored copy inside an unrelated git repository no longer borrows that
-  repository's HEAD as the measuring code's commit.
+- Measurement provenance no longer calls a self-measurement green on the word
+  of a path or of git. Against the public 4.21.3 wheel, a clean, committed
+  edit to `hyodo/` still produced `SELF_SAME_CHECKOUT` / `effective=PASS`
+  whenever the virtualenv lived inside the target; review found the same
+  false green through a copy nested in the target, inherited `GIT_DIR` /
+  `GIT_WORK_TREE`, and `git update-index --skip-worktree` or
+  `--assume-unchanged` on an edited file. Apart from the target directory
+  measuring itself, `SELF_SAME_CHECKOUT` now requires the measuring package's
+  `hyodo/` files to equal the target's (the `__pycache__/` cache and
+  `.DS_Store` / editor swap files aside; a `.pyc` beside the sources is code
+  and is compared); different files
+  are `SELF_OTHER_CHECKOUT` (`MISMATCH`) and unreadable ones are
+  `SOURCE_UNOBSERVED`. Relations, validities, and the runtime-identity schema
+  are unchanged.
+- `tool_commit` is reported only for a checkout's own repository, never for a
+  repository that merely encloses a virtualenv or vendored copy, and git
+  queries no longer inherit repository-relocating variables
+  (`git rev-parse --local-env-vars`).
+- A HyoDo target is recognized by its parsed `[project] name`, normalized, so
+  `name="hyodo"` or `name = "HyoDo"` no longer reads as another project. That
+  misreading moved the target onto `EXTERNAL_TARGET`, which is green without
+  comparison; an unparseable project file beside a `hyodo` package now errs
+  toward self-measurement.
+- Behavior changes to expect: a wheel outside any git repository measuring a
+  byte-identical checkout is now `OBSERVED` instead of `SOURCE_UNOBSERVED`,
+  and two checkouts at the same commit are `MISMATCH` if their `hyodo/` trees
+  differ in any file that is not cache or litter, including untracked ones.
+- Scope: provenance guards against measuring with the wrong code by accident
+  and keeps its evidence honest. It is not a defense against a hostile
+  execution environment — whoever controls `PATH` or the interpreter can
+  replace HyoDo itself, and whoever can write `__pycache__/` or `sys.modules`
+  can change what runs without changing a compared file.
 
 ### Documentation
 

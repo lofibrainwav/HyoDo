@@ -42,7 +42,8 @@ accident stayed invisible. Equal versions never prove equal sources here.
 
 Green needs the files themselves. Apart from the target directory measuring
 itself, ``SELF_SAME_CHECKOUT`` is given only when the measuring package's
-``hyodo/`` files (bytecode excluded) equal the target's. Location proves
+``hyodo/`` files equal the target's (the ``__pycache__/`` cache and OS or
+editor litter aside). Location proves
 nothing — a virtualenv inside the target, or a copy nested in it, is still
 another tree — and git's answers can be wrong about content: index bits hide
 edits from ``git status``, inherited variables relocate the repository, and a
@@ -63,12 +64,18 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Literal
+
+try:
+    import tomllib  # pyright: ignore[reportMissingImports]
+except ModuleNotFoundError:  # Python 3.10
+    import tomli as tomllib  # type: ignore[no-redef]  # pyright: ignore[reportMissingImports]
 
 PROVENANCE_SCHEMA_VERSION = "hyodo.measurement-provenance/v1"
 
@@ -167,18 +174,35 @@ def _own_checkout_commit(root: Path) -> str | None:
 _MAX_SOURCE_FILES = 5000
 
 
+#: Files an OS or editor leaves beside code. Python never imports them, so a
+#: stray one must not turn identical code into a mismatch. Only bytecode in
+#: `__pycache__/` is skipped: a `.pyc` sitting beside the sources imports as a
+#: module on its own, so it is code and is compared.
+_LITTER_NAMES = frozenset({".DS_Store"})
+_LITTER_SUFFIXES = (".swp", ".swo", "~")
+
+
+def _is_not_source(path: Path) -> bool:
+    return (
+        "__pycache__" in path.parts
+        or path.name in _LITTER_NAMES
+        or path.name.endswith(_LITTER_SUFFIXES)
+    )
+
+
 def _source_digests(package_dir: Path) -> dict[str, str] | None:
     """sha256 of every source file under `package_dir`, keyed by relative path.
 
-    Bytecode is a by-product of running the code, not part of it, so
-    `__pycache__/` and `*.pyc` are skipped. None when the tree cannot be read.
+    The `__pycache__/` bytecode cache and OS or editor litter are skipped
+    (`_is_not_source`); everything else under the package is compared.
+    None when the tree cannot be read.
     """
     if not package_dir.is_dir():
         return None
     digests: dict[str, str] = {}
     try:
         for path in package_dir.rglob("*"):
-            if not path.is_file() or path.suffix == ".pyc" or "__pycache__" in path.parts:
+            if not path.is_file() or _is_not_source(path):
                 continue
             if len(digests) >= _MAX_SOURCE_FILES:
                 return None
@@ -236,11 +260,20 @@ def is_hyodo_checkout(root: Path) -> bool:
     pyproject = root / "pyproject.toml"
     if not pyproject.is_file():
         return False
+    # Read the name as TOML: `name="hyodo"` and `name = "HyoDo"` are the same
+    # project, and a spelling this check did not expect used to move a HyoDo
+    # target onto EXTERNAL_TARGET, the one relation green without comparison.
+    # A project file that cannot be read or parsed next to a `hyodo` package
+    # errs toward self-measurement, where green still needs evidence.
     try:
-        text = pyproject.read_text(encoding="utf-8")
-    except OSError:
-        return False
-    return 'name = "hyodo"' in text or "name = 'hyodo'" in text
+        data = tomllib.loads(pyproject.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError):
+        return True
+    project = data.get("project")
+    name = project.get("name") if isinstance(project, dict) else None
+    if not isinstance(name, str):
+        return True
+    return re.sub(r"[-_.]+", "-", name).lower() == "hyodo"
 
 
 def _detect_install_mode(package_root: Path | None) -> InstallMode:
@@ -324,6 +357,12 @@ class MeasurementProvenance:
                 f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
                 f"{self.tool_name} from {self.package_root} — installed package content "
                 "differs from this checkout's hyodo/ source"
+            )
+        if self.relation == "SELF_OTHER_CHECKOUT" and self.tool_commit == self.target_commit:
+            return (
+                f"MEASUREMENT MISMATCH: commits match ({_short(self.target_commit)}) but the "
+                f"hyodo/ files of {self.package_root} differ from this checkout's — edits "
+                "git status does not show, or a git that does not describe these files"
             )
         if self.relation == "SELF_OTHER_CHECKOUT":
             return (
