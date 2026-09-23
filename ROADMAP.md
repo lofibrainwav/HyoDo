@@ -12,11 +12,12 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.3 is the current release target and source-tree release baseline.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-measured in `docs/releases/4.21.3.md`. HyoDo 4.21.2 remains an incomplete
-immutable historical release whose GitHub Release was published without SBOM
-evidence and never reached PyPI (`docs/releases/4.21.2.md`).
+HyoDo 4.21.4 is the current release target and source-tree release baseline.
+Its release chain remains `UNOBSERVED` until publication is read back into
+`docs/releases/4.21.4.md`. HyoDo 4.21.3 remains the current public baseline
+until that chain is complete. HyoDo 4.21.2 remains an incomplete immutable
+historical release whose GitHub Release was published without SBOM evidence
+and never reached PyPI (`docs/releases/4.21.2.md`).
 This does not establish every host integration.
 HyoDo 4.19.6 remains an immutable prior release whose receipt records the
 dashboard startup-readiness fix; 4.19.5 and 4.19.4 are earlier immutable
@@ -99,6 +100,18 @@ evidence is not converted into a pass.
   of accepting any output that merely contains the expected version number.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
+
+### 4.21.4 (release candidate)
+
+- Close the installed-wheel provenance false green: source identity is proved
+  from the measuring package's actual `hyodo/` content instead of an enclosing
+  repository commit.
+- Keep real source drift `MISMATCH` / `effective=UNOBSERVED` while allowing a
+  byte-identical installed wheel to remain observed regardless of venv location.
+- Carry the zero-detection `hyodo init` documentation correction already landed
+  on main; no execution-authority or policy semantics change.
+- Release-chain evidence remains UNOBSERVED until publication is read back into
+  `docs/releases/4.21.4.md`.
 
 ### 4.21.3 (released 2026-09-22)
 
