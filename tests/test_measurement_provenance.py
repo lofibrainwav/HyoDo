@@ -707,3 +707,30 @@ def test_fixture_f_a_nested_checkout_at_another_commit_is_a_mismatch(tmp_path: P
     assert provenance.tool_commit == nested_commit
     assert provenance.relation == "SELF_OTHER_CHECKOUT"
     assert provenance.validity == "MISMATCH"
+
+
+@requires_git
+def test_inherited_git_location_variables_cannot_forge_the_targets_commit(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`GIT_DIR`/`GIT_WORK_TREE` override `git -C <root>` for every call.
+
+    Found by red-team review: pointing both at the measuring checkout made the
+    target report the measurer's commit, so two different trees compared as
+    the same commit and came out OBSERVED. Each query must describe the
+    directory it names, whatever the caller's environment says.
+    """
+    target = _write_checkout(tmp_path / "HyoDo")
+    target_commit = _git_init(target, "target")
+    measurer = _write_checkout(tmp_path / "evil")
+    (measurer / "hyodo" / "gates.py").write_text("# different code\n", encoding="utf-8")
+    measurer_commit = _git_init(measurer, "evil")
+    monkeypatch.setenv("GIT_DIR", str(measurer / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(measurer))
+
+    provenance = resolve_provenance(target, package_root=measurer, tool_version=SAME_VERSION)
+
+    assert provenance.target_commit == target_commit
+    assert provenance.tool_commit == measurer_commit
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"

@@ -25,6 +25,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   without comparison; a nested copy goes through the commit comparison, so a
   nested repository at another commit is `SELF_OTHER_CHECKOUT` and a nested
   copy with no repository of its own is `SOURCE_UNOBSERVED`.
+- Provenance git queries no longer inherit repository-relocating variables
+  (`GIT_DIR`, `GIT_WORK_TREE`, `GIT_INDEX_FILE`, and the rest of
+  `git rev-parse --local-env-vars`). Set by a caller, they overrode
+  `git -C <root>` and let the target report the measurer's commit, so two
+  different trees compared equal and came out `OBSERVED`.
 - `tool_commit` is reported only for a checkout's own repository. A wheel or
   vendored copy inside an unrelated git repository no longer borrows that
   repository's HEAD as the measuring code's commit.
