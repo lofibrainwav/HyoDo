@@ -95,6 +95,9 @@ MERGED -> TAGGED -> DRAFT_CREATED -> EVIDENCE_BUILT -> EVIDENCE_ATTACHED
   reached only from `DRAFT_VERIFIED`, with human authority bound to the merged
   SHA, after re-observing that the Release is still a draft carrying both SBOM
   assets.
+- A later invocation may resume from a draft that already carries exactly the
+  expected SBOM pair, but only after verifying the asset digest again; any
+  other existing asset remains unobserved and blocks the run.
 - An already published Release blocks the run before any mutation. v4.21.2 is
   that case: published by hand before its evidence, it can never take the SBOM
   and never reached PyPI (`docs/releases/4.21.2.md`).
