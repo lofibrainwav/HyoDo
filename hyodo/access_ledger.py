@@ -20,6 +20,15 @@ class AccessEntry:
     exit_code: int
     duration_ms: int
     caller_id: str | None = None
+    # Which reader process wrote the row.  After a runtime promotion this is
+    # what tells a stale reader's rows apart from a fresh one's.  Rows written
+    # before these fields existed read back as ``None``.
+    server_pid: int | None = None
+    server_version: str | None = None
+    # With the PID, the start time identifies the reader instance (PIDs are
+    # reused).  ``root`` is already the resolved slot; the commit pins it.
+    server_started_at: str | None = None
+    runtime_commit: str | None = None
 
 
 @dataclass(frozen=True)
@@ -61,6 +70,14 @@ def record_access(entry: AccessEntry, root: Path | None = None) -> Path:
     return record_access_result(entry, root=root).path
 
 
+def _optional_int(value: object) -> int | None:
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def _optional_str(value: object) -> str | None:
+    return value if isinstance(value, str) else None
+
+
 def read_access_log_result(root: Path, limit: int = 100) -> AccessReadResult:
     """Read valid rows while distinguishing absent, corrupt, and unreadable state."""
     path = root / ACCESS_LEDGER_PATH
@@ -95,6 +112,10 @@ def read_access_log_result(root: Path, limit: int = 100) -> AccessReadResult:
                     exit_code=int(parsed.get("exit_code", -1)),
                     duration_ms=int(parsed.get("duration_ms", 0)),
                     caller_id=parsed.get("caller_id"),
+                    server_pid=_optional_int(parsed.get("server_pid")),
+                    server_version=_optional_str(parsed.get("server_version")),
+                    server_started_at=_optional_str(parsed.get("server_started_at")),
+                    runtime_commit=_optional_str(parsed.get("runtime_commit")),
                 )
             )
         except (TypeError, ValueError):

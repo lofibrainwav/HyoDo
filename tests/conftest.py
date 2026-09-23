@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import os
 
+import pytest
 from hypothesis import HealthCheck, settings
 
 settings.register_profile(
@@ -26,3 +27,9 @@ settings.register_profile(
 
 if os.environ.get("CI"):
     settings.load_profile("hyodo_ci")
+
+
+@pytest.fixture(autouse=True)
+def _isolated_mcp_reader_registry(tmp_path_factory, monkeypatch):
+    """In-process MCP readers must never register in the developer's real registry."""
+    monkeypatch.setenv("HYODO_MCP_READER_DIR", str(tmp_path_factory.mktemp("mcp-readers")))

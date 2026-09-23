@@ -33,6 +33,8 @@ limits are in [Current State](./CURRENT_STATE.md).
 - [Host observation contract](./HOST_OBSERVATION_CONTRACT.md) — what the
   adapters record, what they leave unrecorded, and which gaps are closable.
 - [MCP design](./HYODO_MCP_CONNECTOR_DESIGN.md) — local connector and remote contract.
+- [MCP reader cutover](./MCP_READER_CUTOVER.md) — reader self-registration,
+  stale-pin refusal, and the promotion census.
 - [Remote MCP contract](./M5_REMOTE_CONNECTOR_CONTRACT.md) — hosted endpoint is
   contract-only; it is not `hyodo mcp stdio`.
 - [Measurement provenance](./MEASUREMENT_PROVENANCE.md) — what measured which target.
