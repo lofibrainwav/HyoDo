@@ -151,7 +151,12 @@ def _run_git(root: Path, *args: str) -> str | None:
 
 
 def git_commit(root: Path) -> str | None:
-    """Full commit id of the checkout containing `root`, if it is one."""
+    """Full commit id of the checkout containing `root`, if it is one.
+
+    Walks up to an enclosing repository. That is right for a measured target
+    (a subdirectory is versioned by its repository) and wrong for measuring
+    code, which uses `_own_checkout_commit` instead.
+    """
     return _run_git(root, "rev-parse", "HEAD")
 
 
@@ -218,31 +223,26 @@ def _source_digests(package_dir: Path) -> dict[str, str] | None:
     return digests
 
 
-def _package_matches_source(package_root: Path, target_root: Path) -> bool | None:
-    """True/False when the measuring package's files equal the target's source; None if unreadable.
+def _compare_sources(package_root: Path, target_root: Path) -> tuple[bool | None, str | None]:
+    """Whether the measuring package's `hyodo/` files equal the target's, and the first difference.
 
     `package_root` is the directory that contains the `hyodo` package, as
-    `_default_package_root()` returns it.
+    `_default_package_root()` returns it. Both trees are hashed once. Returns
+    `(None, None)` when either side cannot be read, `(True, None)` when they
+    match, and `(False, "<path> ...")` naming the first differing path.
     """
     installed = _source_digests(package_root / "hyodo")
     source = _source_digests(target_root / "hyodo")
     if not installed or source is None:
-        return None
-    return installed == source
-
-
-def _first_difference(package_root: Path, target_root: Path) -> str | None:
-    """The first `hyodo/` path that differs, phrased for the person reading it."""
-    installed = _source_digests(package_root / "hyodo") or {}
-    source = _source_digests(target_root / "hyodo") or {}
+        return None, None
     for relative in sorted(installed.keys() | source.keys()):
         if relative not in installed:
-            return f"hyodo/{relative} only in this checkout"
+            return False, f"hyodo/{relative} only in this checkout"
         if relative not in source:
-            return f"hyodo/{relative} only in the measuring package"
+            return False, f"hyodo/{relative} only in the measuring package"
         if installed[relative] != source[relative]:
-            return f"hyodo/{relative} differs"
-    return None
+            return False, f"hyodo/{relative} differs"
+    return True, None
 
 
 def _same_directory(first: Path, second: Path) -> bool:
@@ -449,12 +449,12 @@ def _short(commit: str | None) -> str:
     return commit[:8] if commit else "unknown"
 
 
-def _relation_from_content(package_root: Path, target_root: Path) -> Relation:
-    """Same, other, or unobserved, from the `hyodo/` files alone."""
-    matches = _package_matches_source(package_root, target_root)
+def _relation_from_content(package_root: Path, target_root: Path) -> tuple[Relation, str | None]:
+    """Same, other, or unobserved from the `hyodo/` files alone, with the first difference."""
+    matches, difference = _compare_sources(package_root, target_root)
     if matches is None:
-        return "SOURCE_UNOBSERVED"
-    return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
+        return "SOURCE_UNOBSERVED", None
+    return ("SELF_SAME_CHECKOUT", None) if matches else ("SELF_OTHER_CHECKOUT", difference)
 
 
 def _is_hyodo_target(root: Path) -> bool:
@@ -480,20 +480,21 @@ def _classify(
     target_commit: str | None,
     tool_dirty: bool | None,
     target_dirty: bool | None,
-) -> Relation:
-    """Relation between the measuring code and the measured target.
+) -> tuple[Relation, str | None]:
+    """Relation between the measuring code and the measured target, and the first
+    differing `hyodo/` path when the files decided a mismatch.
 
     Version is not an input. Two builds can share a version string and differ
     in every line of code, which is precisely how the original mismatch stayed
     invisible for hours.
     """
     if not _is_hyodo_target(target_root):
-        return "EXTERNAL_TARGET"
+        return "EXTERNAL_TARGET", None
     if package_root is None:
-        return "SOURCE_UNOBSERVED"
+        return "SOURCE_UNOBSERVED", None
     # Only the very same directory is the same code without comparison.
     if _same_directory(package_root, target_root):
-        return "SELF_SAME_CHECKOUT"
+        return "SELF_SAME_CHECKOUT", None
     if not is_hyodo_checkout(package_root):
         # An installed copy has no commit of its own and its location proves
         # nothing, so the files decide.
@@ -505,11 +506,11 @@ def _classify(
     # edits from `git status` and a different `git` on PATH can print
     # anything, so the files decide here too.
     if tool_commit is None or target_commit is None:
-        return "SOURCE_UNOBSERVED"
+        return "SOURCE_UNOBSERVED", None
     if tool_commit != target_commit:
-        return "SELF_OTHER_CHECKOUT"
+        return "SELF_OTHER_CHECKOUT", None
     if tool_dirty or target_dirty:
-        return "SOURCE_UNOBSERVED"
+        return "SOURCE_UNOBSERVED", None
     return _relation_from_content(package_root, target_root)
 
 
@@ -541,12 +542,12 @@ def resolve_provenance(
     tool_commit = _own_checkout_commit(package) if package is not None else None
     # Unlike the measuring package, a target inside a larger repository is
     # versioned by that repository, so its enclosing commit is its history.
-    # Green never rests on it: equality is decided by `_relation_from_content`.
+    # Green never rests on it: equality is decided by `_compare_sources`.
     target_commit = git_commit(target)
     tool_dirty = git_is_dirty(package) if package is not None and tool_commit else None
     target_dirty = git_is_dirty(target)
 
-    relation = _classify(
+    relation, content_difference = _classify(
         target_root=target,
         package_root=package,
         tool_commit=tool_commit,
@@ -568,9 +569,5 @@ def resolve_provenance(
         target_dirty=target_dirty,
         install_mode=_detect_install_mode(package),
         relation=relation,
-        content_difference=(
-            _first_difference(package, target)
-            if relation == "SELF_OTHER_CHECKOUT" and package is not None
-            else None
-        ),
+        content_difference=content_difference,
     )
