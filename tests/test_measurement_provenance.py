@@ -14,6 +14,7 @@ because the thing under test *is* the relationship between real directories.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import subprocess
 from pathlib import Path
@@ -734,3 +735,69 @@ def test_inherited_git_location_variables_cannot_forge_the_targets_commit(
     assert provenance.tool_commit == measurer_commit
     assert provenance.relation == "SELF_OTHER_CHECKOUT"
     assert provenance.validity == "MISMATCH"
+
+
+@requires_git
+@pytest.mark.parametrize("flag", ["--skip-worktree", "--assume-unchanged"])
+def test_index_bits_that_hide_an_edit_cannot_make_two_trees_equal(
+    tmp_path: Path, flag: str
+) -> None:
+    """Same commit and a clean `git status` are not the same code.
+
+    Found by red-team review: `git update-index --skip-worktree` (or
+    `--assume-unchanged`) on an edited file keeps `git status --porcelain`
+    empty, so a tampered clone at the target's commit came out OBSERVED and
+    `hyodo check` printed a full PASS. Equality is now always backed by the
+    files themselves.
+    """
+    target = _write_checkout(tmp_path / "HyoDo")
+    commit = _git_init(target, "target")
+    clone = tmp_path / "clone"
+    subprocess.run(["git", "clone", "-q", str(target), str(clone)], check=True, capture_output=True)
+    (clone / "hyodo" / "__init__.py").write_text(
+        '__version__ = "4.19.0"\n# hidden\n', encoding="utf-8"
+    )
+    subprocess.run(
+        ["git", "-C", str(clone), "update-index", flag, "hyodo/__init__.py"],
+        check=True,
+        capture_output=True,
+    )
+
+    provenance = resolve_provenance(target, package_root=clone, tool_version=SAME_VERSION)
+
+    assert provenance.tool_commit == provenance.target_commit == commit
+    assert provenance.tool_dirty is False
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"
+
+
+@requires_git
+def test_a_git_that_lies_cannot_produce_a_green(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A `git` earlier on PATH may say anything; green still needs equal files."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    measurer = _write_checkout(tmp_path / "other")
+    (measurer / "hyodo" / "gates.py").write_text("# different code\n", encoding="utf-8")
+    _git_init(measurer, "other")
+    fakebin = tmp_path / "fakebin"
+    fakebin.mkdir()
+    fake_git = fakebin / "git"
+    fake_git.write_text(
+        "#!/bin/sh\n"
+        'root="$2"; shift 2\n'
+        'case "$*" in\n'
+        '  "rev-parse HEAD") echo deadbeefdeadbeefdeadbeefdeadbeefdeadbeef ;;\n'
+        '  "rev-parse --show-toplevel") echo "$root" ;;\n'
+        '  "status --porcelain") ;;\n'
+        "esac\n",
+        encoding="utf-8",
+    )
+    fake_git.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{fakebin}{os.pathsep}{os.environ['PATH']}")
+
+    provenance = resolve_provenance(target, package_root=measurer, tool_version=SAME_VERSION)
+
+    assert provenance.tool_commit == provenance.target_commit
+    assert provenance.is_green_allowed is False

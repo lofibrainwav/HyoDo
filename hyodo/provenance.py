@@ -40,12 +40,15 @@ Version is deliberately absent from that decision. Two builds can carry the
 same version string and different code — that is exactly how the original
 accident stayed invisible. Equal versions never prove equal sources here.
 
-Sources are compared two ways, and each way is used only where it is evidence.
-A checkout is identified by its own commit — never by a repository that merely
-encloses it. An installed copy (a wheel in site-packages) has no commit at
-all, so it is compared by content: the files that actually run against the
-target's ``hyodo/`` source. A virtualenv living inside the target proves
-nothing about the code in it.
+Green needs the files themselves. Apart from the target directory measuring
+itself, ``SELF_SAME_CHECKOUT`` is given only when the measuring package's
+``hyodo/`` files (bytecode excluded) equal the target's. Location proves
+nothing — a virtualenv inside the target, or a copy nested in it, is still
+another tree — and git's answers can be wrong about content: index bits hide
+edits from ``git status``, inherited variables relocate the repository, and a
+different ``git`` on PATH can print anything. Commits are still recorded, and a
+checkout's own commit (never an enclosing repository's) can prove two trees
+*differ*; it never proves them equal.
 
 Privacy
 -------
@@ -191,8 +194,8 @@ def _installed_package_dir(package_root: Path) -> Path:
     return package_root if package_root.name == "hyodo" else package_root / "hyodo"
 
 
-def _installed_copy_matches_source(package_root: Path, target_root: Path) -> bool | None:
-    """True/False when an installed copy's files equal the target's source; None if unreadable."""
+def _package_matches_source(package_root: Path, target_root: Path) -> bool | None:
+    """True/False when the measuring package's files equal the target's source; None if unreadable."""
     installed = _source_digests(_installed_package_dir(package_root))
     source = _source_digests(target_root / "hyodo")
     if not installed or source is None:
@@ -394,7 +397,7 @@ def _classify(
     if package_root is not None and not is_hyodo_checkout(package_root):
         # An installed copy: no commit of its own, and its location proves
         # nothing, so only a content comparison can say it is the same code.
-        matches = _installed_copy_matches_source(package_root, target_root)
+        matches = _package_matches_source(package_root, target_root)
         if matches is None:
             return "SOURCE_UNOBSERVED"
         return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
@@ -411,7 +414,14 @@ def _classify(
     # that actually ran, so equality cannot be claimed.
     if tool_dirty or target_dirty:
         return "SOURCE_UNOBSERVED"
-    return "SELF_SAME_CHECKOUT"
+    # Equal commits and a clean status are still only git's word. Index bits
+    # (`--skip-worktree`, `--assume-unchanged`) hide edits from `git status`,
+    # and a different `git` on PATH can print anything, so a green verdict is
+    # only given when the files themselves are equal.
+    matches = _package_matches_source(package_root, target_root) if package_root else None
+    if matches is None:
+        return "SOURCE_UNOBSERVED"
+    return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
 
 
 def resolve_provenance(

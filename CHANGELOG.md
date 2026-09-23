@@ -30,6 +30,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `git rev-parse --local-env-vars`). Set by a caller, they overrode
   `git -C <root>` and let the target report the measurer's commit, so two
   different trees compared equal and came out `OBSERVED`.
+- `SELF_SAME_CHECKOUT` between two checkouts now also requires equal
+  `hyodo/` files. Equal commits and a clean `git status` were accepted on
+  git's word alone, and `git update-index --skip-worktree` or
+  `--assume-unchanged` on an edited file (or a different `git` earlier on
+  PATH) produced a full `hyodo check` PASS for code that differed from the
+  target.
 - `tool_commit` is reported only for a checkout's own repository. A wheel or
   vendored copy inside an unrelated git repository no longer borrows that
   repository's HEAD as the measuring code's commit.
