@@ -5,17 +5,16 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.4 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.21.5 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.21.4.md`. Prior release receipts remain preserved under
+`docs/releases/4.21.5.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
 HyoDo 4.21.5 is the current release target and source-tree release baseline.
-Its release chain remains `UNOBSERVED` until publication is read back into
-`docs/releases/4.21.5.md`. HyoDo 4.21.4 remains the current public baseline
-until that chain is complete. HyoDo 4.21.2 remains an incomplete immutable
+Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+measured in `docs/releases/4.21.5.md`. HyoDo 4.21.2 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
 This does not establish every host integration.
@@ -101,7 +100,7 @@ evidence is not converted into a pass.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
 
-### 4.21.5 (release candidate)
+### 4.21.5 (released 2026-09-23)
 
 - Make runtime promotion observable: MCP readers self-register and
   `hyodo mcp census` reports `PROMOTION_COMPLETE` only when no stale or
@@ -109,10 +108,9 @@ evidence is not converted into a pass.
 - Stale readers (moved root, replaced or unreadable code) refuse measurement
   tools with `STALE_RUNTIME_RECONNECT_REQUIRED`; HyoDo still never restarts or
   kills a reader, and the host keeps promotion authority.
-- Release-chain evidence remains UNOBSERVED until publication is read back into
-  `docs/releases/4.21.5.md`.
+- Release chain measured 9/9 OBSERVED in `docs/releases/4.21.5.md`.
 
-### 4.21.4 (release candidate)
+### 4.21.4 (released 2026-09-23)
 
 - Close the installed-wheel provenance false green: source identity is proved
   from the measuring package's actual `hyodo/` content instead of an enclosing
@@ -121,8 +119,7 @@ evidence is not converted into a pass.
   byte-identical installed wheel to remain observed regardless of venv location.
 - Carry the zero-detection `hyodo init` documentation correction already landed
   on main; no execution-authority or policy semantics change.
-- Release-chain evidence remains UNOBSERVED until publication is read back into
-  `docs/releases/4.21.4.md`.
+- Release chain measured 9/9 OBSERVED in `docs/releases/4.21.4.md`.
 
 ### 4.21.3 (released 2026-09-22)
 

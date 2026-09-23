@@ -45,8 +45,10 @@ new slot, and a reader that has not converged refuses to measure.
 
 - Reader-census suite (including a live stdio reader re-pointed through a
   symlink), public-package verification, and exact-head remote CI passed
-  before publication. Release-chain evidence remains UNOBSERVED until
-  publication is read back into `docs/releases/4.21.5.md`.
+  before publication.
+- Publication is measured and sealed in `docs/releases/4.21.5.md`: 9/9
+  OBSERVED (release-evidence run `35895473223`, PyPI publish/readback run
+  `35895615574`, wheel sha256 prefix `932c3db0b97538c1`).
 
 ## [4.21.4] - 2026-09-23
 
