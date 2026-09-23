@@ -1,6 +1,6 @@
 # HyoDo current state
 
-Public release readback: 2026-09-20 PT
+Public release readback: 2026-09-22 PT
 Runtime capability matrix below: measured 2026-09-13 PT, before 4.19.6.
 
 This file separates shipped product capability from live/runtime observation. Exact
@@ -8,12 +8,12 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package: HyoDo `4.20.2`
+- Latest public package: HyoDo `4.21.3`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.20.2.md`](./releases/4.20.2.md).
+  [`releases/4.21.3.md`](./releases/4.21.3.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: the recorded 4.20.2 release is closed. Post-release
+- HyoDo product status: the recorded 4.21.3 release is closed. Post-release
   research and integration have separate evidence and promotion criteria;
   they do not silently reopen the sealed public artifact. Live-host and
   orchestration experiments remain downstream integration/research work.
@@ -21,6 +21,15 @@ receipt rather than in this self-referential page.
 The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
+
+## 4.21.3 release update
+
+HyoDo 4.21.3 publishes the 4.21.2 verification-plumbing honesty patch together
+with the publication-order fix from #463 through the corrected release pipeline.
+The pipeline now owns publication as a strictly linear state chain and refuses
+wrong-order publication before SBOM evidence. The measured 9-step release chain
+is OBSERVED in [`releases/4.21.3.md`](./releases/4.21.3.md). HyoDo 4.21.2 remains
+an incomplete immutable historical release and is not republished or retagged.
 
 ## 4.20.2 release update
 
@@ -72,7 +81,7 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 The runtime matrix above compares public 4.19.5 with the source state measured
 on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
-4.20.2. The 4.20.2 release-chain receipt is recorded separately above. Do not
+4.21.3. The 4.21.3 release-chain receipt is recorded separately above. Do not
 infer runtime identity from this page alone; use the signed release, CI receipt,
 or runtime identity receipt. Fresh
 Codex/Cursor host observations,
