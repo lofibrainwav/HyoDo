@@ -44,7 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   and keeps its evidence honest. It is not a defense against a hostile
   execution environment — whoever controls `PATH` or the interpreter can
   replace HyoDo itself, and whoever can write `__pycache__/` or `sys.modules`
-  can change what runs without changing a compared file.
+  can change what runs without changing a compared file. On a
+  case-insensitive filesystem, one directory spelled two ways is not
+  recognized as the same path; it is then compared by content, which costs a
+  hash but never produces a false green.
 
 ### Documentation
 

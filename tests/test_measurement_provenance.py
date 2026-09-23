@@ -933,3 +933,34 @@ def test_dashboard_banner_names_the_kind_of_mismatch(
     assert must_say in banner
     assert "unknown" not in banner
     assert "Same version string" not in banner
+
+
+@requires_git
+def test_every_git_location_variable_is_stripped() -> None:
+    """A future git that adds a repository-relocating variable must fail here, not in the field."""
+    from hyodo.provenance import _GIT_LOCATION_ENV
+
+    listed = subprocess.run(
+        ["git", "rev-parse", "--local-env-vars"], check=True, capture_output=True, text=True
+    ).stdout.split()
+
+    assert listed, "git printed no local environment variables"
+    assert set(listed) <= _GIT_LOCATION_ENV
+
+
+@requires_git
+def test_a_tree_larger_than_the_hash_limit_is_unobserved_not_green(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Past the file limit nothing is compared, so nothing may be claimed equal."""
+    monkeypatch.setattr("hyodo.provenance._MAX_SOURCE_FILES", 3)
+    target = _write_checkout(tmp_path / "HyoDo")
+    for index in range(5):
+        (target / "hyodo" / f"module_{index}.py").write_text("# same\n", encoding="utf-8")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SOURCE_UNOBSERVED"
+    assert provenance.is_green_allowed is False
