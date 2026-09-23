@@ -13,6 +13,7 @@ import json
 import os
 import re
 import subprocess
+import sys
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -972,7 +973,7 @@ class GitHubRemote:
 
     def verify_pypi(self, version: str) -> dict[str, Any]:
         done = self._cmd(
-            "python3",
+            sys.executable,
             "scripts/release/verify-pypi-release.py",
             "--version",
             version,

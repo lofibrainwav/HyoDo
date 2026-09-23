@@ -5,6 +5,15 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- The local publication pipeline now runs the PyPI provenance/install readback
+  with the same Python interpreter that launched the pipeline instead of an
+  ambient `python3`. This prevents a host Python below HyoDo's supported
+  range from producing a false release-block after PyPI publication succeeds.
+
 ## [4.21.4] - 2026-09-23
 
 Provenance identity patch. This release closes the installed-wheel false green
@@ -39,9 +48,10 @@ correction already landed on main.
 ### Evidence
 
 - Provenance regression suite, public-package verification, exact-head remote
-  CI, and isolated built-wheel adversarial replay are release blockers.
-- Publication evidence is written to `docs/releases/4.21.4.md` only after
-  the release chain is independently read back.
+  CI, and isolated built-wheel adversarial replay passed before publication.
+- Publication is measured and sealed in `docs/releases/4.21.4.md`: 9/9
+  OBSERVED (release-evidence run `35869925959`, PyPI publish/readback run
+  `35870073157`, wheel sha256 prefix `7abfc0219e51804f`).
 
 ## [4.21.3] - 2026-09-22
 
