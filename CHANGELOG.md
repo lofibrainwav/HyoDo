@@ -30,11 +30,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   partial copy of the `hyodo` package stays on the evidence path.
 
   The comparison ignores what is not code, so normal setups running the same
-  code stay `OBSERVED`: the `__pycache__/` cache, hidden paths (`.idea/`,
-  `.mypy_cache/`, `.DS_Store`, lock files), editor and merge leftovers
-  (`*.swp`, `*~`, `*.orig`, `*.rej`), and CRLF line endings from a
-  `core.autocrlf` checkout. A `.pyc` beside the sources imports on its own and
-  is compared. One directory reached through a symlink or a different letter
+  code stay `OBSERVED`: the `__pycache__/` cache, named tool and cache paths
+  (`.idea/`, `.vscode/`, `.mypy_cache/`, `.pytest_cache/`, `.ruff_cache/`,
+  `.DS_Store`, office lock files), editor and merge leftovers (`*.swp`, `*~`,
+  `*.orig`, `*.rej`), and CRLF line endings in text files (known text suffix,
+  valid UTF-8) from a `core.autocrlf` checkout. Any other path, dotted or not,
+  is compared, and binary files are compared byte for byte. A `.pyc` beside
+  the sources imports on its own and is compared. One directory reached through a symlink or a different letter
   case is the same directory. The dashboard banner names each kind of
   mismatch instead of "commit unknown".
 

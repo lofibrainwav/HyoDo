@@ -179,30 +179,84 @@ def _own_checkout_commit(root: Path) -> str | None:
 _MAX_SOURCE_FILES = 5000
 
 
-#: Leftovers that are never code: editor swap and backup files and merge
-#: rejects. Hidden paths (`.idea/`, `.mypy_cache/`, `.DS_Store`, ...) are
-#: skipped by name, because a module name cannot start with a dot and so
-#: nothing under them can be imported. Bytecode is skipped only inside
-#: `__pycache__/`: a `.pyc` beside the sources imports as a module on its own.
+#: Tool, cache, and OS paths that are never code. Named explicitly: any other
+#: path, dotted or not, may be read by code and is compared.
+_TOOLING_NAMES = frozenset(
+    {
+        "__pycache__",
+        ".DS_Store",
+        ".idea",
+        ".vscode",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".hypothesis",
+        ".tox",
+        ".nox",
+        ".coverage",
+    }
+)
+#: Editor swap and backup files and merge rejects.
 _LITTER_SUFFIXES = (".swp", ".swo", "~", ".orig", ".rej")
+#: `.~lock.<name>#` is the lock file LibreOffice leaves beside an open document.
+_LOCK_PREFIX = ".~lock."
+
+#: Suffixes whose files are text, so CRLF and LF are the same content. Python
+#: reads CRLF source as the same code; a `core.autocrlf` checkout must not look
+#: different from an LF wheel. Anything else is compared byte for byte.
+_TEXT_SUFFIXES = frozenset(
+    {
+        ".py",
+        ".pyi",
+        ".typed",
+        ".txt",
+        ".md",
+        ".rst",
+        ".json",
+        ".toml",
+        ".yaml",
+        ".yml",
+        ".cfg",
+        ".ini",
+        ".html",
+        ".css",
+        ".js",
+        ".svg",
+    }
+)
 
 
 def _is_not_source(relative: PurePosixPath) -> bool:
+    """Bytecode cache, named tool and cache paths, and editor leftovers.
+
+    A `.pyc` outside `__pycache__/` imports as a module on its own, so it is
+    code and is compared.
+    """
     return (
-        "__pycache__" in relative.parts
-        or any(part.startswith(".") for part in relative.parts)
+        any(part in _TOOLING_NAMES for part in relative.parts)
         or relative.name.endswith(_LITTER_SUFFIXES)
+        or (relative.name.startswith(_LOCK_PREFIX) and relative.name.endswith("#"))
     )
+
+
+def _normalized(relative: PurePosixPath, data: bytes) -> bytes:
+    """CRLF → LF for text files only: a known text suffix whose bytes decode as UTF-8."""
+    if relative.suffix not in _TEXT_SUFFIXES:
+        return data
+    try:
+        data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data
+    return data.replace(b"\r\n", b"\n")
 
 
 def _source_digests(package_dir: Path) -> dict[str, str] | None:
     """sha256 of every source file under `package_dir`, keyed by relative path.
 
     Paths are judged relative to the package, so a checkout that happens to
-    live under a hidden directory is still read. Line endings are normalized
-    in files without NUL bytes: Python reads CRLF source as the same code, and
-    a `core.autocrlf` checkout must not look different from an LF wheel.
-    None when the tree cannot be read.
+    live under a directory with a skipped name is still read. Skipped files:
+    `_is_not_source`; line endings: `_normalized`. None when the tree cannot
+    be read.
     """
     if not package_dir.is_dir():
         return None
@@ -214,10 +268,9 @@ def _source_digests(package_dir: Path) -> dict[str, str] | None:
                 continue
             if len(digests) >= _MAX_SOURCE_FILES:
                 return None
-            data = path.read_bytes()
-            if b"\0" not in data:
-                data = data.replace(b"\r\n", b"\n")
-            digests[str(relative)] = hashlib.sha256(data).hexdigest()
+            digests[str(relative)] = hashlib.sha256(
+                _normalized(relative, path.read_bytes())
+            ).hexdigest()
     except OSError:
         return None
     return digests

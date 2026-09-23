@@ -1060,3 +1060,39 @@ def test_an_editable_install_is_reported_as_editable(monkeypatch: pytest.MonkeyP
     )
 
     assert provenance_module._has_editable_marker() is True
+
+
+@requires_git
+@pytest.mark.parametrize("hidden", [".plugins/extra.py", ".data/config.json", ".hidden_module.py"])
+def test_an_unlisted_hidden_path_is_still_compared(tmp_path: Path, hidden: str) -> None:
+    """Only named tool and cache paths are skipped; any other dot path may be read by code."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    extra = target / "hyodo" / hidden
+    extra.parent.mkdir(parents=True, exist_ok=True)
+    extra.write_text("loaded by path\n", encoding="utf-8")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"
+
+
+@requires_git
+@pytest.mark.parametrize("name", ["asset.bin", "icon.png", "notes.txt"])
+def test_line_endings_are_normalized_only_in_known_text(tmp_path: Path, name: str) -> None:
+    """A CRLF-only difference in a binary (or undecodable) file is a real byte difference."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    payload = b"\xff\xfe binary\n\x80 more\n" if name != "notes.txt" else b"plain text\n"
+    (target / "hyodo" / name).write_bytes(payload)
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    (target / "hyodo" / name).write_bytes(payload.replace(b"\n", b"\r\n"))
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    if name == "notes.txt":
+        assert provenance.relation == "SELF_SAME_CHECKOUT"
+    else:
+        assert provenance.relation == "SELF_OTHER_CHECKOUT"
