@@ -29,11 +29,14 @@ hyodo init
 hyodo check
 ```
 
-`init` detects supported test and lint tools and writes `.hyodo/gates.toml`.
-Review and commit that file with your team policy. An existing config is left
-alone unless `--force` is given. No detected tools means no invented passing
-gate; `check` exits **2** when no executable gates run, **1** when a gate fails,
-and **0** only when at least one gate ran and all passed. See the
+`init` detects supported test and lint tools. When it finds supported tooling,
+it writes `.hyodo/gates.toml`; with zero detections it writes
+`.hyodo/gates.toml.example` instead, creates no live gates file, and `check`
+keeps the built-in sampled fallback. Review and commit a live gates file with
+your team policy. An existing config is left alone unless `--force` is given.
+No detected tools means no invented passing gate; `check` exits **2** when no
+executable gates run, **1** when a gate fails, and **0** only when at least one
+gate ran and all passed. See the
 [gate configuration reference](./docs/GATES_SYNTAX.md).
 
 ## Optional integrations

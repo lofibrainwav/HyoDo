@@ -43,10 +43,12 @@ hyodo init
 hyodo check
 ```
 
-`safe` works immediately in any repository. `init` is optional: it detects
-tools you already use and writes `.hyodo/gates.toml`; `check` then runs those
-gates. No detected tooling means no invented green check. See
-[`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for every `gates.toml` field.
+`safe` works immediately in any repository. `init` is optional: when it
+detects supported tooling it writes `.hyodo/gates.toml`; with zero detections
+it writes `.hyodo/gates.toml.example` instead, creates no live gates file, and
+`check` keeps the built-in sampled fallback. No detected tooling means no
+invented green check. See [`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for
+every `gates.toml` field.
 
 Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep
 the rest of `.hyodo/` out of version control — see
