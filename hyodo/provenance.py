@@ -40,6 +40,13 @@ Version is deliberately absent from that decision. Two builds can carry the
 same version string and different code — that is exactly how the original
 accident stayed invisible. Equal versions never prove equal sources here.
 
+Sources are compared two ways, and each way is used only where it is evidence.
+A checkout is identified by its own commit — never by a repository that merely
+encloses it. An installed copy (a wheel in site-packages) has no commit at
+all, so it is compared by content: the files that actually run against the
+target's ``hyodo/`` source. A virtualenv living inside the target proves
+nothing about the code in it.
+
 Privacy
 -------
 An absolute path carries a username. `to_local_dict()` keeps paths, because a
@@ -111,6 +118,61 @@ def _run_git(root: Path, *args: str) -> str | None:
 def git_commit(root: Path) -> str | None:
     """Full commit id of the checkout containing `root`, if it is one."""
     return _run_git(root, "rev-parse", "HEAD")
+
+
+def _own_checkout_commit(root: Path) -> str | None:
+    """Commit of `root` only when `root` is itself the top of a git checkout.
+
+    `git rev-parse HEAD` walks upward until it finds any repository, so run
+    inside a virtualenv or a vendored copy it answers with the HEAD of
+    whatever project happens to contain that directory. That commit says
+    nothing about the code at `root`, so it is not reported.
+    """
+    toplevel = _run_git(root, "rev-parse", "--show-toplevel")
+    if not toplevel or Path(toplevel).resolve() != root.resolve():
+        return None
+    return git_commit(root)
+
+
+#: Upper bound on files hashed per side; a larger tree is reported as
+#: unobserved rather than making every check slow.
+_MAX_SOURCE_FILES = 5000
+
+
+def _source_digests(package_dir: Path) -> dict[str, str] | None:
+    """sha256 of every source file under `package_dir`, keyed by relative path.
+
+    Bytecode is a by-product of running the code, not part of it, so
+    `__pycache__/` and `*.pyc` are skipped. None when the tree cannot be read.
+    """
+    if not package_dir.is_dir():
+        return None
+    digests: dict[str, str] = {}
+    try:
+        for path in package_dir.rglob("*"):
+            if not path.is_file() or path.suffix == ".pyc" or "__pycache__" in path.parts:
+                continue
+            if len(digests) >= _MAX_SOURCE_FILES:
+                return None
+            relative = path.relative_to(package_dir).as_posix()
+            digests[relative] = hashlib.sha256(path.read_bytes()).hexdigest()
+    except OSError:
+        return None
+    return digests
+
+
+def _installed_package_dir(package_root: Path) -> Path:
+    """The installed `hyodo/` directory, given its parent or the package itself."""
+    return package_root if package_root.name == "hyodo" else package_root / "hyodo"
+
+
+def _installed_copy_matches_source(package_root: Path, target_root: Path) -> bool | None:
+    """True/False when an installed copy's files equal the target's source; None if unreadable."""
+    installed = _source_digests(_installed_package_dir(package_root))
+    source = _source_digests(target_root / "hyodo")
+    if not installed or source is None:
+        return None
+    return installed == source
 
 
 def git_is_dirty(root: Path) -> bool | None:
@@ -237,6 +299,12 @@ class MeasurementProvenance:
             return f"measured by {self.tool_name} {self.tool_version or '?'} ({self.install_mode})"
         if self.relation == "SELF_SAME_CHECKOUT":
             return f"self-measured from this checkout ({self.install_mode})"
+        if self.relation == "SELF_OTHER_CHECKOUT" and self.tool_commit is None:
+            return (
+                f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
+                f"{self.tool_name} from {self.package_root} — installed package content "
+                "differs from this checkout's hyodo/ source"
+            )
         if self.relation == "SELF_OTHER_CHECKOUT":
             return (
                 f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
@@ -306,6 +374,13 @@ def _classify(
     """
     if not is_hyodo_checkout(target_root):
         return "EXTERNAL_TARGET"
+    if package_root is not None and not is_hyodo_checkout(package_root):
+        # An installed copy: no commit of its own, and its location proves
+        # nothing, so only a content comparison can say it is the same code.
+        matches = _installed_copy_matches_source(package_root, target_root)
+        if matches is None:
+            return "SOURCE_UNOBSERVED"
+        return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
     if package_root is not None and _is_within(package_root, target_root):
         return "SELF_SAME_CHECKOUT"
     if tool_commit is None or target_commit is None:
@@ -344,9 +419,9 @@ def resolve_provenance(
         except (ImportError, AttributeError):  # pragma: no cover - defensive
             tool_version = None
 
-    tool_commit = git_commit(package) if package is not None else None
+    tool_commit = _own_checkout_commit(package) if package is not None else None
     target_commit = git_commit(target)
-    tool_dirty = git_is_dirty(package) if package is not None else None
+    tool_dirty = git_is_dirty(package) if package is not None and tool_commit else None
     target_dirty = git_is_dirty(target)
 
     relation = _classify(

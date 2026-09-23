@@ -484,3 +484,190 @@ def test_dashboard_treats_a_missing_provenance_record_as_unobserved() -> None:
     value, banner = _provenance_readout({})
     assert value == "UNOBSERVED"
     assert banner != ""
+
+
+# --------------------------------------------------------------------------
+# Fixture F — an installed copy (wheel) measuring a HyoDo checkout
+#
+# Found against the public 4.21.3 wheel on 2026-09-22. An installed copy has no
+# commit of its own, yet two shortcuts gave it one:
+#   * `git rev-parse` run inside site-packages answers with whatever repository
+#     happens to enclose the virtualenv, so an unrelated repo's HEAD was
+#     reported as the measuring code's commit;
+#   * a virtualenv living inside the target made the package path look
+#     "within" the checkout, so a wheel was declared the same code as a source
+#     tree it had never been compared with — a false green on a clean,
+#     committed edit to `hyodo/`.
+# An installed copy is now compared by content: the files that actually run
+# against the target's `hyodo/` source.
+# --------------------------------------------------------------------------
+
+
+def _install_copy(source_checkout: Path, site_packages: Path) -> Path:
+    """Lay the checkout's `hyodo/` out the way a wheel install does."""
+    site_packages.mkdir(parents=True, exist_ok=True)
+    shutil.copytree(source_checkout / "hyodo", site_packages / "hyodo")
+    return site_packages
+
+
+def _commit_all(root: Path, message: str) -> str:
+    env_args = ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false"]
+    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
+    subprocess.run(
+        ["git", "-C", str(root), *env_args, "commit", "-q", "-m", message],
+        check=True,
+        capture_output=True,
+    )
+    return subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _venv_site_packages(root: Path) -> Path:
+    return root / ".venv" / "lib" / "python3.12" / "site-packages"
+
+
+@requires_git
+def test_fixture_f_wheel_inside_the_target_is_not_trusted_after_the_source_changes(
+    tmp_path: Path,
+) -> None:
+    """The false green: a clean, committed source edit next to an older wheel."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    (target / ".gitignore").write_text(".venv/\n", encoding="utf-8")
+    _git_init(target, "target")
+    site = _install_copy(target, _venv_site_packages(target))
+    (target / "hyodo" / "__init__.py").write_text(
+        '__version__ = "4.19.0"\nCHANGED = True\n', encoding="utf-8"
+    )
+    _commit_all(target, "edit the source the wheel was built from")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.install_mode == "wheel"
+    assert provenance.target_dirty is False
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"
+    assert provenance.is_green_allowed is False
+
+
+@requires_git
+def test_fixture_f_wheel_inside_the_target_with_identical_source_is_observed(
+    tmp_path: Path,
+) -> None:
+    target = _write_checkout(tmp_path / "HyoDo")
+    (target / ".gitignore").write_text(".venv/\n", encoding="utf-8")
+    _git_init(target, "target")
+    site = _install_copy(target, _venv_site_packages(target))
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+    assert provenance.validity == "OBSERVED"
+    assert provenance.tool_commit is None
+
+
+@requires_git
+def test_fixture_f_an_enclosing_repository_is_not_the_wheels_commit(tmp_path: Path) -> None:
+    """A virtualenv inside some other repo must not borrow that repo's HEAD."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    unrelated = tmp_path / "unrelated-project"
+    unrelated.mkdir()
+    (unrelated / "README.md").write_text("not hyodo\n", encoding="utf-8")
+    (unrelated / ".gitignore").write_text(".venv/\n", encoding="utf-8")
+    unrelated_commit = _git_init(unrelated, "unrelated")
+    site = _install_copy(target, _venv_site_packages(unrelated))
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.tool_commit is None
+    assert provenance.tool_commit != unrelated_commit
+    assert provenance.tool_dirty is None
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+    assert provenance.validity == "OBSERVED"
+
+
+@requires_git
+def test_fixture_f_a_diverged_wheel_is_a_mismatch_named_by_content(tmp_path: Path) -> None:
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    unrelated = tmp_path / "unrelated-project"
+    unrelated.mkdir()
+    (unrelated / "README.md").write_text("not hyodo\n", encoding="utf-8")
+    _git_init(unrelated, "unrelated")
+    site = _install_copy(target, _venv_site_packages(unrelated))
+    (site / "hyodo" / "__init__.py").write_text('__version__ = "4.19.0"\n# old\n', encoding="utf-8")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.tool_commit is None
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"
+    summary = provenance.summary()
+    assert "MEASUREMENT MISMATCH" in summary
+    assert "installed package content differs" in summary
+    assert "unknown" not in summary
+
+
+@requires_git
+@pytest.mark.parametrize("side", ["target_only", "installed_only"])
+def test_fixture_f_a_file_present_on_one_side_only_is_a_mismatch(tmp_path: Path, side: str) -> None:
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    extra_root = target if side == "target_only" else site
+    (extra_root / "hyodo" / "extra.py").write_text("# only here\n", encoding="utf-8")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"
+
+
+@requires_git
+def test_fixture_f_bytecode_caches_are_not_source(tmp_path: Path) -> None:
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+    cache = site / "hyodo" / "__pycache__"
+    cache.mkdir()
+    (cache / "__init__.cpython-312.pyc").write_bytes(b"\x00compiled")
+    (site / "hyodo" / "stray.pyc").write_bytes(b"\x00compiled")
+
+    provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SELF_SAME_CHECKOUT"
+    assert provenance.validity == "OBSERVED"
+
+
+@requires_git
+def test_fixture_f_an_installed_copy_that_cannot_be_read_is_unobserved(tmp_path: Path) -> None:
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    empty_site = tmp_path / "venv" / "lib" / "python3.12" / "site-packages"
+    empty_site.mkdir(parents=True)
+
+    provenance = resolve_provenance(target, package_root=empty_site, tool_version=SAME_VERSION)
+
+    assert provenance.relation == "SOURCE_UNOBSERVED"
+    assert provenance.validity == "UNOBSERVED"
+
+
+@requires_git
+def test_fixture_f_a_checkout_copy_nested_in_another_repo_borrows_no_commit(
+    tmp_path: Path,
+) -> None:
+    """A checkout-shaped copy with no repository of its own has no commit to report."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    outer = tmp_path / "outer-repo"
+    outer.mkdir()
+    (outer / "README.md").write_text("outer\n", encoding="utf-8")
+    outer_commit = _git_init(outer, "outer")
+    nested_copy = _write_checkout(outer / "vendored" / "HyoDo")
+
+    provenance = resolve_provenance(target, package_root=nested_copy, tool_version=SAME_VERSION)
+
+    assert provenance.tool_commit != outer_commit
+    assert provenance.tool_commit is None
+    assert provenance.relation == "SOURCE_UNOBSERVED"

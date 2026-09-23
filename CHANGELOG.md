@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Measurement provenance no longer reports a false green when an installed
+  HyoDo (a wheel in site-packages) measures a HyoDo checkout. A virtualenv
+  living inside the target used to make the wheel count as the same code
+  without any comparison; a committed edit to `hyodo/` still produced
+  `SELF_SAME_CHECKOUT` / `effective=PASS`. An installed copy is now compared by
+  content against the target's `hyodo/` source (bytecode excluded): equal is
+  `SELF_SAME_CHECKOUT`, different is `SELF_OTHER_CHECKOUT` (`MISMATCH`), and
+  unreadable is `SOURCE_UNOBSERVED`.
+- `tool_commit` is reported only for a checkout's own repository. A wheel or
+  vendored copy inside an unrelated git repository no longer borrows that
+  repository's HEAD as the measuring code's commit.
+
 ### Documentation
 
 - Clarify `hyodo init` zero-detection behavior across the README, Quick Start,
