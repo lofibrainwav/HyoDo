@@ -192,11 +192,15 @@ def test_dashboard_html_uses_raw_evidence_and_never_invents_ux_score():
 def test_start_shows_onboarding_keywords():
     result = runner.invoke(app, ["start"])
     assert result.exit_code == 0
-    assert "quick start" in result.output.lower()
-    assert "score" in result.output.lower()
+    output = result.output.lower()
+    assert "first-use guide" in output
+    assert "hyodo safe --strict" in output
+    assert "hyodo init" in output
+    assert "hyodo check" in output
+    assert "score" not in output
     # Onboarding must not teach the false-STRONG partial example.
     assert "-t 0.9 -g 0.8" not in result.output.replace("\n", " ")
-    assert "works with claude code, codex, grok, gemini cli, cursor" not in result.output.lower()
+    assert "works with claude code, codex, grok, gemini cli, cursor" not in output
 
 
 def test_trinity_shows_checklist_keywords():

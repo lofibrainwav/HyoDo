@@ -1,8 +1,14 @@
 # First-use onboarding (`hyodo start`)
 
-The desired story (GitHub issue #163, M5-C): install, connect one host, then
-type one prompt. Everything below that — stdio flags, Tailscale, pairing
-tokens — stays available, but it is not what a first-time operator sees.
+`hyodo start` is the canonical first-use path for a person who has just
+installed HyoDo. The intended story is: orient to the workspace, optionally
+connect one host, then try one prompt. A host connection is not required for
+local verification; `hyodo safe --strict`, `hyodo init`, and `hyodo check`
+remain the direct-command path.
+
+Everything below that — stdio flags, Tailscale, pairing tokens, policy tuning,
+and advanced host wiring — stays available, but it is not what a first-time
+operator needs to understand.
 
 ```text
 hyodo start
@@ -24,8 +30,9 @@ hyodo start
    anything happens. `claude-code` writes both the `hyodo connect` hook
    (`.claude/settings.json`) and the MCP entry (`.mcp.json`); every other
    host only writes its MCP entry.
-4. **A first prompt to try**, plus the three commands to run by hand if you
-   would rather not connect a host yet.
+4. **A first prompt to try**, plus the three direct commands to run by hand if
+   you would rather not connect a host yet: `hyodo safe --strict`, `hyodo init`,
+   and `hyodo check`.
 
 Non-interactively (`hyodo start` with stdin that is not a TTY — scripts, CI,
 `| cat`), the same four steps print as plain text with the exact commands.
@@ -33,6 +40,15 @@ Nothing is asked and nothing is written.
 
 At most three questions in the whole interactive flow, and nothing is ever
 written without an explicit yes.
+
+The first interactive `hyodo check` may separately ask for approval before it
+executes a newly detected gate command set. That approval is about executing
+project-supplied commands, not about connecting a host. A changed command set
+requires a new approval and missing approval never becomes a passing result.
+
+`hyodo init` writes `.hyodo/gates.toml`, not `.hyodo/policy.toml`. A starter
+policy is created only by the Claude Code connection path when no policy file
+exists, or by an operator who authors one explicitly.
 
 ## Trust journey
 

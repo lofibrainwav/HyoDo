@@ -3,16 +3,44 @@
 Add local guardrails to an existing project without replacing its tests,
 linters, or CI. HyoDo supports Python 3.10+.
 
-## Install and scan
+## Start here
 
 ```bash
 pipx install hyodo
 cd your-project
-hyodo safe --strict
+hyodo start
 ```
 
-`safe` is an early-warning scan, not a full security audit. Use `--json` for
-machine-readable output. In CI, install HyoDo and run the same command:
+`hyodo start` is the canonical first-use path. It shows the current workspace
+and detected hosts, previews every write, and changes nothing without an
+explicit yes. You can skip host connection and keep using HyoDo only for local
+verification.
+
+Prefer direct commands?
+
+```bash
+hyodo safe --strict
+hyodo init
+hyodo check
+hyodo dashboard --open
+```
+
+`safe` is an early-warning scan, not a full security audit. `init` detects
+supported test and lint tools and writes `.hyodo/gates.toml`. The first
+interactive `check` may ask you to approve the exact detected commands before
+running them; a changed command set requires approval again. In CI or another
+non-interactive context, an unseen command set is not executed and cannot turn
+into a passing result by omission.
+
+Review and commit `.hyodo/gates.toml`. `hyodo init` does not create
+`.hyodo/policy.toml`; that file is created only when you configure agent policy
+(for example with `hyodo connect claude-code --write`) or author one yourself.
+No detected tools means no invented passing gate; `check` exits **2** when no
+executable gates run, **1** when a gate fails, and **0** only when at least one
+gate ran and all passed. See the
+[gate configuration reference](./docs/GATES_SYNTAX.md).
+
+For CI, install HyoDo and run the same safety scan:
 
 ```yaml
 - uses: actions/setup-python@v5
@@ -22,21 +50,11 @@ machine-readable output. In CI, install HyoDo and run the same command:
 - run: hyodo safe --strict --json
 ```
 
-## Run existing project checks
-
-```bash
-hyodo init
-hyodo check
-```
-
-`init` detects supported test and lint tools and writes `.hyodo/gates.toml`.
-Review and commit that file with your team policy. An existing config is left
-alone unless `--force` is given. No detected tools means no invented passing
-gate; `check` exits **2** when no executable gates run, **1** when a gate fails,
-and **0** only when at least one gate ran and all passed. See the
-[gate configuration reference](./docs/GATES_SYNTAX.md).
-
 ## Optional integrations
+
+Stop after `safe`, `check`, and the dashboard if that is all you need. The
+surfaces below are optional and are intended for teams that also want agent
+policy, host hooks, or MCP integration.
 
 For agent event and policy checks:
 

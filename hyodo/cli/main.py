@@ -5166,35 +5166,32 @@ def connect(
 #: quote keywords here). Interactive callers see the four-step flow below
 #: instead of this block. Hook vs MCP wording is load-bearing (#204 item 31).
 _START_GUIDE = """
-[bold blue]HyoDo quick start[/bold blue]
+[bold blue]HyoDo first-use guide[/bold blue]
 
-[b]Local evidence verification for AI-assisted work.[/b]
-Model-agnostic means independent of the AI model or agent UI — not language-agnostic.
+[b]See what ran, what the evidence supports, and what remains unknown.[/b]
+Missing evidence stays UNOBSERVED instead of becoming green.
 
-Any caller can record events and evaluate policy. Hook wiring
-(`hyodo connect`) is Claude Code, pre-commit, and GitHub Actions.
-`cursor` and `codex` stay UNOBSERVED until a verified hook contract
-exists. MCP config (`hyodo mcp config`) is a separate surface and
-includes Cursor.
-
-[bold cyan]Core commands:[/bold cyan]
-  • [bold]check[/bold]  - HyoDo checkout release gates (ruff/pyright/pytest)
-  • [bold]score[/bold]  - HyoDo Integrity Score, Six-Virtue Model (not auto-approval)
-  • [bold]safe[/bold]   - lightweight safety early-warning scan
-  • [bold]safe --strict[/bold] - exit 1 on high-severity findings
-  • [bold]event[/bold]  - agent event ledger (opt-in FDE evidence spine)
-  • [bold]policy[/bold] - local agent policy gate (ALLOW|DENY)
-  • [bold]trinity[/bold] - structured review checklist
-
-[bold cyan]Examples:[/bold cyan]
-  $ hyodo check
-  $ hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9
+[bold cyan]Direct local path:[/bold cyan]
   $ hyodo safe --strict
-  $ hyodo event record --file step.json --policy .hyodo/policy.toml
+  $ hyodo init
+  $ hyodo check
+
+`init` detects supported project checks. The first interactive `check` may
+ask you to approve the exact commands before HyoDo executes them; a changed
+command set requires approval again.
+
+[bold cyan]Optional integrations:[/bold cyan]
+  • [bold]dashboard[/bold] - local evidence panel (`hyodo dashboard --open`)
+  • [bold]event[/bold]     - agent event ledger (opt-in evidence spine)
+  • [bold]policy[/bold]    - local agent policy gate
+  • [bold]MCP[/bold]       - optional local host adapter
+
+Hook wiring (`hyodo connect`) is Claude Code, pre-commit, and GitHub Actions.
+`cursor` and `codex` hook enforcement stays UNOBSERVED until a verified live
+host receipt exists. MCP config (`hyodo mcp config`) is a separate surface.
 
 [bold cyan]Boundary:[/bold cyan]
-  Scores and scans support review. Human approval remains required.
-  Event/policy are gates and evidence — not an agent runtime interceptor.
+  HyoDo reports evidence. Human approval remains separate.
     """
 
 #: Order hosts are shown/asked about in - claude-code first because this
@@ -5208,9 +5205,9 @@ _ONBOARDING_HOST_ORDER: tuple[str, ...] = (
 )
 _FIRST_PROMPT = "Check this project"
 _STARTER_COMMANDS: tuple[str, ...] = (
+    "hyodo safe --strict",
+    "hyodo init",
     "hyodo check",
-    "hyodo safe",
-    "hyodo score -t 0.9 -g 0.9 -b 0.9 -i 0.9 -c 0.9",
 )
 
 

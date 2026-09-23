@@ -15,6 +15,24 @@ not run or authorize agents. It does not approve merges or deployments.
 [![License](https://img.shields.io/github/license/lofibrainwav/HyoDo)](./LICENSE)
 [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/lofibrainwav/HyoDo/badge)](https://scorecard.dev/viewer/?uri=github.com/lofibrainwav/HyoDo)
 
+## What changes when you use HyoDo
+
+A normal green CI summary can tell you that something passed. It does not
+always tell you what never ran. HyoDo keeps those cases separate instead of
+turning missing evidence green.
+
+Conceptually, if tests and lint ran but no security gate was observed:
+
+| What happened | What HyoDo means |
+| --- | --- |
+| Tests ran and passed | Evidence supports `PASS` |
+| Lint ran and passed | Evidence supports `PASS` |
+| No security gate ran | Evidence remains `UNOBSERVED` |
+
+`UNOBSERVED` means HyoDo does not have enough evidence to call the result a
+pass or a failure. That distinction is the product: show what was actually
+observed, then leave the decision to a person.
+
 ## Why HyoDo exists
 
 HyoDo helps you inspect AI-assisted work: which project checks ran, what they
@@ -33,26 +51,49 @@ answer:
 HyoDo makes those boundaries explicit with local evidence, policy-evaluation
 results, and fail-closed verification status.
 
-## 30-second start
+## First 10 minutes
+
+The canonical first-use path is one command after installation:
 
 ```bash
 pipx install hyodo
 cd your-project
+hyodo start
+```
+
+`hyodo start` shows the workspace and detected hosts, asks at most three
+questions, previews every write, and changes nothing without an explicit yes.
+Host connection is optional; you can skip it and use HyoDo only as a local
+verification tool.
+
+Prefer direct commands instead?
+
+```bash
 hyodo safe --strict
 hyodo init
 hyodo check
+hyodo dashboard --open
 ```
 
-`safe` works immediately in any repository. `init` is optional: it detects
-tools you already use and writes `.hyodo/gates.toml`; `check` then runs those
-gates. No detected tooling means no invented green check. See
-[`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for every `gates.toml` field.
+`safe` works immediately. `init` detects supported project checks and writes
+`.hyodo/gates.toml`; `check` runs those gates. The first interactive `check`
+may ask you to approve the exact detected commands before HyoDo executes them.
+If that command set changes, approval is required again. In non-interactive
+contexts an unseen command set is not silently executed or reported as green.
+No detected tooling means no invented passing gate. See
+[`docs/GATES_SYNTAX.md`](./docs/GATES_SYNTAX.md) for the full contract.
 
-Commit `.hyodo/gates.toml` and `.hyodo/policy.toml` (team-shared policy); keep
-the rest of `.hyodo/` out of version control — see
-[what to commit](docs/CONNECT.md#what-to-commit) for the `.gitignore` split.
+`hyodo init` does not create `.hyodo/policy.toml`. That file appears only when
+you configure agent policy (for example, when `hyodo connect claude-code
+--write` creates a starter policy because none exists) or when you author one
+yourself. Commit `.hyodo/gates.toml`, and commit `.hyodo/policy.toml` if your
+team uses it; keep generated runtime evidence out of version control. See
+[what to commit](docs/CONNECT.md#what-to-commit) for the exact split.
 
-## What it does
+If local verification is all you need, you can stop here. Hooks, agent policy,
+and MCP are optional integrations.
+
+## Go deeper only when you need it
 
 | Need | HyoDo surface |
 | --- | --- |

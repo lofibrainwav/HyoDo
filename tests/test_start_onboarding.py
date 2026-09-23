@@ -108,18 +108,31 @@ def test_noninteractive_preserves_literal_audience_bracket_text(
     assert "[audience]" in output
 
 
-def test_noninteractive_keeps_todays_guide_content(monkeypatch, tmp_path: Path, capsys) -> None:
-    """Existing docs/tests quote this guide text; it must stay available."""
+def test_noninteractive_keeps_first_use_guide_invariants(
+    monkeypatch, tmp_path: Path, capsys
+) -> None:
+    """The first-use guide stays narrow and preserves the host-boundary wording."""
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
     cli.start()
     output = capsys.readouterr().out.lower()
-    assert "quick start" in output
-    assert "score" in output
+    assert "first-use guide" in output
+    assert "hyodo safe --strict" in output
+    assert "hyodo init" in output
+    assert "hyodo check" in output
+    assert "score" not in output
     # #204 item 31: the guide must not list Cursor/Codex as hooked hosts.
     assert "works with claude code, codex, grok, gemini cli, cursor" not in output
     assert "unobserved" in output
     assert "hyodo connect" in output
+
+
+def test_starter_commands_match_the_documented_direct_local_path() -> None:
+    assert cli._STARTER_COMMANDS == (
+        "hyodo safe --strict",
+        "hyodo init",
+        "hyodo check",
+    )
 
 
 # --------------------------------------------------------------------------
