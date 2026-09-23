@@ -16,7 +16,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `SELF_SAME_CHECKOUT` / `effective=PASS`. An installed copy is now compared by
   content against the target's `hyodo/` source (bytecode excluded): equal is
   `SELF_SAME_CHECKOUT`, different is `SELF_OTHER_CHECKOUT` (`MISMATCH`), and
-  unreadable is `SOURCE_UNOBSERVED`.
+  unreadable is `SOURCE_UNOBSERVED`. This also means a wheel outside any git
+  repository measuring a byte-identical checkout is now `SELF_SAME_CHECKOUT`
+  (`OBSERVED`) instead of `SOURCE_UNOBSERVED`: equal content is the evidence
+  the old commit check could not obtain.
+- A checkout-shaped copy nested inside the target no longer counts as the
+  target by path containment. Only the target directory itself is accepted
+  without comparison; a nested copy goes through the commit comparison, so a
+  nested repository at another commit is `SELF_OTHER_CHECKOUT` and a nested
+  copy with no repository of its own is `SOURCE_UNOBSERVED`.
 - `tool_commit` is reported only for a checkout's own repository. A wheel or
   vendored copy inside an unrelated git repository no longer borrows that
   repository's HEAD as the measuring code's commit.

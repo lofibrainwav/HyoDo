@@ -253,14 +253,6 @@ def _default_package_root() -> Path | None:
     return Path(file).resolve().parent.parent
 
 
-def _is_within(child: Path, parent: Path) -> bool:
-    try:
-        child.relative_to(parent)
-    except ValueError:
-        return False
-    return True
-
-
 @dataclass(frozen=True)
 class MeasurementProvenance:
     """Who measured what, with which code, and whether that is even valid."""
@@ -381,7 +373,10 @@ def _classify(
         if matches is None:
             return "SOURCE_UNOBSERVED"
         return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
-    if package_root is not None and _is_within(package_root, target_root):
+    # Only the very same directory is the same code without comparison. A copy
+    # nested somewhere inside the target is still a different tree and goes
+    # through the commit comparison below.
+    if package_root is not None and package_root.resolve() == target_root.resolve():
         return "SELF_SAME_CHECKOUT"
     if tool_commit is None or target_commit is None:
         return "SOURCE_UNOBSERVED"

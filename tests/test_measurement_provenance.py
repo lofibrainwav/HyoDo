@@ -671,3 +671,39 @@ def test_fixture_f_a_checkout_copy_nested_in_another_repo_borrows_no_commit(
     assert provenance.tool_commit != outer_commit
     assert provenance.tool_commit is None
     assert provenance.relation == "SOURCE_UNOBSERVED"
+
+
+@requires_git
+def test_fixture_f_a_stale_copy_nested_inside_the_target_is_not_the_target(
+    tmp_path: Path,
+) -> None:
+    """Containment is not identity: a vendored copy inside the checkout proves nothing."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    _git_init(target, "target")
+    nested = _write_checkout(target / "vendor" / "hyodo-old")
+    (nested / "hyodo" / "__init__.py").write_text(
+        '__version__ = "4.19.0"\n# old\n', encoding="utf-8"
+    )
+
+    provenance = resolve_provenance(target, package_root=nested, tool_version=SAME_VERSION)
+
+    assert provenance.relation != "SELF_SAME_CHECKOUT"
+    assert provenance.is_green_allowed is False
+
+
+@requires_git
+def test_fixture_f_a_nested_checkout_at_another_commit_is_a_mismatch(tmp_path: Path) -> None:
+    """Two real repositories with different commits must be compared, not nested away."""
+    target = _write_checkout(tmp_path / "HyoDo")
+    (target / ".gitignore").write_text("nested/\n", encoding="utf-8")
+    target_commit = _git_init(target, "target")
+    nested = _write_checkout(target / "nested" / "HyoDo")
+    (nested / "hyodo" / "drift.py").write_text("# different code\n", encoding="utf-8")
+    nested_commit = _git_init(nested, "nested")
+    assert nested_commit != target_commit
+
+    provenance = resolve_provenance(target, package_root=nested, tool_version=SAME_VERSION)
+
+    assert provenance.tool_commit == nested_commit
+    assert provenance.relation == "SELF_OTHER_CHECKOUT"
+    assert provenance.validity == "MISMATCH"
