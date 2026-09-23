@@ -213,14 +213,13 @@ def _source_digests(package_dir: Path) -> dict[str, str] | None:
     return digests
 
 
-def _installed_package_dir(package_root: Path) -> Path:
-    """The installed `hyodo/` directory, given its parent or the package itself."""
-    return package_root if package_root.name == "hyodo" else package_root / "hyodo"
-
-
 def _package_matches_source(package_root: Path, target_root: Path) -> bool | None:
-    """True/False when the measuring package's files equal the target's source; None if unreadable."""
-    installed = _source_digests(_installed_package_dir(package_root))
+    """True/False when the measuring package's files equal the target's source; None if unreadable.
+
+    `package_root` is the directory that contains the `hyodo` package, as
+    `_default_package_root()` returns it.
+    """
+    installed = _source_digests(package_root / "hyodo")
     source = _source_digests(target_root / "hyodo")
     if not installed or source is None:
         return None
@@ -352,19 +351,19 @@ class MeasurementProvenance:
             return f"measured by {self.tool_name} {self.tool_version or '?'} ({self.install_mode})"
         if self.relation == "SELF_SAME_CHECKOUT":
             return f"self-measured from this checkout ({self.install_mode})"
-        if self.relation == "SELF_OTHER_CHECKOUT" and self.tool_commit is None:
-            return (
-                f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
-                f"{self.tool_name} from {self.package_root} — installed package content "
-                "differs from this checkout's hyodo/ source"
-            )
-        if self.relation == "SELF_OTHER_CHECKOUT" and self.tool_commit == self.target_commit:
-            return (
-                f"MEASUREMENT MISMATCH: commits match ({_short(self.target_commit)}) but the "
-                f"hyodo/ files of {self.package_root} differ from this checkout's — edits "
-                "git status does not show, or a git that does not describe these files"
-            )
         if self.relation == "SELF_OTHER_CHECKOUT":
+            if self.tool_commit is None:
+                return (
+                    f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
+                    f"{self.tool_name} from {self.package_root} — installed package content "
+                    "differs from this checkout's hyodo/ source"
+                )
+            if self.tool_commit == self.target_commit:
+                return (
+                    f"MEASUREMENT MISMATCH: commits match ({_short(self.target_commit)}) but "
+                    f"the hyodo/ files of {self.package_root} differ from this checkout's — "
+                    "edits git status does not show, or a git that does not describe these files"
+                )
             return (
                 f"MEASUREMENT MISMATCH: target {_short(self.target_commit)} was measured by "
                 f"{self.tool_name} from {self.package_root} at {_short(self.tool_commit)} — "
@@ -416,6 +415,29 @@ def _short(commit: str | None) -> str:
     return commit[:8] if commit else "unknown"
 
 
+def _relation_from_content(package_root: Path, target_root: Path) -> Relation:
+    """Same, other, or unobserved, from the `hyodo/` files alone."""
+    matches = _package_matches_source(package_root, target_root)
+    if matches is None:
+        return "SOURCE_UNOBSERVED"
+    return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
+
+
+def _is_hyodo_target(root: Path) -> bool:
+    """Whether a measured target must be treated as HyoDo measuring itself.
+
+    Wider than `is_hyodo_checkout` on purpose. EXTERNAL_TARGET is the one
+    relation that is green without comparison, so a target holding the
+    `hyodo` package whose project file is missing or not a file (a partial
+    copy, an export that dropped metadata) stays on the evidence path. The
+    measuring side keeps the narrow test: an installed copy in site-packages
+    has no project file and must still be compared as an installed copy.
+    """
+    if is_hyodo_checkout(root):
+        return True
+    return (root / "hyodo" / "__init__.py").is_file() and not (root / "pyproject.toml").is_file()
+
+
 def _classify(
     *,
     target_root: Path,
@@ -431,36 +453,30 @@ def _classify(
     in every line of code, which is precisely how the original mismatch stayed
     invisible for hours.
     """
-    if not is_hyodo_checkout(target_root):
+    if not _is_hyodo_target(target_root):
         return "EXTERNAL_TARGET"
-    if package_root is not None and not is_hyodo_checkout(package_root):
-        # An installed copy: no commit of its own, and its location proves
-        # nothing, so only a content comparison can say it is the same code.
-        matches = _package_matches_source(package_root, target_root)
-        if matches is None:
-            return "SOURCE_UNOBSERVED"
-        return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
-    # Only the very same directory is the same code without comparison. A copy
-    # nested somewhere inside the target is still a different tree and goes
-    # through the commit comparison below.
-    if package_root is not None and package_root.resolve() == target_root.resolve():
+    if package_root is None:
+        return "SOURCE_UNOBSERVED"
+    # Only the very same directory is the same code without comparison.
+    if package_root.resolve() == target_root.resolve():
         return "SELF_SAME_CHECKOUT"
+    if not is_hyodo_checkout(package_root):
+        # An installed copy has no commit of its own and its location proves
+        # nothing, so the files decide.
+        return _relation_from_content(package_root, target_root)
+    # Another checkout. Its own commit can prove the trees differ, and a
+    # missing commit or a dirty tree means the commit cannot describe the code
+    # that ran, so no claim is made. Equal commits and a clean status are
+    # necessary but never sufficient: index bits (`--skip-worktree`) hide
+    # edits from `git status` and a different `git` on PATH can print
+    # anything, so the files decide here too.
     if tool_commit is None or target_commit is None:
         return "SOURCE_UNOBSERVED"
     if tool_commit != target_commit:
         return "SELF_OTHER_CHECKOUT"
-    # Equal commits, but a dirty tree means the commit under-describes the code
-    # that actually ran, so equality cannot be claimed.
     if tool_dirty or target_dirty:
         return "SOURCE_UNOBSERVED"
-    # Equal commits and a clean status are still only git's word. Index bits
-    # (`--skip-worktree`, `--assume-unchanged`) hide edits from `git status`,
-    # and a different `git` on PATH can print anything, so a green verdict is
-    # only given when the files themselves are equal.
-    matches = _package_matches_source(package_root, target_root) if package_root else None
-    if matches is None:
-        return "SOURCE_UNOBSERVED"
-    return "SELF_SAME_CHECKOUT" if matches else "SELF_OTHER_CHECKOUT"
+    return _relation_from_content(package_root, target_root)
 
 
 def resolve_provenance(
@@ -489,6 +505,9 @@ def resolve_provenance(
             tool_version = None
 
     tool_commit = _own_checkout_commit(package) if package is not None else None
+    # Unlike the measuring package, a target inside a larger repository is
+    # versioned by that repository, so its enclosing commit is its history.
+    # Green never rests on it: equality is decided by `_relation_from_content`.
     target_commit = git_commit(target)
     tool_dirty = git_is_dirty(package) if package is not None and tool_commit else None
     target_dirty = git_is_dirty(target)

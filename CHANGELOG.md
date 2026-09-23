@@ -31,11 +31,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `name="hyodo"` or `name = "HyoDo"` no longer reads as another project. That
   misreading moved the target onto `EXTERNAL_TARGET`, which is green without
   comparison; an unparseable project file beside a `hyodo` package now errs
-  toward self-measurement.
+  toward self-measurement. A target holding the `hyodo` package whose
+  `pyproject.toml` is missing or not a file (a partial copy) also stays
+  self-measurement instead of becoming an evidence-free `EXTERNAL_TARGET`.
 - Behavior changes to expect: a wheel outside any git repository measuring a
   byte-identical checkout is now `OBSERVED` instead of `SOURCE_UNOBSERVED`,
-  and two checkouts at the same commit are `MISMATCH` if their `hyodo/` trees
-  differ in any file that is not cache or litter, including untracked ones.
+  and two checkouts at the same commit whose `hyodo/` trees differ in a way
+  `git status` does not show (index bits, ignored files) are `MISMATCH`.
+  A difference `git status` does show still makes the tree dirty, which stays
+  `SOURCE_UNOBSERVED` as before.
 - Scope: provenance guards against measuring with the wrong code by accident
   and keeps its evidence honest. It is not a defense against a hostile
   execution environment — whoever controls `PATH` or the interpreter can

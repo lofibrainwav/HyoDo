@@ -787,7 +787,21 @@ def _provenance_readout(evidence: dict[str, Any]) -> tuple[str, str]:
         value = "EXTERNAL" if relation == "EXTERNAL_TARGET" else f"SELF {commit}"
         return value, ""
     if validity == "MISMATCH":
-        tool = str(record.get("tool_commit") or "")[:8] or "unknown"
+        tool = str(record.get("tool_commit") or "")[:8]
+        if not tool:
+            return "MISMATCH", (
+                '<p class="provenance-alert">MEASUREMENT MISMATCH — the gate results below '
+                "were produced by an installed HyoDo whose <code>hyodo/</code> files differ "
+                f"from this checkout at {escape(commit)}. Run <code>hyodo check</code> "
+                "from this checkout&rsquo;s own environment.</p>"
+            )
+        if tool == commit:
+            return "MISMATCH", (
+                '<p class="provenance-alert">MEASUREMENT MISMATCH — commits match '
+                f"({escape(commit)}), but the measuring checkout&rsquo;s <code>hyodo/</code> "
+                "files differ from this one: edits <code>git status</code> does not show. "
+                "Run <code>hyodo check</code> for the measuring checkout&rsquo;s path.</p>"
+            )
         return "MISMATCH", (
             '<p class="provenance-alert">MEASUREMENT MISMATCH — the gate results below '
             f"were produced by HyoDo at commit {escape(tool)}, but the target is at "

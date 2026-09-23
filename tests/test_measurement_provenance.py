@@ -44,8 +44,7 @@ def _write_checkout(root: Path) -> Path:
     return root
 
 
-def _git_init(root: Path, message: str) -> str:
-    """Commit the tree and return the commit id."""
+def _commit_all(root: Path, message: str) -> str:
     env_args = [
         "-c",
         "user.email=test@example.com",
@@ -54,20 +53,21 @@ def _git_init(root: Path, message: str) -> str:
         "-c",
         "commit.gpgsign=false",
     ]
-    subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
     subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
     subprocess.run(
         ["git", "-C", str(root), *env_args, "commit", "-q", "-m", message],
         check=True,
         capture_output=True,
     )
-    result = subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "HEAD"],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return result.stdout.strip()
+    return subprocess.run(
+        ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
+    ).stdout.strip()
+
+
+def _git_init(root: Path, message: str) -> str:
+    """Commit the tree and return the commit id."""
+    subprocess.run(["git", "init", "-q", str(root)], check=True, capture_output=True)
+    return _commit_all(root, message)
 
 
 # --------------------------------------------------------------------------
@@ -511,19 +511,6 @@ def _install_copy(source_checkout: Path, site_packages: Path) -> Path:
     return site_packages
 
 
-def _commit_all(root: Path, message: str) -> str:
-    env_args = ["-c", "user.email=t@example.com", "-c", "user.name=t", "-c", "commit.gpgsign=false"]
-    subprocess.run(["git", "-C", str(root), "add", "-A"], check=True, capture_output=True)
-    subprocess.run(
-        ["git", "-C", str(root), *env_args, "commit", "-q", "-m", message],
-        check=True,
-        capture_output=True,
-    )
-    return subprocess.run(
-        ["git", "-C", str(root), "rev-parse", "HEAD"], check=True, capture_output=True, text=True
-    ).stdout.strip()
-
-
 def _venv_site_packages(root: Path) -> Path:
     return root / ".venv" / "lib" / "python3.12" / "site-packages"
 
@@ -642,6 +629,12 @@ def test_fixture_f_bytecode_caches_are_not_source(tmp_path: Path) -> None:
 
 @requires_git
 def test_fixture_f_an_installed_copy_that_cannot_be_read_is_unobserved(tmp_path: Path) -> None:
+    """Boundary guard, not a regression lock: this already held before the fix.
+
+    It pins the new content path's answer for an empty install to
+    SOURCE_UNOBSERVED, so a later change cannot turn "nothing to compare"
+    into a match.
+    """
     target = _write_checkout(tmp_path / "HyoDo")
     _git_init(target, "target")
     empty_site = tmp_path / "venv" / "lib" / "python3.12" / "site-packages"
@@ -807,7 +800,7 @@ def test_a_git_that_lies_cannot_produce_a_green(
 
 @pytest.mark.parametrize(
     "name_line",
-    ['name="hyodo"', "name   =   'hyodo'", 'name = "HyoDo"', 'name = "hyodo"  # the package'],
+    ['name="hyodo"', "name   =   'hyodo'", 'name = "HyoDo"', "name = 'HYODO'"],
 )
 def test_a_reformatted_project_name_is_still_a_hyodo_checkout(
     tmp_path: Path, name_line: str
@@ -831,7 +824,7 @@ def test_an_unreadable_project_file_next_to_the_package_is_not_external(tmp_path
     root = tmp_path / "HyoDo"
     (root / "hyodo").mkdir(parents=True)
     (root / "hyodo" / "__init__.py").write_text("", encoding="utf-8")
-    (root / "pyproject.toml").write_text('[project\nname = "hyodo"\n', encoding="utf-8")
+    (root / "pyproject.toml").write_text('[project\nname = "hyodo-broken\n', encoding="utf-8")
 
     assert is_hyodo_checkout(root) is True
 
@@ -880,3 +873,63 @@ def test_a_sourceless_module_beside_the_package_is_code(tmp_path: Path) -> None:
 
     assert provenance.relation == "SELF_OTHER_CHECKOUT"
     assert provenance.validity == "MISMATCH"
+
+
+@requires_git
+@pytest.mark.parametrize("damage", ["missing", "directory"])
+def test_a_target_whose_project_file_is_gone_is_not_external(tmp_path: Path, damage: str) -> None:
+    """A partial copy of a HyoDo checkout must not buy the evidence-free green.
+
+    Found by red-team review: with `pyproject.toml` missing (or a directory),
+    a target holding the real `hyodo/` source was classified EXTERNAL_TARGET
+    and measured green by different code. The measuring side is unaffected:
+    an installed copy in site-packages still has no project file and is still
+    compared by content.
+    """
+    target = _write_checkout(tmp_path / "HyoDo")
+    (target / "pyproject.toml").unlink()
+    if damage == "directory":
+        (target / "pyproject.toml").mkdir()
+    measurer = _write_checkout(tmp_path / "other")
+    (measurer / "hyodo" / "gates.py").write_text("# different code\n", encoding="utf-8")
+    _git_init(measurer, "other")
+
+    provenance = resolve_provenance(target, package_root=measurer, tool_version=SAME_VERSION)
+
+    assert provenance.relation != "EXTERNAL_TARGET"
+    assert provenance.is_green_allowed is False
+
+
+@pytest.mark.parametrize(
+    ("tool_commit", "must_say"),
+    [
+        (None, "installed HyoDo"),
+        ("814f6fb7b0a52f7e935b2a253825d9516be9993e", "commits match"),
+    ],
+)
+def test_dashboard_banner_names_the_kind_of_mismatch(
+    tool_commit: str | None, must_say: str
+) -> None:
+    """An installed copy has no commit, and equal commits can hide different files.
+
+    The banner used to print "commit unknown ... Same version string" for the
+    first and two equal commits for the second, neither of which tells the
+    reader what differs.
+    """
+    from hyodo.dashboard import _provenance_readout
+
+    value, banner = _provenance_readout(
+        {
+            "provenance": {
+                "relation": "SELF_OTHER_CHECKOUT",
+                "validity": "MISMATCH",
+                "target_commit": "814f6fb7b0a52f7e935b2a253825d9516be9993e",
+                "tool_commit": tool_commit,
+            }
+        }
+    )
+
+    assert value == "MISMATCH"
+    assert must_say in banner
+    assert "unknown" not in banner
+    assert "Same version string" not in banner
