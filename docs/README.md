@@ -16,6 +16,7 @@ limits are in [Current State](./CURRENT_STATE.md).
 ## Security and trust
 
 - [Security policy](../SECURITY.md) — reporting and security commitments.
+- [Trust boundary](./TRUST_BOUNDARY.md) — what HyoDo trusts in a checkout, and upgrading to 4.21.7.
 - [Product boundary](./PRODUCT_BOUNDARY.md) — HyoDo and host responsibilities.
 - [Policy trust](./POLICY_TRUST.md) — policy sources and trust levels.
 - [Misread guide](./MISREAD.md) — common incorrect interpretations.

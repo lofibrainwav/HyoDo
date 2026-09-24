@@ -57,7 +57,8 @@ path:
 | Scan exceptions | operator approval of the file's exact digest | `.hyodo/scan-exceptions.toml` applies nothing until approved |
 | Ledger origin | digest of the bytes HyoDo itself appended | a ledger that arrived with the tree is `UNVERIFIED` and never READY |
 
-A same-named file inside the checkout is reported as ignored, never honored.
+A same-named file inside the checkout is reported as ignored, never honored. The full contract and upgrade
+notes are in [`docs/TRUST_BOUNDARY.md`](docs/TRUST_BOUNDARY.md).
 Approvals do not follow a copy or a clone of the tree to another path. The
 hostile-clone gauntlet (`tests/test_hostile_clone.py`,
 `scripts/release/hostile_clone_gauntlet.sh`) attacks the built wheel with a
