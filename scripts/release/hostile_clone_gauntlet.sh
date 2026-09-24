@@ -11,7 +11,7 @@ set -euo pipefail
 
 wheel="${1:?usage: hostile_clone_gauntlet.sh <wheel>}"
 test -f "$wheel"
-min_tests=8
+min_tests=10
 
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT

@@ -309,6 +309,7 @@ def _derive_hyo(root: Path) -> PillarResult:
     from hyodo.access_ledger import ACCESS_LEDGER_PATH
     from hyodo.connect import detect as detect_connect_targets
     from hyodo.gates import GATES_CONFIG_RELATIVE_PATH
+    from hyodo.ledger_origin import ORIGIN_VERIFIED, ledger_origin
 
     rule_ids = ("hyo.config_present", "hyo.connect_wired", "hyo.ledger_present")
     rows: list[ProvenanceRow] = []
@@ -335,7 +336,9 @@ def _derive_hyo(root: Path) -> PillarResult:
         )
     )
 
-    ledger_present = (root / ACCESS_LEDGER_PATH).is_file()
+    # A ledger that arrived with the checkout earns nothing: only one this
+    # machine's HyoDo wrote counts as present.
+    ledger_present = ledger_origin(root, ACCESS_LEDGER_PATH) == ORIGIN_VERIFIED
     spec = _rule("hyo.ledger_present")
     rows.append(
         ProvenanceRow(

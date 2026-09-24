@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ledger_fixture import write_ledger
+
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH
 from hyodo.identity import (
     RUNTIME_IDENTITY_SCHEMA_VERSION,
@@ -29,8 +31,8 @@ def test_identity_distinguishes_missing_ledger_and_connect_state(tmp_path: Path)
 
 def test_identity_reports_observed_ledger_and_corruption(tmp_path: Path) -> None:
     ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
-    ledger.parent.mkdir()
-    ledger.write_text(
+    write_ledger(
+        ledger,
         json.dumps(
             {
                 "schema_version": "hyodo.agent-event/v1",
@@ -43,12 +45,12 @@ def test_identity_reports_observed_ledger_and_corruption(tmp_path: Path) -> None
             }
         )
         + "\nnot-json\n",
-        encoding="utf-8",
     )
 
     identity = build_runtime_identity(tmp_path)
 
     assert identity["ledger"]["state"] == "OBSERVED"
+    assert identity["ledger"]["origin"] == "VERIFIED"
     assert identity["ledger"]["events"] == 1
     assert identity["ledger"]["corrupt_lines"] == 1
 

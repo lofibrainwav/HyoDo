@@ -19,6 +19,7 @@ from typing import Any
 from hyodo import __version__
 from hyodo.connect import CONNECT_RELATIVE_PATH, check_status
 from hyodo.events import AGENT_EVENT_SCHEMA_VERSION, AGENT_EVENTS_RELATIVE_PATH, read_agent_events
+from hyodo.ledger_origin import ORIGIN_VERIFIED, ledger_origin
 from hyodo.provenance import path_digest, resolve_provenance
 
 RUNTIME_IDENTITY_SCHEMA_VERSION = "hyodo.runtime-identity/v1"
@@ -76,8 +77,11 @@ def _ledger_identity(root: Path) -> dict[str, Any]:
         }
     schema = {event.get("schema_version") for event in events}
     schema_value = next(iter(schema)) if len(schema) == 1 else None
+    origin = ledger_origin(root, AGENT_EVENTS_RELATIVE_PATH)
     return {
-        "state": "OBSERVED",
+        # Parsing is not origin: a ledger HyoDo did not write here is UNVERIFIED.
+        "state": "OBSERVED" if origin == ORIGIN_VERIFIED else "UNVERIFIED",
+        "origin": origin,
         "schema_version": schema_value,
         "path_digest": path_digest(path),
         "events": len(events),

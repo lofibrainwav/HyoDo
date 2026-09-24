@@ -366,7 +366,8 @@ jobs:
     name: "Goodness Gate - Safety"
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [goodness-public-tests, goodness-orchestration, goodness-safety-fixtures]
+    needs:
+      [goodness-public-tests, goodness-orchestration, goodness-safety-fixtures, hostile-clone-gauntlet]
     if: ${{ always() }}
 
     steps:
@@ -375,6 +376,7 @@ jobs:
           PUBLIC_TESTS_RESULT: ${{ needs['goodness-public-tests'].result }}
           ORCHESTRATION_RESULT: ${{ needs['goodness-orchestration'].result }}
           SAFETY_FIXTURES_RESULT: ${{ needs['goodness-safety-fixtures'].result }}
+          GAUNTLET_RESULT: ${{ needs['hostile-clone-gauntlet'].result }}
         run: |
           set -euo pipefail
 
@@ -390,6 +392,7 @@ jobs:
           check_success "Public package tests" "$PUBLIC_TESTS_RESULT"
           check_success "CLI orchestration" "$ORCHESTRATION_RESULT"
           check_success "Safety fixtures" "$SAFETY_FIXTURES_RESULT"
+          check_success "Hostile clone gauntlet" "$GAUNTLET_RESULT"
           echo "All Goodness safety lanes succeeded."
 
   # -------------------------------------------------------------------------

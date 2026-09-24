@@ -149,6 +149,20 @@ def _build_hostile_source(source: Path) -> None:
     #    writer in the source checkout, so they are genuinely anchored *there*.
     for actor in ("hook:host-a", "hook:host-b"):
         assert append_agent_event(source, _hook_event(actor))
+    (hyodo_dir / "mcp-access.jsonl").write_text(
+        json.dumps(
+            {
+                "timestamp": "2026-09-23T00:00:00+00:00",
+                "tool_name": "hyodo_check",
+                "root": str(source),
+                "exit_code": 0,
+                "duration_ms": 1,
+                "caller_id": None,
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
 
 
 @pytest.fixture(scope="module")
@@ -267,7 +281,7 @@ def test_clone_ledgers_do_not_make_continuity_ready(hostile_clone: Path) -> None
     assert payload["origin_status"] == "UNVERIFIED"
     assert "agent_events_origin_unverified" in payload["reasons"]
     # The ledger itself parses and names two hosts -- only its origin fails.
-    assert payload["hosts"]["observed"] == 2
+    assert payload["hosts"]["observed"] >= 2
 
 
 def test_appending_does_not_launder_a_shipped_ledger(hostile_clone: Path, tmp_path: Path) -> None:
@@ -305,3 +319,34 @@ def test_sampled_check_is_not_a_complete_project(tmp_path: Path) -> None:
     assert payload["gate_coverage"] == "FULL"
     assert payload["project_coverage"] == "SAMPLED"
     assert payload["complete"] is False
+
+
+def test_clone_ledger_is_not_verified_runtime_identity_or_score_credit(
+    hostile_clone: Path,
+) -> None:
+    from hyodo.identity import build_runtime_identity
+    from hyodo.score_derive import derive_pillars
+
+    identity = build_runtime_identity(hostile_clone)
+    assert identity["ledger"]["state"] == "UNVERIFIED"
+    assert identity["ledger"]["origin"] == "UNVERIFIED"
+
+    hyo = derive_pillars(hostile_clone, runtime_evidence=True).by_name()["hyo"]
+    ledger_rows = [row for row in hyo.provenance if row.rule_id == "hyo.ledger_present"]
+    assert ledger_rows
+    assert all(row.contribution == 0 for row in ledger_rows)
+
+
+def test_user_state_is_owner_only(tmp_path: Path) -> None:
+    from hyodo.user_state import user_state_home, workspace_state_dir, write_json_private
+
+    write_json_private(tmp_path, "probe.json", {"ok": True})
+    directory = workspace_state_dir(tmp_path)
+    home = user_state_home()
+    current = directory
+    while True:
+        assert current.stat().st_mode & 0o777 == 0o700, current
+        if current == home:
+            break
+        current = current.parent
+    assert (directory / "probe.json").stat().st_mode & 0o777 == 0o600

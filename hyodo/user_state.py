@@ -27,6 +27,7 @@ import contextlib
 import hashlib
 import json
 import os
+import stat
 import tempfile
 from pathlib import Path
 from typing import Any
@@ -53,6 +54,26 @@ def workspace_state_dir(root: Path) -> Path:
     """Return the private per-user directory holding *root*'s authority state."""
     digest = workspace_identity(root).removeprefix(WORKSPACE_IDENTITY_PREFIX)
     return user_state_home() / "workspaces" / digest[:32]
+
+
+def ensure_workspace_state_dir(root: Path) -> Path:
+    """Create *root*'s state directory with every level owner-only (0700).
+
+    ``mkdir(parents=True, mode=...)`` applies the mode to the leaf only, which
+    would leave the list of workspaces readable to other local users.
+    """
+    home = user_state_home()
+    directory = workspace_state_dir(root)
+    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    current = directory
+    while True:
+        with contextlib.suppress(OSError):
+            if stat.S_IMODE(current.stat().st_mode) != 0o700:
+                os.chmod(current, 0o700)
+        if current == home or current.parent == current:
+            break
+        current = current.parent
+    return directory
 
 
 def workspace_state_path(root: Path, name: str) -> Path:
@@ -95,8 +116,7 @@ def write_json_private(root: Path, name: str, payload: Any) -> Path:
     state so a person reading ``~/.hyodo/state`` can tell which checkout a
     directory belongs to.
     """
-    directory = workspace_state_dir(root)
-    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    directory = ensure_workspace_state_dir(root)
     marker = directory / "workspace.json"
     if not marker.exists():
         _atomic_write(

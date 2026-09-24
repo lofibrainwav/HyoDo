@@ -31,9 +31,9 @@ from pathlib import Path
 from typing import Any
 
 from hyodo.user_state import (
+    ensure_workspace_state_dir,
     read_json,
     workspace_identity,
-    workspace_state_dir,
     workspace_state_path,
     write_json_private,
 )
@@ -97,8 +97,7 @@ def _anchor_lock(root: Path) -> Iterator[None]:
     if fcntl is None:  # pragma: no cover - non-POSIX platforms
         yield
         return
-    directory = workspace_state_dir(root)
-    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    directory = ensure_workspace_state_dir(root)
     with (directory / ".ledger-origin.lock").open("a") as handle:
         fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
         try:
@@ -136,6 +135,11 @@ def anchored_append(root: Path, relative: Path, line: str) -> None:
             handle.write(line)
         try:
             content = path.read_bytes()
+            # Anything other than exactly "what was there + our line" means a
+            # writer outside this lock touched the file; never fold its bytes
+            # into an anchor as if HyoDo wrote them.
+            if before is None or content != before + line.encode("utf-8"):
+                tainted = True
             anchors[key] = {
                 "digest": _digest_bytes(content),
                 "bytes": len(content),
