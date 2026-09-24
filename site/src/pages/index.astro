@@ -4,11 +4,20 @@
 // frontmatter is compiled into dist/, where a runtime path lookup would resolve
 // against the bundle rather than against this file.
 import versionFile from '../../../VERSION?raw';
+// VERSION is the source tree; ROADMAP.md names what has actually been published.
+// They differ between a release merge and its measured publication, so the page
+// states both instead of calling the source version public.
+import roadmapFile from '../../../ROADMAP.md?raw';
 
 import '../styles/tokens.css';
 import '../styles/evidence-graph.css';
 
-const publicVersion = versionFile.trim();
+const sourceVersion = versionFile.trim();
+const publishedMatch = roadmapFile.match(/(\d+\.\d+\.\d+)\s+is the latest published release/);
+if (!publishedMatch) {
+	throw new Error('ROADMAP.md states no latest published release');
+}
+const publishedVersion = publishedMatch[1];
 const pypiUrl = 'https://pypi.org/project/hyodo/';
 const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
 const installCommand = 'pipx install hyodo';
@@ -506,7 +515,8 @@ const canonicalUrl = 'https://hyodo.app/';
 				<section class="layer" aria-labelledby="claim-lock-heading">
 					<h2 id="claim-lock-heading">What HyoDo offers today</h2>
 					<p>
-						Public version: <strong>HyoDo {publicVersion}</strong>. A shipped adapter is
+						Latest published release: <strong>HyoDo {publishedVersion}</strong>.
+						Source version: <strong>HyoDo {sourceVersion}</strong>. A shipped adapter is
 						not evidence that a host is connected right now. See <a href="/docs/current-state/">how current status is measured</a>.
 					</p>
 					<table>
