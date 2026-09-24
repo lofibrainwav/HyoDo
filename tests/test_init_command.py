@@ -124,6 +124,8 @@ def test_init_zero_detection_writes_an_inert_example_not_a_live_config(tmp_path:
     rendered = example_path.read_text(encoding="utf-8")
     assert f'schema = "{SCHEMA_ID}"' in rendered
     assert "# [gates.tests]" in rendered  # commented-out example, not an active gate
+    # The suggested test gate follows hyodo/virtues.py: tests are Truth.
+    assert '# [gates.tests]\n# pillar = "truth"' in rendered
 
 
 def test_init_renamed_example_still_refuses_to_load_silently(tmp_path: Path) -> None:

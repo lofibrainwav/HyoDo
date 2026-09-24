@@ -1396,7 +1396,7 @@ _GATES_INIT_EMPTY_TEMPLATE = f"""schema = "{SCHEMA_ID}"
 # each becomes a first-class gate for `hyodo check`. Uncomment and edit:
 #
 # [gates.tests]
-# pillar = "goodness"
+# pillar = "truth"
 # command = "pytest -q"
 # timeout = 120
 #
