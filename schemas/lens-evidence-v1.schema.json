@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/lens-evidence-v1.schema.json",
+  "title": "HyoDo Lens Evidence v1",
+  "description": "What HyoDo observed for one canonical virtue lens. Evidence only: no score, value, weight, aggregate, decision, or authority. A host judge consumes it and records its own judgment separately, bound to this receipt by digest.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "lens",
+    "subject",
+    "state",
+    "coverage",
+    "provenance",
+    "evidence_refs",
+    "residuals",
+    "observed_at",
+    "authority"
+  ],
+  "properties": {
+    "schema_version": {"const": "hyodo.lens-evidence/v1"},
+    "lens": {"enum": ["truth", "goodness", "beauty", "benevolence", "hyo", "eternity"]},
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["exact_artifact_sha"],
+      "properties": {
+        "exact_artifact_sha": {"type": "string", "pattern": "^([0-9a-f]{40}|[0-9a-f]{64})$"},
+        "path": {"type": "string"}
+      }
+    },
+    "state": {"enum": ["OBSERVED", "PARTIAL", "UNOBSERVED"]},
+    "coverage": {
+      "description": "Proxy coverage, not virtue coverage: which of the lens's declared measurable proxies were observed.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["proxies_declared", "proxies_observed"],
+      "properties": {
+        "proxies_declared": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true},
+        "proxies_observed": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["hyodo_version"],
+      "properties": {
+        "hyodo_version": {"type": "string", "minLength": 1},
+        "measured_by": {"type": "string"}
+      }
+    },
+    "evidence_refs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "ref"],
+        "properties": {
+          "kind": {"type": "string", "minLength": 1},
+          "ref": {"type": "string", "minLength": 1},
+          "digest": {"type": "string"}
+        }
+      }
+    },
+    "residuals": {"type": "array", "items": {"type": "string", "minLength": 1}},
+    "observed_at": {"type": "string", "minLength": 1},
+    "authority": {"const": "UNOBSERVED"}
+  }
+}

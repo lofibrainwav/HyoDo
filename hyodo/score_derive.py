@@ -19,6 +19,13 @@ Design constraints (see docs/SCORE_DERIVATION.md):
   rules that *were* observed. A pillar with every rule observed is
   ``OBSERVED``.
 * This stays a review signal, not an approval — see ``hyodo score --help``.
+
+Frozen as legacy compatibility (docs/VIRTUE_CONTRACT.md). The weights in
+:data:`PILLAR_RULE_TABLE` are a judgment, and virtue scores, weights, and
+aggregates belong to the integrating host. This module is kept for
+``hyodo score --from-check`` and must not gain new consumers: six-lens
+evidence is ``hyodo.lens-evidence/v1``, which carries no score.
+``tests/test_lens_boundary.py`` pins the importers.
 """
 
 from __future__ import annotations

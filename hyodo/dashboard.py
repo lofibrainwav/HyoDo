@@ -845,19 +845,22 @@ def render_dashboard_html(
 
     pillars = evidence.get("pillars")
     pillars = pillars if isinstance(pillars, dict) else {}
+    # Cards follow the canonical contract in hyodo/virtues.py: tests and typing
+    # are Truth, safety findings and coverage are Goodness, lint and format
+    # are Beauty -- the same attribution the evidence envelope's gate rows carry.
     bodies = {
         "jin": (
             "<ul>"
             + _metric(
                 "Type check", _status_line(typecheck["status"], typecheck["message"]), "Pyright"
             )
+            + _metric(
+                "Tests", _status_line(tests["status"], _display_message(tests["message"])), "pytest"
+            )
             + "</ul>"
         ),
         "seon": (
             "<ul>"
-            + _metric(
-                "Tests", _status_line(tests["status"], _display_message(tests["message"])), "pytest"
-            )
             + _metric("Change safety risk", risk_display, "HyoDo safe", "0")
             + _metric("Safety scan scope", safety_source, "HyoDo safe")
             + _metric("High-risk findings", str(high), "HyoDo safe", "0")

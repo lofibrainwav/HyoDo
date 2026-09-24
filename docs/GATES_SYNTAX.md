@@ -68,7 +68,7 @@ value must be a TOML table with these fields:
 
 | Field | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
-| `pillar` | string | yes | none | One of `truth`, `goodness`, `beauty`, `benevolence`, `hyo`, `eternity`. In practice BYOG absorbs quality tools under truth/goodness/beauty — benevolence/hyo/eternity are measured natively from the checkout (`hyodo/pillars.py`) and are not meant to carry shell commands. |
+| `pillar` | string | yes | none | One of `truth`, `goodness`, `beauty`, `benevolence`, `hyo`, `eternity`. In practice BYOG absorbs quality tools under truth/goodness/beauty, following `hyodo/virtues.py`: tests, typing, and static checks are `truth`; safety findings and coverage are `goodness`; lint and format are `beauty`. `hyodo init` proposes test runners as `truth`, but a pillar you write here is kept as written. Benevolence/hyo/eternity are measured natively from the checkout (`hyodo/pillars.py`) and are not meant to carry shell commands. |
 | `command` | string or array of strings | yes | none | A non-empty string is split with `shlex.split`; an array is used as literal argv (no shell parsing). A leading run of POSIX `KEY=VALUE` tokens is peeled off and applied as environment overrides for that gate — this is not a separate field, it is a prefix on `command`. |
 | `timeout` | integer (seconds) | no | `120` | Must be a positive `int` (a TOML boolean is rejected even though `bool` is technically an `int` subclass). Applied as the `subprocess.run(..., timeout=...)` wall-clock limit; exceeding it produces a `FAIL` (not `SKIP`) with message `"timeout"`. |
 
@@ -88,10 +88,10 @@ pillar = "truth"
 command = "mypy src"
 timeout = 120
 
-# Goodness: the project's own test suite. Array form avoids shlex parsing
+# Truth: the project's own test suite. Array form avoids shlex parsing
 # surprises when an argument itself contains spaces or shell metacharacters.
 [gates.tests]
-pillar = "goodness"
+pillar = "truth"
 command = ["pytest", "-q", "tests/"]
 timeout = 300
 

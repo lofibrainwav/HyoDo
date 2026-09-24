@@ -54,14 +54,16 @@ def test_init_shows_trilingual_pillar_labels(tmp_path: Path) -> None:
     result = runner.invoke(app, ["init", str(tmp_path)])
 
     assert result.exit_code == 0
-    # pytest -> goodness (善/선/Good)
-    assert "善" in result.output
-    assert "\uc120" in result.output
-    assert "Good" in result.output
-    # mypy -> truth (眞/진/Truth)
+    # pytest and mypy -> truth (眞/진/Truth): tests and typing are Truth.
     assert "眞" in result.output
     assert "\uc9c4" in result.output
     assert "Truth" in result.output
+    # ruff -> beauty (美/미/Beauty)
+    assert "美" in result.output
+    assert "\ubbf8" in result.output
+    assert "Beauty" in result.output
+    # No detected test runner is proposed as Goodness.
+    assert "善" not in result.output
 
 
 def test_init_refuses_to_overwrite_existing_config_without_force(tmp_path: Path) -> None:
@@ -122,6 +124,8 @@ def test_init_zero_detection_writes_an_inert_example_not_a_live_config(tmp_path:
     rendered = example_path.read_text(encoding="utf-8")
     assert f'schema = "{SCHEMA_ID}"' in rendered
     assert "# [gates.tests]" in rendered  # commented-out example, not an active gate
+    # The suggested test gate follows hyodo/virtues.py: tests are Truth.
+    assert '# [gates.tests]\n# pillar = "truth"' in rendered
 
 
 def test_init_renamed_example_still_refuses_to_load_silently(tmp_path: Path) -> None:

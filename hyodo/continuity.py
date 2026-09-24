@@ -31,7 +31,7 @@ from typing import Any
 
 from hyodo.access_ledger import ACCESS_LEDGER_PATH
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH, read_agent_events
-from hyodo.ledger_origin import ORIGIN_DIVERGED, ORIGIN_UNVERIFIED, ledger_origin
+from hyodo.ledger_origin import ORIGIN_DIVERGED, ORIGIN_UNVERIFIED, ledger_continuity
 from hyodo.pairing import load_pairing, pairing_path
 from hyodo.policy import POLICY_RELATIVE_PATH, try_load_policy
 from hyodo.provenance import git_commit, path_digest
@@ -248,6 +248,10 @@ class StoreFact:
     corrupt_lines: int = 0
     #: For ledgers: ``hyodo.ledger_origin`` classification; ``None`` otherwise.
     origin: str | None = None
+    #: For ledgers: lines HyoDo appended here (``None``: never counted here)
+    #: and the recorded breaks in that sequence (Eternity evidence).
+    sequence: int | None = None
+    gaps: tuple[dict[str, Any], ...] = ()
 
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-serializable form used in the ``hyodo.continuity/v1`` receipt."""
@@ -261,6 +265,8 @@ class StoreFact:
         }
         if self.origin is not None:
             payload["origin"] = self.origin
+            payload["sequence"] = self.sequence
+            payload["gaps"] = [dict(gap) for gap in self.gaps]
         return payload
 
 
@@ -329,6 +335,7 @@ def measure_continuity(
     events, events_corrupt = read_agent_events(resolved)
     events_unreadable = events is None
     events_path = resolved / AGENT_EVENTS_RELATIVE_PATH
+    events_continuity = ledger_continuity(resolved, AGENT_EVENTS_RELATIVE_PATH)
     agent_events_store = StoreFact(
         path=str(AGENT_EVENTS_RELATIVE_PATH),
         exists=events_path.exists(),
@@ -336,7 +343,9 @@ def measure_continuity(
         digest=_digest_file(events_path),
         count=len(events) if events is not None else None,
         corrupt_lines=events_corrupt,
-        origin=ledger_origin(resolved, AGENT_EVENTS_RELATIVE_PATH),
+        origin=events_continuity["origin"],
+        sequence=events_continuity["seq"],
+        gaps=tuple(events_continuity["gaps"]),
     )
     if events_unreadable:
         reasons.append("agent_events_unreadable")
@@ -364,6 +373,7 @@ def measure_continuity(
     access_entries, access_corrupt = _read_access_entries(resolved)
     access_unreadable = access_entries is None
     access_path = resolved / ACCESS_LEDGER_PATH
+    access_continuity = ledger_continuity(resolved, ACCESS_LEDGER_PATH)
     access_store = StoreFact(
         path=str(ACCESS_LEDGER_PATH),
         exists=access_path.exists(),
@@ -371,7 +381,9 @@ def measure_continuity(
         digest=_digest_file(access_path),
         count=len(access_entries) if access_entries is not None else None,
         corrupt_lines=access_corrupt,
-        origin=ledger_origin(resolved, ACCESS_LEDGER_PATH),
+        origin=access_continuity["origin"],
+        sequence=access_continuity["seq"],
+        gaps=tuple(access_continuity["gaps"]),
     )
     if access_unreadable:
         reasons.append("access_ledger_unreadable")

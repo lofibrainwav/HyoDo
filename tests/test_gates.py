@@ -334,7 +334,7 @@ pythonVersion = "3.10"
 
     detected = detect_project_gates(tmp_path)
 
-    assert detected["pytest"]["pillar"] == "goodness"
+    assert detected["pytest"]["pillar"] == "truth"
     assert detected["pytest"]["command"] == "pytest -q"
     assert detected["mypy"]["pillar"] == "truth"
     assert detected["ruff"]["pillar"] == "beauty"
@@ -359,7 +359,7 @@ def test_detect_project_gates_package_json(tmp_path: Path) -> None:
     detected = detect_project_gates(tmp_path)
 
     assert detected["npm-test"] == {
-        "pillar": "goodness",
+        "pillar": "truth",
         "command": "npm test",
         "source": "package.json",
     }
@@ -387,7 +387,7 @@ def test_detect_project_gates_go_mod(tmp_path: Path) -> None:
     detected = detect_project_gates(tmp_path)
 
     assert detected["go-vet"]["pillar"] == "truth"
-    assert detected["go-test"]["pillar"] == "goodness"
+    assert detected["go-test"]["pillar"] == "truth"
 
 
 def test_detect_project_gates_cargo_toml(tmp_path: Path) -> None:
@@ -396,7 +396,7 @@ def test_detect_project_gates_cargo_toml(tmp_path: Path) -> None:
     detected = detect_project_gates(tmp_path)
 
     assert detected["cargo-check"]["pillar"] == "truth"
-    assert detected["cargo-test"]["pillar"] == "goodness"
+    assert detected["cargo-test"]["pillar"] == "truth"
 
 
 def test_detect_project_gates_tsconfig(tmp_path: Path) -> None:
@@ -415,8 +415,68 @@ def test_detect_project_gates_makefile(tmp_path: Path) -> None:
 
     detected = detect_project_gates(tmp_path)
 
-    assert detected["make-test"]["pillar"] == "goodness"
+    assert detected["make-test"]["pillar"] == "truth"
     assert detected["make-lint"]["pillar"] == "beauty"
+
+
+def test_every_detected_test_runner_is_truth(tmp_path: Path) -> None:
+    """hyodo/virtues.py: Truth is "tests, typing, and static checks". Every
+    test runner HyoDo proposes -- root or nested -- follows it; lint stays
+    Beauty and types stay Truth."""
+    (tmp_path / "pyproject.toml").write_text(
+        '[project.optional-dependencies]\ndev = ["pytest", "mypy", "ruff"]\n', encoding="utf-8"
+    )
+    (tmp_path / "package.json").write_text(
+        '{"scripts": {"test": "vitest run", "lint": "eslint ."}}', encoding="utf-8"
+    )
+    (tmp_path / "go.mod").write_text("module example.com/demo\n", encoding="utf-8")
+    (tmp_path / "Cargo.toml").write_text('[package]\nname = "demo"\n', encoding="utf-8")
+    (tmp_path / "Makefile").write_text("test:\n\techo t\n\nlint:\n\techo l\n", encoding="utf-8")
+    for rel, name, text in (
+        ("services/worker", "pyproject.toml", '[project]\ndependencies = ["pytest"]\n'),
+        ("apps/web", "package.json", '{"scripts": {"test": "vitest run"}}'),
+        ("tools/cli", "Makefile", "test:\n\techo t\n"),
+    ):
+        (tmp_path / rel).mkdir(parents=True)
+        (tmp_path / rel / name).write_text(text, encoding="utf-8")
+
+    detected = detect_project_gates(tmp_path)
+
+    runners = {
+        "pytest",
+        "npm-test",
+        "go-test",
+        "cargo-test",
+        "make-test",
+        "services-worker-pytest",
+        "apps-web-npm-test",
+        "tools-cli-make-test",
+    }
+    assert runners <= set(detected)
+    assert {name: detected[name]["pillar"] for name in runners} == dict.fromkeys(runners, "truth")
+    assert detected["npm-lint"]["pillar"] == "beauty"
+    assert detected["make-lint"]["pillar"] == "beauty"
+    assert detected["mypy"]["pillar"] == "truth"
+    assert all(spec["pillar"] != "goodness" for spec in detected.values())
+
+
+def test_a_user_declared_pillar_is_never_rewritten(tmp_path: Path) -> None:
+    """Detection only proposes. A pillar the user wrote stays theirs."""
+    gates_path = tmp_path / ".hyodo" / "gates.toml"
+    gates_path.parent.mkdir()
+    gates_path.write_text(
+        f'schema = "{SCHEMA_ID}"\n\n[gates.pytest]\npillar = "goodness"\ncommand = "pytest -q"\n',
+        encoding="utf-8",
+    )
+    (tmp_path / "pyproject.toml").write_text(
+        '[project.optional-dependencies]\ndev = ["pytest"]\n', encoding="utf-8"
+    )
+    assert detect_project_gates(tmp_path)["pytest"]["pillar"] == "truth"
+
+    config = load_gates_config(tmp_path)
+
+    assert config is not None
+    assert [(gate.name, gate.pillar) for gate in config.gates] == [("pytest", "goodness")]
 
 
 # ---------------------------------------------------------------------------
@@ -480,7 +540,7 @@ def test_detect_project_gates_nested_package_json_no_root_tool(tmp_path: Path) -
     detected = detect_project_gates(tmp_path)
 
     assert detected["apps-learning-platform-npm-test"] == {
-        "pillar": "goodness",
+        "pillar": "truth",
         "command": "npm --prefix apps/learning-platform test",
         "source": "apps/learning-platform/package.json",
     }
@@ -506,7 +566,7 @@ dev = ["pytest>=8.0", "ruff"]
 
     detected = detect_project_gates(tmp_path)
 
-    assert detected["services-worker-pytest"]["pillar"] == "goodness"
+    assert detected["services-worker-pytest"]["pillar"] == "truth"
     assert "cd services/worker" in detected["services-worker-pytest"]["command"]
     assert detected["services-worker-ruff"]["pillar"] == "beauty"
 
@@ -518,7 +578,7 @@ def test_detect_project_gates_nested_makefile(tmp_path: Path) -> None:
 
     detected = detect_project_gates(tmp_path)
 
-    assert detected["tools-cli-make-test"]["pillar"] == "goodness"
+    assert detected["tools-cli-make-test"]["pillar"] == "truth"
     assert "cd tools/cli" in detected["tools-cli-make-test"]["command"]
 
 
@@ -554,7 +614,7 @@ def test_detect_project_gates_root_tool_still_wins_and_nested_still_added(tmp_pa
     detected = detect_project_gates(tmp_path)
 
     assert detected["npm-test"] == {
-        "pillar": "goodness",
+        "pillar": "truth",
         "command": "npm test",
         "source": "package.json",
     }

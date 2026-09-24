@@ -592,7 +592,7 @@ def _detect_pyproject_gates(root: Path) -> dict[str, dict[str, str]]:
     detected: dict[str, dict[str, str]] = {}
     if "pytest" in lowered:
         detected["pytest"] = {
-            "pillar": "goodness",
+            "pillar": "truth",
             "command": "pytest -q",
             "source": "pyproject.toml",
         }
@@ -626,7 +626,7 @@ def _detect_package_json_gates(root: Path) -> dict[str, dict[str, str]]:
         and "no test specified" not in test_script.lower()
     ):
         detected["npm-test"] = {
-            "pillar": "goodness",
+            "pillar": "truth",
             "command": "npm test",
             "source": "package.json",
         }
@@ -651,7 +651,7 @@ def _detect_go_gates(root: Path) -> dict[str, dict[str, str]]:
         return {}
     return {
         "go-vet": {"pillar": "truth", "command": "go vet ./...", "source": "go.mod"},
-        "go-test": {"pillar": "goodness", "command": "go test ./...", "source": "go.mod"},
+        "go-test": {"pillar": "truth", "command": "go test ./...", "source": "go.mod"},
     }
 
 
@@ -660,7 +660,7 @@ def _detect_cargo_gates(root: Path) -> dict[str, dict[str, str]]:
         return {}
     return {
         "cargo-check": {"pillar": "truth", "command": "cargo check -q", "source": "Cargo.toml"},
-        "cargo-test": {"pillar": "goodness", "command": "cargo test -q", "source": "Cargo.toml"},
+        "cargo-test": {"pillar": "truth", "command": "cargo test -q", "source": "Cargo.toml"},
     }
 
 
@@ -686,7 +686,7 @@ def _detect_makefile_gates(root: Path) -> dict[str, dict[str, str]]:
         stripped = line.strip()
         if stripped.startswith("test:"):
             detected["make-test"] = {
-                "pillar": "goodness",
+                "pillar": "truth",
                 "command": "make test",
                 "source": f"{makefile.name} (test: target)",
             }
@@ -810,7 +810,7 @@ def _detect_nested_package_json_gates(project_dir: Path, rel: str) -> dict[str, 
         and "no test specified" not in test_script.lower()
     ):
         detected[f"{prefix}-npm-test"] = {
-            "pillar": "goodness",
+            "pillar": "truth",
             "command": f"npm --prefix {rel} test",
             "source": source,
         }
@@ -851,7 +851,7 @@ def _detect_nested_pyproject_gates(project_dir: Path, rel: str) -> dict[str, dic
     detected: dict[str, dict[str, str]] = {}
     if "pytest" in lowered:
         detected[f"{prefix}-pytest"] = {
-            "pillar": "goodness",
+            "pillar": "truth",
             "command": f"bash -c 'cd {rel} && pytest -q'",
             "source": source,
         }
@@ -891,7 +891,7 @@ def _detect_nested_makefile_gates(project_dir: Path, rel: str) -> dict[str, dict
         stripped = line.strip()
         if stripped.startswith("test:"):
             detected[f"{prefix}-make-test"] = {
-                "pillar": "goodness",
+                "pillar": "truth",
                 "command": f"bash -c 'cd {rel} && make test'",
                 "source": f"{rel}/{makefile.name} (test: target)",
             }

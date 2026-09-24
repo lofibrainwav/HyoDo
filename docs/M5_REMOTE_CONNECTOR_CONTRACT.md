@@ -165,7 +165,12 @@ the read-only receipt:
   ledger (required paths, may not exist yet) plus the policy file and the
   pairing file (both optional — absence is not a failure), each with a
   `sha256:` digest so two reads of the same workspace can be compared
-  byte-for-byte.
+  byte-for-byte. The two ledgers additionally carry `origin`
+  (`ABSENT` / `VERIFIED` / `UNVERIFIED` / `DIVERGED`), `sequence` (lines HyoDo
+  appended to that ledger in this workspace, never decreasing; `null` when
+  HyoDo never counted it here), and `gaps` (each recorded break as
+  `{after_seq, reason, recorded_at}`, newest 100). These fields are additive
+  and report continuity only; `sequence` and `gaps` do not change `status`.
 - **Caller identities — two sources.** `source: "mcp"` rows are grouped
   from `.hyodo/mcp-access.jsonl`'s `caller_id` field. The stdio transport
   never sets one (`create_server`'s default, `run_stdio` never passes one),
