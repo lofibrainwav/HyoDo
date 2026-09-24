@@ -5,6 +5,29 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.6] - 2026-09-23
+
+Maintenance release. Ships the deployed-runtime gap closed by #477 that
+4.21.5 itself did not carry.
+
+### Fixed
+
+- Retired-reader registration GC: before a new MCP reader registers, records
+  whose PID/process-start identity is provably retired (SIGTERM, SIGKILL,
+  crash, reboot) are removed at startup; an unobservable identity is never
+  treated as dead. Without this, 4.21.5 deployments kept collecting
+  registration residue after every unclean reader exit.
+- Release candidate planning accepts both coherent candidate states
+  (`UNPREPARED` and `PREPARED`) instead of rejecting a fully prepared
+  candidate with contradictory validations.
+
+### Evidence
+
+- Source: PR #477 (commit 0cd61af) merged to main as 191580419b1ae2fdc40cfa6a3a5895b7e54c1e39.
+- Verified on merged source: 31/31 focused tests (test_release_plan,
+  test_mcp_readers), SIGKILL/SIGTERM crash-residue pruning measured live,
+  ruff/pyright clean, `scripts/verify-public.sh` PASS.
+
 ## [4.21.5] - 2026-09-23
 
 MCP reader cutover patch. A runtime promotion is no longer complete when a
