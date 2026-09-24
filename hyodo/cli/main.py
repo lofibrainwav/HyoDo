@@ -802,13 +802,14 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
                 "tests": run_pytest_check(root),
                 "sbom": run_sbom_check(root),
             }
-            # Built-in dashboard semantics are already canonical here:
-            # typecheck -> Truth, tests -> Goodness, lint/format -> Beauty.
-            # SBOM remains an auxiliary inventory gate, not a virtue claim.
+            # Built-in attribution follows the canonical contract in
+            # hyodo/virtues.py: Truth is "tests, typing, and static checks",
+            # Beauty is "lint, format, and clarity evidence". SBOM remains an
+            # auxiliary inventory gate, not a virtue claim.
             gate_pillars = {
                 "typecheck": "truth",
                 "lint_format": "beauty",
-                "tests": "goodness",
+                "tests": "truth",
                 "sbom": None,
             }
     safety = run_safety_scan(cwd=root)

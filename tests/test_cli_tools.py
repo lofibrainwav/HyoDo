@@ -57,7 +57,7 @@ def test_dashboard_evidence_is_versioned_and_preserves_raw_gate_statuses(tmp_pat
     assert evidence["schema_version"] == "hyodo.dashboard-evidence/v2"
     assert evidence["gates"]["typecheck"]["status"] == "PASS"
     assert evidence["gates"]["typecheck"]["pillar"] == "truth"
-    assert evidence["gates"]["tests"]["pillar"] == "goodness"
+    assert evidence["gates"]["tests"]["pillar"] == "truth"
     assert evidence["gates"]["lint_format"]["pillar"] == "beauty"
     assert evidence["gates"]["sbom"]["pillar"] is None
     assert evidence["safety"]["risk_score"] == 5
