@@ -14,6 +14,12 @@ harmony value. `harmony_aggregate` is only a reserved namespace constant; this
 command does not emit it as a six-axis aggregate or define a canonical summary
 over all six virtues.
 
+**Frozen.** This derivation is legacy compatibility. Its rule weights are a
+judgment, and virtue scores and weights belong to the integrating host, so the
+module is kept for this command and not extended to new consumers. Six-lens
+evidence is `hyodo.lens-evidence/v1`, which carries no score; see
+[`VIRTUE_CONTRACT.md`](VIRTUE_CONTRACT.md#score-and-aggregation-boundary).
+
 ## Rule table
 
 `hyodo/score_derive.py` defines `PILLAR_RULE_TABLE`, a `rule_id -> (pillar,

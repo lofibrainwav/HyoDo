@@ -1,0 +1,7 @@
+{
+  "algorithm": "sha256",
+  "digest": "665c34c14fc3b369f0e4759dd9b6a2c1399388c688360e279081cc4a45f79610",
+  "schema": "lens-evidence-v1.schema.json",
+  "schema_id": "https://hyodo.app/schemas/lens-evidence-v1.schema.json",
+  "schema_version": "hyodo.lens-evidence/v1"
+}

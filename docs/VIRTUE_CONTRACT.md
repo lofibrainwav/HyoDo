@@ -76,10 +76,62 @@ observed-input harmony signal but withholds TOTAL. See
 
 The philosophy-to-engineering reference defines an evaluation record as
 `(value, confidence, evidence, state)` for an individual axis, with missing
-evidence reported as `UNOBSERVED`. That axis-evaluation contract is not yet
-implemented as a general HyoDo API in the current public package. A host may
-define a separately governed, profile-specific summary; HyoDo does not supply
-that host-owned aggregation or turn it into action authority.
+evidence reported as `UNOBSERVED`. HyoDo supplies the evidence and state half
+of that record and never the value: the per-lens receipt is
+[`hyodo.lens-evidence/v1`](../schemas/lens-evidence-v1.schema.json), which
+carries the lens, subject, state, proxy coverage, provenance, evidence
+references, residuals, and observation time, and rejects any score, value,
+weight, aggregate, decision, or authority field. A per-axis value, a judge,
+weights, floors, and any profile-specific summary belong to the integrating
+host, which should record its judgment separately and bind it to the evidence
+receipt by digest. HyoDo does not supply that host-owned judgment or turn it
+into action authority.
+
+`hyodo/score_derive.py` is frozen legacy compatibility for
+`hyodo score --from-check`. It is kept, not extended: new consumers use the
+lens-evidence receipt instead, and `tests/test_lens_boundary.py` pins its
+importers.
+
+## Deterministic results and host judgment
+
+The line between HyoDo and a host is whether a result needs a value judgment.
+A deterministic result of a declared rule belongs to HyoDo: a gate's
+fail-closed `PASS`/`FAIL`, "0 high-severity findings in the observed scope",
+a policy rule's `ALLOW`/`DENY`/`ASK`/`UNOBSERVED`, or a lens's `PARTIAL`
+coverage. A virtue score, a contextual weight, a minimum floor, a six-axis
+aggregate, routing, and execution authority belong to the host.
+
+Observing a lens's declared proxies in full is proxy coverage, not virtue
+coverage. A `truth` receipt with every proxy observed still means only that
+the selected implementation properties were checked.
+
+## Eternity and time
+
+Time and sequence are the coordinate system; Eternity is what can be observed
+about continuity along them: whether the record is contiguous, where it
+breaks, how much was not observed, and whether its origin is trustworthy.
+HyoDo's ledgers carry a local sequence number that never goes backwards and
+record each break as a gap with a reason (`hyodo/ledger_origin.py`), so an
+unobserved stretch is stated rather than left as silence. The continuity
+receipt reports both per ledger.
+
+## Candidate proxy extensions (not canonical)
+
+The following proxies are candidates for the existing 仁 and 孝 scopes. They
+extend what may be measured inside each scope; they do not replace the scope,
+the current proxies, or the coverage limitations in `hyodo/virtues.py`, and
+they are not measured by any shipped command. Each is promoted into the
+canonical contract only after a canary shows it can be observed
+deterministically.
+
+| Virtue | Existing scope (unchanged) | Candidate proxies |
+|---|---|---|
+| Benevolence / 仁 | Relationship awareness and sensitivity to participant, role, and context | Participants per event; observed causal links between events; who/what/when/where/how of an event; the host-supplied "why" recorded as a separate, attributed claim that is checked for consistency but never trusted as authority |
+| Hyo / 孝 | Technology carries its share of the burden; consent, context, privacy, protective friction | Delivery clarity of HyoDo's own output: what can be trusted now, what cannot be trusted yet and why, and the single decision left to the person; uncertainty stated as counts ("3 of 5 checks ran"); audience-appropriate wording |
+
+Consent, context alignment, privacy, and protective friction remain Hyo
+proxies. A delivery proxy that dropped them would narrow the scope, which this
+contract does not allow.
 
 HyoDo is a host-neutral public layer. Integrating hosts own orchestration,
 memory, retrieval, runtime, execution, and final authority. KINGDOM is a
