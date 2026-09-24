@@ -396,7 +396,7 @@ class _PairedBearerMiddleware:
     """Reject HTTP requests unless the bearer token verifies against the pairing.
 
     Unlike :class:`_BearerTokenMiddleware`, this middleware re-reads
-    ``.hyodo/pairing.json`` from disk on every request instead of comparing
+    the workspace pairing record from disk on every request instead of comparing
     against a token fixed at server start. A ``hyodo mcp revoke`` therefore
     takes effect on the very next request with no restart required.
     """

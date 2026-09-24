@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -15,6 +16,7 @@ from hyodo.pairing import (
     PairingState,
     create_pairing,
     load_pairing,
+    pairing_path,
     pairing_state,
     revoke_pairing,
     touch_last_seen,
@@ -38,7 +40,7 @@ def test_create_pairing_round_trips_and_never_writes_the_token(tmp_path: Path):
     assert loaded == record
     assert verify_token(tmp_path, token) is PairingState.PAIRED
 
-    raw = (tmp_path / PAIRING_RELATIVE_PATH).read_text(encoding="utf-8")
+    raw = (pairing_path(tmp_path)).read_text(encoding="utf-8")
     payload = json.loads(raw)
     assert payload["schema"] == PAIRING_SCHEMA_ID
     assert token not in raw
@@ -120,7 +122,7 @@ def test_create_pairing_keeps_device_id_stable_across_re_pair(tmp_path: Path):
     ],
 )
 def test_corrupt_pairing_file_is_unobserved_and_fails_closed(tmp_path: Path, payload: str):
-    path = tmp_path / PAIRING_RELATIVE_PATH
+    path = pairing_path(tmp_path)
     path.parent.mkdir(parents=True)
     path.write_text(payload, encoding="utf-8")
 
@@ -140,7 +142,7 @@ def test_cli_mcp_pair_prints_the_token_once_and_json_receipt(tmp_path: Path):
     assert payload["ok"] is True
     assert payload["exit_code"] == 0
     assert payload["token"]
-    assert (tmp_path / PAIRING_RELATIVE_PATH).exists()
+    assert (pairing_path(tmp_path)).exists()
 
 
 def test_cli_mcp_pair_rejects_missing_workspace(tmp_path: Path):
@@ -175,7 +177,7 @@ def test_cli_mcp_pairing_show_reports_unpaired_exit_2(tmp_path: Path):
 
 
 def test_cli_mcp_pairing_show_reports_unobserved_for_corrupt_file(tmp_path: Path):
-    path = tmp_path / PAIRING_RELATIVE_PATH
+    path = pairing_path(tmp_path)
     path.parent.mkdir(parents=True)
     path.write_text("{not json", encoding="utf-8")
 
@@ -214,3 +216,40 @@ def test_cli_mcp_revoke_without_a_pairing_is_exit_2(tmp_path: Path):
     payload = json.loads(result.output)
     assert payload["ok"] is False
     assert payload["state"] == "UNPAIRED"
+
+
+def test_preseeded_checkout_pairing_never_authenticates(tmp_path: Path):
+    """A repository that ships a digest of a token it knows must not pair."""
+    token = "attacker-known-token"
+    shipped = tmp_path / PAIRING_RELATIVE_PATH
+    shipped.parent.mkdir(parents=True)
+    shipped.write_text(
+        json.dumps(
+            {
+                "schema": "hyodo.pairing/v1",
+                "workspace_id": "w",
+                "device_id": "d",
+                "root": str(tmp_path.resolve()),
+                "token_digest": hashlib.sha256(token.encode("utf-8")).hexdigest(),
+                "created_at": "2026-01-01T00:00:00+00:00",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert verify_token(tmp_path, token) is PairingState.UNPAIRED
+    assert pairing_state(tmp_path) is PairingState.UNPAIRED
+
+
+def test_pairing_record_copied_from_another_root_is_unobserved(tmp_path: Path):
+    original = tmp_path / "original"
+    other = tmp_path / "other"
+    original.mkdir()
+    other.mkdir()
+    _record, token = create_pairing(original)
+    target = pairing_path(other)
+    target.parent.mkdir(parents=True)
+    target.write_text(pairing_path(original).read_text(encoding="utf-8"), encoding="utf-8")
+
+    assert verify_token(other, token) is PairingState.UNOBSERVED
+    assert verify_token(original, token) is PairingState.PAIRED

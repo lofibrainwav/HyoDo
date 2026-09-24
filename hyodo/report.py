@@ -10,9 +10,10 @@ from typing import Any
 
 import hyodo
 from hyodo.event_graph import build_event_graph, render_event_graph_json
-from hyodo.events import read_agent_events
+from hyodo.events import AGENT_EVENTS_RELATIVE_PATH, read_agent_events
 from hyodo.graph_export import compute_backlinks
 from hyodo.graph_view import build_actor_rows
+from hyodo.ledger_origin import ORIGIN_DIVERGED, ORIGIN_UNVERIFIED, ledger_origin
 from hyodo.policy import POLICY_RELATIVE_PATH, try_load_policy
 
 REPORTS_RELATIVE_DIR = Path(".hyodo") / "reports"
@@ -190,6 +191,12 @@ def build_report_graph(root: Path, evidence: dict[str, Any] | None = None) -> di
         ledger_unreadable=evidence["ledger_unreadable"],
         root=root,
     )
+    # A ledger that arrived with the checkout is not evidence recorded here.
+    origin = ledger_origin(root, AGENT_EVENTS_RELATIVE_PATH)
+    graph["ledger_origin"] = origin
+    if graph["status"] == "READY" and origin in (ORIGIN_UNVERIFIED, ORIGIN_DIVERGED):
+        graph["status"] = "UNOBSERVED"
+        graph["reason"] = f"ledger_origin_{origin.lower()}"
     policy = evidence["policy"]
     if (
         policy is not None

@@ -245,6 +245,36 @@ jobs:
           echo "Running public package tests (blocking)..."
           python -m pytest tests -q --tb=short --cov=hyodo --cov-fail-under=80
 
+  hostile-clone-gauntlet:
+    name: "Goodness - Hostile Clone Gauntlet"
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: ./.github/actions/setup-uv-cached
+
+      - name: Install locked Python dependencies
+        run: |
+          uv sync --locked --extra dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Build wheel
+        run: python -m build --wheel
+
+      - name: Attack the built wheel with a hostile clone (release blocker)
+        run: bash scripts/release/hostile_clone_gauntlet.sh dist/*.whl
+
   goodness-orchestration:
     name: "Goodness - CLI Orchestration"
     runs-on: ubuntu-latest
@@ -336,7 +366,8 @@ jobs:
     name: "Goodness Gate - Safety"
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [goodness-public-tests, goodness-orchestration, goodness-safety-fixtures]
+    needs:
+      [goodness-public-tests, goodness-orchestration, goodness-safety-fixtures, hostile-clone-gauntlet]
     if: ${{ always() }}
 
     steps:
@@ -345,6 +376,7 @@ jobs:
           PUBLIC_TESTS_RESULT: ${{ needs['goodness-public-tests'].result }}
           ORCHESTRATION_RESULT: ${{ needs['goodness-orchestration'].result }}
           SAFETY_FIXTURES_RESULT: ${{ needs['goodness-safety-fixtures'].result }}
+          GAUNTLET_RESULT: ${{ needs['hostile-clone-gauntlet'].result }}
         run: |
           set -euo pipefail
 
@@ -360,6 +392,7 @@ jobs:
           check_success "Public package tests" "$PUBLIC_TESTS_RESULT"
           check_success "CLI orchestration" "$ORCHESTRATION_RESULT"
           check_success "Safety fixtures" "$SAFETY_FIXTURES_RESULT"
+          check_success "Hostile clone gauntlet" "$GAUNTLET_RESULT"
           echo "All Goodness safety lanes succeeded."
 
   # -------------------------------------------------------------------------

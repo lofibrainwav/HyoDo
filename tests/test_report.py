@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 
 import pytest
+from ledger_fixture import write_ledger
 from typer.testing import CliRunner
 
 from hyodo.cli.main import app
@@ -28,8 +29,8 @@ def _write_evidence(root: Path) -> None:
         {"policy": {"decision": "ALLOW", "evaluated_by": "hyodo.policy/v1"}},
         {"policy": {"decision": "DENY", "evaluated_by": "hyodo.policy/v1"}},
     ]
-    (hyodo_dir / "agent-events.jsonl").write_text(
-        "".join(json.dumps(event) + "\n" for event in events), encoding="utf-8"
+    write_ledger(
+        hyodo_dir / "agent-events.jsonl", "".join(json.dumps(event) + "\n" for event in events)
     )
     (hyodo_dir / "eval-runs.jsonl").write_text(
         json.dumps({"status": "PASS", "pass_rate": 0.75, "result_path": ".hyodo/eval-runs/a.json"})
@@ -118,7 +119,7 @@ def test_report_graph_exports_edges_and_tool_urls(tmp_path: Path) -> None:
         _graph_event("parent", step_index=0),
         _graph_event("child", parent_event_id="parent", evidence_refs=["parent"], step_index=1),
     ]
-    ledger.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
+    write_ledger(ledger, "".join(json.dumps(event) + "\n" for event in events))
 
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
 
@@ -143,7 +144,7 @@ def test_report_graph_preserves_optional_duration_ms(tmp_path: Path) -> None:
     ledger.parent.mkdir(parents=True, exist_ok=True)
     event = _graph_event("timed", step_index=0)
     event["io"]["duration_ms"] = 250
-    ledger.write_text(json.dumps(event) + "\n", encoding="utf-8")
+    write_ledger(ledger, json.dumps(event) + "\n")
 
     graph = build_report_graph(tmp_path)
 
@@ -157,7 +158,7 @@ def test_report_graph_nodes_carry_actor_id_field(tmp_path: Path) -> None:
         _graph_event("no-label", step_index=0),
         _graph_event("labelled", actor_id="planner", step_index=1),
     ]
-    ledger.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
+    write_ledger(ledger, "".join(json.dumps(event) + "\n" for event in events))
 
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
 
@@ -195,7 +196,7 @@ def test_report_graph_rows_show_two_labelled_agents_and_orchestrator_nesting(
             step_index=2,
         ),
     ]
-    ledger.write_text("".join(json.dumps(event) + "\n" for event in events), encoding="utf-8")
+    write_ledger(ledger, "".join(json.dumps(event) + "\n" for event in events))
 
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
 
@@ -215,7 +216,7 @@ def test_report_graph_fails_closed_on_broken_parent_ref(tmp_path: Path) -> None:
     ledger = tmp_path / AGENT_EVENTS_RELATIVE_PATH
     ledger.parent.mkdir(parents=True, exist_ok=True)
     event = _graph_event("child", parent_event_id="missing", step_index=0)
-    ledger.write_text(json.dumps(event) + "\n", encoding="utf-8")
+    write_ledger(ledger, json.dumps(event) + "\n")
 
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
 
@@ -249,7 +250,7 @@ def test_graph_mission_policy(tmp_path, flag, mission, code):
             event = _graph_event(f"prompt-{step}", step_index=step)
             event.update(kind="prompt", actor="human")
             events.append(event)
-    (folder / "agent-events.jsonl").write_text("".join(json.dumps(e) + "\n" for e in events))
+    write_ledger(folder / "agent-events.jsonl", "".join(json.dumps(e) + "\n" for e in events))
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
     assert result.exit_code == code, result.output
     graph = json.loads((folder / "reports/hyodo-report.graph.json").read_text())
@@ -264,7 +265,7 @@ def test_graph_missing_or_invalid_policy_keeps_existing_behavior(tmp_path, confi
     folder.mkdir()
     if config is not None:
         (folder / "policy.toml").write_text('schema = "hyodo.policy/v1"\n' + config)
-    (folder / "agent-events.jsonl").write_text(json.dumps(_graph_event("tool")) + "\n")
+    write_ledger(folder / "agent-events.jsonl", json.dumps(_graph_event("tool")) + "\n")
     result = runner.invoke(app, ["report", "--root", str(tmp_path), "--format", "graph", "--json"])
     assert result.exit_code == 0, result.output
 

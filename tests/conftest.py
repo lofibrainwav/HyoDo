@@ -33,3 +33,9 @@ if os.environ.get("CI"):
 def _isolated_mcp_reader_registry(tmp_path_factory, monkeypatch):
     """In-process MCP readers must never register in the developer's real registry."""
     monkeypatch.setenv("HYODO_MCP_READER_DIR", str(tmp_path_factory.mktemp("mcp-readers")))
+
+
+@pytest.fixture(autouse=True)
+def _isolated_user_state(tmp_path_factory, monkeypatch):
+    """Operator authority state must never touch the developer's real ~/.hyodo."""
+    monkeypatch.setenv("HYODO_STATE_HOME", str(tmp_path_factory.mktemp("user-state")))

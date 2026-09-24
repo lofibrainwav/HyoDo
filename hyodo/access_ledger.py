@@ -7,6 +7,8 @@ import sys
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
+from hyodo.ledger_origin import anchored_append
+
 ACCESS_LEDGER_PATH = Path(".hyodo") / "mcp-access.jsonl"
 
 
@@ -56,9 +58,7 @@ def record_access_result(entry: AccessEntry, root: Path | None = None) -> Access
         root = Path(".")
     path = root / ACCESS_LEDGER_PATH
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(asdict(entry), sort_keys=True) + "\n")
+        anchored_append(root, ACCESS_LEDGER_PATH, json.dumps(asdict(entry), sort_keys=True) + "\n")
     except OSError:
         print(f"[hyodo] access ledger write failed: {path}", file=sys.stderr)
         return AccessWriteResult(path=path, state="UNOBSERVED", reason="write_failed")

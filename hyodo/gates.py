@@ -41,11 +41,18 @@ import shutil
 import subprocess
 import sys
 from collections import deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from hyodo.user_state import (
+    checkout_shadow,
+    read_json,
+    workspace_identity,
+    workspace_state_path,
+    write_json_private,
+)
 from hyodo.virtues import CANONICAL_VIRTUE_KEYS
 
 try:
@@ -66,8 +73,12 @@ GATES_CONFIG_RELATIVE_PATH = Path(".hyodo") / "gates.toml"
 GATE_MESSAGE_TAIL_CHARS = 200
 
 # Trust-on-first-use receipt for the BYOG command set (see module docstring).
+# It lives in per-user state (`hyodo.user_state`), never in the checkout: a
+# repository can ship a `.hyodo/gates-trust.json` as easily as a gates.toml, so
+# a file at GATES_TRUST_RELATIVE_PATH carries no authority and is only reported.
 GATES_TRUST_RELATIVE_PATH = Path(".hyodo") / "gates-trust.json"
-GATES_TRUST_SCHEMA_ID = "hyodo.gates-trust/v1"
+GATES_TRUST_STATE_NAME = "gates-trust.json"
+GATES_TRUST_SCHEMA_ID = "hyodo.gates-trust/v2"
 # Escape hatch for automation that already trusts its own checkout (CI
 # operators reviewed the repo out-of-band, e.g. via normal PR review) --
 # pre-approves the current command set without an interactive prompt.
@@ -289,15 +300,15 @@ def _is_noninteractive() -> bool:
 
 
 def _load_gate_trust_store(root: Path) -> dict[str, Any]:
-    path = root / GATES_TRUST_RELATIVE_PATH
-    if path.exists():
-        try:
-            data = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            data = None
-        approved = data.get("approved") if isinstance(data, dict) else None
-        if isinstance(approved, dict):
-            return {"schema": GATES_TRUST_SCHEMA_ID, "approved": approved}
+    """Read approvals from per-user state; the checkout's copy is never read."""
+    data, _error = read_json(workspace_state_path(root, GATES_TRUST_STATE_NAME))
+    approved = data.get("approved") if isinstance(data, dict) else None
+    if (
+        isinstance(data, dict)
+        and data.get("workspace_id") == workspace_identity(root)
+        and isinstance(approved, dict)
+    ):
+        return {"schema": GATES_TRUST_SCHEMA_ID, "approved": approved}
     return {"schema": GATES_TRUST_SCHEMA_ID, "approved": {}}
 
 
@@ -311,10 +322,12 @@ def _save_gate_trust_store(root: Path, store: dict[str, Any], fingerprint: str) 
     different facts for anyone reading the run afterwards. Confirmed by
     re-reading the file, not by the write returning without raising.
     """
-    path = root / GATES_TRUST_RELATIVE_PATH
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(store, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        write_json_private(
+            root,
+            GATES_TRUST_STATE_NAME,
+            {**store, "workspace_id": workspace_identity(root)},
+        )
     except OSError:
         return TRUST_PERSISTENCE_UNOBSERVED
     readback = _load_gate_trust_store(root)
@@ -354,7 +367,27 @@ def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
     return answer.strip().lower() in {"y", "yes"}
 
 
+CHECKOUT_TRUST_IGNORED_NOTE = (
+    "checkout-local .hyodo/gates-trust.json ignored: a receipt the checkout can "
+    "write carries no authority"
+)
+
+
 def resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
+    """Decide whether *config*'s command set may execute against *root*.
+
+    Approvals are read only from per-user state (see `hyodo.user_state`). A
+    `.hyodo/gates-trust.json` inside the checkout is never read; when one is
+    present the decision says so, so a reader never mistakes it for the
+    approval that was honored.
+    """
+    decision = _resolve_gate_trust(config, root)
+    if checkout_shadow(root, GATES_TRUST_RELATIVE_PATH):
+        return replace(decision, reason=f"{decision.reason}; {CHECKOUT_TRUST_IGNORED_NOTE}")
+    return decision
+
+
+def _resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
     """Decide whether *config*'s command set may execute against *root*.
 
     Explicit approval is required before any command-set fingerprint is

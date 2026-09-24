@@ -4,12 +4,22 @@ Exceptions are deliberately narrow: general syntax scans may omit an exact
 workspace-relative glob, while safety findings require both a path glob and a
 ``category/label`` rule match.  A malformed configured file is an observation
 failure, never a clean scan.
+
+The exceptions file is authored by the repository, so it cannot approve
+itself: a checkout could otherwise suppress its own safety findings. A file is
+applied only when an operator approved its exact digest -- recorded in per-user
+state by ``hyodo safe --approve-exceptions`` -- or when the environment pins
+that digest in ``HYODO_SCAN_EXCEPTIONS_DIGEST``. Until then nothing in it is
+applied and the scan reports ``exceptions_status: unapproved``.
 """
 
 from __future__ import annotations
 
 import fnmatch
-from dataclasses import dataclass
+import hashlib
+import os
+from dataclasses import dataclass, replace
+from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
@@ -18,9 +28,25 @@ try:
 except ModuleNotFoundError:  # Python 3.10
     import tomli as tomllib  # type: ignore[no-redef]
 
+from hyodo.user_state import (
+    read_json,
+    workspace_identity,
+    workspace_state_path,
+    write_json_private,
+)
 
 SCAN_EXCEPTIONS_SCHEMA = "hyodo.scan-exceptions/v1"
 SCAN_EXCEPTIONS_RELATIVE_PATH = Path(".hyodo") / "scan-exceptions.toml"
+SCAN_EXCEPTIONS_APPROVAL_STATE_NAME = "scan-exceptions-approval.json"
+SCAN_EXCEPTIONS_APPROVAL_SCHEMA = "hyodo.scan-exceptions-approval/v1"
+SCAN_EXCEPTIONS_DIGEST_ENV_VAR = "HYODO_SCAN_EXCEPTIONS_DIGEST"
+
+#: No exceptions file exists.
+EXCEPTIONS_NONE = "none"
+#: The file's exact digest was approved by the operator (or pinned by env).
+EXCEPTIONS_APPROVED = "approved"
+#: The file exists but its digest was never approved; nothing in it applies.
+EXCEPTIONS_UNAPPROVED = "unapproved"
 
 
 class ScanExceptionsConfigError(ValueError):
@@ -50,6 +76,12 @@ class ScanExceptionsConfig:
 
     general: tuple[GeneralException, ...]
     safety: tuple[SafetyException, ...]
+    #: ``none`` / ``approved`` / ``unapproved`` -- see the module docstring.
+    status: str = EXCEPTIONS_NONE
+    #: ``sha256:<hex>`` of the exceptions file when one exists.
+    digest: str | None = None
+    #: Entries present in the file but not applied because it is unapproved.
+    withheld: int = 0
 
 
 def _required_string(item: dict[str, Any], field: str, table: str) -> str:
@@ -75,18 +107,19 @@ def _tables(data: dict[str, Any], key: str) -> list[dict[str, Any]]:
     return value
 
 
-def load_scan_exceptions(root: Path) -> ScanExceptionsConfig:
-    """Load ``.hyodo/scan-exceptions.toml`` or return an empty policy.
+def parse_scan_exceptions(root: Path) -> ScanExceptionsConfig:
+    """Parse ``.hyodo/scan-exceptions.toml`` without checking approval.
 
-    The file is opt-in. Once it exists, malformed schema or entries are errors
-    so a typo cannot silently make a scan look healthier than it is.
+    Used to show an operator what they would approve. Scans must use
+    `load_scan_exceptions`, which applies nothing unapproved.
     """
     path = root / SCAN_EXCEPTIONS_RELATIVE_PATH
     if not path.exists():
         return ScanExceptionsConfig(general=(), safety=())
     try:
-        data = tomllib.loads(path.read_text(encoding="utf-8"))
-    except (OSError, tomllib.TOMLDecodeError) as exc:
+        raw = path.read_bytes()
+        data = tomllib.loads(raw.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, tomllib.TOMLDecodeError) as exc:
         raise ScanExceptionsConfigError(f"cannot read {path}: {exc}") from exc
     if not isinstance(data, dict) or data.get("schema") != SCAN_EXCEPTIONS_SCHEMA:
         raise ScanExceptionsConfigError(f"schema must equal {SCAN_EXCEPTIONS_SCHEMA!r}")
@@ -110,7 +143,61 @@ def load_scan_exceptions(root: Path) -> ScanExceptionsConfig:
         )
         for item in _tables(data, "safety_exceptions")
     )
-    return ScanExceptionsConfig(general=general, safety=safety)
+    digest = "sha256:" + hashlib.sha256(raw).hexdigest()
+    return ScanExceptionsConfig(
+        general=general, safety=safety, status=EXCEPTIONS_UNAPPROVED, digest=digest
+    )
+
+
+def _approved_digests(root: Path) -> dict[str, Any]:
+    data, _error = read_json(workspace_state_path(root, SCAN_EXCEPTIONS_APPROVAL_STATE_NAME))
+    if (
+        not isinstance(data, dict)
+        or data.get("schema") != SCAN_EXCEPTIONS_APPROVAL_SCHEMA
+        or data.get("workspace_id") != workspace_identity(root)
+        or not isinstance(data.get("approved"), dict)
+    ):
+        return {}
+    return data["approved"]
+
+
+def load_scan_exceptions(root: Path) -> ScanExceptionsConfig:
+    """Load the exceptions a scan may apply.
+
+    The file is opt-in. Once it exists, malformed schema or entries are errors
+    so a typo cannot silently make a scan look healthier than it is. A
+    well-formed file whose digest was not approved applies nothing: the result
+    is empty with ``status == "unapproved"`` and ``withheld`` counting what
+    was not applied.
+    """
+    parsed = parse_scan_exceptions(root)
+    if parsed.digest is None:
+        return parsed
+    pinned = os.environ.get(SCAN_EXCEPTIONS_DIGEST_ENV_VAR, "").strip()
+    if parsed.digest == pinned or parsed.digest in _approved_digests(root):
+        return replace(parsed, status=EXCEPTIONS_APPROVED)
+    return ScanExceptionsConfig(
+        general=(),
+        safety=(),
+        status=EXCEPTIONS_UNAPPROVED,
+        digest=parsed.digest,
+        withheld=len(parsed.general) + len(parsed.safety),
+    )
+
+
+def approve_scan_exceptions(root: Path, digest: str, *, by: str) -> Path:
+    """Record operator approval of one exceptions-file digest in user state."""
+    approved = _approved_digests(root)
+    approved[digest] = {"approved_at": datetime.now(timezone.utc).isoformat(), "by": by}
+    return write_json_private(
+        root,
+        SCAN_EXCEPTIONS_APPROVAL_STATE_NAME,
+        {
+            "schema": SCAN_EXCEPTIONS_APPROVAL_SCHEMA,
+            "workspace_id": workspace_identity(root),
+            "approved": approved,
+        },
+    )
 
 
 def _relative_path(path: Path, root: Path) -> str | None:

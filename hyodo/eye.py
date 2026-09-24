@@ -40,7 +40,7 @@ from hyodo.policy import (
     apply_decision_to_event,
     evaluate_policy,
 )
-from hyodo.policy_trust import effective_trust_level, load_policy_trust
+from hyodo.policy_trust import SCOPE_EYE_KEEP, effective_trust_level, load_policy_trust
 
 #: Default time-to-live, in seconds, before a capture is destroyed.
 DEFAULT_TTL_S = 5
@@ -147,7 +147,7 @@ def _effective_trust_level(policy: PolicyConfig, root: Path) -> int:
     """
     if policy.trust is None:
         return 1
-    state, error = load_policy_trust(root)
+    state, error = load_policy_trust(root, scope=SCOPE_EYE_KEEP)
     if error is not None:
         return 0
     return effective_trust_level(policy.trust.max_level, state)

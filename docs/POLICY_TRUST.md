@@ -3,10 +3,29 @@
 HyoDo supports four trust levels (0–3) for fine-grained policy enforcement.
 
 Use `hyodo policy trust grant --level N` (0–3) to grant trust and
-`hyodo policy trust show` to inspect it. Grants live in untracked
-`.hyodo/policy-trust.json`; `[trust] max_level` in `policy.toml` only
-caps the granted level. Non-interactive grants require
+`hyodo policy trust show` to inspect it. `[trust] max_level` in
+`policy.toml` only caps the granted level. Non-interactive grants require
 `HYODO_POLICY_TRUST_ALL=1`.
+
+## Where a grant lives and what it is bound to
+
+A grant is operator state, so it lives in per-user state outside the
+checkout (`~/.hyodo/state/workspaces/<id>/policy-trust.json`, or under
+`$HYODO_STATE_HOME`). A `.hyodo/policy-trust.json` inside the checkout is
+never read: a repository cannot ship its own grant. `policy trust show`
+reports one as `checkout_trust_file_ignored`.
+
+A grant counts only while all four bindings hold:
+
+| Binding | Broken when | Reported as |
+| --- | --- | --- |
+| Workspace | the record is read for another checkout path | `trust_workspace_mismatch` |
+| Policy digest | `.hyodo/policy.toml` changed after the grant | `trust_policy_changed` |
+| Scope | the consumer needs a scope the grant lacks (`policy.ask`, `eye.keep`) | `trust_scope_mismatch` |
+| Freshness | 30 days passed since the grant (`expires_at`) | `trust_expired` |
+
+Any broken binding resolves to effective level 0. Grant again after
+reviewing the changed policy.
 
 ## What each level does
 
@@ -45,7 +64,7 @@ Two fail-closed rules apply when at least one external variable is present:
 at level 2 or 3 the evaluator needs an observable ledger
 (`observed_steps`), otherwise the decision is `UNOBSERVED`
 (`rule_id` `autorun_level2` / `autorun_level3`); and whenever `[trust]` is
-configured but `.hyodo/policy-trust.json` is missing or damaged, the
+configured but the grant is missing, damaged, or fails a binding, the
 decision is `UNOBSERVED` (`trust_grant_unobserved`), never a default grant.
 
 Exit codes are unchanged: `ALLOW` 0, `DENY` 1, `UNOBSERVED` 2, `ASK` 3.

@@ -1,9 +1,11 @@
-"""Untracked local pairing lifecycle for the M5-B secure loopback bridge.
+"""Local pairing lifecycle for the M5-B secure loopback bridge.
 
-Mirrors :mod:`hyodo.policy_trust`'s untracked-store pattern: a workspace-local
-``.hyodo/pairing.json`` file records the pairing lifecycle for the optional
-MCP loopback/tailscale bridge without ever storing the bearer token itself —
-only its sha256 digest is persisted.
+The pairing record lives in per-user state (:mod:`hyodo.user_state`), never in
+the checkout: a repository that shipped ``.hyodo/pairing.json`` with a digest
+of a token it knows would otherwise pair its own caller. The record never
+stores the bearer token itself — only its sha256 digest is persisted — and it
+is honored only while its recorded ``root`` is this workspace. A
+``.hyodo/pairing.json`` inside the checkout is never read.
 
 This module owns no gate, policy, or transport logic. It answers exactly one
 question: does a presented bearer token currently pair with this workspace?
@@ -23,8 +25,12 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from hyodo.user_state import workspace_state_path, write_json_private
+
 PAIRING_SCHEMA_ID = "hyodo.pairing/v1"
+#: The legacy checkout location. Never read; reported when present.
 PAIRING_RELATIVE_PATH = Path(".hyodo") / "pairing.json"
+PAIRING_STATE_NAME = "pairing.json"
 _TOKEN_BYTES = 32
 _REQUIRED_STRING_FIELDS = ("workspace_id", "device_id", "root", "token_digest", "created_at")
 
@@ -70,8 +76,13 @@ def _digest(token: str) -> str:
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
+def pairing_path(root: Path) -> Path:
+    """Return where *root*'s pairing record lives in per-user state."""
+    return workspace_state_path(root.expanduser().resolve(), PAIRING_STATE_NAME)
+
+
 def _path(root: Path) -> Path:
-    return root / PAIRING_RELATIVE_PATH
+    return pairing_path(root)
 
 
 def _parse(raw: Any) -> PairingRecord | None:
@@ -113,7 +124,8 @@ def _load_with_error(root: Path) -> tuple[PairingRecord | None, str | None]:
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None, "pairing_invalid"
     record = _parse(raw)
-    if record is None:
+    if record is None or record.root != str(root):
+        # A record naming another root was copied, not issued here.
         return None, "pairing_invalid"
     return record, None
 
@@ -130,10 +142,7 @@ def load_pairing(root: Path) -> PairingRecord | None:
 
 
 def _save(root: Path, record: PairingRecord) -> Path:
-    path = _path(root)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(record.to_dict(), indent=2, sort_keys=True) + "\n", encoding="utf-8")
-    return path
+    return write_json_private(root, PAIRING_STATE_NAME, record.to_dict())
 
 
 def create_pairing(root: Path) -> tuple[PairingRecord, str]:

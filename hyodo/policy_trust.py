@@ -1,25 +1,54 @@
-"""Untracked operator trust store for policy ASK escalation.
+"""Operator trust store for policy ASK escalation.
 
-The tracked policy file only caps trust. Grants live in the untracked
-``.hyodo/policy-trust.json`` store and require explicit operator approval.
+The tracked policy file only caps trust. Grants require explicit operator
+approval and live in per-user state (`hyodo.user_state`), never in the
+checkout: a repository could otherwise ship its own grant. A grant is bound to
+
+- the workspace identity (the resolved checkout path),
+- the digest of ``.hyodo/policy.toml`` at grant time,
+- the scopes it was granted for, and
+- a freshness window (``expires_at``).
+
+A grant that fails any binding reads back as an error, and every consumer
+resolves an error to trust level 0. A ``.hyodo/policy-trust.json`` inside the
+checkout is never read.
 """
 
 from __future__ import annotations
 
-import json
 import os
 import sys
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
-POLICY_TRUST_SCHEMA_ID = "hyodo.policy-trust/v1"
+from hyodo.user_state import (
+    file_digest,
+    read_json,
+    workspace_identity,
+    workspace_state_path,
+    write_json_private,
+)
+
+POLICY_TRUST_SCHEMA_ID = "hyodo.policy-trust/v2"
+#: The legacy checkout location. Never read; reported when present.
 POLICY_TRUST_RELATIVE_PATH = Path(".hyodo") / "policy-trust.json"
+POLICY_TRUST_STATE_NAME = "policy-trust.json"
 POLICY_TRUST_ENV_VAR = "HYODO_POLICY_TRUST_ALL"
+#: Kept local to avoid importing hyodo.policy, which imports this module.
+_POLICY_FILE_RELATIVE_PATH = Path(".hyodo") / "policy.toml"
+_POLICY_ABSENT_DIGEST = "absent"
 _TRUTHY_ENV_VALUES = frozenset({"1", "true", "yes", "on"})
 _MIN_LEVEL = 0
 _MAX_LEVEL = 3
+
+#: What a grant may be used for. A consumer names the scope it needs.
+SCOPE_POLICY_ASK = "policy.ask"
+SCOPE_EYE_KEEP = "eye.keep"
+DEFAULT_GRANT_SCOPES = (SCOPE_POLICY_ASK, SCOPE_EYE_KEEP)
+#: A grant stops counting after this long; the operator grants again.
+POLICY_TRUST_MAX_AGE = timedelta(days=30)
 
 
 @dataclass(frozen=True)
@@ -39,6 +68,10 @@ class PolicyTrustState:
     granted_at: str
     granted_by: str
     history: tuple[PolicyTrustGrant, ...] = field(default_factory=tuple)
+    workspace_id: str = ""
+    policy_digest: str = ""
+    scopes: tuple[str, ...] = ()
+    expires_at: str = ""
 
 
 @dataclass(frozen=True)
@@ -89,16 +122,37 @@ def _parse_grant(raw: Any) -> PolicyTrustGrant | None:
     )
 
 
-def load_policy_trust(root: Path) -> tuple[PolicyTrustState | None, str | None]:
-    """Load the trust file, distinguishing missing from malformed state."""
-    path = root / POLICY_TRUST_RELATIVE_PATH
+def policy_trust_path(root: Path) -> Path:
+    """Return where *root*'s grant lives in per-user state."""
+    return workspace_state_path(root, POLICY_TRUST_STATE_NAME)
+
+
+def current_policy_digest(root: Path) -> str:
+    """Digest of the policy file a grant is bound to (``absent`` when missing)."""
+    path = root / _POLICY_FILE_RELATIVE_PATH
     if not path.exists():
-        return None, "trust_missing"
+        return _POLICY_ABSENT_DIGEST
+    return file_digest(path) or "unreadable"
+
+
+def _parse_time(value: Any) -> datetime | None:
+    if not isinstance(value, str) or not value:
+        return None
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        parsed = datetime.fromisoformat(value)
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo is not None else None
+
+
+def _read_raw_policy_trust(root: Path) -> tuple[PolicyTrustState | None, str | None]:
+    """Parse the stored grant without evaluating its bindings."""
+    raw, error = read_json(policy_trust_path(root))
+    if error == "missing":
+        return None, "trust_missing"
+    if error is not None or not isinstance(raw, dict):
         return None, "trust_invalid"
-    if not isinstance(raw, dict) or raw.get("schema") != POLICY_TRUST_SCHEMA_ID:
+    if raw.get("schema") != POLICY_TRUST_SCHEMA_ID:
         return None, "trust_invalid"
     current = _parse_grant(raw)
     if current is None:
@@ -112,42 +166,94 @@ def load_policy_trust(root: Path) -> tuple[PolicyTrustState | None, str | None]:
         if parsed is None:
             return None, "trust_invalid"
         history.append(parsed)
+    scopes = raw.get("scopes")
+    if not isinstance(scopes, list) or not all(isinstance(item, str) for item in scopes):
+        return None, "trust_invalid"
+    for key in ("workspace_id", "policy_digest", "expires_at"):
+        if not isinstance(raw.get(key), str) or not raw[key]:
+            return None, "trust_invalid"
     return (
         PolicyTrustState(
             level=current.level,
             granted_at=current.granted_at,
             granted_by=current.granted_by,
             history=tuple(history),
+            workspace_id=raw["workspace_id"],
+            policy_digest=raw["policy_digest"],
+            scopes=tuple(scopes),
+            expires_at=raw["expires_at"],
         ),
         None,
     )
 
 
+def load_policy_trust(
+    root: Path,
+    *,
+    scope: str = SCOPE_POLICY_ASK,
+    now: datetime | None = None,
+) -> tuple[PolicyTrustState | None, str | None]:
+    """Load the grant for *root* and check every binding.
+
+    Returns ``(state, None)`` only when the grant belongs to this workspace,
+    was made against the current policy file, covers *scope*, and has not
+    expired. Otherwise ``(None, reason)`` with one of ``trust_missing``,
+    ``trust_invalid``, ``trust_workspace_mismatch``, ``trust_policy_changed``,
+    ``trust_scope_mismatch``, or ``trust_expired``.
+    """
+    state, error = _read_raw_policy_trust(root)
+    if state is None:
+        return None, error
+    if state.workspace_id != workspace_identity(root):
+        return None, "trust_workspace_mismatch"
+    if state.policy_digest != current_policy_digest(root):
+        return None, "trust_policy_changed"
+    if scope not in state.scopes:
+        return None, "trust_scope_mismatch"
+    expires = _parse_time(state.expires_at)
+    granted = _parse_time(state.granted_at)
+    moment = now or datetime.now(timezone.utc)
+    if expires is None or granted is None:
+        return None, "trust_invalid"
+    if not granted <= moment < expires:
+        return None, "trust_expired"
+    return state, None
+
+
 def _save_policy_trust(root: Path, state: PolicyTrustState) -> None:
-    path = root / POLICY_TRUST_RELATIVE_PATH
-    path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
         "schema": POLICY_TRUST_SCHEMA_ID,
+        "workspace_id": state.workspace_id,
+        "policy_digest": state.policy_digest,
+        "scopes": list(state.scopes),
         "level": state.level,
         "granted_at": state.granted_at,
+        "expires_at": state.expires_at,
         "granted_by": state.granted_by,
         "history": [
             {"level": item.level, "granted_at": item.granted_at, "granted_by": item.granted_by}
             for item in state.history
         ],
     }
-    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    write_json_private(root, POLICY_TRUST_STATE_NAME, payload)
 
 
-def grant_policy_trust(root: Path, level: int, *, by: str) -> PolicyTrustState:
-    """Record a grant and retain the previous grant in history."""
+def grant_policy_trust(
+    root: Path,
+    level: int,
+    *,
+    by: str,
+    scopes: tuple[str, ...] = DEFAULT_GRANT_SCOPES,
+    now: datetime | None = None,
+) -> PolicyTrustState:
+    """Record a grant bound to this workspace, policy digest, scopes, and expiry."""
     if (
         not isinstance(level, int)
         or isinstance(level, bool)
         or not _MIN_LEVEL <= level <= _MAX_LEVEL
     ):
         raise ValueError(f"level must be between {_MIN_LEVEL} and {_MAX_LEVEL}, got {level}")
-    previous, _error = load_policy_trust(root)
+    previous, _error = _read_raw_policy_trust(root)
     history = previous.history if previous is not None else ()
     if previous is not None:
         history = (
@@ -158,11 +264,16 @@ def grant_policy_trust(root: Path, level: int, *, by: str) -> PolicyTrustState:
                 granted_by=previous.granted_by,
             ),
         )
+    moment = now or datetime.now(timezone.utc)
     state = PolicyTrustState(
         level=level,
-        granted_at=datetime.now(timezone.utc).isoformat(),
+        granted_at=moment.isoformat(),
         granted_by=by,
         history=history,
+        workspace_id=workspace_identity(root),
+        policy_digest=current_policy_digest(root),
+        scopes=tuple(scopes),
+        expires_at=(moment + POLICY_TRUST_MAX_AGE).isoformat(),
     )
     _save_policy_trust(root, state)
     return state

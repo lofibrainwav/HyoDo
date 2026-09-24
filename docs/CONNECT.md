@@ -153,10 +153,15 @@ other HyoDo commands write as a local ledger:
 | Commit (team-shared policy) | Ignore (per-machine runtime) |
 | --- | --- |
 | `.hyodo/policy.toml` | `.hyodo/connect.json` |
-| `.hyodo/gates.toml` | `.hyodo/policy-trust.json` |
-| | `.hyodo/agent-events.jsonl` |
-| | `.hyodo/reports/` |
+| `.hyodo/gates.toml` | `.hyodo/agent-events.jsonl` |
+| `.hyodo/scan-exceptions.toml` (applies only after each operator approves it) | `.hyodo/reports/` |
 | | everything else HyoDo writes under `.hyodo/` (manifests, config, evidence exports, and similar generated files) |
+
+Operator decisions are not in this table because they are not in the
+checkout at all: gate approvals, policy trust grants, pairing records, scan
+exception approvals, and ledger origin anchors live in per-user state
+(`~/.hyodo/state/`, or `$HYODO_STATE_HOME`). Committing a file with one of
+those names grants nothing.
 
 A `.gitignore` that keeps the two policy files while ignoring the rest:
 

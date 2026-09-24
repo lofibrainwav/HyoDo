@@ -27,6 +27,8 @@ from __future__ import annotations
 COVERAGE_FULL = "FULL"
 COVERAGE_PARTIAL = "PARTIAL"
 COVERAGE_NONE = "NONE"
+#: Project coverage of built-in sampled gates: a file sample, never the project.
+PROJECT_COVERAGE_SAMPLED = "SAMPLED"
 
 EFFECTIVE_PASS = "PASS"
 EFFECTIVE_FAIL = "FAIL"

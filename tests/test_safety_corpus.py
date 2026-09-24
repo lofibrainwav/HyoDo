@@ -4,6 +4,7 @@ import subprocess
 from types import SimpleNamespace
 from unittest.mock import patch
 
+from hyodo.exceptions import approve_scan_exceptions, parse_scan_exceptions
 from hyodo.safety import collect_scan_corpus, run_safety_scan
 
 GIT_MARKER = "GIT_INTERNAL_MARKER_SHOULD_BE_EXCLUDED"
@@ -127,7 +128,15 @@ reason = "detection fixture"
     target.parent.mkdir()
     target.write_text("git push --force\n", encoding="utf-8")
 
+    unapproved = run_safety_scan(path=str(target), strict=True, cwd=tmp_path)
+    assert unapproved["exceptions_applied"] == 0
+    assert unapproved["exceptions_status"] == "unapproved"
+    assert unapproved["exceptions_withheld"] == 1
+    assert [finding for finding in unapproved["findings"] if finding.severity == "high"]
+
+    approve_scan_exceptions(tmp_path, parse_scan_exceptions(tmp_path).digest or "", by="human:test")
     result = run_safety_scan(path=str(target), strict=True, cwd=tmp_path)
 
+    assert result["exceptions_status"] == "approved"
     assert result["exceptions_applied"] == 1
     assert not [finding for finding in result["findings"] if finding.severity == "high"]

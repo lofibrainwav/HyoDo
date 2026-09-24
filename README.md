@@ -43,7 +43,9 @@ hyodo init
 hyodo check
 ```
 
-`safe` works immediately in any repository. `init` is optional: when it
+`safe` works immediately in any repository. With no path it scans uncommitted
+changes; a clean checkout reports `UNOBSERVED`, not `PASS` — pass `.` to scan the
+tree. `init` is optional: when it
 detects supported tooling it writes `.hyodo/gates.toml`; with zero detections
 it writes `.hyodo/gates.toml.example` instead, creates no live gates file, and
 `check` keeps the built-in sampled fallback. No detected tooling means no
@@ -89,7 +91,7 @@ the latest published package.
   with:
     python-version: "3.12"
 - run: pip install hyodo
-- run: hyodo safe --strict --json
+- run: hyodo safe . --strict --max-files 0 --json
 ```
 
 ```yaml

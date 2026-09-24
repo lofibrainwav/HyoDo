@@ -31,5 +31,21 @@ reason = "detection fixture"
 - `hyodo safe` reports the number of safety findings suppressed by the policy
   in both human and JSON output.
 
+## Approval
+
+The exceptions file is written by the repository, so it cannot approve
+itself. Until an operator approves the file's exact digest, nothing in it is
+applied: findings stay visible and `hyodo safe` reports
+`exceptions_status: "unapproved"` with the number of entries withheld.
+
+- `hyodo safe --approve-exceptions` shows every entry and its digest and asks
+  for approval in a terminal. The approval is stored in per-user state outside
+  the checkout, bound to this checkout's path and to this exact file content.
+  Any edit to the file needs a new approval. It is refused without a terminal.
+- Automation that has reviewed the file out of band can pin its digest with
+  `HYODO_SCAN_EXCEPTIONS_DIGEST=sha256:<hex>`. Only that exact content is
+  applied; a pull request that edits the file changes the digest and its
+  exceptions are withheld again.
+
 Exceptions are a scope boundary, not a way to approve a change. Review their
 paths and reasons with the same care as source code.

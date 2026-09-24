@@ -8,7 +8,10 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package: HyoDo `4.21.3`
+- Latest public package on PyPI: HyoDo `4.21.5`. 4.21.6 exists only as a
+  GitHub Release; its PyPI publication was withheld and it is superseded by the
+  security release 4.21.7 (see "4.21.7 security release" below).
+- Recorded closed release chain: HyoDo `4.21.3`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
   [`releases/4.21.3.md`](./releases/4.21.3.md).
@@ -21,6 +24,23 @@ receipt rather than in this self-referential page.
 The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
+
+## 4.21.7 security release (in preparation)
+
+4.21.7 is security-only: no new capability. Operator authority state -- BYOG
+gate approvals, policy trust grants, MCP pairing records, scan-exception
+approvals, and ledger origin anchors -- moves out of the checkout into
+per-user state bound to the workspace path. Same-named files inside a
+checkout carry no authority. `hyodo safe` no longer reports `PASS` when it
+observed no files, and a sampled `hyodo check` reports
+`project_coverage: SAMPLED` with `complete: false`. A hostile-clone gauntlet
+against the built wheel is a required release gate. See
+[`SECURITY.md`](../SECURITY.md#authority-state-lives-outside-the-checkout).
+Until its release chain is measured, 4.21.7 is not a public artifact.
+
+4.21.6 is an immutable GitHub Release whose PyPI publication was stopped at
+the environment-approval step. It is left in place as a superseded release;
+it is not hidden, retagged, or rewritten.
 
 ## 4.21.3 release update
 
