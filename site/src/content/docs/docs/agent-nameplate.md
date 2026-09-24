@@ -3,8 +3,6 @@ title: Agent Nameplate v1
 description: Provenance-only identity for a harness-assigned agent activity.
 ---
 
-# Agent Nameplate v1
-
 HyoDo's agent nameplate is a provenance receipt, not an authority credential.
 It identifies the harness-assigned role and binds the observation to one exact
 artifact SHA.

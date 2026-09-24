@@ -3,8 +3,6 @@ title: Runtime identity v1
 description: The public runtime identity receipt schema and its exact digest pin.
 ---
 
-# Runtime identity v1
-
 HyoDo's dashboard identity receipt is defined by the public
 [`runtime-identity-v1.schema.json`](/schemas/runtime-identity-v1.schema.json)
 and its exact-byte

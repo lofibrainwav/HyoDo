@@ -5,8 +5,6 @@ description: Privacy-first local friction derivation for future support-allocati
 
 > **Version boundary.** The `hyodo friction` command is introduced in **HyoDo 4.17.0**. HyoDo 4.16.x and earlier do not expose this command. Friction Contribution v1 is local only: HyoDo does not upload friction data, and network transport is disabled.
 
-# Friction Contribution v1
-
 HyoDo can turn local `hyodo.agent-event/v1` traces into coarse,
 privacy-transformed `hyodo.friction-contribution/v1` records.
 

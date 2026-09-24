@@ -3,8 +3,6 @@ title: Product boundary
 description: What HyoDo owns, what it does not own, and the invariants that keep evidence separate from authority.
 ---
 
-# HyoDo product boundary
-
 HyoDo is a local verification and evidence layer for AI-assisted work. It helps
 people see which checks ran, what they found, and what remains unknown. It does
 not become the authority that plans, executes, merges, deploys, or remembers
