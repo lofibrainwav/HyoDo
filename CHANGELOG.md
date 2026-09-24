@@ -5,6 +5,34 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.8] - 2026-09-24
+
+Release candidate for the already-landed evidence/judgment boundary. No new
+HyoDo Core capability is added by this release commit.
+
+### Added
+
+- Preserve a validated `pillar` attribution on `hyodo.dashboard-evidence/v2`
+  gate rows (#482).
+- Emit deterministic `hyodo.lens-evidence/v1` records with explicit
+  `OBSERVED` / `PARTIAL` / `UNOBSERVED` state, provenance, evidence refs, and
+  `authority: UNOBSERVED` (#483).
+- Preserve Eternity continuity sequence and gap reporting (#483).
+
+### Changed
+
+- Freeze legacy score derivation for `hyodo score --from-check` as
+  compatibility only; scores, weights, aggregates, routing, and authority
+  remain outside HyoDo's evidence boundary (#483).
+
+### Evidence
+
+- Source commits: #482 -> `d17c053744dc0fd317e99eb7169cc00cb11ff2e4`,
+  #483 -> `872ecdca1ffa4c51682fd6b6ada586851cb2ec19`.
+- Exact base-main CI was success before the release commit.
+- The 4.21.8 release chain remains `UNOBSERVED` in
+  `docs/releases/4.21.8.md`.
+
 ## [4.21.7] - 2026-09-23
 
 Security release. No new capability. Supersedes 4.21.6, whose PyPI

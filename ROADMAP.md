@@ -12,9 +12,11 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.7 is the current release target and source-tree release baseline.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-measured in `docs/releases/4.21.7.md`. HyoDo 4.21.2 remains an incomplete immutable
+HyoDo 4.21.8 is the current release target and source-tree release baseline.
+Its release-chain receipt is `docs/releases/4.21.8.md`; the tag, GitHub
+Release + SBOM, PyPI provenance, and install smoke remain `UNOBSERVED` until
+measured. HyoDo 4.21.7 remains the latest published release. HyoDo 4.21.2
+remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
 This does not establish every host integration.
@@ -43,6 +45,16 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.21.8 (release candidate, 2026-09-24)
+
+- Publish the merged #482 and #483 evidence/judgment boundary work.
+- Keep gate-to-virtue attribution inside dashboard evidence.
+- Emit `hyodo.lens-evidence/v1` with `authority: UNOBSERVED` and no score,
+  weight, aggregate, decision, verdict, or rationale fields.
+- Freeze legacy score derivation as compatibility only.
+- Release chain remains `UNOBSERVED` until `docs/releases/4.21.8.md` is
+  measured.
 
 ### 4.20.0 (released 2026-09-19)
 
