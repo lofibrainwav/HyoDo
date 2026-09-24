@@ -8,16 +8,17 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.8** is the current release target. Its release chain is
-`UNOBSERVED` in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.8.md);
-until that chain is measured, the latest public package remains **4.21.7**,
+HyoDo **4.21.8** is the current public package once its release chain is
+measured. Its release chain is `UNOBSERVED` in the
+[release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.8.md);
+until that chain is measured, the latest published package remains **4.21.7**,
 whose release chain is measured 9/9 OBSERVED in the
 [4.21.7 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.7.md).
 Product capability and live host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
 - Current release target: **4.21.8** (release chain `UNOBSERVED`)
-- Latest public package: **4.21.7** (security release; see the receipt above)
+- Latest public package: **4.21.8** (release chain `UNOBSERVED`; PyPI remains 4.21.7 until measured)
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
