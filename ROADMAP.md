@@ -12,7 +12,7 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.6 is the current release target and source-tree release baseline.
+HyoDo 4.21.7 is the current release target and source-tree release baseline.
 Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
 measured in `docs/releases/4.21.5.md`. HyoDo 4.21.2 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -100,7 +100,20 @@ evidence is not converted into a pass.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
 
-### 4.21.6 (released 2026-09-23)
+### 4.21.7 (security release, 2026-09-23)
+
+- Move operator authority state out of the checkout: gate approvals, policy
+  trust grants, pairing records, scan-exception approvals, and ledger origin
+  anchors live in per-user state bound to the workspace path; same-named
+  checkout files carry no authority. Contract: `docs/TRUST_BOUNDARY.md`.
+- `hyodo safe` with nothing observed is `UNOBSERVED`, not `PASS`; sampled
+  `hyodo check` reports `project_coverage: SAMPLED` and `complete: false`.
+- Hostile-clone gauntlet against the built wheel is a required release gate.
+
+### 4.21.6 (GitHub Release only, 2026-09-23; superseded by 4.21.7)
+
+PyPI publication was withheld at the environment approval; 4.21.7 carries
+these changes.
 
 - Ship the retired-reader registration GC from #477: before a new MCP reader
   registers, records whose PID/process-start identity is provably retired

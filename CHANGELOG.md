@@ -5,6 +5,47 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.7] - 2026-09-23
+
+Security release. No new capability. Supersedes 4.21.6, whose PyPI
+publication was withheld; its GitHub Release is left unchanged.
+
+### Security
+
+- Operator authority state moves out of the checkout. BYOG gate approvals,
+  policy trust grants, MCP pairing records, scan-exception approvals, and
+  ledger origin anchors live in per-user state (`~/.hyodo/state/`, or
+  `$HYODO_STATE_HOME`), bound to the resolved workspace path. A same-named
+  file inside the checkout is reported as ignored and carries no authority,
+  so a repository can no longer ship its own approval.
+- Policy trust grants are bound to the workspace identity, the policy file
+  digest, the scope, and a 30-day expiry; any broken binding is level 0.
+- Scan exceptions authored by the repository apply nothing until an
+  operator approves their exact digest (`hyodo safe --approve-exceptions`)
+  or automation pins it (`HYODO_SCAN_EXCEPTIONS_DIGEST`).
+- A ledger that HyoDo did not append on this machine is `UNVERIFIED`: it
+  cannot make continuity, the evidence report, runtime identity, or the
+  legacy score look locally observed, and appending to it never launders it.
+
+### Fixed
+
+- `hyodo safe` reports `UNOBSERVED`, not `PASS`, when it observed no files
+  (exit 2 under `--strict`).
+- Sampled `hyodo check` runs report `gate_coverage` and `project_coverage`
+  separately; `project_coverage: SAMPLED` means `complete: false`.
+
+### Changed
+
+- Release gate: a hostile-clone gauntlet attacks the built wheel in CI
+  (`Goodness Gate - Safety`) and in `publish.yml` before upload.
+- Upgrading: approvals are asked for once more, CI that relied on a committed
+  receipt needs an explicit pre-approval, and `hyodo safe` in CI needs a
+  path. See `docs/TRUST_BOUNDARY.md#upgrading-to-4217`.
+
+### Evidence
+
+- Release chain receipt: `docs/releases/4.21.7.md`.
+
 ## [4.21.6] - 2026-09-23
 
 Maintenance release. Ships the deployed-runtime gap closed by #477 that
