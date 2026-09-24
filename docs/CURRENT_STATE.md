@@ -110,7 +110,7 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 The runtime matrix above compares public 4.19.5 with the source state measured
 on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
-4.21.3. The 4.21.3 release-chain receipt is recorded separately above. Do not
+4.21.8. The 4.21.8 release-chain receipt is recorded separately above. Do not
 infer runtime identity from this page alone; use the signed release, CI receipt,
 or runtime identity receipt. Fresh
 Codex/Cursor host observations,

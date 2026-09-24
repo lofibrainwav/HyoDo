@@ -65,4 +65,4 @@ HyoDo                  observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/host experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.21.7 public artifact released and verified.
+prerequisites for calling the HyoDo 4.21.8 public artifact released and verified.
