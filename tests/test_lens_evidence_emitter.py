@@ -260,3 +260,45 @@ def test_unserializable_provenance_is_still_a_valid_receipt(tmp_path: Path) -> N
 def test_caller_errors_are_refused_not_emitted(lens: str, sha: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):
         emit_lens_evidence({}, lens, sha)
+
+
+class _Hostile(dict):
+    """A mapping whose every accessor raises, as a lazy or proxied one might."""
+
+    def get(self, key, default=None):
+        raise RuntimeError("get")
+
+    def items(self):
+        raise RuntimeError("items")
+
+    def __getitem__(self, key):
+        raise RuntimeError("getitem")
+
+    def __iter__(self):
+        raise RuntimeError("iter")
+
+
+def test_a_row_whose_accessors_raise_is_unobserved_not_raised(tmp_path: Path) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["gates"]["tests"] = _Hostile(pillar="truth", status="PASS")
+    for lens in CANONICAL_VIRTUE_KEYS:
+        receipt = emit_lens_evidence(evidence, lens, sha)
+        _valid(receipt)
+        # The row's lens cannot be read, so it may belong to any lens: never complete.
+        assert receipt["state"] != "OBSERVED"
+        assert "gate_unobserved:tests:unreadable_row" in receipt["residuals"]
+    assert emit_lens_evidence(evidence, "truth", sha)["state"] == "PARTIAL"
+
+
+@pytest.mark.parametrize("where", ["envelope", "gates", "provenance"])
+def test_an_unreadable_mapping_is_unobserved_not_raised(tmp_path: Path, where: str) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    if where == "envelope":
+        evidence = _Hostile(evidence)
+    else:
+        evidence[where] = _Hostile(evidence[where])
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    assert receipt["state"] == "UNOBSERVED"
