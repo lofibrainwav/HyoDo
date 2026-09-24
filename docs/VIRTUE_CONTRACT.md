@@ -81,7 +81,11 @@ of that record and never the value: the per-lens receipt is
 [`hyodo.lens-evidence/v1`](../schemas/lens-evidence-v1.schema.json), which
 carries the lens, subject, state, proxy coverage, provenance, evidence
 references, residuals, and observation time, and rejects any score, value,
-weight, aggregate, decision, or authority field. A per-axis value, a judge,
+weight, aggregate, decision, or authority field. `hyodo/lens_evidence.py`
+emits it deterministically from a dashboard evidence envelope; this version
+reads gate evidence only, so a lens with no attributed gate is `UNOBSERVED`,
+and evidence measured at another commit or on a dirty tree is `UNOBSERVED`
+for the subject rather than stale-but-observed. A per-axis value, a judge,
 weights, floors, and any profile-specific summary belong to the integrating
 host, which should record its judgment separately and bind it to the evidence
 receipt by digest. HyoDo does not supply that host-owned judgment or turn it
