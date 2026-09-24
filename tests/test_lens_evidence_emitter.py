@@ -176,8 +176,86 @@ def test_served_envelope_yields_the_same_receipts_as_in_process(tmp_path: Path) 
 
 
 @pytest.mark.parametrize(
+    ("status", "residual"),
+    [
+        (["PASS"], "gate_unobserved:tests:malformed_status"),
+        ({"value": "PASS"}, "gate_unobserved:tests:malformed_status"),
+        (None, "gate_unobserved:tests:malformed_status"),
+        (1, "gate_unobserved:tests:malformed_status"),
+        ("", "gate_unobserved:tests:malformed_status"),
+        ("pass", "gate_unobserved:tests:pass"),
+    ],
+)
+def test_malformed_status_is_unobserved_not_raised(tmp_path: Path, status, residual: str) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["gates"]["tests"]["status"] = status
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    assert receipt["state"] == "PARTIAL"
+    assert receipt["coverage"]["proxies_observed"] == ["typecheck"]
+    assert residual in receipt["residuals"]
+
+
+def test_unserializable_row_is_unobserved_not_raised(tmp_path: Path) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["gates"]["tests"]["extra"] = {1, 2}
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    assert receipt["state"] == "PARTIAL"
+    assert "gate_unobserved:tests:unserializable_row" in receipt["residuals"]
+    assert [ref["ref"] for ref in receipt["evidence_refs"]] == ["typecheck"]
+
+
+@pytest.mark.parametrize("name", [7, "", None, ("a", "b")])
+def test_malformed_gate_name_counts_as_unobserved(tmp_path: Path, name) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["gates"][name] = {"status": "PASS", "message": "ok", "pillar": "truth"}
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    # Two named gates ran, a third attributed gate cannot be cited: not complete.
+    assert receipt["state"] == "PARTIAL"
+    assert receipt["coverage"]["proxies_declared"] == ["tests", "typecheck"]
+    assert "gate_unobserved:malformed_name" in receipt["residuals"]
+
+
+def test_only_a_malformed_name_is_unobserved(tmp_path: Path) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["gates"] = {7: {"status": "PASS", "pillar": "goodness"}}
+    receipt = emit_lens_evidence(evidence, "goodness", sha)
+    _valid(receipt)
+    assert receipt["state"] == "UNOBSERVED"
+    assert "no_attributed_gate" not in receipt["residuals"]
+
+
+@pytest.mark.parametrize("evidence", [None, [], "envelope", 3, {"gates": [], "provenance": 1}])
+def test_malformed_envelope_is_unobserved_not_raised(evidence) -> None:
+    receipt = emit_lens_evidence(evidence, "truth", "a" * 40)
+    _valid(receipt)
+    assert receipt["state"] == "UNOBSERVED"
+    assert "provenance_unobserved" in receipt["residuals"]
+
+
+def test_unserializable_provenance_is_still_a_valid_receipt(tmp_path: Path) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["provenance"]["extra"] = object()
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    assert receipt["provenance"]["measured_by"] == "UNOBSERVED"
+
+
+@pytest.mark.parametrize(
     ("lens", "sha", "message"),
-    [("serenity", "a" * 40, "unknown lens"), ("truth", "abc123", "subject_sha")],
+    [
+        ("serenity", "a" * 40, "unknown lens"),
+        (["truth"], "a" * 40, "unknown lens"),
+        ("truth", "abc123", "subject_sha"),
+        ("truth", 12345, "subject_sha"),
+    ],
 )
 def test_caller_errors_are_refused_not_emitted(lens: str, sha: str, message: str) -> None:
     with pytest.raises(ValueError, match=message):

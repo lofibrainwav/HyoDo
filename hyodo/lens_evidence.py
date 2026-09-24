@@ -40,9 +40,24 @@ OBSERVED_GATE_STATUSES = frozenset({"PASS", "FAIL"})
 _SHA = re.compile(r"^([0-9a-f]{40}|[0-9a-f]{64})$")
 
 
-def _digest(value: Any) -> str:
-    canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+def _digest(value: Any) -> str | None:
+    """Canonical digest, or ``None`` when *value* is not plain JSON."""
+    try:
+        canonical = json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    except (TypeError, ValueError):
+        return None
     return "sha256:" + hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _attributes(row: Any, lens: str) -> bool:
+    return isinstance(row, Mapping) and row.get("pillar") == lens
+
+
+def _gate_status(row: Mapping[str, Any]) -> str | None:
+    # In-process envelopes carry a str-valued enum; served ones a plain str.
+    raw = row.get("status")
+    status = getattr(raw, "value", raw)
+    return status if isinstance(status, str) and status else None
 
 
 def _provenance_residuals(provenance: Mapping[str, Any], subject_sha: str) -> list[str]:
@@ -62,39 +77,52 @@ def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str)
 
     Raises ``ValueError`` for a lens outside the canonical six or a subject
     that is not a full commit or artifact digest: those are caller errors,
-    not observations.
+    not observations. A malformed envelope is not a caller error: whatever
+    cannot be read from it is reported as unobserved, never raised.
     """
-    if lens not in CANONICAL_VIRTUE_KEYS:
+    if not isinstance(lens, str) or lens not in CANONICAL_VIRTUE_KEYS:
         raise ValueError(f"unknown lens: {lens!r}")
-    if not _SHA.match(subject_sha):
+    if not isinstance(subject_sha, str) or not _SHA.match(subject_sha):
         raise ValueError("subject_sha must be a full 40- or 64-character hex digest")
 
-    raw_provenance = evidence.get("provenance")
+    envelope: Mapping[str, Any] = evidence if isinstance(evidence, Mapping) else {}
+    raw_provenance = envelope.get("provenance")
     provenance = raw_provenance if isinstance(raw_provenance, Mapping) else {}
-    raw_gates = evidence.get("gates")
+    raw_gates = envelope.get("gates")
     gates = raw_gates if isinstance(raw_gates, Mapping) else {}
 
     declared: list[str] = []
     observed: list[str] = []
     refs: list[dict[str, str]] = []
     residuals: list[str] = []
-    for name in sorted(gates):
+    # A gate attributed to this lens under a name that cannot be cited is
+    # counted as unobserved; it can neither be listed nor ordered.
+    unnamed = sum(
+        1
+        for name, row in gates.items()
+        if not (isinstance(name, str) and name) and _attributes(row, lens)
+    )
+    for name in sorted(n for n in gates if isinstance(n, str) and n):
         row = gates[name]
-        if not isinstance(row, Mapping) or row.get("pillar") != lens:
+        if not _attributes(row, lens):
             continue
         declared.append(name)
-        # In-process envelopes carry a str-valued enum; served ones a plain str.
-        raw_status = row.get("status")
-        status = getattr(raw_status, "value", raw_status)
-        if status in OBSERVED_GATE_STATUSES:
-            observed.append(name)
-            refs.append({"kind": "gate", "ref": name, "digest": _digest(dict(row))})
-        else:
-            residuals.append(f"gate_unobserved:{name}:{status}")
+        status = _gate_status(row)
+        if status not in OBSERVED_GATE_STATUSES:
+            residuals.append(f"gate_unobserved:{name}:{status or 'malformed_status'}")
+            continue
+        digest = _digest(dict(row))
+        if digest is None:
+            residuals.append(f"gate_unobserved:{name}:unserializable_row")
+            continue
+        observed.append(name)
+        refs.append({"kind": "gate", "ref": name, "digest": digest})
+    residuals.extend(["gate_unobserved:malformed_name"] * unnamed)
 
     unbound = _provenance_residuals(provenance, subject_sha)
     residuals = unbound + residuals
-    if not declared:
+    attributed = len(declared) + unnamed
+    if not attributed:
         residuals.append("no_attributed_gate")
     if unbound:
         # Gates that ran against another tree did not observe this subject:
@@ -103,13 +131,13 @@ def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str)
 
     if unbound or not observed:
         state = "UNOBSERVED"
-    elif len(observed) < len(declared):
+    elif len(observed) < attributed:
         state = "PARTIAL"
     else:
         state = "OBSERVED"
 
     tool_version = provenance.get("tool_version")
-    measured_at = evidence.get("measured_at")
+    measured_at = envelope.get("measured_at")
     return {
         "schema_version": LENS_EVIDENCE_SCHEMA_VERSION,
         "lens": lens,
@@ -120,7 +148,7 @@ def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str)
             "hyodo_version": tool_version
             if isinstance(tool_version, str) and tool_version
             else "UNOBSERVED",
-            "measured_by": _digest(dict(provenance)) if provenance else "UNOBSERVED",
+            "measured_by": (_digest(dict(provenance)) if provenance else None) or "UNOBSERVED",
         },
         "evidence_refs": refs,
         "residuals": residuals,
