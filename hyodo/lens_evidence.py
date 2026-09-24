@@ -72,7 +72,10 @@ def _attributes(row: dict[Any, Any], lens: str) -> bool:
 def _gate_status(row: dict[Any, Any]) -> str | None:
     # In-process envelopes carry a str-valued enum; served ones a plain str.
     raw = row.get("status")
-    status = raw.value if isinstance(raw, Enum) else raw
+    try:
+        status = raw.value if isinstance(raw, Enum) else raw
+    except Exception:  # an enum whose value cannot be read has no status
+        return None
     return status if type(status) is str and status else None
 
 

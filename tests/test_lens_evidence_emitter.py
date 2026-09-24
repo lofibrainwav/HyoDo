@@ -7,6 +7,7 @@ from __future__ import annotations
 import copy
 import json
 import subprocess
+from enum import Enum
 from pathlib import Path
 from unittest.mock import patch
 
@@ -302,3 +303,21 @@ def test_an_unreadable_mapping_is_unobserved_not_raised(tmp_path: Path, where: s
     receipt = emit_lens_evidence(evidence, "truth", sha)
     _valid(receipt)
     assert receipt["state"] == "UNOBSERVED"
+
+
+class _UnreadableStatus(Enum):
+    PASSED = "PASS"
+
+    @property
+    def value(self):  # type: ignore[override]
+        raise RuntimeError("value")
+
+
+def test_an_enum_status_that_cannot_be_read_is_unobserved(tmp_path: Path) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["gates"]["tests"]["status"] = _UnreadableStatus.PASSED
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    assert receipt["state"] == "PARTIAL"
+    assert "gate_unobserved:tests:malformed_status" in receipt["residuals"]
