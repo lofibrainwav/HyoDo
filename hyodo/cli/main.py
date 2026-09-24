@@ -783,18 +783,34 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         gates: dict[str, GateResult] = {
             "gates_config": GateResult(GateStatus.FAIL, f"{GATES_CONFIG_RELATIVE_PATH}: {exc}")
         }
+        gate_pillars: dict[str, str | None] = {"gates_config": None}
     else:
         if gates_config is not None:
+            user_gate_results = run_user_gates_with_trust(gates_config, root)[1]
             gates = {
                 result.name: GateResult(GateStatus(result.status), result.message)
-                for result in run_user_gates_with_trust(gates_config, root)[1]
+                for result in user_gate_results
             }
+            # Preserve the HyoDo-owned lens attribution in the portable evidence
+            # envelope. Consumers must not have to re-parse gates.toml or infer a
+            # virtue from a repository-specific gate name.
+            gate_pillars = {result.name: result.pillar for result in user_gate_results}
         else:
             gates = {
                 "typecheck": run_pyright_check(root),
                 "lint_format": run_ruff_check(root),
                 "tests": run_pytest_check(root),
                 "sbom": run_sbom_check(root),
+            }
+            # Built-in attribution follows the canonical contract in
+            # hyodo/virtues.py: Truth is "tests, typing, and static checks",
+            # Beauty is "lint, format, and clarity evidence". SBOM remains an
+            # auxiliary inventory gate, not a virtue claim.
+            gate_pillars = {
+                "typecheck": "truth",
+                "lint_format": "beauty",
+                "tests": "truth",
+                "sbom": None,
             }
     safety = run_safety_scan(cwd=root)
     safety_source = str(safety["source"])
@@ -811,7 +827,10 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         # The portable form: this dict is served over HTTP by `hyodo dashboard`,
         # so it carries commit ids and path digests, never a home directory.
         "provenance": resolve_provenance(root).to_portable_dict(),
-        "gates": {name: asdict(result) for name, result in gates.items()},
+        "gates": {
+            name: {**asdict(result), "pillar": gate_pillars.get(name)}
+            for name, result in gates.items()
+        },
         "safety": {
             "risk_score": safety_risk,
             # measured       - a real corpus was scored, risk_score is an int

@@ -56,6 +56,10 @@ def test_dashboard_evidence_is_versioned_and_preserves_raw_gate_statuses(tmp_pat
         evidence = collect_dashboard_evidence(tmp_path)
     assert evidence["schema_version"] == "hyodo.dashboard-evidence/v2"
     assert evidence["gates"]["typecheck"]["status"] == "PASS"
+    assert evidence["gates"]["typecheck"]["pillar"] == "truth"
+    assert evidence["gates"]["tests"]["pillar"] == "truth"
+    assert evidence["gates"]["lint_format"]["pillar"] == "beauty"
+    assert evidence["gates"]["sbom"]["pillar"] is None
     assert evidence["safety"]["risk_score"] == 5
     assert evidence["safety"]["source"] == "git diff HEAD"
     assert set(evidence["pillars"]) == {"in", "hyo", "yeong"}
@@ -86,6 +90,7 @@ def test_dashboard_evidence_uses_user_gates_when_gates_toml_present(tmp_path):
 
     assert set(evidence["gates"]) == {"custom_tests"}
     assert evidence["gates"]["custom_tests"]["status"] == "PASS"
+    assert evidence["gates"]["custom_tests"]["pillar"] == "goodness"
     pyright_mock.assert_not_called()
     ruff_mock.assert_not_called()
     pytest_mock.assert_not_called()
