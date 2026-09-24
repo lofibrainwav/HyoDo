@@ -30,7 +30,7 @@ full toolchain discovery pass:
 
 | Source file | What gets absorbed | Pillar | Command written |
 |-------------|--------------------|--------|-----------------|
-| `package.json` `scripts.test` | only if the string is non-empty and does **not** contain `"no test specified"` | `goodness` | `npm test` |
+| `package.json` `scripts.test` | only if the string is non-empty and does **not** contain `"no test specified"` | `truth` | `npm test` |
 | `package.json` `scripts.lint` | only if the string is non-empty | `beauty` | `npm run lint` |
 | `tsconfig.json` (file exists) | always proposes `tsc` when the file is present | `truth` | `npx tsc --noEmit` |
 
@@ -82,7 +82,9 @@ Each gate table needs:
 
 ### Node-oriented example
 
-Maps a typical Node quality stack onto Truth / Beauty / Goodness:
+Maps a typical Node quality stack onto the canonical lenses: tests and static
+checks are Truth, lint is Beauty, and a safety check such as a dependency
+audit is Goodness:
 
 ```toml
 schema = "hyodo.gates/v1"
@@ -91,13 +93,18 @@ schema = "hyodo.gates/v1"
 # Commands run with subprocess shell=False (no pipes, no shell globs).
 
 [gates.npm-test]
-pillar = "goodness"
+pillar = "truth"
 command = "npm test"
 timeout = 300
 
 [gates.eslint]
 pillar = "beauty"
 command = "npx eslint ."
+timeout = 120
+
+[gates.npm-audit]
+pillar = "goodness"
+command = "npm audit --audit-level=high"
 timeout = 120
 
 [gates.shellcheck]
