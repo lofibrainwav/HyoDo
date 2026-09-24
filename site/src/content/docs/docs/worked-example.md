@@ -55,9 +55,9 @@ registers commands that HyoDo will execute, so HyoDo will not run an unreviewed
 command set on your behalf. In a non-interactive shell it refuses and says so:
 
 ```text
-  SKIP pytest (善 선 Good): gates.toml command set is not approved -- no command
-set has been approved for this checkout yet; run `hyodo check` in a terminal to
-review the exact commands and record approval
+  SKIP pytest (善 선 Good): gates.toml command set is new or unapproved in a
+non-interactive environment -- set HYODO_GATES_TRUST_ALL=1 to pre-approve or run
+`hyodo check` interactively once to review and record trust
 
 ==================================================
 No user gates were executed
@@ -67,9 +67,7 @@ HYODO UNOBSERVED — 0/1 gates observed, required gates UNOBSERVED
 
 Exit code **2**, not `0`. Run it once in a real terminal to review and approve —
 that is the step shown under "The command" below. The recorded decision lives in
-per-user state outside your project (`~/.hyodo/state/`), bound to this checkout's
-path; changing a command invalidates it, and a `.hyodo/gates-trust.json` shipped
-inside a repository is ignored.
+`.hyodo/gates-trust.json` in your project, and changing a command invalidates it.
 
 ## The input
 
