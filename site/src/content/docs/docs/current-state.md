@@ -8,12 +8,16 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.7** is the current public package; its release chain is measured
-9/9 OBSERVED in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.7.md).
+HyoDo **4.21.8** is the current release target. Its release chain is
+`UNOBSERVED` in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.8.md);
+until that chain is measured, the latest published package remains **4.21.7**,
+whose release chain is measured 9/9 OBSERVED in the
+[4.21.7 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.7.md).
 Product capability and live host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Latest public package: **4.21.7** (security release; see the receipt above)
+- Current release target: **4.21.8** (release chain `UNOBSERVED`)
+- Latest published package: **4.21.7** (security release; see the 4.21.7 receipt above)
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
@@ -23,6 +27,10 @@ trust grants, pairing records, scan-exception approvals, and ledger origin --
 live in per-user state outside the checkout, so a repository cannot supply its
 own authority. See the
 [trust boundary contract](https://github.com/lofibrainwav/HyoDo/blob/main/docs/TRUST_BOUNDARY.md).
+
+HyoDo 4.21.8 carries the evidence/judgment boundary: gate-to-virtue
+attribution remains evidence, `hyodo.lens-evidence/v1` reports lens state with
+`authority: UNOBSERVED`, and legacy score derivation is compatibility only.
 Package release evidence does not imply a live Codex or Cursor connection;
 host observation is deployment-specific.
 

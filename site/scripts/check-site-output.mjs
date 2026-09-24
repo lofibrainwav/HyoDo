@@ -170,34 +170,70 @@ if (labelMismatches.length > 0) {
 // required to match at least once, so rewording a claim fails the build instead
 // of silently removing it from coverage.
 const currentVersion = readFileSync(join(root, '..', '..', 'VERSION'), 'utf8').trim();
+// VERSION is the source tree. Between a release merge and its measured
+// publication it runs ahead of what users can install, so "published" claims are
+// checked against the ROADMAP.md baseline instead (the same sentence
+// scripts/release/check_roadmap_sync.py reads), never against VERSION.
+const roadmapSource = readFileSync(join(root, '..', '..', 'ROADMAP.md'), 'utf8');
+const publishedMatch = roadmapSource.match(/(\d+\.\d+\.\d+)\s+is the latest published release/);
+const publishedVersion = publishedMatch ? publishedMatch[1] : null;
+const currentStateSource = readFileSync(join(root, '..', 'src', 'content', 'docs', 'docs', 'current-state.md'), 'utf8');
 const currencyAnchors = [
 	{
-		what: 'homepage public-version line',
+		what: 'homepage source-version line',
 		source: homepage,
-		pattern: /Public version:\s*<strong[^>]*>HyoDo\s+([\d.]+)<\/strong>/g,
+		pattern: /Source version:\s*<strong[^>]*>HyoDo\s+([\d.]+)<\/strong>/g,
+		expected: currentVersion,
+		authority: 'VERSION',
 	},
 	{
-		what: 'current-state summary sentence',
-		source: readFileSync(join(root, '..', 'src', 'content', 'docs', 'docs', 'current-state.md'), 'utf8'),
-		pattern: /HyoDo \*\*([\d.]+)\*\* is the current public package/g,
+		what: 'homepage published-release line',
+		source: homepage,
+		pattern: /Latest published release:\s*<strong[^>]*>HyoDo\s+([\d.]+)<\/strong>/g,
+		expected: publishedVersion,
+		authority: 'ROADMAP.md',
 	},
 	{
-		what: 'current-state latest-package bullet',
-		source: readFileSync(join(root, '..', 'src', 'content', 'docs', 'docs', 'current-state.md'), 'utf8'),
-		pattern: /Latest public package:\s*\*\*([\d.]+)\*\*/g,
+		what: 'current-state release-target sentence',
+		source: currentStateSource,
+		pattern: /HyoDo \*\*([\d.]+)\*\* is the current release target/g,
+		expected: currentVersion,
+		authority: 'VERSION',
+	},
+	{
+		what: 'current-state release-target bullet',
+		source: currentStateSource,
+		pattern: /Current release target:\s*\*\*([\d.]+)\*\*/g,
+		expected: currentVersion,
+		authority: 'VERSION',
+	},
+	{
+		what: 'current-state latest-published bullet',
+		source: currentStateSource,
+		pattern: /Latest published package:\s*\*\*([\d.]+)\*\*/g,
+		expected: publishedVersion,
+		authority: 'ROADMAP.md',
 	},
 ];
 
 const currencyFailures = [];
-for (const { what, source, pattern } of currencyAnchors) {
+if (!publishedVersion) {
+	currencyFailures.push('ROADMAP.md states no latest published release; published claims cannot be checked');
+}
+// A "current public package" sentence would call the source version published
+// before its release chain is measured, so it is rejected outright.
+if (/is the current public package|Latest public package:|Public version:/.test(currentStateSource + homepage)) {
+	currencyFailures.push('a page calls the source version public; say "current release target" or "latest published" instead');
+}
+for (const { what, source, pattern, expected, authority } of currencyAnchors) {
 	const found = [...source.matchAll(pattern)];
 	if (found.length === 0) {
 		currencyFailures.push(`${what}: no longer matches; reword the contract here or the claim goes unchecked`);
 		continue;
 	}
 	for (const [, claimed] of found) {
-		if (claimed !== currentVersion) {
-			currencyFailures.push(`${what}: claims ${claimed} is current, but VERSION says ${currentVersion}`);
+		if (expected && claimed !== expected) {
+			currencyFailures.push(`${what}: claims ${claimed}, but ${authority} says ${expected}`);
 		}
 	}
 }
@@ -283,6 +319,6 @@ if (publicLanguageFailures.length > 0) {
 }
 
 console.log(`Sidebar label contract: PASS (${sidebarEntries.length} entries agree with their page titles)`);
-console.log(`Current-version contract: PASS (${currencyAnchors.length} anchors agree with VERSION ${currentVersion})`);
+console.log(`Current-version contract: PASS (${currencyAnchors.length} anchors; source ${currentVersion} from VERSION, published ${publishedVersion} from ROADMAP.md)`);
 console.log('Public-language contract: PASS (source + generated visible text)');
 console.log('Static 404 and homepage output contracts: PASS');
