@@ -1,6 +1,6 @@
 # HyoDo current state
 
-Public release readback: 2026-09-22 PT
+Public release readback: 2026-09-24 UTC
 Runtime capability matrix below: measured 2026-09-13 PT, before 4.19.6.
 
 This file separates shipped product capability from live/runtime observation. Exact
@@ -8,15 +8,15 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package on PyPI: HyoDo `4.21.5`. 4.21.6 exists only as a
-  GitHub Release; its PyPI publication was withheld and it is superseded by the
-  security release 4.21.7 (see "4.21.7 security release" below).
-- Recorded closed release chain: HyoDo `4.21.3`
+- Latest public package on PyPI: HyoDo `4.21.7` (security release). 4.21.6
+  exists only as a GitHub Release; its PyPI publication was withheld and it is
+  superseded by 4.21.7 (see "4.21.7 security release" below).
+- Recorded closed release chain: HyoDo `4.21.7`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.21.3.md`](./releases/4.21.3.md).
+  [`releases/4.21.7.md`](./releases/4.21.7.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: the recorded 4.21.3 release is closed. Post-release
+- HyoDo product status: the recorded 4.21.7 release is closed. Post-release
   research and integration have separate evidence and promotion criteria;
   they do not silently reopen the sealed public artifact. Live-host and
   orchestration experiments remain downstream integration/research work.
@@ -25,7 +25,7 @@ The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
 
-## 4.21.7 security release (in preparation)
+## 4.21.7 security release
 
 4.21.7 is security-only: no new capability. Operator authority state -- BYOG
 gate approvals, policy trust grants, MCP pairing records, scan-exception
@@ -36,7 +36,8 @@ observed no files, and a sampled `hyodo check` reports
 `project_coverage: SAMPLED` with `complete: false`. A hostile-clone gauntlet
 against the built wheel is a required release gate. See
 [`SECURITY.md`](../SECURITY.md#authority-state-lives-outside-the-checkout).
-Until its release chain is measured, 4.21.7 is not a public artifact.
+Its release chain is measured 9/9 OBSERVED in
+[`releases/4.21.7.md`](./releases/4.21.7.md).
 
 4.21.6 is an immutable GitHub Release whose PyPI publication was stopped at
 the environment-approval step. It is left in place as a superseded release;

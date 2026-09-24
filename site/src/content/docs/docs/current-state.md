@@ -8,9 +8,8 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.7** is the current public package once its release chain is
-closed in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.7.md);
-until that receipt reads OBSERVED, the latest package on PyPI is 4.21.5.
+HyoDo **4.21.7** is the current public package; its release chain is measured
+9/9 OBSERVED in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.7.md).
 Product capability and live host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**

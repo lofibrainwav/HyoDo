@@ -5,16 +5,16 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.5 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.21.7 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.21.5.md`. Prior release receipts remain preserved under
+`docs/releases/4.21.7.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
 HyoDo 4.21.7 is the current release target and source-tree release baseline.
 Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-measured in `docs/releases/4.21.5.md`. HyoDo 4.21.2 remains an incomplete immutable
+measured in `docs/releases/4.21.7.md`. HyoDo 4.21.2 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
 This does not establish every host integration.
@@ -100,7 +100,7 @@ evidence is not converted into a pass.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
 
-### 4.21.7 (security release, 2026-09-23)
+### 4.21.7 (security release, released 2026-09-24 UTC)
 
 - Move operator authority state out of the checkout: gate approvals, policy
   trust grants, pairing records, scan-exception approvals, and ledger origin
@@ -109,6 +109,7 @@ evidence is not converted into a pass.
 - `hyodo safe` with nothing observed is `UNOBSERVED`, not `PASS`; sampled
   `hyodo check` reports `project_coverage: SAMPLED` and `complete: false`.
 - Hostile-clone gauntlet against the built wheel is a required release gate.
+- Release chain measured 9/9 OBSERVED in `docs/releases/4.21.7.md`.
 
 ### 4.21.6 (GitHub Release only, 2026-09-23; superseded by 4.21.7)
 

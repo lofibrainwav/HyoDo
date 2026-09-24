@@ -44,7 +44,11 @@ publication was withheld; its GitHub Release is left unchanged.
 
 ### Evidence
 
-- Release chain receipt: `docs/releases/4.21.7.md`.
+- Publication is measured and sealed in `docs/releases/4.21.7.md`: 9/9
+  OBSERVED (release-evidence run `35950299633`, PyPI publish/readback run
+  `35951093300`, wheel sha256 prefix `c8237b9cf434dc5a`). The hostile-clone
+  gauntlet passed 10/10 against the built wheel in that run and again against
+  the wheel downloaded from PyPI.
 
 ## [4.21.6] - 2026-09-23
 
