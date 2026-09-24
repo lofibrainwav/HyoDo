@@ -5,30 +5,32 @@ description: Public release, current main, and measured HyoDo state separated by
 
 # HyoDo current state
 
-Public release readback: **2026-09-20 PT**. Runtime capability matrix below
-was measured 2026-09-13 PT, before 4.19.6; it is a historical snapshot.
+Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
+is a historical snapshot.
 
-HyoDo **4.20.2** is the current public package. Product capability and live
-host observation remain separate evidence axes.
+HyoDo **4.21.7** is the current public package once its release chain is
+closed in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.7.md);
+until that receipt reads OBSERVED, the latest package on PyPI is 4.21.5.
+Product capability and live host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Latest public package: **4.20.2**
-- Release chain: **CLOSED** — signed tag, GitHub Release + SBOM, PyPI provenance,
-  and install smoke verified in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.20.2.md).
+- Latest public package: **4.21.7** (security release; see the receipt above)
+- 4.21.6 was tagged and has a GitHub Release, but it was never published to
+  PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
 
-HyoDo 4.20.2 preserves distinct graph participants and explicit From/To
-endpoints, and adds opt-in comparisons of host-supplied scalar requirements.
-Evidence references, missing observations, and changed requirements are shown
-without claiming automatic intent understanding or execution authority.
-Separately stored occurrence, observation, and recording timestamps remain a
-design target. Package release evidence does not imply a live Codex or Cursor
-connection; host observation is deployment-specific.
+HyoDo 4.21.7 is security-only. Operator decisions -- gate approvals, policy
+trust grants, pairing records, scan-exception approvals, and ledger origin --
+live in per-user state outside the checkout, so a repository cannot supply its
+own authority. See the
+[trust boundary contract](https://github.com/lofibrainwav/HyoDo/blob/main/docs/TRUST_BOUNDARY.md).
+Package release evidence does not imply a live Codex or Cursor connection;
+host observation is deployment-specific.
 
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for the current 4.20.2 release.
+2026-09-13. It is not a fresh runtime readback for the current 4.21.7 release.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |
@@ -59,4 +61,4 @@ HyoDo                  observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/host experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.20.2 public artifact released and verified.
+prerequisites for calling the HyoDo 4.21.7 public artifact released and verified.
