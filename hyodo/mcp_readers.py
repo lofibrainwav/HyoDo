@@ -278,6 +278,70 @@ def build_registration(root_arg: Path, resolved_root: Path, transport: str) -> d
     }
 
 
+def _pid_exists(pid: int) -> bool:
+    """Return False only when the OS process table proves *pid* is absent."""
+    if os.name != "posix":
+        # The census itself is currently POSIX-ps based. On other hosts, keep
+        # residue rather than risk treating an unobservable process as dead.
+        return True
+    try:
+        completed = subprocess.run(
+            ["ps", "-p", str(pid), "-o", "pid="],
+            capture_output=True,
+            text=True,
+            timeout=_PS_TIMEOUT_SECONDS,
+            check=False,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return True
+    if completed.returncode == 0:
+        return completed.stdout.strip() == str(pid)
+    return completed.returncode != 1
+
+
+def prune_retired_registrations(
+    *,
+    directory: Path | None = None,
+    start_lookup: Callable[[int], str | None] = process_start,
+    exists_lookup: Callable[[int], bool] = _pid_exists,
+) -> int:
+    """Remove only registrations whose process is provably gone or reused.
+
+    This runs when a new reader starts. It cleans residue left by SIGTERM,
+    SIGKILL, or crashes, where the context manager's finally block may not run.
+    If process identity cannot be observed, the record is kept.
+    """
+    target_dir = Path(directory) if directory is not None else default_reader_dir()
+    if not target_dir.is_dir():
+        return 0
+    removed = 0
+    for path in sorted(target_dir.glob("*.json")):
+        try:
+            record = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            continue
+        if (
+            not isinstance(record, dict)
+            or record.get("schema_version") != READER_SCHEMA_VERSION
+            or not isinstance(record.get("reader_pid"), int)
+            or not isinstance(record.get("process_start"), str)
+        ):
+            continue
+        pid = record["reader_pid"]
+        recorded_start = record["process_start"]
+        alive = exists_lookup(pid)
+        observed_start = start_lookup(pid) if alive else None
+        retired = (not alive) or (observed_start is not None and observed_start != recorded_start)
+        if not retired:
+            continue
+        try:
+            path.unlink()
+        except OSError:
+            continue
+        removed += 1
+    return removed
+
+
 def register_reader(
     root_arg: Path,
     resolved_root: Path,
@@ -291,6 +355,9 @@ def register_reader(
     and the census reports it as unregistered.  Failures go to stderr because
     stdout carries the stdio protocol.
     """
+    # A prior reader may have been terminated by signal/crash and skipped
+    # registered_reader's finally block. Clean only provably retired records.
+    prune_retired_registrations(directory=directory)
     record = build_registration(root_arg, resolved_root, transport)
     if record["process_start"] is None:
         print("[hyodo] mcp reader not registered: process start unobservable", file=sys.stderr)

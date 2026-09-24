@@ -129,8 +129,13 @@ def plan_release(
         current_version = None
         checks.append(_check("version_sources", "BLOCK", str(exc)))
 
+    # Two intake states are legitimate. Planning sees UNPREPARED; verify/execute
+    # sees PREPARED after prepare_release has already created release files.
+    candidate_state = "PREPARED" if current_version == version else "UNPREPARED"
+
     roadmap_path = root / "ROADMAP.md"
     roadmap_text = roadmap_path.read_text(encoding="utf-8") if roadmap_path.exists() else ""
+    published: str | None = None
     try:
         published = baseline_version(roadmap_text)
         target = target_version(roadmap_text)
@@ -153,26 +158,34 @@ def plan_release(
         checks.append(_check("roadmap", "BLOCK", str(exc)))
 
     release_note = root / "docs" / "releases" / f"{version}.md"
+    note_exists = release_note.exists()
+    note_ok = note_exists if candidate_state == "PREPARED" else not note_exists
     checks.append(
         _check(
-            "release_note_available",
-            "PASS" if not release_note.exists() else "BLOCK",
-            str(release_note.relative_to(root)),
+            "release_note_state",
+            "PASS" if note_ok else "BLOCK",
+            (
+                f"prepared candidate includes {release_note.relative_to(root)}"
+                if candidate_state == "PREPARED"
+                else f"{release_note.relative_to(root)} available for preparation"
+            ),
         )
     )
+
     changelog = root / "CHANGELOG.md"
     changelog_text = changelog.read_text(encoding="utf-8") if changelog.exists() else ""
-    checks.append(
-        _check(
-            "changelog_ready",
-            "PASS"
-            if f"## [{version}]" not in changelog_text and CHANGELOG_HEADER_END in changelog_text
-            else "BLOCK",
+    has_changelog_section = f"## [{version}]" in changelog_text
+    if candidate_state == "PREPARED":
+        changelog_ok = has_changelog_section
+        changelog_detail = "prepared candidate contains version section"
+    else:
+        changelog_ok = not has_changelog_section and CHANGELOG_HEADER_END in changelog_text
+        changelog_detail = (
             "new section can be inserted"
-            if f"## [{version}]" not in changelog_text
-            else "version section already exists",
+            if not has_changelog_section
+            else "version section already exists before preparation"
         )
-    )
+    checks.append(_check("changelog_state", "PASS" if changelog_ok else "BLOCK", changelog_detail))
 
     result = "PASS" if all(item["state"] == "PASS" for item in checks) else "BLOCK"
     plan = {
@@ -187,7 +200,8 @@ def plan_release(
         "branch": branch or None,
         "worktree": str(root),
         "expected_write_set": [path.replace("<version>", version) for path in EXPECTED_WRITE_SET],
-        "expected_version_delta": {"from": current_version, "to": version},
+        "candidate_state": candidate_state,
+        "expected_version_delta": {"from": published or current_version, "to": version},
         "validations": checks,
         "push_target": push_target,
         "pr_target": pr_target,
