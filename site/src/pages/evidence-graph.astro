@@ -4,6 +4,11 @@ import '../styles/evidence-graph.css';
 
 const githubUrl = 'https://github.com/lofibrainwav/HyoDo';
 const pypiUrl = 'https://pypi.org/project/hyodo/';
+const pageTitle = 'HyoDo Evidence Graph — prototype';
+const pageDescription = 'A public, browser-only HyoDo verification view. Defaults to fixed demo data; you can opt in to render a local hyodo.verification-view/v0 JSON file. Nothing is uploaded.';
+const canonicalUrl = 'https://hyodo.app/evidence-graph/';
+const ogImage = new URL('/og-image.png', canonicalUrl).href;
+const ogImageAlt = 'HyoDo — See what ran and what the evidence supports.';
 ---
 
 <!doctype html>
@@ -11,15 +16,27 @@ const pypiUrl = 'https://pypi.org/project/hyodo/';
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
-		<title>HyoDo Evidence Graph — prototype</title>
+		<title>{pageTitle}</title>
+		<meta name="description" content={pageDescription} />
+		<link rel="canonical" href={canonicalUrl} />
+		<meta property="og:type" content="website" />
+		<meta property="og:site_name" content="HyoDo" />
+		<meta property="og:title" content={pageTitle} />
+		<meta property="og:description" content={pageDescription} />
+		<meta property="og:url" content={canonicalUrl} />
+		<meta property="og:image" content={ogImage} />
+		<meta property="og:image:width" content="1200" />
+		<meta property="og:image:height" content="630" />
+		<meta property="og:image:alt" content={ogImageAlt} />
+		<meta name="twitter:card" content="summary_large_image" />
+		<meta name="twitter:title" content={pageTitle} />
+		<meta name="twitter:description" content={pageDescription} />
+		<meta name="twitter:image" content={ogImage} />
+		<meta name="twitter:image:alt" content={ogImageAlt} />
 		<link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 		<link rel="icon" href="/favicon.ico" sizes="32x32" />
 		<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
 		<meta name="theme-color" content="#0b0d10" />
-		<meta
-			name="description"
-			content="A public, browser-only HyoDo verification view. Defaults to fixed demo data; you can opt in to render a local hyodo.verification-view/v0 JSON file. Nothing is uploaded."
-		/>
 	</head>
 	<body class="eg-page">
 		<nav class="navbar">

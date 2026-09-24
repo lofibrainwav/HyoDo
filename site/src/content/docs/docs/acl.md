@@ -8,8 +8,6 @@ description: A research-only field note on evidence-grounded support profiles, s
 > It is not a claim of peer review, venue submission, first-in-field novelty, or
 > measured effectiveness.
 
-# Support allocation field note
-
 **Reader map.** This is the focused field note for the **strategy-prior +
 collaboration-topology** hypothesis. See [Research](/docs/research/) for the
 broader empirical program, benchmark status, related work, evaluation design,

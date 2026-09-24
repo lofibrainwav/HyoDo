@@ -3,8 +3,6 @@ title: Current state
 description: Public release, current main, and measured HyoDo state separated by evidence boundary.
 ---
 
-# HyoDo current state
-
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
@@ -34,7 +32,7 @@ host observation is deployment-specific.
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for the current 4.21.7 release.
+2026-09-13. It is not a fresh runtime readback for the current 4.21.8 release.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |

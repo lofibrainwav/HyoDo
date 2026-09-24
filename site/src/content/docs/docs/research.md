@@ -5,9 +5,7 @@ description: Working research notes behind HyoDo's evidence-grounded human–AI 
 
 > **Status — research-only program, updated 2026-09-08.** This page describes research in progress, not a shipped HyoDo capability or runtime. It is not a claim of peer review, submission, or acceptance by the Association for Computational Linguistics or any other venue.
 
-# Support allocation research program
-
-**Reader map.** This page is the broader empirical program: benchmark status, related work, evaluation design, ablations, and publication boundary. For the focused **strategy-prior + collaboration-topology** hypothesis, including corpus governance, null baselines, and threats to validity, see the [support-allocation field note](/docs/acl/). For the local privacy-minimized sensor contract, see [Friction Contribution](/docs/friction-contribution/).
+**Reader map.** This page is the broader empirical program for support allocation research: benchmark status, related work, evaluation design, ablations, and publication boundary. For the focused **strategy-prior + collaboration-topology** hypothesis, including corpus governance, null baselines, and threats to validity, see the [support-allocation field note](/docs/acl/). For the local privacy-minimized sensor contract, see [Friction Contribution](/docs/friction-contribution/).
 
 **Working title:** *Evidence-Grounded Support Allocation for Human–AI Agents*
 
