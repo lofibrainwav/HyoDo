@@ -18,6 +18,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from ledger_fixture import write_ledger
+
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH
 from hyodo.report import build_report_graph
 from hyodo.verification_view import (
@@ -52,7 +54,7 @@ def _view(root: Path, lines: list[str]) -> dict[str, Any]:
     """Write a ledger under *root* and project it through the real producer."""
     path = root / AGENT_EVENTS_RELATIVE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    write_ledger(path, "\n".join(lines) + "\n")
     return build_verification_view(build_report_graph(root), root=root)
 
 

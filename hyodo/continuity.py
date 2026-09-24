@@ -31,11 +31,16 @@ from typing import Any
 
 from hyodo.access_ledger import ACCESS_LEDGER_PATH
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH, read_agent_events
-from hyodo.pairing import PAIRING_RELATIVE_PATH, load_pairing
+from hyodo.ledger_origin import ORIGIN_DIVERGED, ORIGIN_UNVERIFIED, ledger_origin
+from hyodo.pairing import load_pairing, pairing_path
 from hyodo.policy import POLICY_RELATIVE_PATH, try_load_policy
 from hyodo.provenance import git_commit, path_digest
 
 CONTINUITY_SCHEMA_VERSION = "hyodo.continuity/v1"
+
+# The pairing record lives in per-user state, not the checkout. The receipt
+# names it by label because an absolute home path must not travel in receipts.
+PAIRING_STORE_LABEL = "user-state:pairing.json"
 
 # The M5-D slice observes at most two local caller shapes: one stdio session
 # (no pairing) and one paired loopback/tailscale bridge caller. A third host
@@ -241,10 +246,12 @@ class StoreFact:
     digest: str | None
     count: int | None = None
     corrupt_lines: int = 0
+    #: For ledgers: ``hyodo.ledger_origin`` classification; ``None`` otherwise.
+    origin: str | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Return the JSON-serializable form used in the ``hyodo.continuity/v1`` receipt."""
-        return {
+        payload: dict[str, Any] = {
             "path": self.path,
             "exists": self.exists,
             "readable": self.readable,
@@ -252,6 +259,9 @@ class StoreFact:
             "count": self.count,
             "corrupt_lines": self.corrupt_lines,
         }
+        if self.origin is not None:
+            payload["origin"] = self.origin
+        return payload
 
 
 def measure_continuity(
@@ -311,6 +321,9 @@ def measure_continuity(
     resolved = root.expanduser().resolve()
     measurement_time = measured_at or datetime.now(timezone.utc)
     reasons: list[str] = []
+    # Origin is its own axis: an unanchored ledger is not corrupt, it is
+    # unverified. It blocks READY without being reported as CORRUPT.
+    origin_reasons: list[str] = []
 
     # --- agent-event ledger (required path, may not exist yet) ---
     events, events_corrupt = read_agent_events(resolved)
@@ -323,11 +336,16 @@ def measure_continuity(
         digest=_digest_file(events_path),
         count=len(events) if events is not None else None,
         corrupt_lines=events_corrupt,
+        origin=ledger_origin(resolved, AGENT_EVENTS_RELATIVE_PATH),
     )
     if events_unreadable:
         reasons.append("agent_events_unreadable")
     if events_corrupt:
         reasons.append("agent_events_corrupt")
+    # A ledger that parses is not a ledger written here: one shipped inside a
+    # clone must never make this receipt READY.
+    if agent_events_store.origin in (ORIGIN_UNVERIFIED, ORIGIN_DIVERGED):
+        origin_reasons.append(f"agent_events_origin_{agent_events_store.origin.lower()}")
 
     # --- policy file (optional: absence is not a failure) ---
     policy_path = resolved / POLICY_RELATIVE_PATH
@@ -353,21 +371,24 @@ def measure_continuity(
         digest=_digest_file(access_path),
         count=len(access_entries) if access_entries is not None else None,
         corrupt_lines=access_corrupt,
+        origin=ledger_origin(resolved, ACCESS_LEDGER_PATH),
     )
     if access_unreadable:
         reasons.append("access_ledger_unreadable")
     if access_corrupt:
         reasons.append("access_ledger_corrupt")
+    if access_store.origin in (ORIGIN_UNVERIFIED, ORIGIN_DIVERGED):
+        origin_reasons.append(f"access_ledger_origin_{access_store.origin.lower()}")
 
     # --- pairing file (optional: absence is not a failure) ---
-    pairing_path = resolved / PAIRING_RELATIVE_PATH
+    pairing_file = pairing_path(resolved)
     pairing_record = load_pairing(resolved)
-    pairing_present_but_invalid = pairing_path.exists() and pairing_record is None
+    pairing_present_but_invalid = pairing_file.exists() and pairing_record is None
     pairing_store = StoreFact(
-        path=str(PAIRING_RELATIVE_PATH),
-        exists=pairing_path.exists(),
+        path=PAIRING_STORE_LABEL,
+        exists=pairing_file.exists(),
         readable=not pairing_present_but_invalid,
-        digest=_digest_file(pairing_path),
+        digest=_digest_file(pairing_file),
     )
     if pairing_present_but_invalid:
         reasons.append("pairing_invalid")
@@ -431,6 +452,8 @@ def measure_continuity(
 
     # --- integrity: do the stores that exist parse cleanly? ---
     integrity_status = "CORRUPT" if reasons else "READY"
+    origin_status = "UNVERIFIED" if origin_reasons else "VERIFIED"
+    reasons.extend(origin_reasons)
 
     # --- coverage: was continuity actually observed, or is nothing here yet? ---
     any_store_present = (
@@ -490,7 +513,11 @@ def measure_continuity(
         notes.append("hook_only_observation")
 
     status = (
-        "READY" if integrity_status == "READY" and coverage_status == "OBSERVED" else "UNOBSERVED"
+        "READY"
+        if integrity_status == "READY"
+        and origin_status == "VERIFIED"
+        and coverage_status == "OBSERVED"
+        else "UNOBSERVED"
     )
     exit_code = 0 if status == "READY" else 2
 
@@ -498,6 +525,7 @@ def measure_continuity(
         "schema_version": CONTINUITY_SCHEMA_VERSION,
         "status": status,
         "integrity_status": integrity_status,
+        "origin_status": origin_status,
         "coverage_status": coverage_status,
         "reasons": reasons,
         "notes": notes,

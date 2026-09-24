@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from ledger_fixture import write_ledger
 from typer.testing import CliRunner
 
 from hyodo.cli.main import app
@@ -32,7 +33,7 @@ runner = CliRunner()
 def _write_ledger(root: Path, events: list[dict[str, object]]) -> None:
     path = root / AGENT_EVENTS_RELATIVE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(json.dumps(event) for event in events) + "\n", encoding="utf-8")
+    write_ledger(path, "\n".join(json.dumps(event) for event in events) + "\n")
 
 
 def _event(**overrides: object) -> dict[str, object]:

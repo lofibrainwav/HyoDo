@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -13,14 +14,19 @@ from hyodo.cli.main import app
 from hyodo.policy import POLICY_SCHEMA_ID
 from hyodo.policy_trust import (
     POLICY_TRUST_ENV_VAR,
+    POLICY_TRUST_MAX_AGE,
     POLICY_TRUST_RELATIVE_PATH,
     POLICY_TRUST_SCHEMA_ID,
+    SCOPE_EYE_KEEP,
+    SCOPE_POLICY_ASK,
     default_granted_by,
     effective_trust_level,
     grant_policy_trust,
     load_policy_trust,
+    policy_trust_path,
     resolve_policy_trust_grant,
 )
+from hyodo.user_state import workspace_identity
 
 runner = CliRunner()
 
@@ -37,8 +43,12 @@ def test_grant_and_load_round_trip(tmp_path: Path):
     loaded, error = load_policy_trust(tmp_path)
     assert error is None
     assert loaded == state
-    payload = json.loads((tmp_path / POLICY_TRUST_RELATIVE_PATH).read_text(encoding="utf-8"))
+    payload = json.loads(policy_trust_path(tmp_path).read_text(encoding="utf-8"))
     assert payload["schema"] == POLICY_TRUST_SCHEMA_ID
+    assert payload["workspace_id"] == workspace_identity(tmp_path)
+    assert payload["policy_digest"] == "absent"
+    assert set(payload["scopes"]) == {SCOPE_POLICY_ASK, SCOPE_EYE_KEEP}
+    assert not (tmp_path / POLICY_TRUST_RELATIVE_PATH).exists()
 
 
 def test_grant_accumulates_history(tmp_path: Path):
@@ -68,12 +78,84 @@ def test_grant_accumulates_history(tmp_path: Path):
     ],
 )
 def test_malformed_trust_file_is_unobserved(tmp_path: Path, payload: str, error: str):
-    path = tmp_path / POLICY_TRUST_RELATIVE_PATH
+    path = policy_trust_path(tmp_path)
     path.parent.mkdir(parents=True)
     path.write_text(payload, encoding="utf-8")
     state, actual = load_policy_trust(tmp_path)
     assert state is None
     assert actual == error
+
+
+def test_preseeded_checkout_grant_carries_no_authority(tmp_path: Path):
+    """A repository cannot ship its own policy trust grant."""
+    path = tmp_path / POLICY_TRUST_RELATIVE_PATH
+    path.parent.mkdir(parents=True)
+    path.write_text(
+        json.dumps(
+            {
+                "schema": POLICY_TRUST_SCHEMA_ID,
+                "workspace_id": workspace_identity(tmp_path),
+                "policy_digest": "absent",
+                "scopes": [SCOPE_POLICY_ASK, SCOPE_EYE_KEEP],
+                "level": 3,
+                "granted_at": "2020-01-01T00:00:00+00:00",
+                "expires_at": "2999-01-01T00:00:00+00:00",
+                "granted_by": "human:attacker",
+                "history": [],
+            }
+        ),
+        encoding="utf-8",
+    )
+    state, error = load_policy_trust(tmp_path)
+    assert state is None
+    assert error == "trust_missing"
+    assert effective_trust_level(3, state) == 0
+
+
+def test_grant_does_not_follow_a_copied_record(tmp_path: Path):
+    original = tmp_path / "original"
+    other = tmp_path / "other"
+    original.mkdir()
+    other.mkdir()
+    grant_policy_trust(original, 3, by="human:test")
+    target = policy_trust_path(other)
+    target.parent.mkdir(parents=True)
+    target.write_text(policy_trust_path(original).read_text(encoding="utf-8"), encoding="utf-8")
+    state, error = load_policy_trust(other)
+    assert state is None
+    assert error == "trust_workspace_mismatch"
+
+
+def test_grant_is_void_after_policy_file_changes(tmp_path: Path):
+    policy_file = tmp_path / ".hyodo" / "policy.toml"
+    policy_file.parent.mkdir(parents=True)
+    policy_file.write_text(f'schema = "{POLICY_SCHEMA_ID}"\n', encoding="utf-8")
+    grant_policy_trust(tmp_path, 3, by="human:test")
+    assert load_policy_trust(tmp_path)[1] is None
+    policy_file.write_text(f'schema = "{POLICY_SCHEMA_ID}"\nmax_steps = 99\n', encoding="utf-8")
+    state, error = load_policy_trust(tmp_path)
+    assert state is None
+    assert error == "trust_policy_changed"
+
+
+def test_grant_only_covers_its_scopes(tmp_path: Path):
+    grant_policy_trust(tmp_path, 3, by="human:test", scopes=(SCOPE_POLICY_ASK,))
+    assert load_policy_trust(tmp_path, scope=SCOPE_POLICY_ASK)[1] is None
+    state, error = load_policy_trust(tmp_path, scope=SCOPE_EYE_KEEP)
+    assert state is None
+    assert error == "trust_scope_mismatch"
+
+
+def test_grant_expires(tmp_path: Path):
+    granted_at = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    grant_policy_trust(tmp_path, 3, by="human:test", now=granted_at)
+    inside = granted_at + POLICY_TRUST_MAX_AGE - timedelta(seconds=1)
+    assert load_policy_trust(tmp_path, now=inside)[1] is None
+    state, error = load_policy_trust(tmp_path, now=granted_at + POLICY_TRUST_MAX_AGE)
+    assert state is None
+    assert error == "trust_expired"
+    before = granted_at - timedelta(seconds=1)
+    assert load_policy_trust(tmp_path, now=before)[1] == "trust_expired"
 
 
 def test_effective_trust_level_is_capped(tmp_path: Path):

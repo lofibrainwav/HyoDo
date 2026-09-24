@@ -64,6 +64,7 @@ from hyodo.audience import (
 )
 from hyodo.check_honesty import (
     COVERAGE_FULL,
+    PROJECT_COVERAGE_SAMPLED,
     coverage_detail,
     effective_status,
     gate_coverage,
@@ -111,10 +112,14 @@ from hyodo.events import (
     validate_event,
 )
 from hyodo.exceptions import (
+    EXCEPTIONS_UNAPPROVED,
+    SCAN_EXCEPTIONS_RELATIVE_PATH,
     ScanExceptionsConfig,
     ScanExceptionsConfigError,
+    approve_scan_exceptions,
     is_general_path_excluded,
     load_scan_exceptions,
+    parse_scan_exceptions,
 )
 from hyodo.eye import (
     DEFAULT_TTL_S,
@@ -124,7 +129,9 @@ from hyodo.eye import (
     capture as run_eye_capture,
 )
 from hyodo.gates import (
+    CHECKOUT_TRUST_IGNORED_NOTE,
     GATES_CONFIG_RELATIVE_PATH,
+    GATES_TRUST_RELATIVE_PATH,
     SCHEMA_ID,
     GatesConfigError,
     detect_project_gates,
@@ -163,6 +170,7 @@ from hyodo.pairing import (
     PairingState,
     create_pairing,
     load_pairing,
+    pairing_path,
     pairing_state,
     revoke_pairing,
 )
@@ -188,6 +196,7 @@ from hyodo.policy_trust import (
     effective_trust_level,
     grant_policy_trust,
     load_policy_trust,
+    policy_trust_path,
     resolve_policy_trust_grant,
 )
 from hyodo.provenance import resolve_provenance
@@ -225,6 +234,7 @@ from hyodo.skills import (
     store_body as store_skill_body,
 )
 from hyodo.test_integrity import TestIntegrityReport, scan_test_integrity
+from hyodo.user_state import checkout_shadow
 from hyodo.verdict import explain_decision, render_verdict_line
 from hyodo.verification_view import build_verification_view
 
@@ -1896,8 +1906,16 @@ def _verdict_output(
         effective = effective_status(
             decision, coverage, provenance.validity if provenance is not None else None
         )
+        # Two different questions. `gate_coverage`: did every gate that was
+        # selected run? `project_coverage`: do those gates cover the project?
+        # Built-in sampled gates read at most a sample of files per language,
+        # so a sampled run is never a complete project verification even when
+        # every sampled gate ran. `coverage` stays the 4.21 gate-coverage key.
+        project_coverage = PROJECT_COVERAGE_SAMPLED if state.get("sampled") else coverage
         state["coverage"] = coverage
-        state["complete"] = coverage == COVERAGE_FULL
+        state["gate_coverage"] = coverage
+        state["project_coverage"] = project_coverage
+        state["complete"] = coverage == COVERAGE_FULL and not state.get("sampled")
         state["effective"] = effective
         if effective != decision:
             downgrade_detail = coverage_detail(
@@ -1954,6 +1972,8 @@ def _verdict_output(
             # Additive 4.21 truths. `status`, `gates_ran`, `gates_total`,
             # `failed` and `exit_code` above are untouched 4.20 keys.
             payload["coverage"] = state["coverage"]
+            payload["gate_coverage"] = state["gate_coverage"]
+            payload["project_coverage"] = state["project_coverage"]
             payload["complete"] = state["complete"]
             payload["effective"] = state["effective"]
             if "trust" in state:
@@ -2124,6 +2144,7 @@ def check(
             trust, user_results = run_user_gates_with_trust(
                 gates_config, check_root, verbose=verbose
             )
+            checkout_receipt_ignored = checkout_shadow(check_root, GATES_TRUST_RELATIVE_PATH)
             verdict_state.update(
                 observed=sum(r.status in {"PASS", "FAIL"} for r in user_results),
                 expected=len(user_results),
@@ -2133,8 +2154,11 @@ def check(
                     "persistence": trust.persistence,
                     "previous_command_set": trust.previous,
                     "fingerprint": trust.fingerprint,
+                    "checkout_receipt_ignored": checkout_receipt_ignored,
                 },
             )
+            if checkout_receipt_ignored:
+                console.print(f"[yellow]{CHECKOUT_TRUST_IGNORED_NOTE}.[/yellow]")
             if not trust.approved:
                 # Show what *would* run. A refusal that names no commands asks
                 # the operator to approve something they cannot see, and the
@@ -2796,6 +2820,54 @@ def score(
         )
 
 
+def _approve_scan_exceptions_interactively(root: Path) -> None:
+    """Show the repository's scan exceptions and record an operator approval.
+
+    The file is authored by the repository, so it never approves itself. The
+    approval covers this file's exact digest in this workspace only; any edit
+    to the file needs a new approval. Refused without a terminal: approving
+    exceptions is an operator decision, not something automation can grant.
+    """
+    try:
+        parsed = parse_scan_exceptions(root)
+    except ScanExceptionsConfigError as exc:
+        console.print(f"[red]Invalid scan exceptions: {exc}[/red]")
+        raise typer.Exit(2) from exc
+    if parsed.digest is None:
+        console.print(f"No {SCAN_EXCEPTIONS_RELATIVE_PATH} in {root}; nothing to approve.")
+        raise typer.Exit(2)
+    try:
+        interactive = sys.stdin.isatty() and sys.stdout.isatty()
+    except (AttributeError, ValueError):
+        interactive = False
+    if not interactive or os.environ.get("CI", "").strip().lower() in {"1", "true", "yes", "on"}:
+        console.print(
+            "[red]Refusing to approve scan exceptions without a terminal.[/red] "
+            "Run `hyodo safe --approve-exceptions` interactively."
+        )
+        raise typer.Exit(2)
+    console.print(f"Scan exceptions in {root / SCAN_EXCEPTIONS_RELATIVE_PATH}:")
+    for item in parsed.general:
+        console.print(f"  general  {rich_escape(item.path)} -- {rich_escape(item.reason)}")
+    for item in parsed.safety:
+        console.print(
+            f"  safety   {rich_escape(item.path)} [{rich_escape(item.rule)}] "
+            f"-- {rich_escape(item.reason)}"
+        )
+    console.print(f"  digest: {parsed.digest}")
+    try:
+        answer = input("Approve these exceptions for this workspace? [y/N] ")
+    except EOFError:
+        answer = ""
+    if answer.strip().lower() not in {"y", "yes"}:
+        console.print("[yellow]Not approved; the exceptions stay withheld.[/yellow]")
+        raise typer.Exit(2)
+    path = approve_scan_exceptions(root, parsed.digest, by=default_granted_by())
+    console.print(f"[green]APPROVED[/green] {parsed.digest}")
+    console.print(f"record: {path}")
+    raise typer.Exit(0)
+
+
 @app.command()
 def safe(
     path: str | None = typer.Argument(None, help="Path to scan"),
@@ -2822,6 +2894,11 @@ def safe(
     quiet: bool = typer.Option(False, "--quiet", help="Print only the verdict line"),
     explain: bool = typer.Option(False, "--explain", help="Print a stored explanation"),
     audience: str | None = _audience_option(),
+    approve_exceptions: bool = typer.Option(
+        False,
+        "--approve-exceptions",
+        help="Review .hyodo/scan-exceptions.toml and approve its exact digest (interactive)",
+    ),
 ):
     """
     Safety early-warning scan.
@@ -2846,6 +2923,8 @@ def safe(
     Not a full SAST / secret-scan / dependency audit unless --scan is used.
     """
 
+    if approve_exceptions:
+        _approve_scan_exceptions_interactively(Path.cwd().resolve())
     profile = _resolve_audience_or_exit(Path.cwd(), audience, "safe", json_output)
     verdict_state: dict[str, Any] = {"unit": "files"}
     with _verdict_output("safe", verdict_state, quiet, explain, json_output, profile):
@@ -2886,11 +2965,29 @@ def safe(
             + ("; file coverage UNOBSERVED" if scanned is None or total is None else "")
             + partial_note,
         )
+        exceptions_status = result.get("exceptions_status", "none")
+        exceptions_withheld = int(result.get("exceptions_withheld", 0))
+        if exceptions_status == EXCEPTIONS_UNAPPROVED:
+            verdict_state["detail"] += (
+                f"; {exceptions_withheld} scan exception(s) withheld until approved "
+                "(hyodo safe --approve-exceptions)"
+            )
+        # Nothing observed is not a clean scan. A clean clone has no diff and
+        # no status corpus, so "0 of 0 files" must not print HYODO PASS.
+        nothing_observed = coverage == "UNOBSERVED" and not (
+            isinstance(scanned, int) and scanned > 0
+        )
         if source.startswith(("missing:", "error:")):
             verdict_state["detail"] = "scan target UNOBSERVED"
             verdict_state["decision"] = "UNOBSERVED"
         elif strict and high_only:
             verdict_state["decision"] = "FAIL"
+        elif nothing_observed:
+            verdict_state["detail"] = (
+                "no files observed (coverage UNOBSERVED); pass a path, e.g. hyodo safe . "
+                "--max-files 0"
+            )
+            verdict_state["decision"] = "UNOBSERVED"
         elif coverage == "PARTIAL":
             # A capped/partial scan is not a clean pass: a reader (or a CI gate
             # reading only the verdict line) must not mistake "40/161 files
@@ -2898,11 +2995,13 @@ def safe(
             verdict_state["decision"] = "PARTIAL"
         else:
             verdict_state["decision"] = "PASS"
+        # --strict is a CI gate: an unobserved scan cannot satisfy it.
+        unobserved_exit = 2 if strict and nothing_observed else 0
         if json_output:
             exit_code = (
                 2
                 if source.startswith(("missing:", "error:"))
-                else (1 if strict and high_only else 0)
+                else (1 if strict and high_only else unobserved_exit)
             )
             payload = {
                 "source": source,
@@ -2915,6 +3014,8 @@ def safe(
                 "exit_code": exit_code,
                 "findings": [asdict(f) for f in result["findings"]],
                 "exceptions_applied": int(result.get("exceptions_applied", 0)),
+                "exceptions_status": exceptions_status,
+                "exceptions_withheld": exceptions_withheld,
                 "scanned_files": result.get("scanned_files"),
                 "total_scannable": result.get("total_scannable"),
                 "text_scannable_files": result.get("text_scannable_files"),
@@ -2939,6 +3040,12 @@ def safe(
         if exceptions_applied:
             console.print(
                 f"[yellow]Audited safety exceptions applied: {exceptions_applied}[/yellow]"
+            )
+        if exceptions_status == EXCEPTIONS_UNAPPROVED:
+            console.print(
+                f"[yellow]Scan exceptions withheld: {exceptions_withheld} "
+                f"({SCAN_EXCEPTIONS_RELATIVE_PATH} is not approved for this workspace; "
+                "review it with hyodo safe --approve-exceptions)[/yellow]"
             )
 
         # missing path OR unreadable/scan IO failure — not a validation pass
@@ -3015,7 +3122,7 @@ def safe(
 
         if strict and high_only:
             raise typer.Exit(1)
-        raise typer.Exit(0)
+        raise typer.Exit(unobserved_exit)
 
 
 @app.command("inspect")
@@ -3161,7 +3268,7 @@ def mcp_pair(
         raise typer.Exit(2)
 
     record, token = create_pairing(root_path)
-    pairing_file = root_path / PAIRING_RELATIVE_PATH
+    pairing_file = pairing_path(root_path)
     if json_output:
         payload = {
             "ok": True,
@@ -3247,7 +3354,8 @@ def mcp_pairing_show(
         "created_at": record.created_at if record is not None else None,
         "revoked_at": record.revoked_at if record is not None else None,
         "last_seen_at": record.last_seen_at if record is not None else None,
-        "pairing_file": str(root_path / PAIRING_RELATIVE_PATH),
+        "pairing_file": str(pairing_path(root_path)),
+        "checkout_pairing_file_ignored": checkout_shadow(root_path, PAIRING_RELATIVE_PATH),
         "exit_code": 0 if state is PairingState.PAIRED else 2,
     }
     if json_output:
@@ -3404,7 +3512,7 @@ def mcp_serve(
         False,
         "--paired",
         help=(
-            "Verify the caller's bearer token against `.hyodo/pairing.json` instead of a "
+            "Verify the caller's bearer token against the workspace pairing record instead of a "
             "static --token; every request re-reads the pairing so a revoke takes effect "
             "immediately"
         ),
@@ -3422,7 +3530,7 @@ def mcp_serve(
         raise typer.Exit(2)
     if paired and token is not None:
         console.print(
-            "[red]--paired verifies the bearer token against `.hyodo/pairing.json`; "
+            "[red]--paired verifies the bearer token against the pairing record; "
             "do not also pass --token.[/red]"
         )
         raise typer.Exit(2)
@@ -4653,7 +4761,7 @@ def event_record(
 @trust_app.command("grant")
 def policy_trust_grant(
     level: int = typer.Option(..., "--level", min=0, max=3, help="Trust level to grant (0-3)"),
-    root: str = typer.Option(".", "--root", help="Project root that owns .hyodo/policy-trust.json"),
+    root: str = typer.Option(".", "--root", help="Project root the grant is bound to"),
     by: str | None = typer.Option(
         None, "--by", help="Human or system identity recorded in the ledger"
     ),
@@ -4662,8 +4770,10 @@ def policy_trust_grant(
 ):
     """Record an explicit operator policy trust grant.
 
-    Grants are untracked local state and are refused in non-interactive runs
-    unless ``HYODO_POLICY_TRUST_ALL=1`` is explicitly set.
+    Grants live in per-user state outside the checkout, are bound to this
+    workspace, the current policy file digest, their scopes, and a 30-day
+    expiry, and are refused in non-interactive runs unless
+    ``HYODO_POLICY_TRUST_ALL=1`` is explicitly set.
     """
     root_path = Path(root).resolve()
     granted_by = by or default_granted_by()
@@ -4690,7 +4800,10 @@ def policy_trust_grant(
         "granted_level": state.level,
         "granted_by": state.granted_by,
         "granted_at": state.granted_at,
-        "ledger": str(root_path / POLICY_TRUST_RELATIVE_PATH),
+        "ledger": str(policy_trust_path(root_path)),
+        "policy_digest": state.policy_digest,
+        "scopes": list(state.scopes),
+        "expires_at": state.expires_at,
         "via": decision.via,
         "exit_code": 0,
     }
@@ -4730,8 +4843,10 @@ def policy_trust_show(
             {"level": item.level, "granted_at": item.granted_at, "granted_by": item.granted_by}
             for item in (state.history if state is not None else ())
         ],
-        "trust_file": str(root_path / POLICY_TRUST_RELATIVE_PATH),
+        "trust_file": str(policy_trust_path(root_path)),
         "trust_error": trust_error,
+        "expires_at": state.expires_at if state is not None else None,
+        "checkout_trust_file_ignored": checkout_shadow(root_path, POLICY_TRUST_RELATIVE_PATH),
         "cap": cap,
         "effective_level": effective,
         "exit_code": 0 if state is not None else 2,

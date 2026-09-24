@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Any
 
 from hyodo.intent_review import normalize_intent_review
+from hyodo.ledger_origin import anchored_append
 from hyodo.retrieval_provenance import normalize_event_provenance
 
 AGENT_EVENT_SCHEMA_VERSION = "hyodo.agent-event/v1"
@@ -598,9 +599,11 @@ def append_agent_event(root: Path, event: dict[str, Any]) -> bool:
     """
     path = root / AGENT_EVENTS_RELATIVE_PATH
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n")
+        anchored_append(
+            root,
+            AGENT_EVENTS_RELATIVE_PATH,
+            json.dumps(event, sort_keys=True, ensure_ascii=False) + "\n",
+        )
         if stat.S_IMODE(path.stat().st_mode) != 0o600:
             os.chmod(path, 0o600)
         return True

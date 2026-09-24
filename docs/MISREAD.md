@@ -55,7 +55,9 @@ absent (`hyodo/connect.py::build_starter_policy`). `allowed_tools` and
 
 Already covered: [`docs/POLICY_TRUST.md`](./POLICY_TRUST.md) and
 [`docs/CONNECT.md`](./CONNECT.md#what-to-commit). Grants live in
-untracked `.hyodo/policy-trust.json`. Teammates do not inherit a grant.
+per-user state outside the checkout, bound to the workspace path, the
+policy digest, a scope, and a 30-day expiry. A `.hyodo/policy-trust.json`
+in the checkout is ignored. Teammates do not inherit a grant.
 Tracked `[trust] max_level` is a ceiling only.
 
 ## Level 2+ without a visible ledger is `UNOBSERVED`

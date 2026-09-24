@@ -29,19 +29,30 @@ Commands in `.hyodo/gates.toml` are executable code supplied by the checkout.
 HyoDo therefore requires explicit approval before executing a new command set:
 
 - In an interactive terminal, `hyodo check` prints the exact commands and asks
-  for approval. A positive answer records the command-set fingerprint in the
-  local `.hyodo/gates-trust.json` receipt.
+  for approval. A positive answer records the command-set fingerprint in
+  per-user state outside the checkout (`~/.hyodo/state/workspaces/<id>/`,
+  or `$HYODO_STATE_HOME`), bound to this checkout's resolved path.
 - In CI, MCP, or another non-interactive context, an unseen or changed command
-  set is reported as `SKIP` and is not executed. Set
-  `HYODO_GATES_TRUST_ALL=1` only when the checkout has been reviewed out of
-  band and automation is intentionally pre-approving the current set.
+  set is reported as `SKIP` and is not executed.
 - A previously approved fingerprint runs without another prompt. Any changed
   fingerprint requires a new approval and is never silently treated as PASS.
 
-The trust receipt is machine-local runtime state and should normally not be
-committed. Approval controls whether commands execute; it does not establish
-that the approved commands are safe or that their results authorize a merge or
-deployment.
+A `.hyodo/gates-trust.json` file inside the checkout is never read. Anything
+the checkout contains can be authored by the checkout, so a receipt shipped
+with a repository carries no authority; `hyodo check` reports it as ignored
+(`trust.checkout_receipt_ignored` in `--json`). Approval does not follow a
+copy or a clone of the tree to another path.
+
+### `HYODO_GATES_TRUST_ALL=1`
+
+This variable pre-approves whatever command set the checkout defines at the
+moment it runs, including one a pull request just changed. Set it only where
+changes to `.hyodo/gates.toml` already require human review before they reach
+the job that runs `hyodo check` (for example, a protected branch with required
+review, or a CODEOWNERS entry for `.hyodo/gates.toml`). Never set it on a job
+that runs untrusted pull-request code. Approval controls whether commands
+execute; it does not establish that the approved commands are safe or that
+their results authorize a merge or deployment.
 
 ## Table: top level
 

@@ -33,6 +33,7 @@ from hyodo.policy_trust import (  # noqa: F401
     POLICY_TRUST_SCHEMA_ID,
     grant_policy_trust,
     load_policy_trust,
+    policy_trust_path,
 )
 
 
@@ -317,7 +318,7 @@ def test_trust_level_3_allows_unlisted_web_domain(tmp_path):
 
 
 def test_damaged_trust_file_is_unobserved_for_external_variable(tmp_path):
-    trust_path = tmp_path / ".hyodo" / "policy-trust.json"
+    trust_path = policy_trust_path(tmp_path)
     trust_path.parent.mkdir(parents=True)
     trust_path.write_text("{not json", encoding="utf-8")
     policy = _bare_policy(ask_tools=("send_email",), trust=TrustPolicy(max_level=3))

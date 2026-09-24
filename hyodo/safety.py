@@ -1013,7 +1013,7 @@ def run_safety_scan(
         findings = scan_text(corpus)
         findings.append(assess_rollback_signal(corpus))
 
-    return _result_payload(
+    result = _result_payload(
         source,
         findings,
         strict,
@@ -1023,3 +1023,8 @@ def run_safety_scan(
         text_scannable_files=text_scannable_files,
         scope=scope,
     )
+    # A repository-authored exceptions file applies only once an operator
+    # approved its digest; say so instead of letting withheld entries vanish.
+    result["exceptions_status"] = exceptions.status
+    result["exceptions_withheld"] = exceptions.withheld
+    return result

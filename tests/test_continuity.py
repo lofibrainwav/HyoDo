@@ -40,7 +40,7 @@ from hyodo.events import (
     validate_event,
 )
 from hyodo.mcp_server import create_loopback_app, create_server
-from hyodo.pairing import create_pairing, revoke_pairing
+from hyodo.pairing import create_pairing, pairing_path, revoke_pairing
 
 try:  # HTTP bridge tests need extras the base test lane does not install.
     import httpx
@@ -365,7 +365,7 @@ def test_continuity_second_device_missing_is_unobserved(tmp_path) -> None:
 
 
 def _write_last_seen(root: Path, value: str) -> None:
-    path = root / ".hyodo" / "pairing.json"
+    path = pairing_path(root)
     payload = json.loads(path.read_text(encoding="utf-8"))
     payload["last_seen_at"] = value
     path.write_text(json.dumps(payload), encoding="utf-8")

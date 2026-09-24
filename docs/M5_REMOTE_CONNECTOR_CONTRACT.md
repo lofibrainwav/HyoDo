@@ -97,11 +97,14 @@ live, and `availability` in the machine contract stays `UNOBSERVED`.
 
 What is measured:
 
-- **Pairing lifecycle.** `hyodo mcp pair --root <workspace>` creates an
-  untracked `.hyodo/pairing.json` record (`hyodo.pairing/v1`) and prints a
-  32-byte urlsafe bearer token exactly once. Only the token's sha256 digest
-  is ever written to disk. `hyodo mcp revoke` (alias `unpair`) and
-  `hyodo mcp pairing show` read and update that same file.
+- **Pairing lifecycle.** `hyodo mcp pair --root <workspace>` creates a
+  pairing record (`hyodo.pairing/v1`) in per-user state outside the checkout
+  (`~/.hyodo/state/workspaces/<id>/pairing.json`) and prints a 32-byte
+  urlsafe bearer token exactly once. Only the token's sha256 digest is ever
+  written to disk, and the record is honored only for the workspace path it
+  names. `hyodo mcp revoke` (alias `unpair`) and `hyodo mcp pairing show`
+  read and update that same record. A `.hyodo/pairing.json` inside the
+  checkout is never read, so a repository cannot pair a caller of its own.
 - **Paired serving.** `hyodo mcp serve --bind loopback --paired` (and
   `--bind tailscale --paired`) verifies every request's bearer token against
   the pairing record instead of a static `--token`. The record is re-read on

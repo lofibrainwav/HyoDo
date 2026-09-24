@@ -36,7 +36,7 @@ from typer.testing import CliRunner
 
 from hyodo.access_ledger import read_access_log
 from hyodo.cli.main import app
-from hyodo.pairing import PAIRING_RELATIVE_PATH, create_pairing, revoke_pairing
+from hyodo.pairing import create_pairing, pairing_path, revoke_pairing
 
 needs_http_bridge = pytest.mark.skipif(
     httpx is None or uvicorn is None or streamable_http_client is None,
@@ -627,7 +627,7 @@ def test_mcp_paired_bridge_corrupt_pairing_file_is_unobserved(tmp_path):
     """Receipt: a present-but-unreadable pairing file fails closed as UNOBSERVED."""
     from hyodo.mcp_server import create_loopback_app
 
-    path = tmp_path / PAIRING_RELATIVE_PATH
+    path = pairing_path(tmp_path)
     path.parent.mkdir(parents=True)
     path.write_text("{not json", encoding="utf-8")
     app_under_test = create_loopback_app(tmp_path, paired=True)
@@ -652,7 +652,7 @@ def test_mcp_paired_bridge_never_persists_the_token(tmp_path):
     finally:
         server.stop()
 
-    pairing_raw = (tmp_path / PAIRING_RELATIVE_PATH).read_text(encoding="utf-8")
+    pairing_raw = (pairing_path(tmp_path)).read_text(encoding="utf-8")
     assert token not in pairing_raw
 
     ledger_path = tmp_path / ".hyodo" / "mcp-access.jsonl"

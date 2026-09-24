@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 
 from hyodo.cli.main import app
 from hyodo.connector_contract import MCP_CAPABILITIES, build_connector_contract
-from hyodo.pairing import PAIRING_RELATIVE_PATH, create_pairing, revoke_pairing
+from hyodo.pairing import create_pairing, pairing_path, revoke_pairing
 
 runner = CliRunner()
 
@@ -165,7 +165,7 @@ def test_connector_contract_unpaired_workspace_stays_contract_only(tmp_path) -> 
 
 
 def test_connector_contract_corrupt_pairing_file_is_unobserved(tmp_path) -> None:
-    path = tmp_path / PAIRING_RELATIVE_PATH
+    path = pairing_path(tmp_path)
     path.parent.mkdir(parents=True)
     path.write_text("{not json", encoding="utf-8")
 

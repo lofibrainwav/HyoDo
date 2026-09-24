@@ -25,6 +25,7 @@ import hyodo.gates as gates
 from hyodo.gates import (
     GATES_TRUST_ENV_VAR,
     GATES_TRUST_RELATIVE_PATH,
+    GATES_TRUST_STATE_NAME,
     SCHEMA_ID,
     GatesConfig,
     GateTrustDecision,
@@ -35,6 +36,7 @@ from hyodo.gates import (
     resolve_gate_trust,
     run_user_gates,
 )
+from hyodo.user_state import workspace_identity, workspace_state_path
 
 # ---------------------------------------------------------------------------
 # helpers
@@ -78,7 +80,15 @@ def _write_gates_toml(root: Path, body: str) -> Path:
 
 
 def _trust_store(root: Path) -> dict:
-    return json.loads((root / GATES_TRUST_RELATIVE_PATH).read_text(encoding="utf-8"))
+    return json.loads(
+        workspace_state_path(root, GATES_TRUST_STATE_NAME).read_text(encoding="utf-8")
+    )
+
+
+def _write_user_trust(root: Path, text: str) -> None:
+    path = workspace_state_path(root, GATES_TRUST_STATE_NAME)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(text, encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -99,7 +109,8 @@ def test_first_use_requires_interactive_approval_and_records_trust(
     assert marker.exists()  # actually ran -- not just reported PASS
 
     store = _trust_store(tmp_path)
-    assert store["schema"] == "hyodo.gates-trust/v1"
+    assert store["schema"] == "hyodo.gates-trust/v2"
+    assert store["workspace_id"] == workspace_identity(tmp_path)
     fingerprint = compute_gate_set_fingerprint(config)
     assert fingerprint in store["approved"]
     assert store["approved"][fingerprint]["via"] == "prompt"
@@ -390,9 +401,7 @@ def test_ci_env_var_falsy_values_are_not_truthy(
 def test_malformed_trust_store_requires_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    hyodo_dir = tmp_path / ".hyodo"
-    hyodo_dir.mkdir()
-    (hyodo_dir / "gates-trust.json").write_text("{not json", encoding="utf-8")
+    _write_user_trust(tmp_path, "{not json")
 
     config = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
     _force_noninteractive(monkeypatch)
@@ -405,11 +414,15 @@ def test_malformed_trust_store_requires_approval(
 def test_trust_store_with_non_dict_approved_field_requires_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    hyodo_dir = tmp_path / ".hyodo"
-    hyodo_dir.mkdir()
-    (hyodo_dir / "gates-trust.json").write_text(
-        json.dumps({"schema": "hyodo.gates-trust/v1", "approved": "not-a-dict"}),
-        encoding="utf-8",
+    _write_user_trust(
+        tmp_path,
+        json.dumps(
+            {
+                "schema": "hyodo.gates-trust/v2",
+                "workspace_id": workspace_identity(tmp_path),
+                "approved": "not-a-dict",
+            }
+        ),
     )
 
     config = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
@@ -418,3 +431,72 @@ def test_trust_store_with_non_dict_approved_field_requires_approval(
     results = run_user_gates(config, tmp_path)
 
     assert results[0].status == "SKIP"
+
+
+# ---------------------------------------------------------------------------
+# hostile checkout: authority state shipped inside the tree is never honored
+# ---------------------------------------------------------------------------
+
+
+def test_preseeded_checkout_receipt_never_approves_execution(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A clone that ships a receipt for its own gates must not run them."""
+    marker = tmp_path / "pwned.txt"
+    config = _config(_marker_gate("pwn", marker))
+    receipt = tmp_path / GATES_TRUST_RELATIVE_PATH
+    receipt.parent.mkdir(parents=True, exist_ok=True)
+    receipt.write_text(
+        json.dumps(
+            {
+                "schema": "hyodo.gates-trust/v1",
+                "workspace_id": workspace_identity(tmp_path),
+                "approved": {compute_gate_set_fingerprint(config): {"via": "prompt"}},
+            }
+        ),
+        encoding="utf-8",
+    )
+    _force_noninteractive(monkeypatch)
+
+    decision = resolve_gate_trust(config, tmp_path)
+    results = run_user_gates(config, tmp_path)
+
+    assert decision.approved is False
+    assert "checkout-local .hyodo/gates-trust.json ignored" in decision.reason
+    assert results[0].status == "SKIP"
+    assert not marker.exists()
+
+
+def test_approval_does_not_follow_a_copy_of_the_tree(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Approval binds to the workspace path, so a copied tree starts unapproved."""
+    original = tmp_path / "original"
+    copy = tmp_path / "copy"
+    original.mkdir()
+    copy.mkdir()
+    config = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
+    _approve_first_use(config, original, monkeypatch)
+    _force_noninteractive(monkeypatch)
+
+    assert resolve_gate_trust(config, original).approved is True
+    assert resolve_gate_trust(config, copy).approved is False
+
+
+def test_user_state_receipt_for_another_workspace_is_ignored(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
+    _write_user_trust(
+        tmp_path,
+        json.dumps(
+            {
+                "schema": "hyodo.gates-trust/v2",
+                "workspace_id": "sha256:" + "0" * 64,
+                "approved": {compute_gate_set_fingerprint(config): {"via": "prompt"}},
+            }
+        ),
+    )
+    _force_noninteractive(monkeypatch)
+
+    assert resolve_gate_trust(config, tmp_path).approved is False

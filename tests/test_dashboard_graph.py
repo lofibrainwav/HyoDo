@@ -20,6 +20,7 @@ from pathlib import Path
 from threading import Thread
 
 import pytest
+from ledger_fixture import write_ledger
 
 from hyodo.cli.main import DASHBOARD_CSP, DashboardState, make_dashboard_handler
 from hyodo.dashboard import GRAPH_SCRIPT, GRAPH_SCRIPT_SHA256
@@ -39,7 +40,7 @@ EVIDENCE: dict[str, object] = {
 def _write_ledger(root: Path, lines: list[str]) -> None:
     path = root / AGENT_EVENTS_RELATIVE_PATH
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(lines) + ("\n" if lines else ""), encoding="utf-8")
+    write_ledger(path, "\n".join(lines) + ("\n" if lines else ""))
 
 
 def _event(**overrides: object) -> str:

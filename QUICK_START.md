@@ -12,14 +12,16 @@ hyodo safe --strict
 ```
 
 `safe` is an early-warning scan, not a full security audit. Use `--json` for
-machine-readable output. In CI, install HyoDo and run the same command:
+machine-readable output. With no path it scans your uncommitted changes; a
+clean checkout has nothing to scan and reports `UNOBSERVED` (exit **2** under
+`--strict`), never `PASS`. In CI, where the checkout is clean, pass the tree:
 
 ```yaml
 - uses: actions/setup-python@v5
   with:
     python-version: "3.12"
 - run: pip install hyodo
-- run: hyodo safe --strict --json
+- run: hyodo safe . --strict --max-files 0 --json
 ```
 
 ## Run existing project checks

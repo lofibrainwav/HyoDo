@@ -32,14 +32,41 @@ This keeps destructive actions, credential exposure, deployment risk, and unsafe
 
 ## Supported Versions
 
-The current public release is HyoDo **4.20.0**. Security fixes target the
-current `4.20.x` release line. Older release lines must be upgraded before a
-security report can be reproduced against a supported artifact.
+Security fixes target the current `4.21.x` release line, starting at
+**4.21.7**. Older releases must be upgraded before a security report can be
+reproduced against a supported artifact.
 
 | Version | Supported |
 |---------|-----------|
-| 4.20.x  | ✅ Current release line |
-| < 4.20  | ❌ Upgrade required |
+| 4.21.7 and later 4.21.x | ✅ Current release line |
+| 4.21.6 | ❌ GitHub Release only; never published to PyPI; superseded by 4.21.7 |
+| < 4.21.7 | ❌ Upgrade required (checkout-controlled authority state) |
+
+## Authority state lives outside the checkout
+
+HyoDo verifies a checkout, so nothing inside that checkout may grant
+authority. From 4.21.7, operator decisions are read only from per-user state
+(`~/.hyodo/state/`, or `$HYODO_STATE_HOME`), bound to the resolved workspace
+path:
+
+| Decision | Stored as | Checkout file with the same name |
+|----------|-----------|----------------------------------|
+| BYOG gate approval | command-set fingerprint | `.hyodo/gates-trust.json` is ignored |
+| Policy trust grant | level bound to workspace, policy digest, scope, expiry | `.hyodo/policy-trust.json` is ignored |
+| MCP bridge pairing | token digest bound to the workspace path | `.hyodo/pairing.json` is ignored |
+| Scan exceptions | operator approval of the file's exact digest | `.hyodo/scan-exceptions.toml` applies nothing until approved |
+| Ledger origin | digest of the bytes HyoDo itself appended | a ledger that arrived with the tree is `UNVERIFIED` and never READY |
+
+A same-named file inside the checkout is reported as ignored, never honored.
+Approvals do not follow a copy or a clone of the tree to another path. The
+hostile-clone gauntlet (`tests/test_hostile_clone.py`,
+`scripts/release/hostile_clone_gauntlet.sh`) attacks the built wheel with a
+repository that ships all of the above and is a required release gate.
+
+Environment pre-approvals (`HYODO_GATES_TRUST_ALL`, `HYODO_POLICY_TRUST_ALL`,
+`HYODO_SCAN_EXCEPTIONS_DIGEST`) remain available for automation. Use them only
+on jobs where changes to `.hyodo/` already require human review before they
+run; never on a job that runs untrusted pull-request code.
 
 ## Reporting a Vulnerability
 

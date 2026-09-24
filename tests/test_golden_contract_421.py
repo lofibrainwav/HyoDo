@@ -28,8 +28,9 @@ from hyodo.cli.main import app
 from hyodo.gates import (
     GATES_CONFIG_RELATIVE_PATH,
     GATES_TRUST_ENV_VAR,
-    GATES_TRUST_RELATIVE_PATH,
+    GATES_TRUST_STATE_NAME,
 )
+from hyodo.user_state import user_state_home, workspace_identity, workspace_state_path
 
 runner = CliRunner()
 
@@ -167,10 +168,16 @@ def test_no_gate_executed_exits_2(tmp_path: Path, trusted: None) -> None:
 
 def test_changed_command_set_is_refused_without_naming_the_bypass(tmp_path: Path) -> None:
     _write_gates(tmp_path, _gate("ok", "true"))
-    trust = tmp_path / GATES_TRUST_RELATIVE_PATH
+    trust = workspace_state_path(tmp_path, GATES_TRUST_STATE_NAME)
     trust.parent.mkdir(parents=True, exist_ok=True)
     trust.write_text(
-        json.dumps({"schema": "hyodo.gates-trust/v1", "approved": {"deadbeef": {"via": "prompt"}}}),
+        json.dumps(
+            {
+                "schema": "hyodo.gates-trust/v2",
+                "workspace_id": workspace_identity(tmp_path),
+                "approved": {"deadbeef": {"via": "prompt"}},
+            }
+        ),
         encoding="utf-8",
     )
 
@@ -245,12 +252,13 @@ def test_unpersistable_trust_receipt_does_not_rewrite_gate_results(
 ) -> None:
     """A receipt that cannot be stored is surfaced, never charged to a gate."""
     _write_gates(tmp_path, _gate("ok", "true"))
-    hyodo_dir = tmp_path / ".hyodo"
-    hyodo_dir.chmod(stat.S_IRUSR | stat.S_IXUSR)  # readable, not writable
+    state_home = user_state_home()
+    state_home.mkdir(parents=True, exist_ok=True)
+    state_home.chmod(stat.S_IRUSR | stat.S_IXUSR)  # readable, not writable
     try:
         exit_code, payload = _check_json(tmp_path)
     finally:
-        hyodo_dir.chmod(stat.S_IRWXU)
+        state_home.chmod(stat.S_IRWXU)
 
     # The gate ran and passed; only the receipt is missing.
     assert exit_code == 0

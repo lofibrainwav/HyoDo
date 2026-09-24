@@ -20,6 +20,7 @@ from unittest.mock import patch
 from typer.testing import CliRunner
 
 from hyodo.cli.main import GateStatus, _collect_files, _run_general_gates, app
+from hyodo.exceptions import approve_scan_exceptions, parse_scan_exceptions
 from hyodo.safety import run_safety_scan
 
 runner = CliRunner()
@@ -73,6 +74,7 @@ reason = "private legal working material"
 """,
         encoding="utf-8",
     )
+    approve_scan_exceptions(tmp_path, parse_scan_exceptions(tmp_path).digest or "", by="human:test")
     private_file = tmp_path / "private" / "legal" / "broken.py"
     private_file.parent.mkdir(parents=True)
     private_file.write_text("def broken(:\n", encoding="utf-8")

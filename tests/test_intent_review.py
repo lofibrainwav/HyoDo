@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from ledger_fixture import write_ledger
 
 from hyodo.events import AGENT_EVENTS_RELATIVE_PATH, validate_event
 from hyodo.intent_review import normalize_intent_review, project_intent_review
@@ -195,7 +196,7 @@ def test_real_ledger_projects_intent_review_without_rewriting_it(tmp_path: Path)
         events.append(event)
     path = tmp_path / AGENT_EVENTS_RELATIVE_PATH
     path.parent.mkdir(parents=True)
-    path.write_text("\n".join(json.dumps(e) for e in events) + "\n")
+    write_ledger(path, "\n".join(json.dumps(e) for e in events) + "\n")
     original = path.read_bytes()
     graph = build_report_graph(tmp_path)
     view = build_verification_view(graph, root=tmp_path)
