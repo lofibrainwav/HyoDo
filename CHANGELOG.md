@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.21.8] - 2026-09-24
 
-Release candidate for the already-landed evidence/judgment boundary. No new
+Publishes the already-landed evidence/judgment boundary. No new
 HyoDo Core capability is added by this release commit.
 
 ### Added
@@ -30,8 +30,9 @@ HyoDo Core capability is added by this release commit.
 - Source commits: #482 -> `d17c053744dc0fd317e99eb7169cc00cb11ff2e4`,
   #483 -> `872ecdca1ffa4c51682fd6b6ada586851cb2ec19`.
 - Exact base-main CI was success before the release commit.
-- The 4.21.8 release chain remains `UNOBSERVED` in
-  `docs/releases/4.21.8.md`.
+- Publication is measured and sealed in `docs/releases/4.21.8.md`: 9/9
+  OBSERVED (release-evidence run `36063280175`, PyPI publish/readback run
+  `36063407919`, wheel sha256 prefix `0dab4e34030abf53`).
 
 ## [4.21.7] - 2026-09-23
 

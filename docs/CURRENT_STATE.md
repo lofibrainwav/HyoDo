@@ -8,15 +8,15 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package on PyPI: HyoDo `4.21.7` (security release). 4.21.6
-  exists only as a GitHub Release; its PyPI publication was withheld and it is
-  superseded by 4.21.7 (see "4.21.7 security release" below).
-- Recorded closed release chain: HyoDo `4.21.7`
+- Latest public package on PyPI: HyoDo `4.21.8`. 4.21.6 exists only as a
+  GitHub Release; its PyPI publication was withheld and it is superseded by
+  the security release 4.21.7 (see "4.21.7 security release" below).
+- Recorded closed release chain: HyoDo `4.21.8`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.21.7.md`](./releases/4.21.7.md).
+  [`releases/4.21.8.md`](./releases/4.21.8.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: the recorded 4.21.7 release is closed. Post-release
+- HyoDo product status: the recorded 4.21.8 release is closed. Post-release
   research and integration have separate evidence and promotion criteria;
   they do not silently reopen the sealed public artifact. Live-host and
   orchestration experiments remain downstream integration/research work.
@@ -24,6 +24,14 @@ receipt rather than in this self-referential page.
 The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
+
+## 4.21.8 release
+
+4.21.8 publishes the evidence/judgment boundary: gate-to-virtue attribution
+stays inside `hyodo.dashboard-evidence/v2`, `hyodo.lens-evidence/v1` reports
+lens state with `authority: UNOBSERVED`, and legacy score derivation is
+compatibility only. It adds no new HyoDo Core capability. Its release chain is
+measured 9/9 OBSERVED in [`releases/4.21.8.md`](./releases/4.21.8.md).
 
 ## 4.21.7 security release
 
@@ -102,7 +110,7 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 The runtime matrix above compares public 4.19.5 with the source state measured
 on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
-4.21.3. The 4.21.3 release-chain receipt is recorded separately above. Do not
+4.21.8. The 4.21.8 release-chain receipt is recorded separately above. Do not
 infer runtime identity from this page alone; use the signed release, CI receipt,
 or runtime identity receipt. Fresh
 Codex/Cursor host observations,

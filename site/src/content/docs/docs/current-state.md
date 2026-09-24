@@ -8,16 +8,13 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.8** is the current release target. Its release chain is
-`UNOBSERVED` in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.8.md);
-until that chain is measured, the latest published package remains **4.21.7**,
-whose release chain is measured 9/9 OBSERVED in the
-[4.21.7 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.7.md).
+HyoDo **4.21.8** is the current release target, and its release chain is
+measured 9/9 OBSERVED in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.8.md).
 Product capability and live host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Current release target: **4.21.8** (release chain `UNOBSERVED`)
-- Latest published package: **4.21.7** (security release; see the 4.21.7 receipt above)
+- Current release target: **4.21.8** (release chain 9/9 OBSERVED)
+- Latest published package: **4.21.8** (see the receipt above)
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
@@ -68,4 +65,4 @@ HyoDo                  observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/host experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.21.7 public artifact released and verified.
+prerequisites for calling the HyoDo 4.21.8 public artifact released and verified.
