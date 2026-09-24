@@ -12,7 +12,7 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.5 is the current release target and source-tree release baseline.
+HyoDo 4.21.6 is the current release target and source-tree release baseline.
 Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
 measured in `docs/releases/4.21.5.md`. HyoDo 4.21.2 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -99,6 +99,16 @@ evidence is not converted into a pass.
   of accepting any output that merely contains the expected version number.
 - Preserve all 4.21.0 check status, exit-code, coverage, trust, and provenance
   semantics unchanged.
+
+### 4.21.6 (released 2026-09-23)
+
+- Ship the retired-reader registration GC from #477: before a new MCP reader
+  registers, records whose PID/process-start identity is provably retired
+  (SIGTERM, SIGKILL, crash, reboot) are removed; an unobservable identity is
+  never treated as dead. Closes the deployed-runtime gap where 4.21.5 kept
+  collecting registration residue after an unclean reader exit.
+- Release candidate planning accepts both coherent states (`UNPREPARED` and
+  `PREPARED`) instead of rejecting a fully prepared candidate.
 
 ### 4.21.5 (released 2026-09-23)
 
