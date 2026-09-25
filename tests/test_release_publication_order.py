@@ -13,6 +13,7 @@ still mutated would be caught.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -323,6 +324,12 @@ def test_workflow_jobs_map_onto_the_publication_states() -> None:
             assert job in jobs, f"{workflow} has no job {job!r} for {state}"
             assert state in PUBLICATION_ORDER
 
+    # The pipeline reads job ids from this map, not from the files.
+    assert pipeline.WORKFLOW_JOB_IDS.keys() == pipeline.WORKFLOW_STATES.keys()
+    for workflow, names in pipeline.WORKFLOW_JOB_IDS.items():
+        jobs = _jobs(workflow)
+        assert names == {spec.get("name", job): job for job, spec in jobs.items()}
+
     evidence = _jobs("release-evidence.yml")
     assert evidence["attach-assets"]["needs"] == "build-evidence"
     publish = _jobs("publish.yml")
@@ -530,6 +537,33 @@ def test_publish_run_discovery_ignores_runs_before_publication(
     remote.publish_started_at = pipeline._parse_utc("2999-01-01T00:00:00Z")
     with pytest.raises(pipeline.PipelineExternalError, match=r"no publish\.yml run"):
         remote.wait_publish_workflow(TAG)
+
+
+def test_publish_run_is_read_without_pyyaml(monkeypatch: pytest.MonkeyPatch) -> None:
+    # This read happens after the irreversible publish, often from a system
+    # interpreter. A missing PyYAML there once left the release published but
+    # the receipt short of PYPI_PUBLISHED.
+    monkeypatch.setitem(sys.modules, "yaml", None)
+    jobs = [
+        {"name": "Build release artifacts", "conclusion": "success"},
+        {"name": "Publish to PyPI (OIDC)", "conclusion": "success"},
+        {"name": "Post-publish readback", "conclusion": "success"},
+    ]
+    stub = _GhStub(
+        runs=[
+            {
+                "databaseId": 222,
+                "createdAt": "2999-01-01T00:00:00Z",
+                "headBranch": TAG,
+                "displayTitle": f"HyoDo {TAG}",
+            }
+        ],
+        jobs={"222": jobs},
+    )
+    remote = _remote_with(monkeypatch, stub)
+    remote.publish_started_at = pipeline._parse_utc("2000-01-01T00:00:00Z")
+    run = remote.wait_publish_workflow(TAG)
+    assert run["jobs"] == {"build": "success", "publish": "success", "verify": "success"}
 
 
 def test_release_evidence_run_name_carries_the_tag() -> None:

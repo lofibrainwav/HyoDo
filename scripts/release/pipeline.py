@@ -728,6 +728,22 @@ WORKFLOW_STATES: dict[str, dict[str, str]] = {
     },
 }
 
+# `gh run view` reports jobs by display name; WORKFLOW_STATES is keyed by job
+# id. This map is written out rather than parsed from the workflow files so the
+# pipeline needs no PyYAML: it runs after the irreversible publish, often from a
+# system interpreter. Tests fail if a workflow's job names drift from it.
+WORKFLOW_JOB_IDS: dict[str, dict[str, str]] = {
+    "release-evidence.yml": {
+        "Build exact-tag SBOM evidence": "build-evidence",
+        "Attach and verify draft Release SBOM assets": "attach-assets",
+    },
+    "publish.yml": {
+        "Build release artifacts": "build",
+        "Publish to PyPI (OIDC)": "publish",
+        "Post-publish readback": "verify",
+    },
+}
+
 
 def _utcnow() -> datetime:
     return datetime.now(UTC)
@@ -881,11 +897,7 @@ class GitHubRemote:
         self._ok("gh", "release", "edit", tag, "--repo", self.repo, "--draft=false", "--latest")
 
     def _job_names(self, workflow: str) -> dict[str, str]:
-        import yaml
-
-        path = self.root / ".github" / "workflows" / workflow
-        jobs = yaml.safe_load(path.read_text(encoding="utf-8"))["jobs"]
-        return {spec.get("name", job): job for job, spec in jobs.items()}
+        return WORKFLOW_JOB_IDS[workflow]
 
     def _wait_run(
         self,
