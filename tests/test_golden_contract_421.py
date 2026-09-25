@@ -17,7 +17,6 @@ exit code and legacy status stay exactly where 4.20 left them.
 from __future__ import annotations
 
 import json
-import stat
 from pathlib import Path
 
 import pytest
@@ -30,7 +29,7 @@ from hyodo.gates import (
     GATES_TRUST_ENV_VAR,
     GATES_TRUST_STATE_NAME,
 )
-from hyodo.user_state import user_state_home, workspace_identity, workspace_state_path
+from hyodo.user_state import USER_STATE_ENV_VAR, workspace_identity, workspace_state_path
 
 runner = CliRunner()
 
@@ -248,17 +247,17 @@ def test_second_run_reports_previously_approved(tmp_path: Path, trusted: None) -
 
 
 def test_unpersistable_trust_receipt_does_not_rewrite_gate_results(
-    tmp_path: Path, trusted: None
+    tmp_path: Path, trusted: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """A receipt that cannot be stored is surfaced, never charged to a gate."""
     _write_gates(tmp_path, _gate("ok", "true"))
-    state_home = user_state_home()
-    state_home.mkdir(parents=True, exist_ok=True)
-    state_home.chmod(stat.S_IRUSR | stat.S_IXUSR)  # readable, not writable
-    try:
-        exit_code, payload = _check_json(tmp_path)
-    finally:
-        state_home.chmod(stat.S_IRWXU)
+    # Structurally impossible state root: deterministic across existing parent
+    # directories and independent of permission behavior/root privileges.
+    blocked_state_home = tmp_path / "state-home-is-a-file"
+    blocked_state_home.write_text("not a directory\n", encoding="utf-8")
+    monkeypatch.setenv(USER_STATE_ENV_VAR, str(blocked_state_home))
+
+    exit_code, payload = _check_json(tmp_path)
 
     # The gate ran and passed; only the receipt is missing.
     assert exit_code == 0
