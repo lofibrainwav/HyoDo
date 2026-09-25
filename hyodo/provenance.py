@@ -331,7 +331,16 @@ def _same_directory(first: Path, second: Path) -> bool:
 
 def git_is_dirty(root: Path) -> bool | None:
     """True if the checkout has uncommitted changes; None if unobservable."""
-    if git_commit(root) is None:
+    return _dirty_at(root, git_commit(root))
+
+
+def _dirty_at(root: Path, commit: str | None) -> bool | None:
+    """`git_is_dirty` for a root whose `git_commit` the caller already observed.
+
+    The commit only answers "is this a checkout at all"; passing it in saves
+    the second `git rev-parse HEAD` a caller that just ran it would pay.
+    """
+    if commit is None:
         return None
     status = _run_git(root, "status", "--porcelain")
     if status is None:
@@ -616,12 +625,19 @@ def resolve_provenance(
             tool_version = None
 
     tool_commit = _own_checkout_commit(package) if package is not None else None
-    # Unlike the measuring package, a target inside a larger repository is
-    # versioned by that repository, so its enclosing commit is its history.
-    # Green never rests on it: equality is decided by `_compare_sources`.
-    target_commit = git_commit(target)
-    tool_dirty = git_is_dirty(package) if package is not None and tool_commit else None
-    target_dirty = git_is_dirty(target)
+    # `_own_checkout_commit` returns `git_commit(package)` whenever it returns
+    # a commit, so the dirty check reuses it instead of asking git again.
+    tool_dirty = _dirty_at(package, tool_commit) if package is not None and tool_commit else None
+    if package is not None and tool_commit and _same_directory(package, target):
+        # The same directory gives the same answers to the same git commands;
+        # ask once. Only facts from this call are reused, nothing is cached.
+        target_commit, target_dirty = tool_commit, tool_dirty
+    else:
+        # Unlike the measuring package, a target inside a larger repository is
+        # versioned by that repository, so its enclosing commit is its history.
+        # Green never rests on it: equality is decided by `_compare_sources`.
+        target_commit = git_commit(target)
+        target_dirty = _dirty_at(target, target_commit)
 
     relation, content_difference = _classify(
         target_root=target,
