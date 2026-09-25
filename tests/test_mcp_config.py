@@ -16,6 +16,7 @@ from urllib.parse import parse_qs, unquote, urlsplit
 import pytest
 from typer.testing import CliRunner
 
+from hyodo.cli import main as cli_main
 from hyodo.cli.main import app
 from hyodo.mcp_config import (
     ALL_HOSTS,
@@ -47,6 +48,11 @@ def _isolated_environment(tmp_path: Path, monkeypatch) -> None:
     fake_home.mkdir(exist_ok=True)
     monkeypatch.setenv("HOME", str(fake_home))
     monkeypatch.setenv("COLUMNS", "1000")
+    # Rich reads COLUMNS once, when the console is created at import. If it
+    # was set then, the width is pinned and the env var above has no effect;
+    # under pytest-xdist on CI the console rendered at 80 columns. Pin the
+    # width on the console itself for the duration of each test.
+    monkeypatch.setattr(cli_main.console, "_width", 1000)
 
 
 def _dir_digest(root: Path) -> str:
