@@ -5,6 +5,28 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.9] - 2026-09-25
+
+Provenance correctness release. HyoDo no longer reports unknown as different.
+No new HyoDo Core capability is added by this release commit.
+
+### Fixed
+
+- In 4.21.8, a source subtree that could not be read could be classified
+  `SELF_OTHER_CHECKOUT` / `MISMATCH`: `Path.rglob` could hide a directory-scan
+  `OSError`, so the unreadable subtree looked like missing files. Source
+  traversal now surfaces that error, and an unreadable source subtree is
+  `SOURCE_UNOBSERVED` / `UNOBSERVED` with `green_allowed=false` (#488).
+
+### Evidence
+
+- Source commits: #487 -> `ca0a2029d94ae2f37bc1b2bec466f5051b48fe8b`,
+  #488 -> `1b3a0c1e417e1d136154b45308dc96c9fcb94790`.
+- #487 is test-only: it makes the trust persistence golden fixture
+  deterministic. It is verification evidence, not a product capability.
+- The 4.21.9 release chain is `UNOBSERVED` in `docs/releases/4.21.9.md` until
+  it is measured after publication.
+
 ## [4.21.8] - 2026-09-24
 
 Publishes the already-landed evidence/judgment boundary. No new
