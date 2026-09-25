@@ -307,6 +307,11 @@ jobs:
         # root: all four gates orchestrate to exit 0 with Eternity actually
         # PASSing (not SKIP). The individual tools are checked elsewhere; this is
         # the one-shot orchestration proof the other jobs do not cover.
+        # pytest reads PYTEST_ADDOPTS itself, so the gate's own command runs on
+        # parallel workers without any change to `hyodo check`. The serial run
+        # is kept as evidence on main pushes (serial-full-suite).
+        env:
+          PYTEST_ADDOPTS: "-n auto --junitxml=${{ runner.temp }}/hyodo-check-junit.xml"
         run: |
           set +e
           out="$(hyodo check 2>&1)"
@@ -316,6 +321,75 @@ jobs:
           test "$ec" -eq 0
           echo "$out" | grep -q "All executed gates passed"
           echo "$out" | grep -q "SBOM generated (public surface)"
+
+      - name: Slowest test files in the `hyodo check` pytest gate
+        # `hyodo check` prints only pytest's summary line, so per-test timing
+        # comes from the JUnit report. Under xdist these are per-worker
+        # durations, not the suite's critical path.
+        if: ${{ always() }}
+        env:
+          JUNIT_PATH: ${{ runner.temp }}/hyodo-check-junit.xml
+        run: |
+          python3 - <<'PY'
+          import collections
+          import os
+          import xml.etree.ElementTree as ET
+
+          path = os.environ["JUNIT_PATH"]
+          if not os.path.exists(path):
+              print(f"UNOBSERVED: no JUnit report at {path}")
+              raise SystemExit(0)
+          per_file = collections.Counter()
+          cases = 0
+          for case in ET.parse(path).iter("testcase"):
+              cases += 1
+              module = (case.get("classname") or "").split(".")
+              name = "/".join(module[:2]) if module[:1] == ["tests"] else ".".join(module)
+              per_file[name] += float(case.get("time") or 0)
+          print(f"{cases} test cases, {sum(per_file.values()):.1f}s summed across workers")
+          for name, seconds in per_file.most_common(25):
+              print(f"{seconds:7.2f}s  {name}")
+          PY
+
+      - name: Upload `hyodo check` JUnit report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hyodo-check-junit-attempt-${{ github.run_attempt }}
+          path: ${{ runner.temp }}/hyodo-check-junit.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  # Serial evidence for the merged SHA. The PR-time lanes run pytest on
+  # parallel workers; bugs that only appear in one execution order would hide
+  # there. This job runs the suite the way a default `hyodo check` does.
+  serial-full-suite:
+    name: "Goodness - Serial Full Suite (main)"
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: ./.github/actions/setup-uv-cached
+
+      - name: Install locked Python dependencies
+        run: |
+          uv sync --locked --extra dev
+          echo "$GITHUB_WORKSPACE/.venv/bin" >> "$GITHUB_PATH"
+
+      - name: Serial full suite on the merged SHA (no xdist)
+        run: python -m pytest tests -q --tb=short -ra -p no:xdist
 
   goodness-safety-fixtures:
     name: "Goodness - Safety Fixtures"
@@ -633,7 +707,8 @@ jobs:
     name: "HyoDo Integrity Score"
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [truth-gate, truth-gate-mcp-v1, goodness-gate, beauty-gate, public-language]
+    needs:
+      [truth-gate, truth-gate-mcp-v1, goodness-gate, beauty-gate, public-language, serial-full-suite]
     if: ${{ always() }}
 
     steps:
@@ -645,6 +720,8 @@ jobs:
           GOODNESS_RESULT: ${{ needs['goodness-gate'].result }}
           BEAUTY_RESULT: ${{ needs['beauty-gate'].result }}
           PUBLIC_LANGUAGE_RESULT: ${{ needs['public-language'].result }}
+          SERIAL_RESULT: ${{ needs['serial-full-suite'].result }}
+          REF: ${{ github.ref }}
         run: |
           set -euo pipefail
 
@@ -670,6 +747,13 @@ jobs:
             exit 1
           fi
 
+          if [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+            check_success "Serial full suite" "$SERIAL_RESULT"
+          elif [ "$SERIAL_RESULT" != "skipped" ]; then
+            echo "::error::Serial full suite ran outside a main push (result=$SERIAL_RESULT)"
+            exit 1
+          fi
+
           echo "All required upstream jobs succeeded."
 
       - name: Validate HyoDo public release readiness
@@ -685,6 +769,7 @@ jobs:
           echo "  - Python 3.10-3.14 lint/type/package checks"
           echo "  - MCP SDK v1 compatibility"
           echo "  - Public package tests and CLI orchestration"
+          echo "  - Serial full suite on main pushes"
           echo "  - Documentation lint and external-first guards"
           echo "  - PR public-language check when applicable"
           echo "  - Required release files present"
