@@ -17,6 +17,7 @@ from pathlib import Path
 
 import pytest
 
+from scripts.release import verify_release_chain
 from scripts.release.verify_release_chain import (
     CHAIN_STEPS,
     ChainStep,
@@ -219,6 +220,81 @@ def test_a_missing_tag_is_unobserved_without_claiming_anything_about_signing() -
     step = tag_step(tag="v9.9.9", commit=None, signed=False, verified=False)
     assert step.state == "UNOBSERVED"
     assert step.evidence is None
+
+
+# --- a host without allowed signers can still observe the tag ------------
+
+_COMMIT = "b22c9748c93f73d0a66d56d2bb006f7c876586c8"
+_TAG_OBJECT = "e9015a1b99be0c5f318ba2a733129ae200b9b492"
+
+
+def _github_tag(
+    *, verified: bool = True, target: str = _COMMIT, ref_type: str = "tag"
+) -> dict[str, dict]:
+    return {
+        "repos/o/r/git/ref/tags/v4.21.9": {"object": {"type": ref_type, "sha": _TAG_OBJECT}},
+        f"repos/o/r/git/tags/{_TAG_OBJECT}": {
+            "tag": "v4.21.9",
+            "object": {"type": "commit", "sha": target},
+            "verification": {"verified": verified, "reason": "valid" if verified else "unsigned"},
+        },
+    }
+
+
+def _serve(monkeypatch: pytest.MonkeyPatch, payloads: dict[str, dict]) -> None:
+    def fake_gh_json(*args: str):
+        return payloads.get(args[1]) if args[0] == "api" else None
+
+    monkeypatch.setattr(verify_release_chain, "_gh_json", fake_gh_json)
+
+
+def test_a_github_verified_tag_is_observed_and_says_who_verified_it() -> None:
+    step = tag_step(
+        tag="v4.21.9", commit=_COMMIT, signed=True, verified=False, github_verified=True
+    )
+    assert step.state == "OBSERVED"
+    assert "verified by GitHub" in step.render()
+
+
+def test_local_verification_keeps_its_evidence_wording() -> None:
+    step = tag_step(tag="v4.21.9", commit=_COMMIT, signed=True, verified=True, github_verified=True)
+    assert step.evidence == "`v4.21.9` -> `b22c974`, signature verified"
+
+
+def test_github_verification_requires_a_verified_tag_on_the_measured_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    check = verify_release_chain._github_verifies_tag
+    _serve(monkeypatch, _github_tag())
+    assert check("o/r", "v4.21.9", _COMMIT) is True
+    assert check("o/r", "v4.21.9", None) is False
+    assert check("o/r", "v4.21.9", "0" * 40) is False
+    _serve(monkeypatch, _github_tag(verified=False))
+    assert check("o/r", "v4.21.9", _COMMIT) is False
+    _serve(monkeypatch, _github_tag(ref_type="commit"))
+    assert check("o/r", "v4.21.9", _COMMIT) is False
+    _serve(monkeypatch, {})
+    assert check("o/r", "v4.21.9", _COMMIT) is False
+
+
+def test_measure_chain_observes_the_tag_without_local_allowed_signers(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # 4.21.9's readback ran on a host with no gpg.ssh.allowedSignersFile:
+    # `git tag -v` failed, so a published, GitHub-verified tag read UNOBSERVED.
+    def fake_run(*args: str, timeout: int = 30):
+        if args[-2:] == ("-n1", "v4.21.9"):
+            return _COMMIT
+        if args[-2:] == ("-p", "v4.21.9"):
+            return "object ...\n-----BEGIN SSH SIGNATURE-----\n"
+        return None  # includes `git tag -v`
+
+    monkeypatch.setattr(verify_release_chain, "_run", fake_run)
+    _serve(monkeypatch, _github_tag())
+    steps = verify_release_chain.measure_chain("4.21.9", repo="o/r", root=tmp_path)
+    assert steps[0].name == "Signed verified tag"
+    assert steps[0].state == "OBSERVED"
+    assert "verified by GitHub" in (steps[0].evidence or "")
 
 
 # --- a past release stays observed after a newer one ships ---------------
