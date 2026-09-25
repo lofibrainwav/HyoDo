@@ -67,7 +67,10 @@ def _append_event(root: Path, line: str) -> None:
 def _running_server(root: Path | None):
     state = DashboardState(dict(EVIDENCE))
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_dashboard_handler(state, root=root))
-    thread = Thread(target=server.serve_forever, daemon=True)
+    # serve_forever() checks for shutdown every poll_interval (default 0.5s), so
+    # shutdown() on exit blocked each test for up to half a second. Requests are
+    # still served on socket readiness; only the shutdown check gets faster.
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     try:
         yield server.server_address[1]

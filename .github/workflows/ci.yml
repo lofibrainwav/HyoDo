@@ -241,6 +241,9 @@ jobs:
       - name: Run Public Package Tests (release blocker)
         env:
           HYODO_SBOM_INTEGRATION: "1"
+          # sys.monitoring-based line coverage (Python 3.12+). Same measured
+          # lines and total as the default tracer, with less per-line overhead.
+          COVERAGE_CORE: sysmon
         run: |
           echo "Running public package tests (blocking)..."
           python -m pytest tests -q --tb=short --cov=hyodo --cov-fail-under=80

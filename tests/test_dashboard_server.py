@@ -40,7 +40,10 @@ EVIDENCE: dict[str, object] = {
 def dashboard_server():
     state = DashboardState(dict(EVIDENCE))
     server = ThreadingHTTPServer(("127.0.0.1", 0), make_dashboard_handler(state))
-    thread = Thread(target=server.serve_forever, daemon=True)
+    # serve_forever() checks for shutdown every poll_interval (default 0.5s), so
+    # shutdown() on exit blocked each test for up to half a second. Requests are
+    # still served on socket readiness; only the shutdown check gets faster.
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     try:
         yield state, server.server_address[1]
@@ -101,7 +104,7 @@ def _running_server(allow_origins: tuple[str, ...] = ()):
     server = ThreadingHTTPServer(
         ("127.0.0.1", 0), make_dashboard_handler(state, allow_origins=allow_origins)
     )
-    thread = Thread(target=server.serve_forever, daemon=True)
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     try:
         yield server.server_address[1]
@@ -330,7 +333,7 @@ def test_manual_refresh_requires_token_and_redirects_after_replacing_snapshot():
         ("127.0.0.1", 0),
         make_dashboard_handler(state, refresh, "issued-token"),
     )
-    thread = Thread(target=server.serve_forever, daemon=True)
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     try:
         port = server.server_address[1]
@@ -374,7 +377,7 @@ def test_manual_refresh_failure_keeps_snapshot_and_exposes_failure_status():
     server = ThreadingHTTPServer(
         ("127.0.0.1", 0), make_dashboard_handler(state, broken_refresh, "issued-token")
     )
-    thread = Thread(target=server.serve_forever, daemon=True)
+    thread = Thread(target=server.serve_forever, kwargs={"poll_interval": 0.01}, daemon=True)
     thread.start()
     try:
         status, _headers, _body = _post(
