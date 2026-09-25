@@ -628,6 +628,43 @@ def test_fixture_f_bytecode_caches_are_not_source(tmp_path: Path) -> None:
 
 
 @requires_git
+@pytest.mark.skipif(os.name != "posix", reason="mode-000 directory fixture is POSIX-only")
+def test_fixture_f_an_unreadable_source_subdirectory_is_unobserved_not_mismatch(
+    tmp_path: Path,
+) -> None:
+    """Unreadable source is missing evidence, not proof that source differs.
+
+    Python 3.13+ Path.rglob() suppresses directory-scanning OSErrors. The old
+    traversal then saw the unreadable subtree as absent and incorrectly
+    classified an otherwise identical wheel/source pair as MISMATCH.
+    """
+    target = _write_checkout(tmp_path / "HyoDo")
+    hidden = target / "hyodo" / "privatepkg"
+    hidden.mkdir()
+    (hidden / "__init__.py").write_text("# same source\n", encoding="utf-8")
+    _git_init(target, "target")
+    site = _install_copy(target, tmp_path / "venv" / "lib" / "python3.12" / "site-packages")
+
+    previous_mode = hidden.stat().st_mode & 0o777
+    hidden.chmod(0)
+    try:
+        try:
+            next(hidden.iterdir())
+        except PermissionError:
+            pass
+        else:
+            pytest.skip("current user can still traverse a mode-000 directory")
+
+        provenance = resolve_provenance(target, package_root=site, tool_version=SAME_VERSION)
+    finally:
+        hidden.chmod(previous_mode)
+
+    assert provenance.relation == "SOURCE_UNOBSERVED"
+    assert provenance.validity == "UNOBSERVED"
+    assert provenance.is_green_allowed is False
+
+
+@requires_git
 def test_fixture_f_an_installed_copy_that_cannot_be_read_is_unobserved(tmp_path: Path) -> None:
     """Boundary guard, not a regression lock: this already held before the fix.
 

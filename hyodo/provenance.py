@@ -261,16 +261,39 @@ def _source_digests(package_dir: Path) -> dict[str, str] | None:
     if not package_dir.is_dir():
         return None
     digests: dict[str, str] = {}
+
+    def _raise_walk_error(error: OSError) -> None:
+        raise error
+
     try:
-        for path in package_dir.rglob("*"):
-            relative = PurePosixPath(path.relative_to(package_dir).as_posix())
-            if not path.is_file() or _is_not_source(relative):
-                continue
-            if len(digests) >= _MAX_SOURCE_FILES:
-                return None
-            digests[str(relative)] = hashlib.sha256(
-                _normalized(relative, path.read_bytes())
-            ).hexdigest()
+        # Path.rglob() suppresses directory-scanning OSErrors on modern
+        # Python, which can turn an unreadable source subtree into an
+        # apparent set of missing files and therefore a false MISMATCH.
+        # os.walk(onerror=...) lets us preserve the contract: if any source
+        # subtree cannot be observed, equality/difference is UNOBSERVED.
+        for directory, dirnames, filenames in os.walk(
+            package_dir, topdown=True, onerror=_raise_walk_error
+        ):
+            current = Path(directory)
+            # Named tooling/cache directories are deliberately outside the
+            # source contract, so unreadability there is irrelevant.
+            dirnames[:] = [
+                name
+                for name in dirnames
+                if not _is_not_source(
+                    PurePosixPath((current / name).relative_to(package_dir).as_posix())
+                )
+            ]
+            for name in filenames:
+                path = current / name
+                relative = PurePosixPath(path.relative_to(package_dir).as_posix())
+                if not path.is_file() or _is_not_source(relative):
+                    continue
+                if len(digests) >= _MAX_SOURCE_FILES:
+                    return None
+                digests[str(relative)] = hashlib.sha256(
+                    _normalized(relative, path.read_bytes())
+                ).hexdigest()
     except OSError:
         return None
     return digests
