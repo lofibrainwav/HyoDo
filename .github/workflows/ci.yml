@@ -246,7 +246,7 @@ jobs:
           COVERAGE_CORE: sysmon
         run: |
           echo "Running public package tests (blocking)..."
-          python -m pytest tests -q --tb=short --cov=hyodo --cov-fail-under=80
+          python -m pytest tests -q --tb=short -n auto --cov=hyodo --cov-fail-under=80
 
   hostile-clone-gauntlet:
     name: "Goodness - Hostile Clone Gauntlet"
