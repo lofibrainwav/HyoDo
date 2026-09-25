@@ -1133,3 +1133,116 @@ def test_line_endings_are_normalized_only_in_known_text(tmp_path: Path, name: st
         assert provenance.relation == "SELF_SAME_CHECKOUT"
     else:
         assert provenance.relation == "SELF_OTHER_CHECKOUT"
+
+
+# --------------------------------------------------------------------------
+# One call asks git each question once, and the evidence does not change
+# --------------------------------------------------------------------------
+
+
+def _reference_git_facts(package: Path | None, target: Path) -> dict[str, object]:
+    """The four git facts as `resolve_provenance` gathered them before in-call reuse:
+    independent calls to the public helpers, each asking git on its own."""
+    from hyodo.provenance import _own_checkout_commit, git_commit, git_is_dirty
+
+    tool_commit = _own_checkout_commit(package) if package is not None else None
+    return {
+        "tool_commit": tool_commit,
+        "target_commit": git_commit(target),
+        "tool_dirty": git_is_dirty(package) if package is not None and tool_commit else None,
+        "target_dirty": git_is_dirty(target),
+    }
+
+
+def _layouts(tmp_path: Path) -> dict[str, tuple[Path | None, Path]]:
+    clean = _write_checkout(tmp_path / "clean")
+    _git_init(clean, "clean")
+
+    dirty = _write_checkout(tmp_path / "dirty")
+    _git_init(dirty, "dirty")
+    (dirty / "hyodo" / "__init__.py").write_text('__version__ = "edited"\n', encoding="utf-8")
+
+    same_commit = tmp_path / "same-commit"
+    subprocess.run(["git", "clone", "-q", str(clean), str(same_commit)], check=True)
+
+    other_commit = tmp_path / "other-commit"
+    subprocess.run(["git", "clone", "-q", str(clean), str(other_commit)], check=True)
+    (other_commit / "hyodo" / "extra.py").write_text("X = 1\n", encoding="utf-8")
+    _commit_all(other_commit, "diverge")
+
+    not_git = _write_checkout(tmp_path / "not-git")
+    nested = clean / "hyodo"  # inside a checkout, not its top level
+
+    return {
+        "same directory, clean": (clean, clean),
+        "same directory, dirty": (dirty, dirty),
+        "other checkout, same commit": (clean, same_commit),
+        "other checkout, other commit": (clean, other_commit),
+        "target is not a checkout": (clean, not_git),
+        "measuring code below a checkout's top": (nested, clean),
+        "measuring checkout is dirty, target clean": (dirty, clean),
+        "measuring package not found": (None, clean),
+    }
+
+
+@requires_git
+def test_in_call_git_reuse_reports_the_same_evidence_for_every_layout(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hyodo import provenance
+
+    for label, (package, target) in _layouts(tmp_path).items():
+        if package is None:
+            # resolve_provenance only falls back to the real package when
+            # package_root is None; pin that fallback to "not found".
+            monkeypatch.setattr(provenance, "_default_package_root", lambda: None)
+        measured = resolve_provenance(target, package_root=package, tool_version=SAME_VERSION)
+        expected = _reference_git_facts(package, target.resolve())
+        observed = {key: getattr(measured, key) for key in expected}
+        assert observed == expected, label
+        relation, difference = provenance._classify(
+            target_root=target.resolve(),
+            package_root=package.resolve() if package is not None else None,
+            **expected,  # type: ignore[arg-type]
+        )
+        assert (measured.relation, measured.content_difference) == (relation, difference), label
+        monkeypatch.undo()
+
+
+@requires_git
+def test_one_call_asks_git_each_question_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from hyodo import provenance
+
+    layouts = _layouts(tmp_path)
+    real_run_git = provenance._run_git
+    calls: list[tuple[str, ...]] = []
+
+    def counting_run_git(root: Path, *args: str) -> str | None:
+        calls.append(args)
+        return real_run_git(root, *args)
+
+    monkeypatch.setattr(provenance, "_run_git", counting_run_git)
+
+    # `hyodo check` at a checkout's root: the measuring code is the target.
+    package, target = layouts["same directory, clean"]
+    resolve_provenance(target, package_root=package, tool_version=SAME_VERSION)
+    assert calls == [
+        ("rev-parse", "--show-toplevel"),
+        ("rev-parse", "HEAD"),
+        ("status", "--porcelain"),
+    ]
+
+    calls.clear()
+    package, target = layouts["other checkout, same commit"]
+    resolve_provenance(target, package_root=package, tool_version=SAME_VERSION)
+    assert sorted(calls) == sorted(
+        [
+            ("rev-parse", "--show-toplevel"),
+            ("rev-parse", "HEAD"),
+            ("status", "--porcelain"),
+            ("rev-parse", "HEAD"),
+            ("status", "--porcelain"),
+        ]
+    )
