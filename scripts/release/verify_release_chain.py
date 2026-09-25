@@ -32,6 +32,12 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
+from urllib.parse import quote
+
+try:
+    from scripts.release.verify_git_tag import evaluate_tag_trust
+except ModuleNotFoundError:  # pragma: no cover - direct script execution path
+    from verify_git_tag import evaluate_tag_trust
 
 StepState = Literal["OBSERVED", "UNOBSERVED"]
 
@@ -208,7 +214,9 @@ def install_smoke_step(version: str, *, wheel_sha256: str | None) -> ChainStep:
     )
 
 
-def tag_step(*, tag: str, commit: str | None, signed: bool, verified: bool) -> ChainStep:
+def tag_step(
+    *, tag: str, commit: str | None, signed: bool, verified: bool, github_verified: bool = False
+) -> ChainStep:
     """The tag step, keeping "not verifiable here" apart from "not signed".
 
     Every tag from v4.16.0 on carries a signature block, but only v4.19.1
@@ -216,12 +224,22 @@ def tag_step(*, tag: str, commit: str | None, signed: bool, verified: bool) -> C
     allowed-signers file. Rendering both as a bare UNOBSERVED would let a
     reader take "we could not check" for "nobody signed it", which is the
     louder and wronger claim.
+
+    A host without an allowed-signers file can still observe the tag through
+    GitHub's verification, the same check publish.yml applies before PyPI.
+    The evidence names which of the two verified it.
     """
     if commit and verified:
         return ChainStep(
             name="Signed verified tag",
             state="OBSERVED",
             evidence=f"`{tag}` -> `{commit[:7]}`, signature verified",
+        )
+    if commit and github_verified:
+        return ChainStep(
+            name="Signed verified tag",
+            state="OBSERVED",
+            evidence=f"`{tag}` -> `{commit[:7]}`, signature verified by GitHub",
         )
     if commit and signed:
         return ChainStep(
@@ -264,6 +282,27 @@ def matching_run(runs: list[dict[str, Any]] | None, *, tag: str, commit: str | N
     return None
 
 
+def _github_verifies_tag(repo: str, tag: str, commit: str | None) -> bool:
+    """Whether GitHub reports `tag` as a verified annotated tag on `commit`.
+
+    Both payloads are read through `gh api` and judged by the same
+    `evaluate_tag_trust` that publish.yml runs, including the target commit.
+    """
+    if not commit:
+        return False
+    ref = _gh_json("api", f"repos/{repo}/git/ref/tags/{quote(tag, safe='')}")
+    if not isinstance(ref, dict):
+        return False
+    tag_sha = (ref.get("object") or {}).get("sha")
+    tag_object = _gh_json("api", f"repos/{repo}/git/tags/{tag_sha}") if tag_sha else {}
+    if not isinstance(tag_object, dict):
+        return False
+    ok, _detail, _target = evaluate_tag_trust(
+        ref, tag_object, expected_tag=tag, expected_commit=commit
+    )
+    return ok
+
+
 def measure_chain(version: str, *, repo: str, root: Path) -> list[ChainStep]:
     """Read each chain step back off git, GitHub and PyPI."""
     tag = f"v{version}"
@@ -278,7 +317,16 @@ def measure_chain(version: str, *, repo: str, root: Path) -> list[ChainStep]:
     raw_tag = _run("git", "-C", str(root), "cat-file", "-p", tag) or ""
     signed = "SIGNATURE-----" in raw_tag
     verified = _run("git", "-C", str(root), "tag", "-v", tag) is not None
-    steps.append(tag_step(tag=tag, commit=commit, signed=signed, verified=verified))
+    github_verified = not verified and _github_verifies_tag(repo, tag, commit)
+    steps.append(
+        tag_step(
+            tag=tag,
+            commit=commit,
+            signed=signed,
+            verified=verified,
+            github_verified=github_verified,
+        )
+    )
 
     release = _gh_json(
         "release", "view", tag, "--repo", repo, "--json", "isDraft,publishedAt,assets"
