@@ -12,8 +12,8 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.9 is the latest published release, measured 9/9 OBSERVED in
-`docs/releases/4.21.9.md`. HyoDo 4.21.2
+HyoDo 4.21.9 is the current release target and the latest published release.
+Its release chain is measured 9/9 OBSERVED in `docs/releases/4.21.9.md`. HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
