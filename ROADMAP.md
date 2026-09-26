@@ -5,18 +5,15 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.8 is the latest published release. Its signed tag, GitHub Release,
+HyoDo 4.21.9 is the latest published release. Its signed tag, GitHub Release,
 SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.21.8.md`. Prior release receipts remain preserved under
+`docs/releases/4.21.9.md`. Prior release receipts remain preserved under
 `docs/releases/` and are not rewritten by this release.
 
 ## Current release
 
-HyoDo 4.21.9 is the current release target and source-tree release candidate.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-`UNOBSERVED` in `docs/releases/4.21.9.md` until measured after publication.
-HyoDo 4.21.8 remains the latest published release, measured 9/9 OBSERVED in
-`docs/releases/4.21.8.md`. HyoDo 4.21.2
+HyoDo 4.21.9 is the latest published release, measured 9/9 OBSERVED in
+`docs/releases/4.21.9.md`. HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
@@ -47,13 +44,13 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.21.9 (release candidate; release chain UNOBSERVED)
+### 4.21.9 (released 2026-09-25 UTC)
 
-- Publish the merged #488 provenance fix: an unreadable source subtree is
+- Publishes the merged #488 provenance fix: an unreadable source subtree is
   `SOURCE_UNOBSERVED` / `UNOBSERVED` with `green_allowed=false`, not
   `SELF_OTHER_CHECKOUT` / `MISMATCH`.
 - #487 is test-only fixture hardening and adds no product capability.
-- Release chain is `UNOBSERVED` in `docs/releases/4.21.9.md` until measured.
+- Release chain measured 9/9 OBSERVED in `docs/releases/4.21.9.md`.
 
 ### 4.21.8 (released 2026-09-24 UTC)
 
