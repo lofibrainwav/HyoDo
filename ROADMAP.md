@@ -5,12 +5,10 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.9 is the latest published release and remains the latest fully
-sealed public release. HyoDo 4.21.10 has
-a verified signed tag and immutable published GitHub Release with durable SBOM
-evidence, but its PyPI publish workflow `36224231839` is waiting at the
-`pypi` environment approval boundary; its chain is therefore not closed.
-Prior release receipts remain preserved under `docs/releases/`.
+HyoDo 4.21.10 is the latest published release and is measured 9/9 OBSERVED
+in `docs/releases/4.21.10.md`. Its signed tag, GitHub Release, SBOM, PyPI
+OIDC provenance, and install smoke are closed. Prior release receipts remain
+preserved under `docs/releases/`.
 
 ## Current release
 
@@ -58,13 +56,12 @@ evidence is not converted into a pass.
   capability.
 - Release chain is `UNOBSERVED` in `docs/releases/4.21.11.md` until measured.
 
-### 4.21.10 (GitHub Release published; PyPI pending)
+### 4.21.10 (released 2026-09-26 UTC)
 
 - Publishes the merged #501 native hook root fix at immutable tag target
   `b3d8da5b32aefcb553da3414c69177fbad30d347`.
-- Signed tag, GitHub Release, release-evidence workflow, and SBOM assets are
-  observed. PyPI publish workflow `36224231839` is waiting at the `pypi`
-  environment approval boundary, so the chain is not yet sealed.
+- Release chain measured 9/9 OBSERVED in `docs/releases/4.21.10.md`
+  (release-evidence `36224167136`, PyPI publish/readback `36224231839`).
 - #506 merged after this tag and is not part of 4.21.10.
 
 ### 4.21.9 (released 2026-09-25 UTC)
