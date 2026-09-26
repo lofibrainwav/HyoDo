@@ -14,14 +14,25 @@ receipt rather than in this self-referential page.
   provenance, and install smoke verified in
   [`releases/4.21.9.md`](./releases/4.21.9.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: the recorded 4.21.9 release is closed. Post-release
-  research and integration have separate evidence and promotion criteria;
-  they do not silently reopen the sealed public artifact. Live-host and
-  orchestration experiments remain downstream integration/research work.
+- Release candidate: HyoDo `4.21.10`; release chain `UNOBSERVED` in
+  [`releases/4.21.10.md`](./releases/4.21.10.md) until measured.
+- HyoDo product status: the recorded 4.21.9 release is closed. Research and
+  integration have separate evidence and promotion criteria; they do not
+  silently reopen the sealed public artifact. Live-host and orchestration
+  experiments remain downstream integration/research work.
 
 The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
+
+## 4.21.10 release candidate
+
+4.21.10 publishes the native hook root fix from #501: an explicit `--root` on
+`hyodo event record --hook` / `hyodo policy check --hook` is the storage and
+policy root for all native adapters; the host payload `cwd` is only the
+fallback when `--root` is absent. `hyodo connect claude-code` no longer writes
+`--root .` into PreToolUse. It adds no new HyoDo Core capability. Its release
+chain is `UNOBSERVED` in [`releases/4.21.10.md`](./releases/4.21.10.md).
 
 ## 4.21.9 release
 
