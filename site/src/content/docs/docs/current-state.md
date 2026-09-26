@@ -6,16 +6,15 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.10** is the current release target. Its release chain is
-`UNOBSERVED` in the [release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.10.md);
-until that chain is measured, the latest published package remains **4.21.9**,
-whose release chain is measured 9/9 OBSERVED in the
-[4.21.9 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.9.md).
-Product capability and live host observation remain separate evidence axes.
+HyoDo **4.21.11** is the current release target and source-tree release candidate.
+The latest published package is **4.21.10**, whose release chain is measured
+9/9 OBSERVED with signed tag, GitHub Release + SBOM, PyPI OIDC provenance,
+and install smoke. Product capability and live host observation remain
+separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Current release target: **4.21.10** (release chain `UNOBSERVED`)
-- Latest published package: **4.21.9** (see the 4.21.9 receipt above)
+- Current release target: **4.21.11** (release chain `UNOBSERVED`)
+- Latest published package: **4.21.10** (release chain 9/9 `OBSERVED`)
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
@@ -26,10 +25,14 @@ live in per-user state outside the checkout, so a repository cannot supply its
 own authority. See the
 [trust boundary contract](https://github.com/lofibrainwav/HyoDo/blob/main/docs/TRUST_BOUNDARY.md).
 
-HyoDo 4.21.10 carries the native hook root fix from #501: an explicit
-`--root` on `event record --hook` / `policy check --hook` is the storage and
-policy root, and the host payload `cwd` is only the fallback when `--root` is
-absent. `hyodo connect claude-code` no longer writes `--root .`.
+HyoDo 4.21.11 carries #506: unknown `policy.toml` keys fail closed as
+`policy_invalid` / `UNOBSERVED` instead of silently weakening intended
+policy. Valid `hyodo.policy/v1` semantics are unchanged.
+
+HyoDo 4.21.10 carries the native hook root fix from #501 at immutable tag
+target `b3d8da5b32aefcb553da3414c69177fbad30d347`. Its release chain is
+measured 9/9 OBSERVED, including PyPI OIDC provenance and install smoke.
+#506 merged after that tag and is not part of 4.21.10.
 
 HyoDo 4.21.9 carries the provenance classification fix from #488: an
 unreadable source subtree is `SOURCE_UNOBSERVED` / `UNOBSERVED` with
@@ -45,7 +48,7 @@ host observation is deployment-specific.
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for the current 4.21.9 release.
+2026-09-13. It is not a fresh runtime readback for the current 4.21.10 release.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |
@@ -76,4 +79,4 @@ HyoDo                  observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/host experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.21.9 public artifact released and verified.
+prerequisites for calling the HyoDo 4.21.10 public artifact released and verified.

@@ -1,6 +1,6 @@
 # HyoDo current state
 
-Public release readback: 2026-09-25 UTC
+Public release readback: 2026-09-26 UTC
 Runtime capability matrix below: measured 2026-09-13 PT, before 4.19.6.
 
 This file separates shipped product capability from live/runtime observation. Exact
@@ -8,15 +8,15 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package on PyPI: HyoDo `4.21.9`.
-- Recorded closed release chain: HyoDo `4.21.9`
+- Latest public package on PyPI: HyoDo `4.21.10`.
+- Recorded closed release chain: HyoDo `4.21.10`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.21.9.md`](./releases/4.21.9.md).
+  [`releases/4.21.10.md`](./releases/4.21.10.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- Release candidate: HyoDo `4.21.10`; release chain `UNOBSERVED` in
-  [`releases/4.21.10.md`](./releases/4.21.10.md) until measured.
-- HyoDo product status: the recorded 4.21.9 release is closed. Research and
+- Release candidate: HyoDo `4.21.11`; release chain `UNOBSERVED` in
+  [`releases/4.21.11.md`](./releases/4.21.11.md) until measured.
+- HyoDo product status: the recorded 4.21.10 release is closed. Research and
   integration have separate evidence and promotion criteria; they do not
   silently reopen the sealed public artifact. Live-host and orchestration
   experiments remain downstream integration/research work.
@@ -25,14 +25,17 @@ The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
 
-## 4.21.10 release candidate
+## 4.21.11 release candidate
 
-4.21.10 publishes the native hook root fix from #501: an explicit `--root` on
-`hyodo event record --hook` / `hyodo policy check --hook` is the storage and
-policy root for all native adapters; the host payload `cwd` is only the
-fallback when `--root` is absent. `hyodo connect claude-code` no longer writes
-`--root .` into PreToolUse. It adds no new HyoDo Core capability. Its release
-chain is `UNOBSERVED` in [`releases/4.21.10.md`](./releases/4.21.10.md).
+4.21.11 carries #506: unknown `policy.toml` keys now fail closed through the existing `policy_invalid` / `UNOBSERVED` path instead of being ignored. Valid `hyodo.policy/v1` files keep the same semantics. Its release chain is `UNOBSERVED` in [`releases/4.21.11.md`](./releases/4.21.11.md).
+
+## 4.21.10 release
+
+4.21.10 carries the native hook root fix from #501 at immutable tag target
+`b3d8da5b32aefcb553da3414c69177fbad30d347`. Its release chain is measured
+9/9 OBSERVED in [`releases/4.21.10.md`](./releases/4.21.10.md), including
+PyPI OIDC provenance and install smoke. #506 merged later and is not part of
+4.21.10.
 
 ## 4.21.9 release
 
@@ -127,7 +130,7 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 The runtime matrix above compares public 4.19.5 with the source state measured
 on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
-4.21.9. The 4.21.9 release-chain receipt is recorded separately above. Do not
+4.21.10. The 4.21.10 release-chain receipt is recorded separately above. Do not
 infer runtime identity from this page alone; use the signed release, CI receipt,
 or runtime identity receipt. Fresh
 Codex/Cursor host observations,

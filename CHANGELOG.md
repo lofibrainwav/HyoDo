@@ -5,6 +5,41 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.11] - 2026-09-26
+
+Policy configuration fail-closed maintenance release. Unknown policy keys no
+longer silently weaken the operator's intended policy. No new HyoDo Core
+capability is added by this release commit.
+
+### Fixed
+
+- `load_policy_config()` now rejects unknown root keys and unknown keys inside
+  `[web]`, `[trust]`, and `[ephemeral]` with `PolicyConfigError`.
+  Previously a typo such as `allowed_toolz = ["search"]` parsed cleanly as
+  `allowed_tools=None`, so an unlisted tool could fall through to `ALLOW`.
+  The same malformed policy now follows the existing fail-closed path:
+  `policy_invalid` -> `UNOBSERVED`, exit code 2 (#505, #506).
+- Unknown-key diagnostics name the offending key and add a did-you-mean hint
+  for close typos. Valid `hyodo.policy/v1` files keep the same semantics; no
+  schema version or policy capability is added (#506).
+
+### Evidence
+
+- #506 merged to main as
+  `9e357c5ccb4f3663bae1592a7935c2963f3e6bd1`.
+- Hostile regression before the fix: `allowed_toolz` erased the intended
+  allowlist and the unlisted tool evaluated `ALLOW`. After the fix the real
+  CLI reports `policy_invalid` / `UNOBSERVED`, exit 2.
+- Focused policy/CLI verification: 182 passed. Full public verification: 2,141
+  passed. Fresh main CI at `9e357c5` completed successfully across HyoDo CI,
+  Smoke Test, Security verification, CodeQL SAST, and OpenSSF Scorecard;
+  `Goodness - Serial Full Suite (main)` succeeded.
+- Immutable `v4.21.10` targets
+  `b3d8da5b32aefcb553da3414c69177fbad30d347` and therefore does not contain
+  #506. 4.21.11 is the first release candidate that carries this fix.
+- The 4.21.11 release chain is `UNOBSERVED` in
+  `docs/releases/4.21.11.md` until publication is measured.
+
 ## [4.21.10] - 2026-09-25
 
 Native hook root correctness release. An explicit `--root` is the storage and
@@ -37,8 +72,9 @@ policy root. No new HyoDo Core capability is added by this release commit.
   the published package): the release pipeline judges CI checks against
   per-event expected-N/A allowlists, and requires the main-only serial suite
   to succeed on main.
-- The 4.21.10 release chain is `UNOBSERVED` in `docs/releases/4.21.10.md`
-  until it is measured after publication.
+- Publication is measured and sealed in `docs/releases/4.21.10.md`: 9/9
+  OBSERVED (release-evidence run `36224167136`, PyPI publish/readback run
+  `36224231839`, wheel sha256 prefix `643265d6bf691d2a`).
 
 ## [4.21.9] - 2026-09-25
 

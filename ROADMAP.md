@@ -5,18 +5,19 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.9 is the latest published release. Its signed tag, GitHub Release,
-SBOM receipt, PyPI provenance, and install readback are recorded in
-`docs/releases/4.21.9.md`. Prior release receipts remain preserved under
-`docs/releases/` and are not rewritten by this release.
+HyoDo 4.21.10 is the latest published release and is measured 9/9 OBSERVED
+in `docs/releases/4.21.10.md`. Its signed tag, GitHub Release, SBOM, PyPI
+OIDC provenance, and install smoke are closed. Prior release receipts remain
+preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.21.10 is the current release target and source-tree release candidate.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-`UNOBSERVED` in `docs/releases/4.21.10.md` until measured after publication.
-HyoDo 4.21.9 remains the latest published release, measured 9/9 OBSERVED in
-`docs/releases/4.21.9.md`. HyoDo 4.21.2
+HyoDo 4.21.11 is the current release target and source-tree release
+candidate. It carries #506,
+which merged after the immutable 4.21.10 tag and is therefore absent from
+4.21.10. Its release chain is `UNOBSERVED` in
+`docs/releases/4.21.11.md` until measured after publication.
+HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
@@ -47,13 +48,21 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.21.10 (release candidate; release chain UNOBSERVED)
+### 4.21.11 (release candidate; release chain UNOBSERVED)
 
-- Publish the merged #501 native hook root fix: an explicit `--root` wins over
-  the host payload `cwd` for `event record --hook` and `policy check --hook`;
-  without `--root`, payload `cwd` stays the fallback.
-- `hyodo connect claude-code` no longer writes `--root .` into PreToolUse.
-- Release chain is `UNOBSERVED` in `docs/releases/4.21.10.md` until measured.
+- Publish #506: unknown `policy.toml` keys fail closed instead of silently
+  weakening intended policy.
+- Preserve valid `hyodo.policy/v1` semantics; no schema bump or new policy
+  capability.
+- Release chain is `UNOBSERVED` in `docs/releases/4.21.11.md` until measured.
+
+### 4.21.10 (released 2026-09-26 UTC)
+
+- Publishes the merged #501 native hook root fix at immutable tag target
+  `b3d8da5b32aefcb553da3414c69177fbad30d347`.
+- Release chain measured 9/9 OBSERVED in `docs/releases/4.21.10.md`
+  (release-evidence `36224167136`, PyPI publish/readback `36224231839`).
+- #506 merged after this tag and is not part of 4.21.10.
 
 ### 4.21.9 (released 2026-09-25 UTC)
 
