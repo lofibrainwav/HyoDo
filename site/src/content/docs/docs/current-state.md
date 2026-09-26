@@ -48,7 +48,7 @@ host observation is deployment-specific.
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for the current 4.21.9 release.
+2026-09-13. It is not a fresh runtime readback for the current 4.21.10 release.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |
@@ -79,4 +79,4 @@ HyoDo                  observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/host experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.21.9 public artifact released and verified.
+prerequisites for calling the HyoDo 4.21.10 public artifact released and verified.
