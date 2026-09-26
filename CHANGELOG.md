@@ -24,8 +24,9 @@ No new HyoDo Core capability is added by this release commit.
   #488 -> `1b3a0c1e417e1d136154b45308dc96c9fcb94790`.
 - #487 is test-only: it makes the trust persistence golden fixture
   deterministic. It is verification evidence, not a product capability.
-- The 4.21.9 release chain is `UNOBSERVED` in `docs/releases/4.21.9.md` until
-  it is measured after publication.
+- Publication is measured and sealed in `docs/releases/4.21.9.md`: 9/9
+  OBSERVED (release-evidence run `36158404831`, PyPI publish/readback run
+  `36162825331`, wheel sha256 prefix `ee1a245993302962`).
 
 ## [4.21.8] - 2026-09-24
 
