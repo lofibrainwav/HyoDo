@@ -5,18 +5,18 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.10 is the latest published release and is measured 9/9 OBSERVED
-in `docs/releases/4.21.10.md`. Its signed tag, GitHub Release, SBOM, PyPI
+HyoDo 4.21.11 is the latest published release and is measured 9/9 OBSERVED
+in `docs/releases/4.21.11.md`. Its signed tag, GitHub Release, SBOM, PyPI
 OIDC provenance, and install smoke are closed. Prior release receipts remain
 preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.21.11 is the current release target and source-tree release
-candidate. It carries #506,
+HyoDo 4.21.11 is the current release target and the latest published release.
+It carries #506,
 which merged after the immutable 4.21.10 tag and is therefore absent from
-4.21.10. Its release chain is `UNOBSERVED` in
-`docs/releases/4.21.11.md` until measured after publication.
+4.21.10. Its release chain is measured 9/9 OBSERVED in
+`docs/releases/4.21.11.md`.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -48,13 +48,14 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.21.11 (release candidate; release chain UNOBSERVED)
+### 4.21.11 (released 2026-09-26 UTC)
 
 - Publish #506: unknown `policy.toml` keys fail closed instead of silently
   weakening intended policy.
 - Preserve valid `hyodo.policy/v1` semantics; no schema bump or new policy
   capability.
-- Release chain is `UNOBSERVED` in `docs/releases/4.21.11.md` until measured.
+- Release chain measured 9/9 OBSERVED in `docs/releases/4.21.11.md`
+  (release-evidence `36227376912`, PyPI publish/readback `36227437446`).
 
 ### 4.21.10 (released 2026-09-26 UTC)
 

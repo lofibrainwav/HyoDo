@@ -6,15 +6,15 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.11** is the current release target and source-tree release candidate.
-The latest published package is **4.21.10**, whose release chain is measured
+HyoDo **4.21.11** is the current release target and the latest published
+package. Its release chain is measured
 9/9 OBSERVED with signed tag, GitHub Release + SBOM, PyPI OIDC provenance,
 and install smoke. Product capability and live host observation remain
 separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Current release target: **4.21.11** (release chain `UNOBSERVED`)
-- Latest published package: **4.21.10** (release chain 9/9 `OBSERVED`)
+- Current release target: **4.21.11** (release chain 9/9 `OBSERVED`)
+- Latest published package: **4.21.11** (see the 4.21.11 receipt)
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
@@ -27,7 +27,9 @@ own authority. See the
 
 HyoDo 4.21.11 carries #506: unknown `policy.toml` keys fail closed as
 `policy_invalid` / `UNOBSERVED` instead of silently weakening intended
-policy. Valid `hyodo.policy/v1` semantics are unchanged.
+policy. Valid `hyodo.policy/v1` semantics are unchanged. Its release chain is
+measured 9/9 OBSERVED at immutable tag target
+`230bf26ecbf542e60754457a69e1733317651ced`.
 
 HyoDo 4.21.10 carries the native hook root fix from #501 at immutable tag
 target `b3d8da5b32aefcb553da3414c69177fbad30d347`. Its release chain is
