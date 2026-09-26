@@ -8,13 +8,12 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest fully sealed public release: HyoDo `4.21.9`.
-- Recorded closed release chain: HyoDo `4.21.9`
+- Latest public package on PyPI: HyoDo `4.21.10`.
+- Recorded closed release chain: HyoDo `4.21.10`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.21.9.md`](./releases/4.21.9.md).
+  [`releases/4.21.10.md`](./releases/4.21.10.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo `4.21.10` has a verified signed tag, published GitHub Release, and SBOM evidence; PyPI publication is still waiting at the `pypi` environment approval boundary.
 - Release candidate: HyoDo `4.21.11`; release chain `UNOBSERVED` in
   [`releases/4.21.11.md`](./releases/4.21.11.md) until measured.
 - HyoDo product status: the recorded 4.21.9 release is closed. Research and
@@ -32,7 +31,11 @@ branches, and worktrees must not be folded into HyoDo closeout status.
 
 ## 4.21.10 release
 
-4.21.10 carries the native hook root fix from #501 at immutable tag target `b3d8da5b32aefcb553da3414c69177fbad30d347`. Its GitHub Release and SBOM are published; PyPI publication is still waiting at the environment approval boundary. #506 merged later and is not part of 4.21.10.
+4.21.10 carries the native hook root fix from #501 at immutable tag target
+`b3d8da5b32aefcb553da3414c69177fbad30d347`. Its release chain is measured
+9/9 OBSERVED in [`releases/4.21.10.md`](./releases/4.21.10.md), including
+PyPI OIDC provenance and install smoke. #506 merged later and is not part of
+4.21.10.
 
 ## 4.21.9 release
 
