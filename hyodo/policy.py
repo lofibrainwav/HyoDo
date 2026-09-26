@@ -13,6 +13,7 @@ and ``trust`` fields follow that contract.
 
 from __future__ import annotations
 
+import difflib
 import fnmatch
 from dataclasses import dataclass
 from pathlib import Path
@@ -35,6 +36,46 @@ _BUILTIN_WEB_TOOLS = frozenset({"web_fetch", "browser", "http", "fetch", "WebFet
 #: never promotable to ALLOW at trust level 2 (see the trust gate below).
 _BUILTIN_SUPPLY_CHAIN_TOOLS = frozenset({"skills.ingest", "eye.capture"})
 _SAFE_HTTP_METHODS = frozenset({"GET", "HEAD"})
+
+#: Root keys the hyodo.policy/v1 parser actually reads. Anything outside this
+#: set is almost always an operator typo (``allowed_toolz``), and treating it
+#: as absent would silently weaken the policy into a broader ALLOW — so it is
+#: rejected as policy_invalid, never warned about and carried on.
+_ALLOWED_ROOT_KEYS = frozenset(
+    {
+        "schema",
+        "max_steps",
+        "allowed_tools",
+        "blocked_path_globs",
+        "require_declared_paths",
+        "require_mission_prompt",
+        "web",
+        "ask_tools",
+        "ask_threshold",
+        "trust",
+        "ephemeral",
+    }
+)
+_ALLOWED_WEB_KEYS = frozenset({"allowed_domains", "allow_non_get", "allow_credential_paths"})
+_ALLOWED_TRUST_KEYS = frozenset({"max_level"})
+_ALLOWED_EPHEMERAL_KEYS = frozenset({"phash_distance_threshold"})
+
+
+def _reject_unknown_keys(
+    raw: dict[Any, Any], allowed: frozenset[str], context: str, path: Path
+) -> None:
+    """Raise PolicyConfigError naming every unsupported key in *raw*.
+
+    An obvious single typo gets a did-you-mean hint as a small DX courtesy;
+    correctness comes from the rejection itself, never from the hint.
+    """
+    unknown = sorted(key for key in raw if key not in allowed)
+    for key in unknown:
+        message = f"{path}: unknown {context} key {key!r} is not supported and cannot be ignored"
+        suggestion = difflib.get_close_matches(key, allowed, n=1, cutoff=0.6)
+        if suggestion:
+            message += f"; did you mean {suggestion[0]!r}?"
+        raise PolicyConfigError(message)
 
 
 class PolicyConfigError(ValueError):
@@ -156,6 +197,8 @@ def load_policy_config(path: Path) -> PolicyConfig:
             f"{path}: unsupported schema {schema!r}; expected {POLICY_SCHEMA_ID!r}"
         )
 
+    _reject_unknown_keys(raw, _ALLOWED_ROOT_KEYS, "policy", path)
+
     max_steps = raw.get("max_steps")
     if max_steps is not None and (
         not isinstance(max_steps, int) or isinstance(max_steps, bool) or max_steps < 0
@@ -193,6 +236,7 @@ def load_policy_config(path: Path) -> PolicyConfig:
     if web_raw is not None:
         if not isinstance(web_raw, dict):
             raise PolicyConfigError(f"{path}: [web] must be a table")
+        _reject_unknown_keys(web_raw, _ALLOWED_WEB_KEYS, "web", path)
         allowed_domains_raw = web_raw.get("allowed_domains", [])
         if not isinstance(allowed_domains_raw, list) or not all(
             isinstance(domain, str) and domain for domain in allowed_domains_raw
@@ -228,6 +272,7 @@ def load_policy_config(path: Path) -> PolicyConfig:
     if trust_raw is not None:
         if not isinstance(trust_raw, dict):
             raise PolicyConfigError(f"{path}: [trust] must be a table")
+        _reject_unknown_keys(trust_raw, _ALLOWED_TRUST_KEYS, "trust", path)
         max_level = trust_raw.get("max_level", 3)
         if not isinstance(max_level, int) or isinstance(max_level, bool) or not 0 <= max_level <= 3:
             raise PolicyConfigError(f"{path}: trust.max_level must be an integer between 0 and 3")
@@ -238,6 +283,7 @@ def load_policy_config(path: Path) -> PolicyConfig:
     if ephemeral_raw is not None:
         if not isinstance(ephemeral_raw, dict):
             raise PolicyConfigError(f"{path}: [ephemeral] must be a table")
+        _reject_unknown_keys(ephemeral_raw, _ALLOWED_EPHEMERAL_KEYS, "ephemeral", path)
         phash_distance_threshold = ephemeral_raw.get("phash_distance_threshold", 10)
         if (
             not isinstance(phash_distance_threshold, int)
