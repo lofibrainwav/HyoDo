@@ -72,8 +72,9 @@ policy root. No new HyoDo Core capability is added by this release commit.
   the published package): the release pipeline judges CI checks against
   per-event expected-N/A allowlists, and requires the main-only serial suite
   to succeed on main.
-- The 4.21.10 release chain is `UNOBSERVED` in `docs/releases/4.21.10.md`
-  until it is measured after publication.
+- Publication is measured and sealed in `docs/releases/4.21.10.md`: 9/9
+  OBSERVED (release-evidence run `36224167136`, PyPI publish/readback run
+  `36224231839`, wheel sha256 prefix `643265d6bf691d2a`).
 
 ## [4.21.9] - 2026-09-25
 
