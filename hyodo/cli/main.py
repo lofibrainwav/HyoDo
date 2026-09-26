@@ -4194,9 +4194,20 @@ _NATIVE_HOOKS = frozenset({"claude-code", "cursor", "codex"})
 
 
 def _map_hook_payload(
-    payload: object, root: Path, hook: str
+    payload: object, root: Path, hook: str, *, explicit_root: bool = False
 ) -> tuple[MappedHookEvent | None, str | None]:
-    """Select the host adapter without duplicating event-recording logic."""
+    """Select the host adapter without duplicating event-recording logic.
+
+    An explicit ``--root`` is the operator's storage/policy root: the host
+    payload ``cwd`` must not override it (a worktree cwd would otherwise get
+    its own ``.hyodo`` ledger). Only without ``--root`` does the payload
+    ``cwd`` stay the fallback root. A missing/blank ``cwd`` is left as-is so
+    adapters still report malformed payloads instead of having one repaired.
+    """
+    if explicit_root and isinstance(payload, dict):
+        cwd = payload.get("cwd")
+        if isinstance(cwd, str) and cwd.strip():
+            payload = {**payload, "cwd": str(root)}
     if hook == "claude-code":
         return map_claude_code_hook_payload(payload, root)
     if hook == "cursor":
@@ -4381,10 +4392,11 @@ def event_record(
         "--stdin",
         help="Read event JSON from stdin instead of --file",
     ),
-    root: str = typer.Option(
-        ".",
+    root: str | None = typer.Option(
+        None,
         "--root",
-        help="Project root that owns .hyodo/agent-events.jsonl",
+        help="Project root that owns .hyodo/agent-events.jsonl (default: .). "
+        "With --hook, an explicit --root wins over the payload cwd.",
     ),
     policy: str | None = typer.Option(
         None,
@@ -4454,7 +4466,8 @@ def event_record(
             console.print(f"[red]{message}[/red]")
         raise typer.Exit(2)
 
-    root_path = Path(root).resolve()
+    explicit_root = root is not None
+    root_path = Path(root if root is not None else ".").resolve()
     profile = _resolve_audience_or_exit(root_path, audience, "event record --policy", json_output)
     file_path = Path(file) if file else None
     data, err = _load_event_payload(file_path, stdin_flag)
@@ -4487,7 +4500,7 @@ def event_record(
             else:
                 console.print(f"[red]{message}[/red]")
             raise typer.Exit(2)
-        mapped, map_err = _map_hook_payload(data, root_path, hook)
+        mapped, map_err = _map_hook_payload(data, root_path, hook, explicit_root=explicit_root)
         if mapped is None:
             mapping_exit = 0 if shadow else 2
             if json_output:
@@ -4899,10 +4912,11 @@ def policy_check(
         "-c",
         help="policy.toml path (default: <root>/.hyodo/policy.toml)",
     ),
-    root: str = typer.Option(
-        ".",
+    root: str | None = typer.Option(
+        None,
         "--root",
-        help="Project root used for ledger counting and trust state",
+        help="Project root used for ledger counting and trust state "
+        "(default: .). With --hook, an explicit --root wins over the payload cwd.",
     ),
     json_output: bool = typer.Option(
         False,
@@ -4944,7 +4958,9 @@ def policy_check(
         raise typer.BadParameter("--native-response requires --hook cursor or codex")
     if native_response and not json_output:
         raise typer.BadParameter("--native-response requires --json")
-    profile = _resolve_audience_or_exit(Path(root).resolve(), audience, "policy check", json_output)
+    explicit_root = root is not None
+    root_path = Path(root if root is not None else ".").resolve()
+    profile = _resolve_audience_or_exit(root_path, audience, "policy check", json_output)
     verdict_state: dict[str, Any] = {"unit": "surfaces"}
     verdict_state.update(
         decision="UNOBSERVED", detail="trust=UNOBSERVED, required evidence UNOBSERVED"
@@ -4958,7 +4974,6 @@ def policy_check(
         profile,
         native_response,
     ):
-        root_path = Path(root).resolve()
         file_path = Path(file) if file else None
         data, err = _load_event_payload(file_path, stdin_flag)
         if err is not None:
@@ -4999,7 +5014,7 @@ def policy_check(
                 raise typer.Exit(2)
             if native_response and isinstance(data, dict):
                 native_event_name = data.get("hook_event_name")
-            mapped, map_err = _map_hook_payload(data, root_path, hook)
+            mapped, map_err = _map_hook_payload(data, root_path, hook, explicit_root=explicit_root)
             if mapped is None:
                 mapping_exit = 0 if shadow else 2
                 if json_output:

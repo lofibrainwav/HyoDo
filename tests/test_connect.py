@@ -71,7 +71,7 @@ def test_dry_run_json_includes_planned_content(tmp_path: Path) -> None:
     settings = json.loads(files[0]["content"])
     pre = settings["hooks"]["PreToolUse"][0]["hooks"][0]["command"]
     post = settings["hooks"]["PostToolUse"][0]["hooks"][0]["command"]
-    assert pre == "hyodo policy check --stdin --hook claude-code --root ."
+    assert pre == "hyodo policy check --stdin --hook claude-code"
     assert post == "hyodo event record --stdin --hook claude-code --policy .hyodo/policy.toml"
     assert files[1]["path"] == ".hyodo/policy.toml"
     assert files[1]["existed_before"] is False
