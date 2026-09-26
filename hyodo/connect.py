@@ -143,9 +143,10 @@ def build_claude_code_settings(existing: dict[str, Any] | None, *, shadow: bool)
     settings: dict[str, Any] = dict(existing) if isinstance(existing, dict) else {}
     existing_hooks = settings.get("hooks")
     hooks: dict[str, Any] = dict(existing_hooks) if isinstance(existing_hooks, dict) else {}
-    pre_command = _claude_code_hook_command(
-        HOOK_PRE_COMMAND_PREFIX, shadow=shadow, extra="--root ."
-    )
+    # No --root: an explicit root would pin the hook process cwd over the
+    # payload cwd, while PostToolUse follows the payload cwd. Both halves use
+    # the same fallback root this way.
+    pre_command = _claude_code_hook_command(HOOK_PRE_COMMAND_PREFIX, shadow=shadow)
     post_command = _claude_code_hook_command(
         HOOK_POST_COMMAND_PREFIX, shadow=shadow, extra="--policy .hyodo/policy.toml"
     )
