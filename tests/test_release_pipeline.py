@@ -219,3 +219,100 @@ def test_ci_skips_are_counted_separately(
     assert result["result"] == expected
     assert result["passed"] == passed
     assert len(result["skipped"]) == skipped
+
+
+SERIAL = "Goodness - Serial Full Suite (main)"
+
+
+def _runs(*pairs: tuple[str, str, str]) -> dict[str, object]:
+    return {
+        "check_runs": [
+            {"name": name, "status": status, "conclusion": conclusion}
+            for name, status, conclusion in pairs
+        ]
+    }
+
+
+@pytest.mark.parametrize(
+    ("event", "runs", "expected"),
+    [
+        # 1. PR: the main-only serial suite skipped, everything else green.
+        ("pull_request", [("a", "completed", "success"), (SERIAL, "completed", "skipped")], "PASS"),
+        # 2. PR: any other skipped check still blocks.
+        ("pull_request", [("a", "completed", "success"), ("b", "completed", "skipped")], "BLOCK"),
+        (
+            "pull_request",
+            [
+                ("a", "completed", "success"),
+                (SERIAL, "completed", "skipped"),
+                ("b", "completed", "skipped"),
+            ],
+            "BLOCK",
+        ),
+        # 3. The serial suite failing, cancelled, or timing out blocks.
+        (
+            "pull_request",
+            [("a", "completed", "success"), (SERIAL, "completed", "failure")],
+            "BLOCK",
+        ),
+        (
+            "pull_request",
+            [("a", "completed", "success"), (SERIAL, "completed", "cancelled")],
+            "BLOCK",
+        ),
+        (
+            "pull_request",
+            [("a", "completed", "success"), (SERIAL, "completed", "timed_out")],
+            "BLOCK",
+        ),
+        ("push", [("a", "completed", "success"), (SERIAL, "completed", "failure")], "BLOCK"),
+        # 4. Pending waits.
+        ("pull_request", [("a", "in_progress", None), (SERIAL, "completed", "skipped")], "WAIT"),
+        ("push", [("a", "completed", "success"), (SERIAL, "queued", None)], "WAIT"),
+        # 5. Zero checks never pass; nor does an all-N/A PR.
+        ("pull_request", [], "BLOCK"),
+        ("push", [], "BLOCK"),
+        ("pull_request", [(SERIAL, "completed", "skipped")], "BLOCK"),
+        # 6. Main push: the serial suite must actually succeed.
+        ("push", [("a", "completed", "success"), (SERIAL, "completed", "success")], "PASS"),
+        ("push", [("a", "completed", "success"), (SERIAL, "completed", "skipped")], "BLOCK"),
+        ("push", [("a", "completed", "success")], "BLOCK"),
+        # PR-only jobs are skipped on main by design and do not block the push.
+        (
+            "push",
+            [
+                ("a", "completed", "success"),
+                (SERIAL, "completed", "success"),
+                ("Pull request dependency review", "completed", "skipped"),
+            ],
+            "PASS",
+        ),
+    ],
+)
+def test_main_only_check_policy(tmp_path: Path, monkeypatch, event, runs, expected) -> None:
+    calls: list[tuple[str, ...]] = []
+
+    def fake_gh_json(*args: str) -> dict[str, object]:
+        calls.append(args)
+        return _runs(*runs)
+
+    monkeypatch.setattr("scripts.release.pipeline._gh_json", fake_gh_json)
+    result = _check_snapshot(tmp_path, slug="fixture/repo", sha="abc123", event=event)
+    assert result["result"] == expected
+    # Read the whole check set, not the API's default first page.
+    assert calls[0][1].endswith("check-runs?per_page=100")
+
+
+def test_pr_serial_skip_is_expected_na_not_a_skip(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setattr(
+        "scripts.release.pipeline._gh_json",
+        lambda *args: _runs(("a", "completed", "success"), (SERIAL, "completed", "skipped")),
+    )
+    result = _check_snapshot(tmp_path, slug="fixture/repo", sha="abc123")
+    assert result["expected_na"] == [SERIAL]
+    assert result["skipped"] == []
+
+
+def test_unknown_ci_event_is_rejected(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="unknown CI event"):
+        _check_snapshot(tmp_path, slug="fixture/repo", sha="abc123", event="schedule")
