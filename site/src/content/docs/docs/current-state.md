@@ -6,8 +6,8 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.11** is the current source-tree release candidate. The latest
-fully sealed public release remains **4.21.9**. HyoDo 4.21.10 has a verified
+HyoDo **4.21.11** is the current release target and source-tree release candidate.
+The latest fully sealed public release remains **4.21.9**. HyoDo 4.21.10 has a verified
 signed tag, published GitHub Release, and SBOM evidence, but its PyPI publish
 workflow is waiting at the `pypi` environment approval boundary, so that
 release chain is not closed yet. Product capability and live host observation
@@ -15,7 +15,7 @@ remain separate evidence axes.
 
 - Canonical source branch: **`main`**
 - Current release target: **4.21.11** (release chain `UNOBSERVED`)
-- Latest fully sealed public release: **4.21.9**
+- Latest published package: **4.21.9** (fully sealed; see the 4.21.9 receipt)
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
