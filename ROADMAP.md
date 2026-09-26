@@ -5,7 +5,7 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.9 remains the latest fully sealed public release. HyoDo 4.21.10 has
+HyoDo 4.21.9 is the latest published release and remains the latest fully sealed public release. HyoDo 4.21.10 has
 a verified signed tag and immutable published GitHub Release with durable SBOM
 evidence, but its PyPI publish workflow `36224231839` is waiting at the
 `pypi` environment approval boundary; its chain is therefore not closed.
@@ -13,7 +13,7 @@ Prior release receipts remain preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.21.11 is the current source-tree release candidate. It carries #506,
+HyoDo 4.21.11 is the current release target and source-tree release candidate. It carries #506,
 which merged after the immutable 4.21.10 tag and is therefore absent from
 4.21.10. Its release chain is `UNOBSERVED` in
 `docs/releases/4.21.11.md` until measured after publication.
