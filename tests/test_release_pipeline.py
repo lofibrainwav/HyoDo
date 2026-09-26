@@ -222,6 +222,7 @@ def test_ci_skips_are_counted_separately(
 
 
 SERIAL = "Goodness - Serial Full Suite (main)"
+DEP_REVIEW = "Pull request dependency review"
 
 
 def _runs(*pairs: tuple[str, str, str]) -> dict[str, object]:
@@ -277,15 +278,53 @@ def _runs(*pairs: tuple[str, str, str]) -> dict[str, object]:
         ("push", [("a", "completed", "success"), (SERIAL, "completed", "success")], "PASS"),
         ("push", [("a", "completed", "success"), (SERIAL, "completed", "skipped")], "BLOCK"),
         ("push", [("a", "completed", "success")], "BLOCK"),
-        # PR-only jobs are skipped on main by design and do not block the push.
+        # Push: only the named PR-only check may be skipped.
         (
             "push",
             [
                 ("a", "completed", "success"),
                 (SERIAL, "completed", "success"),
-                ("Pull request dependency review", "completed", "skipped"),
+                (DEP_REVIEW, "completed", "skipped"),
             ],
             "PASS",
+        ),
+        (
+            "push",
+            [
+                ("a", "completed", "success"),
+                (SERIAL, "completed", "success"),
+                ("b", "completed", "skipped"),
+            ],
+            "BLOCK",
+        ),
+        (
+            "push",
+            [
+                ("a", "completed", "success"),
+                (SERIAL, "completed", "success"),
+                (DEP_REVIEW, "completed", "skipped"),
+                ("b", "completed", "skipped"),
+            ],
+            "BLOCK",
+        ),
+        (
+            "push",
+            [
+                ("a", "completed", "success"),
+                (SERIAL, "completed", "success"),
+                (DEP_REVIEW, "completed", "failure"),
+            ],
+            "BLOCK",
+        ),
+        # The N/A lists are per event: dependency review skipped on a PR blocks.
+        (
+            "pull_request",
+            [
+                ("a", "completed", "success"),
+                (SERIAL, "completed", "skipped"),
+                (DEP_REVIEW, "completed", "skipped"),
+            ],
+            "BLOCK",
         ),
     ],
 )
@@ -316,3 +355,27 @@ def test_pr_serial_skip_is_expected_na_not_a_skip(tmp_path: Path, monkeypatch) -
 def test_unknown_ci_event_is_rejected(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="unknown CI event"):
         _check_snapshot(tmp_path, slug="fixture/repo", sha="abc123", event="schedule")
+
+
+def test_expected_na_table_matches_workflow_event_gates() -> None:
+    """Each expected-N/A name is a job gated to run only on the other event."""
+    import re
+
+    from scripts.release.pipeline import EXPECTED_NA_BY_EVENT
+
+    root = Path(__file__).resolve().parents[1]
+    jobs: dict[str, str] = {}
+    for workflow in (root / ".github" / "workflows").glob("*.yml"):
+        text = workflow.read_text(encoding="utf-8")
+        for match in re.finditer(
+            r'^    name: "?(?P<name>[^"\n]+?)"?\n    if: (?P<cond>.+)$', text, re.M
+        ):
+            jobs[match["name"]] = match["cond"]
+    gate_for = {
+        "pull_request": "github.event_name == 'push'",
+        "push": "github.event_name == 'pull_request'",
+    }
+    for event, names in EXPECTED_NA_BY_EVENT.items():
+        for name in names:
+            assert name in jobs, f"{name} not found as a gated job"
+            assert jobs[name].startswith(gate_for[event]), (name, jobs[name])
