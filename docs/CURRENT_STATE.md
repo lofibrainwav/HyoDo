@@ -8,9 +8,7 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package on PyPI: HyoDo `4.21.9`. 4.21.6 exists only as a
-  GitHub Release; its PyPI publication was withheld and it is superseded by
-  the security release 4.21.7 (see "4.21.7 security release" below).
+- Latest public package on PyPI: HyoDo `4.21.9`.
 - Recorded closed release chain: HyoDo `4.21.9`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
@@ -28,10 +26,10 @@ branches, and worktrees must not be folded into HyoDo closeout status.
 
 ## 4.21.9 release
 
-4.21.9 publishes the provenance fix from #488: an unreadable source subtree is
-`SOURCE_UNOBSERVED` / `UNOBSERVED` with `green_allowed=false`, not
-`SELF_OTHER_CHECKOUT` / `MISMATCH`. #487 is test-only fixture hardening and
-adds no product capability. Its release chain is measured 9/9 OBSERVED in
+4.21.9 publishes the provenance classification fix from #488: an unreadable
+source subtree is `SOURCE_UNOBSERVED` / `UNOBSERVED` with `green_allowed=false`,
+not `SELF_OTHER_CHECKOUT` / `MISMATCH`. #487 is test-only fixture hardening; it
+adds no new HyoDo Core capability. Its release chain is measured 9/9 OBSERVED in
 [`releases/4.21.9.md`](./releases/4.21.9.md).
 
 ## 4.21.8 release

@@ -6,14 +6,14 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.21.9** is the current release target and released source-tree
-baseline. Its release chain is measured 9/9 OBSERVED in the
-[release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.9.md).
+HyoDo **4.21.9** is the current release target and the latest published
+package. Its release chain is measured 9/9 OBSERVED in the
+[4.21.9 release receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.21.9.md).
 Current source/main is post-release maintenance, not a new public release.
 Product capability and live host observation remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Current release target: **4.21.9** (release chain 9/9 OBSERVED)
+- Current release target: **4.21.9** (release chain 9/9 `OBSERVED`)
 - Latest published package: **4.21.9** (see the 4.21.9 receipt above)
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
@@ -25,9 +25,11 @@ live in per-user state outside the checkout, so a repository cannot supply its
 own authority. See the
 [trust boundary contract](https://github.com/lofibrainwav/HyoDo/blob/main/docs/TRUST_BOUNDARY.md).
 
-HyoDo 4.21.9 publishes the provenance fix from #488: an unreadable source
-subtree is `SOURCE_UNOBSERVED` / `UNOBSERVED` with `green_allowed=false`, not
-`SELF_OTHER_CHECKOUT` / `MISMATCH`. #487 is test-only fixture hardening.
+HyoDo 4.21.9 carries the provenance classification fix from #488: an
+unreadable source subtree is `SOURCE_UNOBSERVED` / `UNOBSERVED` with
+`green_allowed=false`, not `SELF_OTHER_CHECKOUT` / `MISMATCH`. #487 is
+test-only fixture hardening and adds no product capability.
+
 HyoDo 4.21.8 carries the evidence/judgment boundary: gate-to-virtue
 attribution remains evidence, `hyodo.lens-evidence/v1` reports lens state with
 `authority: UNOBSERVED`, and legacy score derivation is compatibility only.

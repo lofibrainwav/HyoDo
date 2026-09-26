@@ -12,11 +12,8 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.9 is the current release target and released source-tree baseline.
-Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
-9/9 OBSERVED in `docs/releases/4.21.9.md`. Current source/main may advance
-after publication; that is post-release maintenance, not a new public release.
-HyoDo 4.21.2
+HyoDo 4.21.9 is the current release target and the latest published release.
+Its release chain is measured 9/9 OBSERVED in `docs/releases/4.21.9.md`. HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
@@ -49,7 +46,7 @@ evidence is not converted into a pass.
 
 ### 4.21.9 (released 2026-09-25 UTC)
 
-- Publish the merged #488 provenance fix: an unreadable source subtree is
+- Publishes the merged #488 provenance fix: an unreadable source subtree is
   `SOURCE_UNOBSERVED` / `UNOBSERVED` with `green_allowed=false`, not
   `SELF_OTHER_CHECKOUT` / `MISMATCH`.
 - #487 is test-only fixture hardening and adds no product capability.
