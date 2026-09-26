@@ -5,6 +5,41 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.21.10] - 2026-09-25
+
+Native hook root correctness release. An explicit `--root` is the storage and
+policy root. No new HyoDo Core capability is added by this release commit.
+
+### Fixed
+
+- In 4.21.9, `hyodo event record --hook <host> --root A` and
+  `hyodo policy check --hook <host> --root A` let the host payload `cwd`
+  replace the root after mapping. A hook fired from worktree B wrote
+  `B/.hyodo`, counted steps from B's ledger, and read B's policy and trust
+  state. An explicit `--root` now wins for both commands and all native
+  adapters (claude-code, codex, cursor). Without `--root`, the payload `cwd`
+  stays the fallback root. A missing or blank `cwd` is still reported as
+  malformed rather than repaired by `--root` (#501).
+
+### Changed
+
+- `hyodo connect claude-code` no longer writes `--root .` into the PreToolUse
+  command, so both hook halves keep the payload-`cwd` fallback. Settings
+  written by an older `connect` still carry `--root .`; with this release that
+  pre hook resolves root from the hook process cwd. Re-running
+  `hyodo connect claude-code --write` rewrites the owned entry (#501).
+
+### Evidence
+
+- Source commit: #501 -> `68f58cade006251d89a8ed0f9406bbc0cccdc8e7`.
+- #503 -> `eb8e6844821f182aed1ab3546ce58d73f11b018d` and #504 ->
+  `7d90db83421dbc1993ded783718f33a947faaa22` are release tooling only (not in
+  the published package): the release pipeline judges CI checks against
+  per-event expected-N/A allowlists, and requires the main-only serial suite
+  to succeed on main.
+- The 4.21.10 release chain is `UNOBSERVED` in `docs/releases/4.21.10.md`
+  until it is measured after publication.
+
 ## [4.21.9] - 2026-09-25
 
 Provenance correctness release. HyoDo no longer reports unknown as different.
@@ -24,8 +59,9 @@ No new HyoDo Core capability is added by this release commit.
   #488 -> `1b3a0c1e417e1d136154b45308dc96c9fcb94790`.
 - #487 is test-only: it makes the trust persistence golden fixture
   deterministic. It is verification evidence, not a product capability.
-- The 4.21.9 release chain is `UNOBSERVED` in `docs/releases/4.21.9.md` until
-  it is measured after publication.
+- Publication is measured and sealed in `docs/releases/4.21.9.md`: 9/9
+  OBSERVED (release-evidence run `36158404831`, PyPI publish/readback run
+  `36162825331`, wheel sha256 prefix `ee1a245993302962`).
 
 ## [4.21.8] - 2026-09-24
 

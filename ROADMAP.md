@@ -12,8 +12,11 @@ SBOM receipt, PyPI provenance, and install readback are recorded in
 
 ## Current release
 
-HyoDo 4.21.9 is the current release target and the latest published release.
-Its release chain is measured 9/9 OBSERVED in `docs/releases/4.21.9.md`. HyoDo 4.21.2
+HyoDo 4.21.10 is the current release target and source-tree release candidate.
+Its signed tag, GitHub Release + SBOM, PyPI provenance, and install smoke are
+`UNOBSERVED` in `docs/releases/4.21.10.md` until measured after publication.
+HyoDo 4.21.9 remains the latest published release, measured 9/9 OBSERVED in
+`docs/releases/4.21.9.md`. HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
 and never reached PyPI (`docs/releases/4.21.2.md`).
@@ -43,6 +46,14 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.21.10 (release candidate; release chain UNOBSERVED)
+
+- Publish the merged #501 native hook root fix: an explicit `--root` wins over
+  the host payload `cwd` for `event record --hook` and `policy check --hook`;
+  without `--root`, payload `cwd` stays the fallback.
+- `hyodo connect claude-code` no longer writes `--root .` into PreToolUse.
+- Release chain is `UNOBSERVED` in `docs/releases/4.21.10.md` until measured.
 
 ### 4.21.9 (released 2026-09-25 UTC)
 

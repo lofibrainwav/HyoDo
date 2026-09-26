@@ -1,6 +1,6 @@
 {
   "name": "hyodo",
-  "version": "4.21.9",
+  "version": "4.21.10",
   "description": "Model-agnostic local guardrails for AI-assisted development: quality gates, evidence, and policy. Unobserved is never green; review scores are advisory.",
   "author": {
     "name": "BRNESTRM",
