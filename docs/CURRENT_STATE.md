@@ -8,15 +8,13 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package on PyPI: HyoDo `4.21.10`.
-- Recorded closed release chain: HyoDo `4.21.10`
+- Latest public package on PyPI: HyoDo `4.21.11`.
+- Recorded closed release chain: HyoDo `4.21.11`
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.21.10.md`](./releases/4.21.10.md).
+  [`releases/4.21.11.md`](./releases/4.21.11.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- Release candidate: HyoDo `4.21.11`; release chain `UNOBSERVED` in
-  [`releases/4.21.11.md`](./releases/4.21.11.md) until measured.
-- HyoDo product status: the recorded 4.21.10 release is closed. Research and
+- HyoDo product status: the recorded 4.21.11 release is closed. Research and
   integration have separate evidence and promotion criteria; they do not
   silently reopen the sealed public artifact. Live-host and orchestration
   experiments remain downstream integration/research work.
@@ -25,9 +23,15 @@ The HyoDo/Kingdom ownership and status-separation contract is maintained in
 [`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
 branches, and worktrees must not be folded into HyoDo closeout status.
 
-## 4.21.11 release candidate
+## 4.21.11 release
 
-4.21.11 carries #506: unknown `policy.toml` keys now fail closed through the existing `policy_invalid` / `UNOBSERVED` path instead of being ignored. Valid `hyodo.policy/v1` files keep the same semantics. Its release chain is `UNOBSERVED` in [`releases/4.21.11.md`](./releases/4.21.11.md).
+4.21.11 carries #506 at immutable tag target
+`230bf26ecbf542e60754457a69e1733317651ced`: unknown `policy.toml` keys now fail
+closed through the existing `policy_invalid` / `UNOBSERVED` path instead of
+being ignored. Valid `hyodo.policy/v1` files keep the same semantics. Its
+release chain is measured 9/9 OBSERVED in
+[`releases/4.21.11.md`](./releases/4.21.11.md), including PyPI OIDC provenance
+and install smoke.
 
 ## 4.21.10 release
 
