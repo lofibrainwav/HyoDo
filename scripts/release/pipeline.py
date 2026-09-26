@@ -233,36 +233,68 @@ def create_one_pr(root: Path, *, base: str = "main", title: str, body: str) -> d
     return {"created": True, "pr": created}
 
 
-def _check_snapshot(root: Path, *, slug: str, sha: str) -> dict[str, Any]:
-    data = _gh_json(root, f"repos/{slug}/commits/{sha}/check-runs")
+# Named CI policy. These checks run only on a push to main (ci.yml gates them
+# with `github.event_name == 'push' && github.ref == 'refs/heads/main'`). On a
+# pull-request candidate they are skipped by design: expected N/A, not missing
+# evidence. Every other skipped check still blocks. On main they must succeed.
+MAIN_ONLY_CHECKS = frozenset({"Goodness - Serial Full Suite (main)"})
+_FAILED_CONCLUSION_EXEMPT = frozenset({"success", "skipped"})
+
+
+def _check_snapshot(
+    root: Path, *, slug: str, sha: str, event: str = "pull_request"
+) -> dict[str, Any]:
+    """Classify exact-SHA check runs under the named CI policy.
+
+    ``event="pull_request"``: a skipped ``MAIN_ONLY_CHECKS`` run is recorded as
+    ``expected_na``; any other skipped run blocks; only success passes.
+    ``event="push"`` (main): every ``MAIN_ONLY_CHECKS`` run must be present and
+    successful, and nothing may be pending or failed. An empty check set never
+    passes.
+    """
+    if event not in {"pull_request", "push"}:
+        raise ValueError(f"unknown CI event: {event!r}")
+    data = _gh_json(root, f"repos/{slug}/commits/{sha}/check-runs?per_page=100")
     checks = data.get("check_runs", [])
+    completed = [item for item in checks if item.get("status") == "completed"]
     pending = [item["name"] for item in checks if item.get("status") != "completed"]
     failed = [
         item["name"]
-        for item in checks
-        if item.get("status") == "completed"
-        and item.get("conclusion") not in {"success", "skipped"}
+        for item in completed
+        if item.get("conclusion") not in _FAILED_CONCLUSION_EXEMPT
     ]
-    skipped = [
-        item["name"]
-        for item in checks
-        if item.get("status") == "completed" and item.get("conclusion") == "skipped"
-    ]
-    passed = sum(
-        item.get("status") == "completed" and item.get("conclusion") == "success" for item in checks
-    )
+    all_skipped = [item["name"] for item in completed if item.get("conclusion") == "skipped"]
+    passed = sum(item.get("conclusion") == "success" for item in completed)
+    expected_na: list[str] = []
+    missing_required: list[str] = []
+    if event == "pull_request":
+        expected_na = [name for name in all_skipped if name in MAIN_ONLY_CHECKS]
+        skipped = [name for name in all_skipped if name not in MAIN_ONLY_CHECKS]
+        blocking_skips = skipped
+    else:
+        skipped = all_skipped
+        successes = {item["name"] for item in completed if item.get("conclusion") == "success"}
+        missing_required = sorted(MAIN_ONLY_CHECKS - successes)
+        # Other skips on a push are reported, not failed: PR-only jobs such as
+        # dependency review are skipped on main by design.
+        blocking_skips = [name for name in skipped if name in MAIN_ONLY_CHECKS]
+    if pending:
+        result = "WAIT"
+    elif passed and not failed and not blocking_skips and not missing_required:
+        result = "PASS"
+    else:
+        result = "BLOCK"
     return {
         "sha": sha,
+        "event": event,
         "total": len(checks),
         "pending": pending,
         "failed": failed,
         "skipped": skipped,
+        "expected_na": expected_na,
+        "missing_required": missing_required,
         "passed": passed,
-        "result": "PASS"
-        if passed and not pending and not failed and not skipped
-        else "WAIT"
-        if pending
-        else "BLOCK",
+        "result": result,
     }
 
 
@@ -821,6 +853,9 @@ class GitHubRemote:
         version = self._ok("git", "show", f"{sha}:VERSION").strip()
         return {"sha": sha, "version": version}
 
+    def observe_main_ci(self, sha: str) -> dict[str, Any]:
+        return _check_snapshot(self.root, slug=self.repo, sha=sha, event="push")
+
     def observe_tag(self, tag: str) -> dict[str, Any] | None:
         if not self._ok("git", "ls-remote", "--tags", "origin", f"refs/tags/{tag}"):
             return None
@@ -1085,6 +1120,19 @@ def run_publication(
         if main_state.get("version") != version:
             raise _PublicationBlocked(
                 f"origin/main VERSION is {main_state.get('version')!r}, not {version!r}"
+            )
+        # Main-only checks are N/A on the PR; the merged main SHA is where they
+        # must actually succeed before anything is tagged.
+        main_ci = remote.observe_main_ci(main_sha)
+        receipt["main_ci"] = main_ci
+        if main_ci.get("result") != "PASS":
+            waiting = main_ci.get("result") == "WAIT"
+            raise _PublicationBlocked(
+                f"main CI at {main_sha} is {main_ci.get('result')}: "
+                f"pending={main_ci.get('pending')} failed={main_ci.get('failed')} "
+                f"missing_required={main_ci.get('missing_required')}",
+                "WAITING_CI" if waiting else "BLOCKED",
+                "WAIT" if waiting else "BLOCK",
             )
 
         # TAGGED ------------------------------------------------------------

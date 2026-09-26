@@ -62,10 +62,14 @@ class FakeRemote:
         self.evidence_jobs = {"build-evidence": "success", "attach-assets": "success"}
         self.assets_verify = True
         self.drop_assets_before_publish = False
+        self.main_ci: dict[str, Any] = {"result": "PASS", "sha": MAIN_SHA}
 
     # -- observations ---------------------------------------------------
     def observe_main(self) -> dict[str, str]:
         return {"sha": MAIN_SHA, "version": VERSION}
+
+    def observe_main_ci(self, sha: str) -> dict[str, Any]:
+        return dict(self.main_ci)
 
     def observe_tag(self, tag: str) -> dict | None:
         return self.tag
@@ -629,3 +633,34 @@ def test_a_crash_while_observing_main_still_returns_a_receipt() -> None:
     assert receipt["result"] == "BLOCK"
     assert "TimeoutExpired" in receipt["residuals"][0]
     assert remote.mutations() == []
+
+
+@pytest.mark.parametrize(
+    ("main_ci", "stage", "result"),
+    [
+        (
+            {"result": "BLOCK", "missing_required": ["Goodness - Serial Full Suite (main)"]},
+            "BLOCKED",
+            "BLOCK",
+        ),
+        (
+            {"result": "WAIT", "pending": ["Goodness - Serial Full Suite (main)"]},
+            "WAITING_CI",
+            "WAIT",
+        ),
+    ],
+)
+def test_publication_requires_main_only_checks_green_on_main(main_ci, stage, result) -> None:
+    remote = FakeRemote()
+    remote.main_ci = main_ci
+    receipt = pipeline.run_publication(
+        VERSION,
+        remote,
+        notes=Path("notes.md"),
+        execute=True,
+        authorize_ref="ref",
+        authorize_sha=MAIN_SHA,
+    )
+    assert receipt["stage"] == stage
+    assert receipt["result"] == result
+    assert not MUTATIONS & set(remote.calls)
