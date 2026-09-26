@@ -233,27 +233,39 @@ def create_one_pr(root: Path, *, base: str = "main", title: str, body: str) -> d
     return {"created": True, "pr": created}
 
 
-# Named CI policy. These checks run only on a push to main (ci.yml gates them
-# with `github.event_name == 'push' && github.ref == 'refs/heads/main'`). On a
-# pull-request candidate they are skipped by design: expected N/A, not missing
-# evidence. Every other skipped check still blocks. On main they must succeed.
-MAIN_ONLY_CHECKS = frozenset({"Goodness - Serial Full Suite (main)"})
+# Named CI policy: expected-N/A allowlists per event, mirroring the `if:`
+# gates in .github/workflows. A skipped check is N/A only when this table
+# names it for that event; every other skipped check blocks.
+#   pull_request: the serial suite runs only on a push to main (ci.yml).
+#   push (main):  dependency review runs only on a pull request (security.yml).
+SERIAL_FULL_SUITE = "Goodness - Serial Full Suite (main)"
+DEPENDENCY_REVIEW = "Pull request dependency review"
+EXPECTED_NA_BY_EVENT: dict[str, frozenset[str]] = {
+    "pull_request": frozenset({SERIAL_FULL_SUITE}),
+    "push": frozenset({DEPENDENCY_REVIEW}),
+}
+# Checks that must be present and successful for that event.
+REQUIRED_SUCCESS_BY_EVENT: dict[str, frozenset[str]] = {
+    "pull_request": frozenset(),
+    "push": frozenset({SERIAL_FULL_SUITE}),
+}
 _FAILED_CONCLUSION_EXEMPT = frozenset({"success", "skipped"})
 
 
 def _check_snapshot(
     root: Path, *, slug: str, sha: str, event: str = "pull_request"
 ) -> dict[str, Any]:
-    """Classify exact-SHA check runs under the named CI policy.
+    """Classify exact-SHA check runs under the named per-event CI policy.
 
-    ``event="pull_request"``: a skipped ``MAIN_ONLY_CHECKS`` run is recorded as
-    ``expected_na``; any other skipped run blocks; only success passes.
-    ``event="push"`` (main): every ``MAIN_ONLY_CHECKS`` run must be present and
-    successful, and nothing may be pending or failed. An empty check set never
-    passes.
+    A skipped run is ``expected_na`` only if ``EXPECTED_NA_BY_EVENT[event]``
+    names it; any other skipped run blocks. ``REQUIRED_SUCCESS_BY_EVENT[event]``
+    runs must be present and successful. Failure/cancelled/timed_out blocks,
+    pending waits, and an empty check set never passes.
     """
-    if event not in {"pull_request", "push"}:
+    if event not in EXPECTED_NA_BY_EVENT:
         raise ValueError(f"unknown CI event: {event!r}")
+    allowed_na = EXPECTED_NA_BY_EVENT[event]
+    required = REQUIRED_SUCCESS_BY_EVENT[event]
     data = _gh_json(root, f"repos/{slug}/commits/{sha}/check-runs?per_page=100")
     checks = data.get("check_runs", [])
     completed = [item for item in checks if item.get("status") == "completed"]
@@ -264,23 +276,14 @@ def _check_snapshot(
         if item.get("conclusion") not in _FAILED_CONCLUSION_EXEMPT
     ]
     all_skipped = [item["name"] for item in completed if item.get("conclusion") == "skipped"]
+    expected_na = [name for name in all_skipped if name in allowed_na]
+    skipped = [name for name in all_skipped if name not in allowed_na]
+    successes = {item["name"] for item in completed if item.get("conclusion") == "success"}
+    missing_required = sorted(required - successes)
     passed = sum(item.get("conclusion") == "success" for item in completed)
-    expected_na: list[str] = []
-    missing_required: list[str] = []
-    if event == "pull_request":
-        expected_na = [name for name in all_skipped if name in MAIN_ONLY_CHECKS]
-        skipped = [name for name in all_skipped if name not in MAIN_ONLY_CHECKS]
-        blocking_skips = skipped
-    else:
-        skipped = all_skipped
-        successes = {item["name"] for item in completed if item.get("conclusion") == "success"}
-        missing_required = sorted(MAIN_ONLY_CHECKS - successes)
-        # Other skips on a push are reported, not failed: PR-only jobs such as
-        # dependency review are skipped on main by design.
-        blocking_skips = [name for name in skipped if name in MAIN_ONLY_CHECKS]
     if pending:
         result = "WAIT"
-    elif passed and not failed and not blocking_skips and not missing_required:
+    elif passed and not failed and not skipped and not missing_required:
         result = "PASS"
     else:
         result = "BLOCK"
