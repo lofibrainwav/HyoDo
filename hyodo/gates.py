@@ -109,12 +109,18 @@ TRUST_PREVIOUS_UNOBSERVED = "UNOBSERVED"
 # approval prompt: ESC-introduced CSI / OSC / two-byte sequences, then any other
 # C0 control, DEL, and C1 controls. Each match becomes one visible U+241B, so a
 # hostile name or argv cannot move the cursor, erase lines, or retitle the
-# terminal. Tab, LF and CR are not matched and pass through unchanged.
+# terminal. Tab, LF and CR are not matched here; CR and LF are handled by
+# `_PROMPT_LINE_BREAKS` below, and tab passes through unchanged.
 _PROMPT_CONTROL_RE = re.compile(
     r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])"
     r"|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]"
 )
 _PROMPT_CONTROL_REPLACEMENT = "\u241b"
+# CR and LF need no ESC to forge a line: CR returns the cursor to column 0 so
+# later text overwrites the real argv on screen, and LF prints an extra
+# "[pillar] name: command" line no gate has. Each becomes its visible Control
+# Pictures glyph (U+240D / U+240A) so one gate always renders as one line.
+_PROMPT_LINE_BREAKS = str.maketrans({"\r": "\u240d", "\n": "\u240a"})
 
 # A leading token shaped like ``KEY=VALUE`` (POSIX env-prefix assignment) that
 # must be separated from the executable when running with shell=False.
@@ -440,7 +446,7 @@ def _sanitize_for_prompt(text: str) -> str:
     approved. Only the display is changed; the fingerprint still covers the
     exact bytes that would execute.
     """
-    return _PROMPT_CONTROL_RE.sub(_PROMPT_CONTROL_REPLACEMENT, text)
+    return _PROMPT_CONTROL_RE.sub(_PROMPT_CONTROL_REPLACEMENT, text).translate(_PROMPT_LINE_BREAKS)
 
 
 def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:

@@ -676,3 +676,66 @@ def test_cli_gates_trust_revoke_then_check_is_unobserved(
     assert payload["removed"][0]["via"] == f"env:{GATES_TRUST_ENV_VAR}"
     assert payload["env_var_set"] is False
     assert resolve_gate_trust(config, tmp_path).approved is False
+
+
+def test_prompt_neutralizes_cr_and_lf_line_forgery(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """CR and LF alone, with no ESC byte, must not rewrite or forge prompt lines.
+
+    A bare CR returns the cursor to column 0 so a benign-looking string can
+    overwrite the real argv on screen; a LF in the name can print an extra
+    ``[pillar] name: command`` line that no gate actually has.
+    """
+    marker = tmp_path / "pwned.txt"
+    _write_gates_toml(
+        tmp_path,
+        f"""
+schema = "{SCHEMA_ID}"
+
+[gates."tests\\n  [truth] lint: ruff check ."]
+pillar = "truth"
+command = [
+  {json.dumps(sys.executable)},
+  "-c",
+  "open({json.dumps(str(marker))[1:-1]!r}, 'w').write('x')",
+  "\\r  [truth] tests: pytest -q                                        ",
+]
+""",
+    )
+    config = load_gates_config(tmp_path)
+    assert config is not None
+    assert "\n" in config.gates[0].name  # the hostile bytes really were parsed
+    assert "\r" in config.gates[0].command[-1]
+    _force_interactive(monkeypatch, "n")
+
+    results = run_user_gates(config, tmp_path)
+    out = capsys.readouterr().out
+
+    assert "\r" not in out
+    gate_lines = [line for line in out.splitlines() if line.startswith("  [")]
+    assert len(gate_lines) == 1  # one gate, one line: no forged extra entry
+    assert "␍" in gate_lines[0]
+    assert "␊" in gate_lines[0]
+    assert "pwned.txt" in gate_lines[0]  # the real command stays on the visible line
+    assert results[0].status == "SKIP"
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("a\rb", "a␍b"),
+        ("a\nb", "a␊b"),
+        ("a\r\nb", "a␍␊b"),
+        ("a\tb\r", "a\tb␍"),
+    ],
+)
+def test_sanitize_for_prompt_makes_cr_and_lf_visible(raw: str, expected: str) -> None:
+    assert gates._sanitize_for_prompt(raw) == expected
+
+
+def test_fingerprint_distinguishes_raw_cr_lf_from_their_display_glyphs() -> None:
+    raw = _config(UserGate(name="g", pillar="truth", command=("echo", "a\rb\nc"), timeout=5))
+    shown = _config(UserGate(name="g", pillar="truth", command=("echo", "a␍b␊c"), timeout=5))
+    assert compute_gate_set_fingerprint(raw) != compute_gate_set_fingerprint(shown)
