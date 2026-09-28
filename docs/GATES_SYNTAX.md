@@ -54,6 +54,20 @@ that runs untrusted pull-request code. Approval controls whether commands
 execute; it does not establish that the approved commands are safe or that
 their results authorize a merge or deployment.
 
+An approval made this way is recorded in per-user state with
+`via: "env:HYODO_GATES_TRUST_ALL"` and outlives the variable: unsetting it
+does not withdraw the approval. Withdraw it explicitly:
+
+```bash
+hyodo gates trust revoke             # every approval for this workspace
+hyodo gates trust revoke --env-only  # only approvals recorded via the variable
+```
+
+After a revoke, the next non-interactive `hyodo check` without the variable
+does not execute the command set and reports it `UNOBSERVED`. Revoking while
+the variable is still set is reported, because the next run would record the
+approval again.
+
 ## Table: top level
 
 | Field | Type | Required | Default | Meaning |

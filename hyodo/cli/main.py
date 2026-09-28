@@ -131,14 +131,18 @@ from hyodo.eye import (
 from hyodo.gates import (
     CHECKOUT_TRUST_IGNORED_NOTE,
     GATES_CONFIG_RELATIVE_PATH,
+    GATES_TRUST_ENV_VAR,
     GATES_TRUST_RELATIVE_PATH,
     SCHEMA_ID,
+    TRUST_PERSISTENCE_OBSERVED,
     GatesConfigError,
     detect_project_gates,
     detect_project_markers,
     format_gate_command,
+    gate_trust_env_preapproves,
     load_gates_config,
     render_gates_toml,
+    revoke_gate_trust,
     run_user_gates_with_trust,
 )
 from hyodo.graph_export import build_graph_export
@@ -305,6 +309,16 @@ admission_app = typer.Typer(
     help="Bounded policy-admission observations from an external executor",
     add_completion=False,
 )
+gates_app = typer.Typer(
+    name="gates",
+    help="Bring-Your-Own-Gates (.hyodo/gates.toml) operator controls",
+    add_completion=False,
+)
+gates_trust_app = typer.Typer(
+    name="trust",
+    help="Recorded approvals for a checkout's BYOG command set",
+    add_completion=False,
+)
 mcp_app.add_typer(rules_app, name="rules")
 mcp_app.add_typer(pairing_app, name="pairing")
 app.add_typer(event_app, name="event")
@@ -317,6 +331,8 @@ app.add_typer(skills_app, name="skills")
 app.add_typer(graph_app, name="graph")
 app.add_typer(eye_app, name="eye")
 app.add_typer(admission_app, name="admission")
+app.add_typer(gates_app, name="gates")
+gates_app.add_typer(gates_trust_app, name="trust")
 console = Console()
 
 
@@ -3346,6 +3362,59 @@ def _mcp_revoke(
         console.print(f"  workspace_id: {record.workspace_id}")
         console.print(f"  revoked_at:   {record.revoked_at}")
     raise typer.Exit(0)
+
+
+@gates_trust_app.command("revoke")
+def gates_trust_revoke(
+    root: str = typer.Option(".", "--root", help="Workspace root to revoke BYOG approvals for"),
+    env_only: bool = typer.Option(
+        False,
+        "--env-only",
+        help=f"Only withdraw approvals recorded via {GATES_TRUST_ENV_VAR}; keep prompt approvals",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Withdraw recorded approvals so the command set must be approved again.
+
+    An approval recorded via the environment pre-approval persists after the
+    variable is unset; this removes it. Exit 0 when the re-read state no
+    longer approves any removed fingerprint, 2 when that cannot be confirmed.
+    """
+    root_path = Path(root).expanduser().resolve()
+    revocation = revoke_gate_trust(root_path, env_only=env_only)
+    observed = revocation.persistence == TRUST_PERSISTENCE_OBSERVED
+    state = "UNOBSERVED" if not observed else ("REVOKED" if revocation.removed else "NONE")
+    env_still_set = gate_trust_env_preapproves()
+    exit_code = 0 if observed else 2
+    payload = {
+        "ok": observed,
+        "state": state,
+        "scope": "env" if env_only else "all",
+        "removed": [
+            {"fingerprint": fingerprint, "via": via}
+            for fingerprint, via in sorted(revocation.removed.items())
+        ],
+        "remaining": revocation.remaining,
+        "persistence": revocation.persistence,
+        "env_var_set": env_still_set,
+        "exit_code": exit_code,
+    }
+    if json_output:
+        console.print_json(json.dumps(payload))
+    else:
+        color = {"REVOKED": "green", "NONE": "yellow"}.get(state, "red")
+        console.print(f"[{color}]{state}[/{color}]")
+        for fingerprint, via in sorted(revocation.removed.items()):
+            console.print(f"  removed:   {fingerprint} (via {via})")
+        if not revocation.removed:
+            console.print("  no matching approval was recorded for this workspace")
+        console.print(f"  remaining: {revocation.remaining}")
+        if env_still_set:
+            console.print(
+                f"[yellow]{GATES_TRUST_ENV_VAR} is still set in this environment; the next "
+                "`hyodo check` here will pre-approve and record the command set again.[/yellow]"
+            )
+    raise typer.Exit(exit_code)
 
 
 # Registered under both names: `revoke` is the primary verb used in the M5-B
