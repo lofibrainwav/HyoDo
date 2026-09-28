@@ -105,6 +105,17 @@ TRUST_PERSISTENCE_UNOBSERVED = "UNOBSERVED"
 TRUST_PREVIOUS_NONE = "NONE"
 TRUST_PREVIOUS_UNOBSERVED = "UNOBSERVED"
 
+# Terminal control sequences a gates.toml string could smuggle into the
+# approval prompt: ESC-introduced CSI / OSC / two-byte sequences, then any other
+# C0 control, DEL, and C1 controls. Each match becomes one visible U+241B, so a
+# hostile name or argv cannot move the cursor, erase lines, or retitle the
+# terminal. Tab, LF and CR are not matched and pass through unchanged.
+_PROMPT_CONTROL_RE = re.compile(
+    r"\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b]*(?:\x07|\x1b\\)|[@-Z\\-_])"
+    r"|[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f]"
+)
+_PROMPT_CONTROL_REPLACEMENT = "\u241b"
+
 # A leading token shaped like ``KEY=VALUE`` (POSIX env-prefix assignment) that
 # must be separated from the executable when running with shell=False.
 _ENV_ASSIGNMENT_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
@@ -283,6 +294,11 @@ def _env_truthy(name: str) -> bool:
     return os.environ.get(name, "").strip().lower() in _TRUTHY_ENV_VALUES
 
 
+def gate_trust_env_preapproves() -> bool:
+    """Whether `GATES_TRUST_ENV_VAR` would pre-approve a command set right now."""
+    return _env_truthy(GATES_TRUST_ENV_VAR)
+
+
 def _is_noninteractive() -> bool:
     """Best-effort detection of an automated (CI / no-terminal) environment.
 
@@ -344,10 +360,87 @@ def _remember_gate_trust(root: Path, store: dict[str, Any], fingerprint: str, *,
     return _save_gate_trust_store(root, store, fingerprint)
 
 
+@dataclass(frozen=True)
+class GateTrustRevocation:
+    """Outcome of `revoke_gate_trust` for one workspace's BYOG approvals.
+
+    ``removed`` maps each withdrawn fingerprint to the ``via`` it was recorded
+    with, so a reader can see whether an operator's prompt approval or an
+    environment pre-approval was withdrawn. ``persistence`` is
+    `TRUST_PERSISTENCE_OBSERVED` only when a re-read of per-user state shows
+    none of the removed fingerprints still approved.
+    """
+
+    removed: dict[str, str]
+    remaining: int
+    persistence: str
+
+
+def revoke_gate_trust(root: Path, *, env_only: bool = False) -> GateTrustRevocation:
+    """Withdraw recorded BYOG approvals for *root* from per-user state.
+
+    An approval recorded via `GATES_TRUST_ENV_VAR` outlives the variable: it
+    is a receipt, and unsetting the variable does not remove it. This is the
+    explicit way to take it back. With *env_only*, only approvals whose
+    ``via`` is the environment pre-approval are removed and operator prompt
+    approvals are kept; otherwise every approval for the workspace is removed.
+    When nothing remains the state file is deleted rather than left empty.
+
+    The checkout's own `GATES_TRUST_RELATIVE_PATH` is never touched: it never
+    granted anything, so there is nothing in it to revoke.
+    """
+    path = workspace_state_path(root, GATES_TRUST_STATE_NAME)
+    approved = _load_gate_trust_store(root)["approved"]
+    removed = {
+        fingerprint: str(entry.get("via", TRUST_VIA_NONE))
+        if isinstance(entry, dict)
+        else TRUST_VIA_NONE
+        for fingerprint, entry in approved.items()
+        if not env_only or (isinstance(entry, dict) and entry.get("via") == TRUST_VIA_ENV)
+    }
+    kept = {fp: entry for fp, entry in approved.items() if fp not in removed}
+    try:
+        if kept and removed:
+            write_json_private(
+                root,
+                GATES_TRUST_STATE_NAME,
+                {
+                    "schema": GATES_TRUST_SCHEMA_ID,
+                    "approved": kept,
+                    "workspace_id": workspace_identity(root),
+                },
+            )
+        elif path.exists() or path.is_symlink():
+            # Also clears a malformed or foreign-workspace file: it approved
+            # nothing, and leaving it would only confuse the next reader.
+            path.unlink()
+    except OSError:
+        return GateTrustRevocation(removed, len(kept), TRUST_PERSISTENCE_UNOBSERVED)
+    readback = _load_gate_trust_store(root)["approved"]
+    persistence = (
+        TRUST_PERSISTENCE_UNOBSERVED
+        if any(fingerprint in readback for fingerprint in removed)
+        else TRUST_PERSISTENCE_OBSERVED
+    )
+    return GateTrustRevocation(removed, len(readback), persistence)
+
+
 def format_gate_command(gate: UserGate) -> str:
     """Render the exact argv (with any env prefix) a gate would execute."""
     env_prefix = " ".join(gate.env) + " " if gate.env else ""
     return f"{env_prefix}{' '.join(gate.command)}"
+
+
+def _sanitize_for_prompt(text: str) -> str:
+    """Neutralize terminal control sequences before *text* reaches the prompt.
+
+    The approval prompt is the one place an operator decides what runs, so a
+    gates.toml string must render as inert characters: an escape sequence that
+    moved the cursor or erased a line could show one command while another is
+    approved. Only the display is changed; the fingerprint still covers the
+    exact bytes that would execute.
+    """
+    return _PROMPT_CONTROL_RE.sub(_PROMPT_CONTROL_REPLACEMENT, text)
 
 
 def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
@@ -358,7 +451,11 @@ def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
     """
     print("HyoDo Bring-Your-Own-Gates: .hyodo/gates.toml command set changed or is new.")
     for gate in config.gates:
-        print(f"  [{gate.pillar}] {gate.name}: {format_gate_command(gate)}")
+        # `pillar` is allow-listed at parse time and `fingerprint` is hex; name
+        # and argv are free-form repository text and must not drive the terminal.
+        name = _sanitize_for_prompt(gate.name)
+        command = _sanitize_for_prompt(format_gate_command(gate))
+        print(f"  [{gate.pillar}] {name}: {command}")
     print(f"  fingerprint: {fingerprint}")
     try:
         answer = input("Trust and run this command set now? [y/N] ")
@@ -413,7 +510,7 @@ def _resolve_gate_trust(config: GatesConfig, root: Path) -> GateTrustDecision:
             previous=previous,
         )
 
-    if _env_truthy(GATES_TRUST_ENV_VAR):
+    if gate_trust_env_preapproves():
         persistence = _remember_gate_trust(root, store, fingerprint, via=TRUST_VIA_ENV)
         return GateTrustDecision(
             True,

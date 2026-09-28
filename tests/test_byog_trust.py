@@ -500,3 +500,179 @@ def test_user_state_receipt_for_another_workspace_is_ignored(
     _force_noninteractive(monkeypatch)
 
     assert resolve_gate_trust(config, tmp_path).approved is False
+
+
+# ---------------------------------------------------------------------------
+# approval prompt must not pass terminal control sequences through
+# ---------------------------------------------------------------------------
+
+
+def test_prompt_neutralizes_escape_sequences_from_gates_toml(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """A hostile gates.toml cannot repaint or hide the lines being approved.
+
+    The name erases the prompt line and moves the cursor; the argv carries an
+    OSC title write, a CSI clear-screen, a bare C0 control, and a C1 CSI.
+    None of those bytes may reach the terminal, and the command stays visible.
+    """
+    marker = tmp_path / "pwned.txt"
+    _write_gates_toml(
+        tmp_path,
+        f"""
+schema = "{SCHEMA_ID}"
+
+[gates."tests\\u001b[2K\\u001b[1A"]
+pillar = "truth"
+command = [
+  {json.dumps(sys.executable)},
+  "-c",
+  "open({json.dumps(str(marker))[1:-1]!r}, 'w').write('x')",
+  "\\u001b]0;owned\\u0007\\u001b[2J\\u0008\\u009b31m",
+]
+""",
+    )
+    config = load_gates_config(tmp_path)
+    assert config is not None
+    assert "\x1b" in config.gates[0].name  # the hostile bytes really were parsed
+    _force_interactive(monkeypatch, "n")
+
+    results = run_user_gates(config, tmp_path)
+    out = capsys.readouterr().out
+
+    assert "\x1b" not in out
+    assert "\x07" not in out
+    assert "\x08" not in out
+    assert "\x9b" not in out
+    assert "␛" in out
+    assert "pwned.txt" in out  # the real command is still shown to the operator
+    assert results[0].status == "SKIP"
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize(
+    ("raw", "expected"),
+    [
+        ("plain -c 'x'", "plain -c 'x'"),
+        ("a\tb", "a\tb"),
+        ("a\x1b[31;1mb", "a␛b"),
+        ("a\x1b]8;;https://x\x1b\\b", "a␛b"),
+        ("a\x1b]0;title\x07b", "a␛b"),
+        ("a\x1bcb", "a␛cb"),
+        ("a\x1b7b", "a␛7b"),
+        ("a\x00\x7f\x85\x9bb", "a␛␛␛␛b"),
+    ],
+)
+def test_sanitize_for_prompt_replaces_control_sequences(raw: str, expected: str) -> None:
+    assert gates._sanitize_for_prompt(raw) == expected
+
+
+def test_fingerprint_still_covers_raw_bytes_not_sanitized_display() -> None:
+    """Sanitizing the display must not let two different argv share approval."""
+    clean = _config(UserGate(name="g", pillar="truth", command=("echo", "␛"), timeout=5))
+    hostile = _config(UserGate(name="g", pillar="truth", command=("echo", "\x1b[2J"), timeout=5))
+    assert compute_gate_set_fingerprint(clean) != compute_gate_set_fingerprint(hostile)
+
+
+# ---------------------------------------------------------------------------
+# revoking recorded approvals
+# ---------------------------------------------------------------------------
+
+
+def test_env_approval_persists_after_env_is_removed_until_revoked(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "ran.txt"
+    config = _config(_marker_gate("write", marker))
+    _force_noninteractive(monkeypatch)
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
+    assert run_user_gates(config, tmp_path)[0].status == "PASS"
+    marker.unlink()
+    monkeypatch.delenv(GATES_TRUST_ENV_VAR)
+
+    # The receipt outlives the variable -- this is the behavior revoke answers.
+    assert resolve_gate_trust(config, tmp_path).via == gates.TRUST_VIA_PREVIOUSLY_APPROVED
+
+    revocation = gates.revoke_gate_trust(tmp_path)
+
+    fingerprint = compute_gate_set_fingerprint(config)
+    assert revocation.removed == {fingerprint: f"env:{GATES_TRUST_ENV_VAR}"}
+    assert revocation.remaining == 0
+    assert revocation.persistence == gates.TRUST_PERSISTENCE_OBSERVED
+    assert not workspace_state_path(tmp_path, GATES_TRUST_STATE_NAME).exists()
+
+    results = run_user_gates(config, tmp_path)
+    assert results[0].status == "SKIP"
+    assert "not approved" in results[0].message
+    assert not marker.exists()
+
+
+def test_revoke_env_only_keeps_operator_prompt_approvals(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    prompted = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
+    _approve_first_use(prompted, tmp_path, monkeypatch)
+    env_approved = _config(UserGate(name="g", pillar="truth", command=("true", "x"), timeout=5))
+    _force_noninteractive(monkeypatch)
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
+    assert resolve_gate_trust(env_approved, tmp_path).approved is True
+    monkeypatch.delenv(GATES_TRUST_ENV_VAR)
+
+    revocation = gates.revoke_gate_trust(tmp_path, env_only=True)
+
+    assert list(revocation.removed) == [compute_gate_set_fingerprint(env_approved)]
+    assert revocation.remaining == 1
+    assert revocation.persistence == gates.TRUST_PERSISTENCE_OBSERVED
+    assert resolve_gate_trust(prompted, tmp_path).approved is True
+    assert resolve_gate_trust(env_approved, tmp_path).approved is False
+
+
+def test_revoke_without_recorded_approval_is_an_observed_no_op(tmp_path: Path) -> None:
+    revocation = gates.revoke_gate_trust(tmp_path)
+
+    assert revocation.removed == {}
+    assert revocation.remaining == 0
+    assert revocation.persistence == gates.TRUST_PERSISTENCE_OBSERVED
+
+
+def test_revoke_never_touches_checkout_local_receipt(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shadow = tmp_path / GATES_TRUST_RELATIVE_PATH
+    shadow.parent.mkdir(parents=True)
+    shadow.write_text("{}", encoding="utf-8")
+    _approve_first_use(
+        _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5)),
+        tmp_path,
+        monkeypatch,
+    )
+
+    gates.revoke_gate_trust(tmp_path)
+
+    assert shadow.read_text(encoding="utf-8") == "{}"
+
+
+def test_cli_gates_trust_revoke_then_check_is_unobserved(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+
+    marker = tmp_path / "ran.txt"
+    config = _config(_marker_gate("write", marker))
+    _force_noninteractive(monkeypatch)
+    monkeypatch.setenv(GATES_TRUST_ENV_VAR, "1")
+    assert run_user_gates(config, tmp_path)[0].status == "PASS"
+    monkeypatch.delenv(GATES_TRUST_ENV_VAR)
+
+    result = CliRunner().invoke(
+        app, ["gates", "trust", "revoke", "--root", str(tmp_path), "--json"]
+    )
+
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["state"] == "REVOKED"
+    assert payload["removed"][0]["via"] == f"env:{GATES_TRUST_ENV_VAR}"
+    assert payload["env_var_set"] is False
+    assert resolve_gate_trust(config, tmp_path).approved is False
