@@ -94,7 +94,7 @@ mcp = [
 mutation = [
     # Receipt semantics and status codes are version-sensitive; keep these exact
     # until the mutation parser and configs are revalidated against an upgrade.
-    "mutmut==3.7.0",
+    "mutmut==3.8.0",
     "cosmic-ray==8.7.0",
 ]
 
@@ -207,7 +207,7 @@ exclude_lines = [
     "def __repr__",
 ]
 
-# Mutation testing configuration (mutmut 3.7.0).
+# Mutation testing configuration (mutmut 3.8.0).
 # Run in an isolated checkout: mutmut run
 [tool.mutmut]
 source_paths = ["hyodo/__init__.py", "hyodo/safety.py", "hyodo/events.py", "hyodo/exceptions.py"]
