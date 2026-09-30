@@ -1,0 +1,7 @@
+{
+  "algorithm": "sha256",
+  "digest": "6a48a1211fa07d0a011e2a0f617709b89b8dd96cfd43062ff5c1f7c1b74aa03d",
+  "schema": "host-promise-observation-v0.schema.json",
+  "schema_id": "https://hyodo.app/schemas/host-promise-observation-v0.schema.json",
+  "schema_version": "hyodo.host-promise-observation/v0"
+}
