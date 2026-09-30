@@ -219,3 +219,42 @@ source, check state, evidence reference, and missing dimension. The detailed
 event view retains expected and actual values and comparison history.
 This summary does not establish a promise, accepted contract, artifact
 verification, or execution authority.
+
+## Supplying a Promise observation
+
+A host that keeps its own record of what it promised may hand HyoDo a read-only
+projection of that record. HyoDo does not read a host's private stores; the
+host writes one file under the evidence root and HyoDo validates and renders it:
+
+```text
+<evidence root>/.hyodo/host-promise-observation.json    # hyodo.host-promise-observation/v0
+```
+
+The contract is published as `schemas/host-promise-observation-v0.schema.json`
+(pinned by `host-promise-observation-v0.pin.json`). It is a consumer contract:
+what HyoDo accepts, not a claim about any host's internals.
+
+- **Three stages only.** A host may supply `promise`, `contract`, and
+  `boundaries`. Action, Artifact, Evidence, and Readback come from HyoDo's own
+  evidence; Trust stays a human judgment. Keys for other stages are dropped,
+  not rendered.
+- **Authority is always `NONE`.** A projection that declares anything else is
+  rejected. The projection is not authority, not proof that a promise was
+  kept, and not a completion score.
+- **Observed absence is not non-observation.** `source OBSERVED` with no active
+  promise renders `NONE`. A missing file supplies nothing, so the rail keeps its
+  `UNOBSERVED` labels. A present but unreadable, oversized, malformed, or
+  self-contradicting file renders `UNOBSERVED` with the reason, and is never
+  shown as `NONE`.
+- **Consistent or rejected.** A producer cannot report a stage `OBSERVED` while
+  its own source is `UNOBSERVED`, nor an active promise while a stage is `NONE`.
+- **Minimised at the consumer.** Only an allowlist is read. Free text
+  (commitments, responsibilities), delegation lists, and receipt identifiers
+  are dropped before rendering; the dashboard shows only a count of dropped
+  fields, never their content. Delegation is accepted as counts. The file is
+  capped at 256 KiB and 200 promise records.
+- **Labelled by source.** Each supplied stage carries `data-source="host:<label>"`
+  so HyoDo evidence and host observation are never mixed, and the summary states
+  the observation is not run-scoped.
+
+Without the file, the rail renders exactly as before.

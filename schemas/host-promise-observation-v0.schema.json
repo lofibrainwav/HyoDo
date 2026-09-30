@@ -1,0 +1,253 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://hyodo.app/schemas/host-promise-observation-v0.schema.json",
+  "title": "HyoDo host promise observation v0",
+  "description": "A host-supplied, read-only projection of the host's own Promise state. HyoDo validates and renders it beside its own evidence; it is never authority and never proof of fulfillment. Only Promise, Contract, and Boundaries may be supplied. Free text and delegation lists are outside this contract and are dropped by the consumer.",
+  "type": "object",
+  "required": [
+    "schema",
+    "producer",
+    "observed_at",
+    "authority",
+    "source",
+    "active_promise",
+    "rail",
+    "promises"
+  ],
+  "additionalProperties": true,
+  "properties": {
+    "schema": {
+      "const": "hyodo.host-promise-observation/v0"
+    },
+    "producer": {
+      "type": "object",
+      "required": [
+        "host"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "host": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._:@-]{1,64}$"
+        },
+        "schema_version": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "maxLength": 64
+        }
+      }
+    },
+    "observed_at": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "maxLength": 40
+    },
+    "authority": {
+      "const": "NONE"
+    },
+    "source": {
+      "type": "object",
+      "required": [
+        "state"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "state": {
+          "enum": [
+            "OBSERVED",
+            "UNOBSERVED"
+          ]
+        },
+        "problem_count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 10000
+        }
+      }
+    },
+    "active_promise": {
+      "type": "object",
+      "required": [
+        "resolution"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "resolution": {
+          "enum": [
+            "ACTIVE",
+            "NONE",
+            "AMBIGUOUS",
+            "UNOBSERVED"
+          ]
+        },
+        "promise_id": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "pattern": "^[A-Za-z0-9._-]{3,80}$"
+        }
+      }
+    },
+    "rail": {
+      "type": "object",
+      "required": [
+        "promise",
+        "contract",
+        "boundaries"
+      ],
+      "additionalProperties": true,
+      "properties": {
+        "promise": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "enum": [
+                "OBSERVED",
+                "NONE",
+                "UNOBSERVED"
+              ]
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 200
+            }
+          }
+        },
+        "contract": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "enum": [
+                "OBSERVED",
+                "NONE",
+                "UNOBSERVED"
+              ]
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 200
+            }
+          }
+        },
+        "boundaries": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "state"
+          ],
+          "properties": {
+            "state": {
+              "enum": [
+                "OBSERVED",
+                "NONE",
+                "UNOBSERVED"
+              ]
+            },
+            "note": {
+              "type": [
+                "string",
+                "null"
+              ],
+              "maxLength": 200
+            }
+          }
+        }
+      }
+    },
+    "promises": {
+      "type": "array",
+      "maxItems": 200,
+      "items": {
+        "type": "object",
+        "required": [
+          "promise_id",
+          "status",
+          "authority_state"
+        ],
+        "additionalProperties": true,
+        "properties": {
+          "promise_id": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]{3,80}$"
+          },
+          "status": {
+            "enum": [
+              "OPEN",
+              "KEPT",
+              "PARTIAL",
+              "BROKEN",
+              "UNOBSERVED",
+              "SUPERSEDED_BY_HUMAN",
+              "TRANSFERRED"
+            ]
+          },
+          "corrupt": {
+            "type": "boolean"
+          },
+          "authority_state": {
+            "enum": [
+              "VERIFIED_DIRECT_HUMAN",
+              "NOT_SUFFICIENT",
+              "UNVERIFIED",
+              "UNOBSERVED"
+            ]
+          },
+          "delegation_counts": {
+            "type": [
+              "object",
+              "null"
+            ],
+            "required": [
+              "auto",
+              "ask",
+              "must_not",
+              "completion_conditions"
+            ],
+            "additionalProperties": true,
+            "properties": {
+              "auto": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "ask": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "must_not": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              },
+              "completion_conditions": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 10000
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

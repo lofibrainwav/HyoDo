@@ -22,6 +22,7 @@ from hyodo.graph_view import (
     column_coverage,
     orb_state,
 )
+from hyodo.host_promise_observation import load_host_promise_observation
 from hyodo.verification_view import build_verification_view
 from hyodo.virtues import DOCUMENT_VIRTUE_NAMES, VIRTUE_CONTRACT
 
@@ -1999,8 +2000,72 @@ def _render_intent_comparisons(view: dict[str, Any]) -> str:
     )
 
 
-def _render_promise_observation(view: dict[str, Any]) -> str:
-    """Expose observation coverage, never infer a promise from tool activity."""
+_HOST_STAGE_LABELS = {"promise": "Promise", "contract": "Contract", "boundaries": "Boundaries"}
+
+
+def _host_promise_stage_overrides(
+    host_promise: dict[str, Any] | None,
+) -> dict[str, tuple[str, str, str]]:
+    """Map a validated host projection onto the three stages a host may supply.
+
+    Returns ``{label: (state, reason, source)}``. ``None`` means nothing was supplied, so the
+    caller keeps the existing ``UNOBSERVED`` labels unchanged. A rejected projection overrides
+    the three stages with ``UNOBSERVED`` and the rejection reason: it is never shown as absence.
+    """
+    if host_promise is None:
+        return {}
+    if host_promise.get("state") != "OBSERVED":
+        reason = f"Host promise observation rejected: {host_promise.get('reason') or 'invalid'}."
+        return dict.fromkeys(_HOST_STAGE_LABELS.values(), ("UNOBSERVED", reason, "host:rejected"))
+    host = host_promise["producer"]["host"]
+    out: dict[str, tuple[str, str, str]] = {}
+    for key, label in _HOST_STAGE_LABELS.items():
+        entry = host_promise["rail"][key]
+        note = entry.get("note") or "Supplied by the host as an observation, not as authority."
+        out[label] = (entry["state"], f"Host ({host}) observation: {note}", f"host:{host}")
+    return out
+
+
+def _render_host_promise_summary(host_promise: dict[str, Any] | None) -> str:
+    """One minimised block describing what the host supplied. It shows counts and states only."""
+    if host_promise is None:
+        return ""
+    if host_promise.get("state") != "OBSERVED":
+        return (
+            '<p class="host-promise-summary" data-host-promise="rejected">'
+            f"Host promise observation could not be used: {escape(str(host_promise.get('reason') or 'invalid'))}. "
+            "This is not the same as no promise.</p>"
+        )
+    promises = host_promise["promises"]
+    dropped = host_promise["dropped_fields"]
+    parts = [
+        f"Host: {escape(host_promise['producer']['host'])}",
+        f"observed {escape(host_promise.get('observed_at') or 'time UNOBSERVED')}",
+        f"active promise: {escape(host_promise['resolution'])}",
+        f"{len(promises)} promise record(s)",
+        "authority NONE",
+    ]
+    if host_promise["problem_count"]:
+        parts.append(f"{host_promise['problem_count']} host log problem(s)")
+    if dropped:
+        parts.append(f"{dropped} field(s) not read (outside the accepted contract)")
+    return (
+        '<p class="host-promise-summary" data-host-promise="observed">'
+        + " · ".join(parts)
+        + ". Supplied by the host, not run-scoped, and not proof of fulfillment or authority.</p>"
+    )
+
+
+def _render_promise_observation(
+    view: dict[str, Any], host_promise: dict[str, Any] | None = None
+) -> str:
+    """Expose observation coverage, never infer a promise from tool activity.
+
+    ``host_promise`` is an optional host-supplied projection (see ``hyodo.host_promise_observation``).
+    It can supply only Promise, Contract, and Boundaries; every other stage keeps HyoDo's own
+    evidence-derived state, and Trust stays a human judgment. Each supplied stage is labelled
+    with its source so HyoDo evidence and host observation are never mixed.
+    """
     stages = (
         (
             "Human Intent",
@@ -2040,6 +2105,11 @@ def _render_promise_observation(view: dict[str, Any]) -> str:
             "Repeated, inspectable fulfillment can inform trust; this view does not award it.",
         ),
     )
+    host_supplied = _host_promise_stage_overrides(host_promise)
+    stages = tuple(
+        (label, *host_supplied[label][:2]) if label in host_supplied else (label, state, reason)
+        for label, state, reason in stages
+    )
     focus = {
         "Human Intent": ("仁 · 孝", "眞", "Whose request is recorded, and what was asked and why?"),
         "Promise": (
@@ -2072,7 +2142,12 @@ def _render_promise_observation(view: dict[str, Any]) -> str:
         ),
     }
     rows = "".join(
-        f'<li data-promise-stage="{escape(label, quote=True)}"><b>{escape(label)}</b> '
+        (
+            f'<li data-source="{escape(host_supplied[label][2], quote=True)}" '
+            if label in host_supplied
+            else "<li "
+        )
+        + f'data-promise-stage="{escape(label, quote=True)}"><b>{escape(label)}</b> '
         f"<strong>{escape(state)}</strong><p>{escape(reason)}</p>"
         '<p class="promise-lenses">Lenses: 眞 · 善 · 美 · 仁 · 孝 · 永</p>'
         + (
@@ -2093,18 +2168,24 @@ def _render_promise_observation(view: dict[str, Any]) -> str:
         "<p>These are observation checkpoints, not verified connections or a completion score. "
         "UNOBSERVED means this view cannot establish the claim, not that the activity never happened.</p>"
         "<p>Primary and Supporting guide review questions, not scores, measured evidence, or exclusive assignments. All six lenses remain independent at every stage.</p>"
-        f"<ol>{rows}</ol>{_render_intent_comparisons(view)}</section>"
+        f"<ol>{rows}</ol>{_render_host_promise_summary(host_promise)}"
+        f"{_render_intent_comparisons(view)}</section>"
     )
 
 
-def _render_run_rails(view: dict[str, Any], run_ids: list[str], selected: str) -> str:
+def _render_run_rails(
+    view: dict[str, Any],
+    run_ids: list[str],
+    selected: str,
+    host_promise: dict[str, Any] | None = None,
+) -> str:
     """Render one canonical rail per run so filtering never mixes scopes."""
     rails = []
     for run_id in run_ids or ["UNOBSERVED"]:
         scoped = _scoped_verification_view(view, run_id)
         rails.append(
             f'<div class="run-rail" data-run-rail="{escape(run_id, quote=True)}"'
-            f"{'' if run_id == selected else ' hidden'}>{_render_promise_observation(scoped)}{_render_verification_rail(scoped)}{_render_missing_panel({}, view=scoped, scope='Selected run: ' + run_id)}</div>"
+            f"{'' if run_id == selected else ' hidden'}>{_render_promise_observation(scoped, host_promise)}{_render_verification_rail(scoped)}{_render_missing_panel({}, view=scoped, scope='Selected run: ' + run_id)}</div>"
         )
     return "".join(rails)
 
@@ -2376,6 +2457,8 @@ def render_graph_html(
         graph_root = graph.get("root")
         effective_root = Path(graph_root) if isinstance(graph_root, str) and graph_root else None
     verification_view = build_verification_view(graph, root=effective_root)
+    # Optional host-supplied Promise projection under the evidence root's .hyodo/ (None = nothing supplied).
+    host_promise = load_host_promise_observation(effective_root)
     run_ids = sorted(
         {str(node["run_id"]) for node in raw_node_list if isinstance(node.get("run_id"), str)}
     )
@@ -2810,7 +2893,7 @@ h1 {{ letter-spacing:.035em; text-transform:uppercase; font-size:clamp(1.5rem,3v
 {notice_html}
 {_render_verification_header(verification_view)}
 {_render_run_overview(nodes, verification_view)}
-{_render_run_rails(verification_view, run_ids, latest_run)}
+{_render_run_rails(verification_view, run_ids, latest_run, host_promise)}
 <section class="orb-wrap legacy-orb">{orb_html}</section>
 {daw_html}
 <div class="grid-wrap legacy-proof-grid">
