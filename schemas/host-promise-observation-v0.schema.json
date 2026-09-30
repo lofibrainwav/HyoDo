@@ -181,7 +181,7 @@
         "required": [
           "promise_id",
           "status",
-          "authority_state"
+          "host_reported_authority"
         ],
         "additionalProperties": true,
         "properties": {
@@ -202,14 +202,6 @@
           },
           "corrupt": {
             "type": "boolean"
-          },
-          "authority_state": {
-            "enum": [
-              "VERIFIED_DIRECT_HUMAN",
-              "NOT_SUFFICIENT",
-              "UNVERIFIED",
-              "UNOBSERVED"
-            ]
           },
           "delegation_counts": {
             "type": [
@@ -245,6 +237,15 @@
                 "maximum": 10000
               }
             }
+          },
+          "host_reported_authority": {
+            "enum": [
+              "HOST_VERIFIED_DIRECT_HUMAN",
+              "HOST_NOT_SUFFICIENT",
+              "HOST_UNVERIFIED",
+              "HOST_UNOBSERVED"
+            ],
+            "description": "What the host reports about how it verified the human authority behind the promise. HyoDo does not verify authority and never treats this as authority."
           }
         }
       }

@@ -60,7 +60,7 @@ def _active() -> dict[str, Any]:
             {
                 "promise_id": "P-ACTIVE-1",
                 "status": "OPEN",
-                "authority_state": "VERIFIED_DIRECT_HUMAN",
+                "host_reported_authority": "HOST_VERIFIED_DIRECT_HUMAN",
                 "delegation_counts": {
                     "auto": 3,
                     "ask": 1,
@@ -220,7 +220,9 @@ def test_note_text_is_sanitised_and_bounded() -> None:
         lambda r: r["active_promise"].update(promise_id="../../etc/passwd"),
         lambda r: r["promises"][0].update(promise_id="a b"),
         lambda r: r["promises"][0].update(status="DONE"),
-        lambda r: r["promises"][0].update(authority_state="GRANTED"),
+        lambda r: r["promises"][0].update(host_reported_authority="GRANTED"),
+        lambda r: r["promises"][0].update(host_reported_authority="VERIFIED_DIRECT_HUMAN"),
+        lambda r: r["promises"][0].pop("host_reported_authority"),
         lambda r: r["promises"].__setitem__(0, "not an object"),
         lambda r: r.update(promises=[copy.deepcopy(r["promises"][0])] * 201),
     ],
@@ -383,7 +385,7 @@ def test_schema_pin_matches_public_schema() -> None:
 
 def test_schema_constants_and_enums_match_the_parser() -> None:
     from hyodo.host_promise_observation import (
-        AUTHORITY_STATES,
+        HOST_AUTHORITY_VALUES,
         PROMISE_STATUSES,
         RESOLUTIONS,
         STAGE_STATES,
@@ -401,7 +403,8 @@ def test_schema_constants_and_enums_match_the_parser() -> None:
     )
     item = props["promises"]["items"]["properties"]
     assert set(item["status"]["enum"]) == PROMISE_STATUSES
-    assert set(item["authority_state"]["enum"]) == AUTHORITY_STATES
+    assert set(item["host_reported_authority"]["enum"]) == HOST_AUTHORITY_VALUES
+    assert "authority_state" not in item
 
 
 def test_schema_allows_extras_because_the_consumer_drops_them() -> None:
@@ -410,3 +413,48 @@ def test_schema_allows_extras_because_the_consumer_drops_them() -> None:
     assert schema["additionalProperties"] is True
     assert "commitment" not in json.dumps(schema["properties"])
     assert "responsibility" not in json.dumps(schema["properties"])
+
+
+# ---- wording: host-reported authority and HyoDo-owned stages ------------------------------------
+
+
+def test_authority_values_are_host_reported_never_a_hyodo_finding() -> None:
+    from hyodo.host_promise_observation import HOST_AUTHORITY_VALUES
+
+    assert all(v.startswith("HOST_") for v in HOST_AUTHORITY_VALUES)
+    parsed = parse_host_promise_observation(_active())
+    assert parsed["promises"][0]["host_reported_authority"] == "HOST_VERIFIED_DIRECT_HUMAN"
+    assert "authority_state" not in json.dumps(parsed)
+
+
+def test_old_field_name_is_not_accepted_as_the_authority_field() -> None:
+    raw = _active()
+    entry = raw["promises"][0]
+    entry["authority_state"] = entry.pop("host_reported_authority")
+    assert parse_host_promise_observation(raw)["state"] == "UNOBSERVED"
+
+
+def test_hyodo_owned_stages_say_so_when_a_host_projection_is_shown() -> None:
+    html = _render_promise_observation(VIEW, parse_host_promise_observation(_active()))
+    for stage in ("Artifact", "Readback"):
+        block = _stage_html(html, stage)
+        assert "<strong>UNOBSERVED</strong>" in block
+        assert (
+            "HyoDo-owned stage; HyoDo has not observed it yet (a host cannot supply it)." in block
+        )
+    assert "HyoDo-owned" not in _stage_html(html, "Promise")
+    assert "HyoDo-owned" not in _stage_html(html, "Trust")
+
+
+def test_hyodo_owned_note_names_hyodo_evidence_when_it_did_observe() -> None:
+    view = {"events": {"e1": {"what": {"kind": "tool_call"}}}, "missing": {}}
+    from html import unescape
+
+    html = _render_promise_observation(view, parse_host_promise_observation(_active()))
+    block = unescape(_stage_html(html, "Action"))
+    assert "<strong>OBSERVED</strong>" in block
+    assert "HyoDo-owned stage, from HyoDo's own evidence." in block
+
+
+def test_without_a_host_projection_the_owned_stage_text_is_unchanged() -> None:
+    assert "HyoDo-owned" not in _render_promise_observation(VIEW)

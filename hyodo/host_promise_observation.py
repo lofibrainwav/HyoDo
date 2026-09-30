@@ -40,8 +40,11 @@ HOST_PROMISE_RELATIVE_PATH = Path(".hyodo") / "host-promise-observation.json"
 
 STAGE_STATES = frozenset({"OBSERVED", "NONE", "UNOBSERVED"})
 RESOLUTIONS = frozenset({"ACTIVE", "NONE", "AMBIGUOUS", "UNOBSERVED"})
-AUTHORITY_STATES = frozenset(
-    {"VERIFIED_DIRECT_HUMAN", "NOT_SUFFICIENT", "UNVERIFIED", "UNOBSERVED"}
+#: What the *host* reports about how it verified the human authority behind a promise. HyoDo does
+#: not verify authority itself; every value is prefixed HOST_ so the word "verified" is never
+#: read as HyoDo's own finding.
+HOST_AUTHORITY_VALUES = frozenset(
+    {"HOST_VERIFIED_DIRECT_HUMAN", "HOST_NOT_SUFFICIENT", "HOST_UNVERIFIED", "HOST_UNOBSERVED"}
 )
 PROMISE_STATUSES = frozenset(
     {"OPEN", "KEPT", "PARTIAL", "BROKEN", "UNOBSERVED", "SUPERSEDED_BY_HUMAN", "TRANSFERRED"}
@@ -108,7 +111,7 @@ def _delegation_counts(raw: Any, dropped: list[int]) -> dict[str, int] | None:
 def _normalise_promise(raw: Any, dropped: list[int]) -> dict[str, Any] | None:
     if not isinstance(raw, dict):
         return None
-    allowed = {"promise_id", "status", "corrupt", "authority_state", "delegation_counts"}
+    allowed = {"promise_id", "status", "corrupt", "host_reported_authority", "delegation_counts"}
     dropped[0] += _dropped(raw, allowed)
     promise_id = raw.get("promise_id")
     status = raw.get("status")
@@ -117,14 +120,14 @@ def _normalise_promise(raw: Any, dropped: list[int]) -> dict[str, Any] | None:
     if status not in PROMISE_STATUSES:
         return None
     corrupt = raw.get("corrupt") is True
-    authority_state = raw.get("authority_state")
-    if authority_state not in AUTHORITY_STATES:
+    host_reported_authority = raw.get("host_reported_authority")
+    if host_reported_authority not in HOST_AUTHORITY_VALUES:
         return None
     return {
         "promise_id": promise_id,
         "status": status,
         "corrupt": corrupt,
-        "authority_state": authority_state,
+        "host_reported_authority": host_reported_authority,
         "delegation_counts": None
         if corrupt
         else _delegation_counts(raw.get("delegation_counts"), dropped),

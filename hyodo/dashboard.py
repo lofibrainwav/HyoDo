@@ -2000,6 +2000,26 @@ def _render_intent_comparisons(view: dict[str, Any]) -> str:
     )
 
 
+_HYODO_OWNED_LABELS = frozenset({"Action", "Artifact", "Evidence", "Readback"})
+
+
+def _hyodo_owned_note(
+    label: str, state: str, reason: str, host_promise: dict[str, Any] | None
+) -> str:
+    """When a host projection is shown, say plainly which stages stay HyoDo's own evidence.
+
+    A host cannot supply these stages. ``UNOBSERVED`` here means HyoDo has not observed it yet,
+    not that the host failed to report it. Without a host projection the existing text is unchanged.
+    """
+    if host_promise is None or label not in _HYODO_OWNED_LABELS:
+        return reason
+    if state == "UNOBSERVED":
+        return (
+            f"HyoDo-owned stage; HyoDo has not observed it yet (a host cannot supply it). {reason}"
+        )
+    return f"HyoDo-owned stage, from HyoDo's own evidence. {reason}"
+
+
 _HOST_STAGE_LABELS = {"promise": "Promise", "contract": "Contract", "boundaries": "Boundaries"}
 
 
@@ -2107,7 +2127,9 @@ def _render_promise_observation(
     )
     host_supplied = _host_promise_stage_overrides(host_promise)
     stages = tuple(
-        (label, *host_supplied[label][:2]) if label in host_supplied else (label, state, reason)
+        (label, *host_supplied[label][:2])
+        if label in host_supplied
+        else (label, state, _hyodo_owned_note(label, state, reason, host_promise))
         for label, state, reason in stages
     )
     focus = {
