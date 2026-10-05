@@ -109,6 +109,23 @@ MERGED -> TAGGED -> DRAFT_CREATED -> EVIDENCE_BUILT -> EVIDENCE_ATTACHED
   that case: published by hand before its evidence, it can never take the SBOM
   and never reached PyPI (`docs/releases/4.21.2.md`).
 
+## Distribution contract
+
+Each release is recorded in two places with different roles. Neither replaces
+the other, and one being present does not establish the other.
+
+- **PyPI is the canonical distribution** of the wheel and the sdist. Install
+  with `pip install hyodo==<version>`. The published digests are the PyPI
+  file digests, and the OIDC provenance is attached there.
+- **The GitHub Release is the release record**: the signed tag, the notes, and
+  the evidence assets `sbom.cyclonedx.json` and `sbom.cyclonedx.json.sha256`.
+  It does not carry the wheel or the sdist, and no step in the pipeline
+  attaches them.
+
+A reader who needs the package takes it from PyPI. A reader who needs the
+evidence takes the SBOM and its SHA-256 from the Release and checks the tag
+target against the release receipt in `docs/releases/<version>.md`.
+
 ## Pipeline contract
 
 ```text
