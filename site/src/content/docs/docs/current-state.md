@@ -6,15 +6,15 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.22.0** is the current release target. The latest published package
-is 4.21.11, whose release chain was measured 9/9 OBSERVED with signed tag,
-GitHub Release + SBOM, PyPI OIDC provenance, and install smoke. The 4.22.0
-candidate has not been published or installed from PyPI. Product capability
-and live host observation remain separate evidence axes.
+HyoDo **4.22.0** is the current release target and latest published package.
+Its release chain is measured 9/9 OBSERVED with a signed tag, GitHub Release
+and SBOM, PyPI OIDC provenance, and install smoke. Product capability,
+documentation-site deployment, and live host observation remain separate
+evidence axes.
 
 - Canonical source branch: **`main`**
-- Current release target: **4.22.0** (release chain `UNOBSERVED`)
-- Latest published package: **4.21.11** (see the 4.21.11 receipt)
+- Current release target: **4.22.0**
+- Latest published package: **4.22.0** (see the [4.22.0 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.22.0.md))
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
@@ -50,7 +50,7 @@ host observation is deployment-specific.
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for the current 4.21.10 release.
+2026-09-13. It is not a fresh runtime readback for the current 4.22.0 release.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |
@@ -81,4 +81,4 @@ HyoDo                  observes / records / validates / attests / measures
 
 Fresh Codex/Cursor observation, QMD/Neo4j closed-loop work, and matched
 Support-allocation/host experiments are downstream integration/research work. They are not
-prerequisites for calling the HyoDo 4.21.10 public artifact released and verified.
+prerequisites for calling the HyoDo 4.22.0 public artifact released and verified.

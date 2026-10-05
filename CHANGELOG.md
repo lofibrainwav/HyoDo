@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.22.0] - 2026-10-04
 
-Release candidate. Publication and installed-package verification are pending.
+Published from signed tag `v4.22.0`. The GitHub Release, SBOM, PyPI OIDC
+provenance, and install smoke are measured in `docs/releases/4.22.0.md`.
 
 ### Added
 
