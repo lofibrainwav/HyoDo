@@ -5,6 +5,40 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.22.0] - 2026-10-04
+
+Release candidate. Publication and installed-package verification are pending.
+
+### Added
+
+- The dashboard can display a host-supplied Promise observation without treating
+  it as HyoDo execution authority (#518).
+
+### Changed
+
+- Site and development dependency maintenance already merged on main: Astro,
+  Starlight, Python CI locks, and the scoped documentation-linter override
+  (#511, #513, #519, #520, #521). These changes are not Python runtime
+  dependencies of the published wheel.
+
+### Fixed
+
+- BYOG gate approval prompts render control characters visibly while retaining
+  a fingerprint over the raw executable bytes. `hyodo gates trust revoke`
+  invalidates persisted approvals, including environment-origin approvals
+  (#517).
+- The site lock's fast-uri, js-yaml and virtualenv advisory fixes are included
+  from #521. Two later advisory findings on the Astro dependency tree remain
+  under review in the release candidate; this entry does not claim they are
+  cleared.
+
+### Evidence
+
+- Source baseline: main `83792c35a817da4d863379f520da5abdc339228b`.
+  The immutable `v4.21.11` tag predates #517 and #521.
+- Release-chain steps, signed tag, PyPI provenance and install smoke remain
+  `UNOBSERVED` until the pipeline measures them.
+
 ## [4.21.11] - 2026-09-26
 
 Policy configuration fail-closed maintenance release. Unknown policy keys no
