@@ -5,21 +5,18 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.22.0 is the latest published release and is measured 9/9 OBSERVED
-in `docs/releases/4.22.0.md`. Its signed tag, GitHub Release, SBOM, PyPI
+HyoDo 4.22.1 is the latest published release and is measured 9/9 OBSERVED
+in `docs/releases/4.22.1.md`. Its signed tag, GitHub Release, SBOM, PyPI
 OIDC provenance, and install smoke are closed. Prior release receipts remain
 preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.1 is the current release target; the latest published release is
-4.22.0, whose publication chain is measured 9/9 OBSERVED in
-`docs/releases/4.22.0.md`. The 4.22.1 candidate adds actionable policy and eval
-error detail (#516, #508) and public version wording (#532) without any
-authority or exit-code change. Its release chain is `UNOBSERVED` until the exact
-candidate is merged and published through the release pipeline. See
-`docs/releases/4.22.1.md`. Neither release establishes live host integration or
-documentation-site deployment.
+HyoDo 4.22.1 is the current release target and latest published release.
+It adds actionable policy and eval error detail (#516, #508) and public version
+wording (#532) without any authority or exit-code change. Its publication chain
+is measured 9/9 OBSERVED in `docs/releases/4.22.1.md`. This does not establish
+live host integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -51,13 +48,14 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.1 (release candidate)
+### 4.22.1 (released 2026-10-05 UTC)
 
 - Correctness maintenance only: expose policy validation detail (#516) and
   eval invalid-id detail (#508) beside unchanged reason codes and exit codes,
-  and reconcile public version wording (#532).
-- Feature development is frozen. Do not count a prepared candidate as a public
-  release.
+  and reconcile public version wording (#532), from signed tag `v4.22.1`.
+- Feature development is frozen; correctness and security maintenance only.
+  The package release chain is measured in `docs/releases/4.22.1.md`;
+  published-site and live host behavior require their own readback.
 
 ### 4.22.0 (released 2026-10-05 UTC)
 

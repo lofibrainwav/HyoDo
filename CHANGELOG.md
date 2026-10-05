@@ -7,7 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [4.22.1] - 2026-10-05
 
-Release candidate. Publication and installed-package verification are pending.
+Published from signed tag `v4.22.1`. The GitHub Release, SBOM, PyPI OIDC
+provenance, and install smoke are measured in `docs/releases/4.22.1.md`.
 
 ### Changed
 
@@ -29,8 +30,7 @@ Release candidate. Publication and installed-package verification are pending.
 - No authority, reason-code, decision, or exit-code change. An invalid policy
   is still `UNOBSERVED` with exit 2; an invalid eval dataset is still
   `UNOBSERVED` with exit 2.
-- The release chain is `UNOBSERVED` until the exact merged candidate is
-  published through the release pipeline. See `docs/releases/4.22.1.md`.
+- The measured release chain is recorded in `docs/releases/4.22.1.md`.
 
 ## [4.22.0] - 2026-10-04
 
