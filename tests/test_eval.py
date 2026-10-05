@@ -115,3 +115,76 @@ def test_eval_missing_dataset_is_unobserved_input(tmp_path: Path) -> None:
 
     assert result.exit_code == 2
     assert json.loads(result.output)["status"] == "UNOBSERVED"
+
+
+def _invalid_id_case(bad_id: object) -> dict[str, object]:
+    return {"id": bad_id, "input": "a", "expected": "a", "scoring": "exact"}
+
+
+def test_eval_invalid_id_names_the_offending_value_and_stays_unobserved(tmp_path: Path) -> None:
+    dataset = tmp_path / "golden.jsonl"
+    _write_dataset(dataset, [_invalid_id_case(["not", "a", "string"])])
+    args = [
+        "eval",
+        "--dataset",
+        str(dataset),
+        "--runner",
+        f"{sys.executable} -c pass",
+        "--root",
+        str(tmp_path),
+    ]
+
+    human = runner.invoke(app, args)
+    machine = runner.invoke(app, [*args, "--json"])
+
+    # Fail-visible semantics are unchanged: UNOBSERVED, exit 2, never PASS.
+    assert human.exit_code == 2
+    assert machine.exit_code == 2
+    assert json.loads(machine.output)["status"] == "UNOBSERVED"
+    reason = json.loads(machine.output)["reason"]
+    assert reason.startswith("dataset line 1 has invalid id")
+    assert "['not', 'a', 'string'] (list)" in reason
+    assert "non-empty string" in reason
+    # Bracketed values must survive Rich markup in the human surface.
+    assert "['not', 'a', 'string'] (list)" in human.output.replace("\n", "")
+
+
+def test_eval_invalid_id_variants_are_not_repaired(tmp_path: Path) -> None:
+    for bad_id, shown in [(42, "42 (int)"), ("   ", "'   ' (str)"), (None, "None (NoneType)")]:
+        dataset = tmp_path / "golden.jsonl"
+        _write_dataset(dataset, [_invalid_id_case(bad_id)])
+        result = runner.invoke(
+            app,
+            [
+                "eval",
+                "--dataset",
+                str(dataset),
+                "--runner",
+                f"{sys.executable} -c pass",
+                "--root",
+                str(tmp_path),
+                "--json",
+            ],
+        )
+        assert result.exit_code == 2
+        assert shown in json.loads(result.output)["reason"]
+
+
+def test_eval_invalid_id_value_is_bounded(tmp_path: Path) -> None:
+    dataset = tmp_path / "golden.jsonl"
+    _write_dataset(dataset, [_invalid_id_case(["x" * 500])])
+    result = runner.invoke(
+        app,
+        [
+            "eval",
+            "--dataset",
+            str(dataset),
+            "--runner",
+            f"{sys.executable} -c pass",
+            "--root",
+            str(tmp_path),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2
+    assert len(json.loads(result.output)["reason"]) < 200

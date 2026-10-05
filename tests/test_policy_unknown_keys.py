@@ -195,3 +195,72 @@ def test_minimal_v1_policy_still_loads(tmp_path: Path):
     cfg = load_policy_config(policy)
     assert cfg.allowed_tools is None
     assert cfg.web is None
+
+
+# --- E: detail is exposed beside, never instead of, the stable reason code --
+
+
+def test_unknown_key_cli_json_keeps_reason_code_and_adds_detail(tmp_path: Path):
+    _write_policy(tmp_path, TYPO_ALLOWLIST_POLICY)
+    result = _run_policy_check(tmp_path)
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["decision"] == "UNOBSERVED"
+    assert payload["reason"] == "policy_invalid"
+    assert payload["exit_code"] == 2
+    assert "allowed_toolz" in payload["detail"]
+    assert "did you mean 'allowed_tools'?" in payload["detail"]
+
+
+def test_unknown_key_cli_human_output_names_key_and_suggestion(tmp_path: Path):
+    _write_policy(tmp_path, TYPO_ALLOWLIST_POLICY)
+    event_path = tmp_path / "event.json"
+    event_path.write_text(
+        json.dumps(_event({"name": "evil_unlisted_tool", "paths": [], "urls": []})),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app, ["policy", "check", "--file", str(event_path), "--root", str(tmp_path)]
+    )
+    assert result.exit_code == 2
+    assert "UNOBSERVED" in result.output
+    assert "ALLOW" not in result.output
+    flat = " ".join(result.output.split())
+    assert "allowed_toolz" in flat
+    assert "did you mean 'allowed_tools'?" in flat
+
+
+def test_missing_policy_has_no_detail_field(tmp_path: Path):
+    result = _run_policy_check(tmp_path)
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["reason"] == "policy_missing"
+    assert "detail" not in payload
+
+
+def test_event_record_with_invalid_policy_exposes_detail_and_stays_fail_closed(tmp_path: Path):
+    policy = _write_policy(tmp_path, TYPO_ALLOWLIST_POLICY)
+    event_path = tmp_path / "event.json"
+    event_path.write_text(
+        json.dumps(_event({"name": "evil_unlisted_tool", "paths": [], "urls": []})),
+        encoding="utf-8",
+    )
+    result = runner.invoke(
+        app,
+        [
+            "event",
+            "record",
+            "--file",
+            str(event_path),
+            "--root",
+            str(tmp_path),
+            "--policy",
+            str(policy),
+            "--json",
+        ],
+    )
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["ok"] is False
+    assert payload["reasons"] == ["policy_invalid"]
+    assert "allowed_toolz" in payload["detail"]
