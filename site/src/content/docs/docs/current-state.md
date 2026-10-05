@@ -6,16 +6,15 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.22.1** is the current release target; the latest published package
-is 4.22.0. The 4.22.1 candidate has not been published or installed from PyPI.
-HyoDo 4.22.0's release chain is measured 9/9 OBSERVED with a signed tag, GitHub Release
+HyoDo **4.22.1** is the current release target and latest published package.
+Its release chain is measured 9/9 OBSERVED with a signed tag, GitHub Release
 and SBOM, PyPI OIDC provenance, and install smoke. Product capability,
 documentation-site deployment, and live host observation remain separate
 evidence axes.
 
 - Canonical source branch: **`main`**
 - Current release target: **4.22.1**
-- Latest published package: **4.22.0** (see the [4.22.0 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.22.0.md))
+- Latest published package: **4.22.1** (see the [4.22.1 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.22.1.md))
 - 4.21.6 was tagged and has a GitHub Release, but it was never published to
   PyPI; it is superseded by 4.21.7 and left unchanged.
 - Phase 0: **CLOSED**; Evidence Pack v1 remains sealed with named residuals.
