@@ -5,17 +5,17 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.21.11 is the latest published release and is measured 9/9 OBSERVED
-in `docs/releases/4.21.11.md`. Its signed tag, GitHub Release, SBOM, PyPI
+HyoDo 4.22.0 is the latest published release and is measured 9/9 OBSERVED
+in `docs/releases/4.22.0.md`. Its signed tag, GitHub Release, SBOM, PyPI
 OIDC provenance, and install smoke are closed. Prior release receipts remain
 preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.0 is the current release target; the latest published release is
-4.21.11. The candidate includes #517, #518 and #521 from main. Its release
-chain is `UNOBSERVED` until the exact candidate is merged and published through
-the release pipeline. See `docs/releases/4.22.0.md`.
+HyoDo 4.22.0 is the current release target and latest published release.
+It includes #517, #518 and #521 from main. Its publication chain is measured
+9/9 OBSERVED in `docs/releases/4.22.0.md`. This does not establish live host
+integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -47,13 +47,14 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.0 (release candidate)
+### 4.22.0 (released 2026-10-05 UTC)
 
-- Deliver the already merged BYOG prompt-display and trust-revocation fix
+- Delivers the already merged BYOG prompt-display and trust-revocation fix
   (#517), dashboard Promise observation (#518), and dependency maintenance
-  (#519–#521, #511, #513) in a new immutable release.
+  (#519–#521, #511, #513) from signed tag `v4.22.0`.
 - Keep source, wheel, site build, published site, and release-chain evidence
-  separate. Do not count a prepared candidate as a public release.
+  separate. The package release chain is measured in `docs/releases/4.22.0.md`;
+  published-site and live host behavior require their own readback.
 
 ### 4.21.11 (released 2026-09-26 UTC)
 

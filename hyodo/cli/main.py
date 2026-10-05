@@ -191,6 +191,7 @@ from hyodo.policy import (
     PolicyConfig,
     PolicyDecision,
     apply_decision_to_event,
+    describe_policy_error,
     evaluate_policy,
     try_load_policy,
 )
@@ -4183,7 +4184,7 @@ def eval_command(
         if isinstance(failure, dict) and isinstance(failure.get("code"), str):
             console.print(f"  runner: {failure['code']}")
     else:
-        console.print(f"[red]UNOBSERVED[/red] eval: {summary['reason']}")
+        console.print(f"[red]UNOBSERVED[/red] eval: {rich_escape(str(summary['reason']))}")
     raise typer.Exit(exit_code)
 
 
@@ -4631,6 +4632,9 @@ def event_record(
     ledger_obligation: dict[str, bool] = {}
     if policy is not None:
         cfg, policy_err = try_load_policy(Path(policy))
+        policy_detail = (
+            describe_policy_error(Path(policy)) if policy_err == "policy_invalid" else None
+        )
         if cfg is None:
             # Fail-closed: missing/invalid policy is unobserved, never ALLOW. When
             # neither --shadow nor --hook claude-code is set, this remains the
@@ -4658,6 +4662,7 @@ def event_record(
                             {
                                 "ok": False,
                                 "reasons": [policy_err or "policy_unobserved"],
+                                **({"detail": policy_detail} if policy_detail else {}),
                                 "exit_code": 2,
                             }
                         )
@@ -4667,6 +4672,8 @@ def event_record(
                         f"[red]Policy unobserved ({policy_err}).[/red] "
                         "Not ALLOW. Fix --policy path or TOML."
                     )
+                    if policy_detail:
+                        console.print(f"detail: {policy_detail}", markup=False)
                 raise typer.Exit(2)
             observed = count_run_events(root_path, normalized["run_id"])
             decision = _unobserved_policy_decision(
@@ -5133,6 +5140,7 @@ def policy_check(
             Path(config).resolve() if config else (root_path / POLICY_RELATIVE_PATH).resolve()
         )
         cfg, policy_err = try_load_policy(policy_path)
+        policy_detail: str | None = None
         # Step budget is counted from the working-tree ledger, never from the
         # caller-supplied step_index. (Same root basis as the default policy lookup.)
         observed = count_run_events(root_path, normalized["run_id"])
@@ -5146,6 +5154,8 @@ def policy_check(
             decision = _unobserved_policy_decision(
                 normalized, policy_err, hook=hook, observed_steps=observed, root=root_path
             )
+            if policy_err == "policy_invalid":
+                policy_detail = describe_policy_error(policy_path)
         else:
             decision = evaluate_policy(normalized, cfg, observed_steps=observed, root=root_path)
         verdict_state.update(_policy_verdict_state(decision))
@@ -5204,6 +5214,8 @@ def policy_check(
                 payload = decision.as_dict()
                 payload["exit_code"] = final_exit_code
                 payload["shadow"] = shadow
+                if policy_detail:
+                    payload["detail"] = policy_detail
                 if decision.trust_level >= 2:
                     payload["ledger_write_required"] = True
                     payload["ledger_written"] = False
@@ -5215,6 +5227,8 @@ def policy_check(
                 console.print(f"rule_id: {decision.rule_id}")
             if decision.reason:
                 console.print(f"reason: {decision.reason}")
+            if policy_detail:
+                console.print(f"detail: {policy_detail}", markup=False)
             if shadow:
                 console.print("[dim]shadow: true (recorded, not enforced)[/dim]")
             if decision.trust_level >= 2:

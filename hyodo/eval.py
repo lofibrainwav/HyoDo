@@ -34,6 +34,14 @@ class EvalCase:
     tags: list[str]
 
 
+def _describe_value(value: Any) -> str:
+    """Return a short, bounded description of a rejected dataset value."""
+    shown = repr(value)
+    if len(shown) > 60:
+        shown = shown[:57] + "..."
+    return f"{shown} ({type(value).__name__})"
+
+
 def load_dataset(path: Path) -> list[EvalCase]:
     """Load a deterministic JSONL dataset, rejecting malformed input."""
     try:
@@ -58,7 +66,10 @@ def load_dataset(path: Path) -> list[EvalCase]:
             raise EvalInputError(f"dataset line {line_number} must be an object")
         case_id = raw.get("id")
         if not isinstance(case_id, str) or not case_id.strip():
-            raise EvalInputError(f"dataset line {line_number} has invalid id")
+            raise EvalInputError(
+                f"dataset line {line_number} has invalid id: got {_describe_value(case_id)}; "
+                'expected a non-empty string, for example {"id": "case-1", ...}'
+            )
         if case_id in seen_ids:
             raise EvalInputError(f"dataset line {line_number} repeats id {case_id!r}")
         if "input" not in raw or "expected" not in raw:

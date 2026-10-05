@@ -320,6 +320,19 @@ def try_load_policy(path: Path) -> tuple[PolicyConfig | None, str | None]:
         return None, "policy_invalid"
 
 
+def describe_policy_error(path: Path) -> str | None:
+    """Return the human-readable reason *path* fails validation, if it does.
+
+    Detail only: ``try_load_policy`` stays the source of the stable
+    ``policy_invalid`` reason code, and an invalid policy is never accepted here.
+    """
+    try:
+        load_policy_config(path)
+    except PolicyConfigError as exc:
+        return str(exc)
+    return None
+
+
 def _path_blocked(path: str, globs: tuple[str, ...]) -> str | None:
     """Return matching glob if *path* is blocked, else None."""
     # Normalize for matching: strip file:// and collapse redundant separators lightly.
