@@ -12,11 +12,10 @@ preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.21.11 is the current release target and the latest published release.
-It carries #506,
-which merged after the immutable 4.21.10 tag and is therefore absent from
-4.21.10. Its release chain is measured 9/9 OBSERVED in
-`docs/releases/4.21.11.md`.
+HyoDo 4.22.0 is the current release target; the latest published release is
+4.21.11. The candidate includes #517, #518 and #521 from main. Its release
+chain is `UNOBSERVED` until the exact candidate is merged and published through
+the release pipeline. See `docs/releases/4.22.0.md`.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -47,6 +46,14 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.22.0 (release candidate)
+
+- Deliver the already merged BYOG prompt-display and trust-revocation fix
+  (#517), dashboard Promise observation (#518), and dependency maintenance
+  (#519–#521, #511, #513) in a new immutable release.
+- Keep source, wheel, site build, published site, and release-chain evidence
+  separate. Do not count a prepared candidate as a public release.
 
 ### 4.21.11 (released 2026-09-26 UTC)
 

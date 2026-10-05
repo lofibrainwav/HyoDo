@@ -70,6 +70,12 @@ status are documented there; remote ChatGPT MCP remains contract-only.
 | Policy result | `0` ALLOW · `1` DENY · `2` UNOBSERVED · `3` ASK |
 | `schema check` | `0` valid · `1` validation error · `2` unobserved input |
 
+Exit codes are per-command mechanical contracts — each row above stands alone.
+`UNOBSERVED` is an evidence state, not an exit code: HyoDo looked but could
+not determine pass or fail. An exit `2` often carries an unobserved outcome,
+but the two are not identical (`safe` exit `2` means bad path; Policy has a
+separate exit `3` for ASK).
+
 `UNOBSERVED` means there is not enough evidence to say whether a check passed
 or failed. It is neither a pass nor a failure.
 Policy results come from `event record --policy` and `policy check`; an invalid
