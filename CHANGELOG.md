@@ -5,6 +5,33 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.22.1] - 2026-10-05
+
+Release candidate. Publication and installed-package verification are pending.
+
+### Changed
+
+- `hyodo policy check` and `hyodo event record --policy` expose the policy
+  validation detail (offending key and did-you-mean suggestion) beside the
+  stable `policy_invalid` reason code, in a separate `detail` field and in
+  human output (#516).
+- `hyodo eval` names the rejected dataset id value, its type, and the accepted
+  shape when a case id is invalid (#508).
+
+### Fixed
+
+- Public version wording: ROADMAP, CHANGELOG, the 4.22.0 release note, and the
+  site current-state page no longer describe the published 4.22.0 as a
+  candidate, so hyodo.app stops reporting 4.21.11 as the latest release (#532).
+
+### Evidence
+
+- No authority, reason-code, decision, or exit-code change. An invalid policy
+  is still `UNOBSERVED` with exit 2; an invalid eval dataset is still
+  `UNOBSERVED` with exit 2.
+- The release chain is `UNOBSERVED` until the exact merged candidate is
+  published through the release pipeline. See `docs/releases/4.22.1.md`.
+
 ## [4.22.0] - 2026-10-04
 
 Published from signed tag `v4.22.0`. The GitHub Release, SBOM, PyPI OIDC
