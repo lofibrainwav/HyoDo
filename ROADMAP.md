@@ -12,11 +12,10 @@ preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.1 is the current release target and latest published release.
-It adds actionable policy and eval error detail (#516, #508) and public version
-wording (#532) without any authority or exit-code change. Its publication chain
-is measured 9/9 OBSERVED in `docs/releases/4.22.1.md`. This does not establish
-live host integration or documentation-site deployment.
+HyoDo 4.22.2 is the current release target. HyoDo 4.22.1 remains the latest
+published release. The 4.22.2 candidate carries code-linked check evidence
+(#539); its publication chain is unobserved in `docs/releases/4.22.2.md`.
+This does not establish live host integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -47,6 +46,13 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.22.2 (release candidate)
+
+- Carry code-linked gate and target provenance through check, history, and
+  dashboard evidence (#539). Keep unknown and stale evidence visibly withheld.
+- Publish and verify the package chain before calling this a public baseline;
+  host installation and live use need separate readback.
 
 ### 4.22.1 (released 2026-10-05 UTC)
 
