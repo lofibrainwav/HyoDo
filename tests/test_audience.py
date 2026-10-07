@@ -150,12 +150,17 @@ def _payloads_identical_minus_audience(payloads: dict[str, tuple[int, dict]]) ->
     """Return True only when every profile agrees on exit code and payload minus audience."""
     codes = {code for code, _ in payloads.values()}
     assert len(codes) == 1, payloads
+    # measured_at varies per run, not per profile; it must not mask a
+    # profile-driven decision difference, nor fail on clock ticks.
+    volatile = ("audience", "measured_at")
     baseline = dict(payloads["engineer"][1])
-    baseline.pop("audience", None)
+    for key in volatile:
+        baseline.pop(key, None)
     for profile, (_code, payload) in payloads.items():
         assert payload.get("audience") == profile
         stripped = dict(payload)
-        stripped.pop("audience", None)
+        for key in volatile:
+            stripped.pop(key, None)
         assert stripped == baseline, (profile, payload)
     return True
 

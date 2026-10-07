@@ -348,6 +348,56 @@ def _dirty_at(root: Path, commit: str | None) -> bool | None:
     return bool(status.strip())
 
 
+def _untracked_content_digest(root: Path) -> str | None:
+    """sha256 over the names and bytes of untracked, non-ignored files.
+
+    None when git cannot answer or a file cannot be read. A tree that changes
+    under the hash (a file vanishing mid-read) degrades to None rather than
+    to a digest of half the tree.
+    """
+    toplevel = _run_git(root, "rev-parse", "--show-toplevel")
+    if toplevel is None:
+        return None
+    listing = _run_git(root, "ls-files", "--others", "--exclude-standard", "-z")
+    if listing is None:
+        return None
+    names = sorted(name for name in listing.split("\0") if name)
+    digest = hashlib.sha256()
+    try:
+        for name in names:
+            digest.update(name.encode("utf-8"))
+            digest.update(b"\0")
+            with open(os.path.join(toplevel, name), "rb") as handle:
+                for chunk in iter(lambda: handle.read(65536), b""):
+                    digest.update(chunk)
+            digest.update(b"\0")
+    except OSError:
+        return None
+    return digest.hexdigest()
+
+
+def target_content_fingerprint(root: Path) -> dict[str, str | None]:
+    """Content identity of a measured tree, for pre/post-run comparison.
+
+    A commit id plus a dirty boolean cannot see a file that was already dirty
+    being edited again mid-run (True stays True, the commit never moves), so
+    the fingerprint also hashes the full tracked diff and untracked bytes.
+    mtime-only touches hash equal -- content, not timestamps, is compared.
+    Every field degrades to None (never raises) when git cannot answer; two
+    fully-None fingerprints compare equal, preserving the old behavior for
+    targets outside any repository.
+    """
+    diff = _run_git(root, "diff", "HEAD")
+    return {
+        "commit": git_commit(root),
+        "porcelain": _run_git(root, "status", "--porcelain"),
+        "diff_sha256": hashlib.sha256(diff.encode("utf-8")).hexdigest()
+        if diff is not None
+        else None,
+        "untracked_sha256": _untracked_content_digest(root),
+    }
+
+
 def path_digest(value: Path | str | None) -> str | None:
     """Stable, non-reversing id for a filesystem path.
 
