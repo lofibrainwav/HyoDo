@@ -22,7 +22,7 @@ Review-emphasis percentages are philosophical labels only — not F weights.
 
 from __future__ import annotations
 
-__version__ = "4.22.1"
+__version__ = "4.22.2"
 __philosophy_version__ = "V6"
 __author__ = "HyoDo contributors"
 __license__ = "MIT"

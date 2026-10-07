@@ -5,6 +5,31 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.22.2] - 2026-10-06
+
+Release candidate for code-linked check evidence. Publication remains
+unobserved until the release-chain receipt is measured.
+
+### Changed
+
+- `hyodo check --json` carries measured gate rows and timestamps with target
+  provenance. History receipts preserve those fields without rewriting past
+  rows (#539).
+- The development lock updates `multidict` for the CI dependency audit; the
+  published package runtime dependency declaration is unchanged (#539).
+
+### Fixed
+
+- A check made against another target no longer inherits provenance from the
+  caller's current directory. A tree changed during measurement yields
+  `UNOBSERVED` evidence and exit 2 rather than a trusted gate row (#539).
+
+### Evidence
+
+- Source: #539, merged as `7d0c021fa253f9117ded8531c0a446de612bf95f`.
+- The release chain remains `UNOBSERVED` in `docs/releases/4.22.2.md` until
+  tag, publication, provenance, and install readback are measured.
+
 ## [4.22.1] - 2026-10-05
 
 Published from signed tag `v4.22.1`. The GitHub Release, SBOM, PyPI OIDC
