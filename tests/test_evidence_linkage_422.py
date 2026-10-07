@@ -109,6 +109,57 @@ def test_midcheck_move_downgrades_and_withholds_rows(
     assert payload["target_changed_during_run"] is True
     assert "gates" not in payload
     assert payload["provenance_post"]["target_dirty"] is True
+    # Exit 0 means "passed" to callers that only read the process status.
+    # A moved target has no valid gates: exit 2, never a silent zero.
+    assert result.exit_code == 2
+    assert payload["exit_code"] == 2
+
+
+def test_dirty_again_midrun_is_detected_by_content(
+    tmp_path: Path, trusted: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    _write_gates(tmp_path, '\n[gates.smoke]\npillar = "truth"\ncommand = "true"\n')
+    pre = {
+        "commit": "a" * 40,
+        "porcelain": " M f.txt",
+        "diff_sha256": "0" * 64,
+        "untracked_sha256": "1" * 64,
+    }
+    post = {**pre, "diff_sha256": "2" * 64}  # same commit, still dirty, bytes differ
+    prints = {"n": 0}
+
+    def _staged_fingerprint(root):
+        prints["n"] += 1
+        return pre if prints["n"] == 1 else post
+
+    monkeypatch.setattr("hyodo.cli.main.target_content_fingerprint", _staged_fingerprint)
+    result = runner.invoke(app, ["check", str(tmp_path), "--json"])
+    payload = json.loads(result.output)
+    assert prints["n"] == 2
+    assert payload["status"] == "UNOBSERVED"
+    assert payload["target_changed_during_run"] is True
+    assert result.exit_code == 2
+    assert "gates" not in payload
+
+
+def test_content_fingerprint_sees_redirty_but_not_retouch(
+    git_repo: Path,
+) -> None:
+    from hyodo.provenance import target_content_fingerprint
+
+    before = target_content_fingerprint(git_repo)
+    (git_repo / "f.txt").write_text("dirty-1\n", encoding="utf-8")
+    dirty_once = target_content_fingerprint(git_repo)
+    assert dirty_once != before
+    (git_repo / "f.txt").write_text("dirty-2\n", encoding="utf-8")
+    dirty_twice = target_content_fingerprint(git_repo)
+    # Commit and dirty-boolean are identical here; only content differs.
+    assert dirty_twice["commit"] == dirty_once["commit"]
+    assert dirty_twice["porcelain"] == dirty_once["porcelain"]
+    assert dirty_twice != dirty_once
+    # An untracked file joining mid-run is also a content change.
+    (git_repo / "new.txt").write_text("untracked\n", encoding="utf-8")
+    assert target_content_fingerprint(git_repo) != dirty_twice
 
 
 def test_history_receipt_preserves_provenance_and_pillars(tmp_path: Path) -> None:

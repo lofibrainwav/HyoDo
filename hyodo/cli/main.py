@@ -204,7 +204,7 @@ from hyodo.policy_trust import (
     policy_trust_path,
     resolve_policy_trust_grant,
 )
-from hyodo.provenance import resolve_provenance
+from hyodo.provenance import resolve_provenance, target_content_fingerprint
 from hyodo.report import build_report_graph, write_report
 from hyodo.safety import run_safety_scan
 from hyodo.schema import validate_schema_payload
@@ -1945,11 +1945,22 @@ def _verdict_output(
             or provenance.target_dirty != provenance_post.target_dirty
         )
     )
+    state_pre = state.get("target_state_pre")
+    state_post = state.get("target_state_post")
+    if isinstance(state_pre, dict) and isinstance(state_post, dict) and state_pre != state_post:
+        # Dirty-again mid-run: same commit, dirty before and after, but the
+        # actual bytes changed under the gates. The boolean pair cannot see it.
+        target_moved = True
     if target_moved:
         state["target_changed_during_run"] = True
     if target_moved and decision == "PASS":
         decision = "UNOBSERVED"
         detail = "target tree changed during the run (pre/post commit or dirty state differ)"
+    if target_moved and exit_code == 0:
+        # Exit 0 means "all executed gates passed" to callers that only read
+        # the process status. A moved target has no valid gates, which is the
+        # exit-2 case (same as "no executed gates"), never a silent zero.
+        exit_code = 2
 
     # 4.21 honesty axis. `decision` above stays exactly what 4.20 computed --
     # it is what the JSON `status` key and the exit code mean, and callers
@@ -2169,6 +2180,7 @@ def check(
         # otherwise `hyodo check <elsewhere>` reports this directory's commit
         # for another directory's gates.
         verdict_state["provenance"] = resolve_provenance(check_root)
+        verdict_state["target_state_pre"] = target_content_fingerprint(check_root)
 
         # --general mode: language-agnostic gates (explicit opt-in, unchanged)
         if general:
@@ -2261,6 +2273,7 @@ def check(
             # the target side after the run so a mid-check change is recorded
             # instead of silently reported as the pre-run commit.
             verdict_state["provenance_post"] = resolve_provenance(check_root)
+            verdict_state["target_state_post"] = target_content_fingerprint(check_root)
             if checkout_receipt_ignored:
                 console.print(f"[yellow]{CHECKOUT_TRUST_IGNORED_NOTE}.[/yellow]")
             if not trust.approved:
