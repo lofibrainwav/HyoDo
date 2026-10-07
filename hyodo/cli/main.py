@@ -2048,7 +2048,10 @@ def _verdict_output(
             # callers working; these keys let consumers bind the verdict to
             # the exact code and per-gate outcomes without re-running gates.
             payload["measured_at"] = datetime.now(timezone.utc).isoformat()
-            if "gate_rows" in state:
+            # Rows from a run that crossed a tree change describe no single
+            # commit, so they are withheld: emitting them would let consumers
+            # attribute lenses to code that never existed as one tree.
+            if "gate_rows" in state and not state.get("target_changed_during_run"):
                 payload["gates"] = {
                     row["name"]: {
                         "status": row["status"],
