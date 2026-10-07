@@ -290,6 +290,14 @@ def append_history_receipt(root: Path, evidence: dict[str, Any]) -> bool:
         # Gate-set fingerprint: streak metrics must not silently continue across
         # a coverage shrink (e.g. 4-gate preset -> trivial single BYOG gate).
         "gate_set_fingerprint": gate_set_fingerprint(statuses.keys()),
+        # Additive linkage (readers ignore unknown keys): the evidence already
+        # carried these, but the receipt dropped them, so no consumer could
+        # tell which commit or lens a row belonged to. Past rows are never
+        # rewritten -- only new rows carry this.
+        "provenance": evidence.get("provenance"),
+        "pillars": {
+            name: gate.get("pillar") for name, gate in gates.items() if isinstance(gate, dict)
+        },
     }
     path = root / HISTORY_RELATIVE_PATH
     try:

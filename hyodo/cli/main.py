@@ -794,6 +794,7 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
     built-in HyoDo checkout preset. A malformed gates.toml is surfaced as one
     failing `gates_config` entry rather than silently falling back.
     """
+    dashboard_trust = None
     try:
         gates_config = load_gates_config(root)
     except GatesConfigError as exc:
@@ -803,7 +804,7 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
         gate_pillars: dict[str, str | None] = {"gates_config": None}
     else:
         if gates_config is not None:
-            user_gate_results = run_user_gates_with_trust(gates_config, root)[1]
+            dashboard_trust, user_gate_results = run_user_gates_with_trust(gates_config, root)
             gates = {
                 result.name: GateResult(GateStatus(result.status), result.message)
                 for result in user_gate_results
@@ -858,6 +859,15 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
             "findings": [asdict(finding) for finding in safety["findings"]],
         },
     }
+    if dashboard_trust is not None:
+        # The trust decision already existed in memory; dropping it hid which
+        # command set produced these gate outcomes. Same shape as check JSON.
+        evidence["trust"] = {
+            "via": dashboard_trust.via,
+            "persistence": dashboard_trust.persistence,
+            "previous_command_set": dashboard_trust.previous,
+            "fingerprint": dashboard_trust.fingerprint,
+        }
     # Record this run before reading the ledger so Yeong includes it.
     if not append_history_receipt(root, evidence):
         console.print("[yellow]Could not append .hyodo/history.jsonl receipt.[/yellow]")
@@ -1924,6 +1934,22 @@ def _verdict_output(
     if provenance is not None and provenance.validity == "MISMATCH" and decision == "PASS":
         decision = "UNOBSERVED"
         detail = provenance.summary()
+    # Same axis as MISMATCH: gates that ran across a mid-check tree change
+    # describe no single commit, so their verdict cannot be reported as green.
+    provenance_post = state.get("provenance_post")
+    target_moved = (
+        provenance is not None
+        and provenance_post is not None
+        and (
+            provenance.target_commit != provenance_post.target_commit
+            or provenance.target_dirty != provenance_post.target_dirty
+        )
+    )
+    if target_moved:
+        state["target_changed_during_run"] = True
+    if target_moved and decision == "PASS":
+        decision = "UNOBSERVED"
+        detail = "target tree changed during the run (pre/post commit or dirty state differ)"
 
     # 4.21 honesty axis. `decision` above stays exactly what 4.20 computed --
     # it is what the JSON `status` key and the exit code mean, and callers
@@ -2018,6 +2044,23 @@ def _verdict_output(
                 # the portable form: commit ids and digests, never a home
                 # directory, because --json output travels into issues
                 payload["provenance"] = provenance.to_portable_dict()
+            # Additive evidence linkage. Untouched 4.20 keys above keep old
+            # callers working; these keys let consumers bind the verdict to
+            # the exact code and per-gate outcomes without re-running gates.
+            payload["measured_at"] = datetime.now(timezone.utc).isoformat()
+            if "gate_rows" in state:
+                payload["gates"] = {
+                    row["name"]: {
+                        "status": row["status"],
+                        "pillar": row["pillar"],
+                        "message": row["message"],
+                    }
+                    for row in state["gate_rows"]
+                }
+            if state.get("target_changed_during_run"):
+                payload["target_changed_during_run"] = True
+            if provenance_post is not None:
+                payload["provenance_post"] = provenance_post.to_portable_dict()
         else:
             assert captured is not None
             payload = json.loads(captured.get())
@@ -2117,6 +2160,12 @@ def check(
 
         console.print(f"Target: {target}")
         check_root = target if target.is_dir() else target.parent
+        # The early provenance (cwd) exists so "which HyoDo?" survives a
+        # blowup before target resolution. Now that the target is known, the
+        # measurement must describe the tree the gates actually run on --
+        # otherwise `hyodo check <elsewhere>` reports this directory's commit
+        # for another directory's gates.
+        verdict_state["provenance"] = resolve_provenance(check_root)
 
         # --general mode: language-agnostic gates (explicit opt-in, unchanged)
         if general:
@@ -2192,7 +2241,23 @@ def check(
                     "fingerprint": trust.fingerprint,
                     "checkout_receipt_ignored": checkout_receipt_ignored,
                 },
+                # Per-gate rows for machine readers: the terminal already
+                # prints these, but --json callers never received them, so no
+                # consumer could attribute a lens without re-running the gates.
+                gate_rows=[
+                    {
+                        "name": r.name,
+                        "pillar": r.pillar,
+                        "status": r.status,
+                        "message": r.message,
+                    }
+                    for r in user_results
+                ],
             )
+            # Gates take minutes; the tree may have moved under them. Re-resolve
+            # the target side after the run so a mid-check change is recorded
+            # instead of silently reported as the pre-run commit.
+            verdict_state["provenance_post"] = resolve_provenance(check_root)
             if checkout_receipt_ignored:
                 console.print(f"[yellow]{CHECKOUT_TRUST_IGNORED_NOTE}.[/yellow]")
             if not trust.approved:
