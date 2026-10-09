@@ -207,6 +207,87 @@ command = "echo *.nomatch"
     assert "*.nomatch" in results[0].message
 
 
+def test_checkout_relative_gate_executable_runs_from_target_root(tmp_path: Path) -> None:
+    binary = tmp_path / "bin" / "python"
+    binary.parent.mkdir()
+    binary.symlink_to(sys.executable)
+    _write_gates(
+        tmp_path,
+        """schema = "hyodo.gates/v1"
+[gates.local]
+pillar = "truth"
+command = './bin/python -c "print(12345)"'
+""",
+    )
+    config = load_gates_config(tmp_path)
+    assert config is not None
+    result = run_user_gates(config, tmp_path, verbose=True)[0]
+    assert result.status == "PASS"
+    assert "12345" in result.message
+
+
+def test_dot_root_executable_does_not_fall_back_to_path(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "gate").symlink_to(sys.executable)
+    _write_gates(
+        tmp_path,
+        """schema = "hyodo.gates/v1"
+[gates.local]
+pillar = "truth"
+command = './gate -c "print(24680)"'
+""",
+    )
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("PATH", "/usr/bin:/bin")
+    config = load_gates_config(Path("."))
+    assert config is not None
+    result = run_user_gates(config, Path("."), verbose=True)[0]
+    assert result.status == "PASS"
+    assert "24680" in result.message
+
+
+def test_checkout_relative_executable_with_spaces(tmp_path: Path) -> None:
+    root = tmp_path / "project with spaces"
+    binary = root / "bin" / "python with spaces"
+    binary.parent.mkdir(parents=True)
+    binary.symlink_to(sys.executable)
+    _write_gates(
+        root,
+        """schema = "hyodo.gates/v1"
+[gates.local]
+pillar = "truth"
+command = '"./bin/python with spaces" -c "print(67890)"'
+""",
+    )
+    config = load_gates_config(root)
+    assert config is not None
+    result = run_user_gates(config, root, verbose=True)[0]
+    assert result.status == "PASS"
+    assert "67890" in result.message
+
+
+@pytest.mark.parametrize("kind", ["missing", "not_executable"])
+def test_checkout_relative_executable_unavailable_is_skip(tmp_path: Path, kind: str) -> None:
+    if kind == "not_executable":
+        binary = tmp_path / "bin" / "tool"
+        binary.parent.mkdir()
+        binary.write_text("not executable", encoding="utf-8")
+    _write_gates(
+        tmp_path,
+        """schema = "hyodo.gates/v1"
+[gates.local]
+pillar = "truth"
+command = "./bin/tool"
+""",
+    )
+    config = load_gates_config(tmp_path)
+    assert config is not None
+    result = run_user_gates(config, tmp_path)[0]
+    assert result.status == "SKIP"
+    assert result.message == "./bin/tool not installed"
+
+
 def test_non_wildcard_args_untouched(tmp_path: Path) -> None:
     (tmp_path / "keep.me").write_text("", encoding="utf-8")
     _write_gates(

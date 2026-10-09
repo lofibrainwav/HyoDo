@@ -11,6 +11,8 @@ green, matching the existing zero-executed-gates contract).
 
 from __future__ import annotations
 
+import json
+import sys
 from pathlib import Path
 from unittest.mock import patch
 
@@ -56,6 +58,30 @@ command = "true"
     assert "PASS" in result.output
     assert "ok" in result.output
     assert "All executed gates passed" in result.output
+
+
+def test_check_runs_checkout_relative_gate_executable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    binary = tmp_path / "gate"
+    binary.symlink_to(sys.executable)
+    _write_gates_toml(
+        tmp_path,
+        """schema = "hyodo.gates/v1"
+[gates.local]
+pillar = "truth"
+command = './gate -c "print(12345)"'
+""",
+    )
+    result = runner.invoke(app, ["check", str(tmp_path), "--json"])
+    assert result.exit_code == 0, result.output
+    payload = json.loads(result.output)
+    assert payload["status"] == "PASS"
+    assert payload["gates"]["local"]["status"] == "PASS"
+    monkeypatch.chdir(tmp_path)
+    relative = runner.invoke(app, ["check", ".", "--json"])
+    assert relative.exit_code == 0, relative.output
+    assert json.loads(relative.output)["gates"]["local"]["status"] == "PASS"
 
 
 def test_check_user_gates_fail_exits_1(tmp_path: Path) -> None:

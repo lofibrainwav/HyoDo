@@ -85,9 +85,19 @@ def test_generated_claude_code_hook_json_matches_documented_shape(tmp_path: Path
     ``hooks.PreToolUse``/``PostToolUse`` -> [{"matcher", "hooks": [{"type",
     "command"}]}]."""
     result = runner.invoke(
-        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path)]
+        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path), "--json"]
     )
     assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["status"] == "written"
+    assert (
+        json.loads(
+            runner.invoke(
+                app,
+                ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path), "--json"],
+            ).output
+        )["status"]
+        == "up_to_date"
+    )
     settings = json.loads((tmp_path / ".claude" / "settings.json").read_text())
     for event_name in ("PreToolUse", "PostToolUse"):
         entries = settings["hooks"][event_name]
@@ -99,6 +109,18 @@ def test_generated_claude_code_hook_json_matches_documented_shape(tmp_path: Path
         assert hook["type"] == "command"
         assert isinstance(hook["command"], str)
         assert hook["command"].startswith("hyodo ")
+
+
+def test_connect_write_failure_never_reports_written(tmp_path: Path) -> None:
+    settings_path = tmp_path / ".claude" / "settings.json"
+    settings_path.mkdir(parents=True)
+    result = runner.invoke(
+        app, ["connect", "claude-code", "--write", "--yes", "--root", str(tmp_path), "--json"]
+    )
+    assert result.exit_code == 2
+    payload = json.loads(result.output)
+    assert payload["status"] == "error"
+    assert not (tmp_path / CONNECT_RELATIVE_PATH).exists()
 
 
 # --------------------------------------------------------------------------
