@@ -27,7 +27,7 @@ it *would* have made — stamped ``policy.shadow: true`` — while always exitin
 from __future__ import annotations
 
 import shutil
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, TypeGuard
@@ -275,7 +275,7 @@ class TargetPlan:
     """The outcome of planning one harness target."""
 
     name: str
-    status: str  # "would_write" | "up_to_date" | "unobserved" | "unknown"
+    status: str  # "would_write" | "written" | "up_to_date" | "unobserved" | "unknown"
     message: str
     files: tuple[PlannedFile, ...] = field(default_factory=tuple)
     shadow_ignored: bool = False
@@ -416,7 +416,8 @@ def _tracked_paths(state: dict[str, Any]) -> set[str]:
 def write_target(name: str, root: Path, *, shadow: bool, state: dict[str, Any]) -> TargetPlan:
     """Write *name*'s files (idempotent) and update *state* in place.
 
-    Returns the same shape as :func:`plan_target`; ``state`` is mutated with
+    Returns the same shape as :func:`plan_target`, with completed writes marked
+    ``written``; ``state`` is mutated with
     a fresh ``targets[name]`` entry (path, digest, shadow flag, timestamp,
     backup path if one was made).
     """
@@ -469,6 +470,12 @@ def write_target(name: str, root: Path, *, shadow: bool, state: dict[str, Any]) 
         "written_at": datetime.now(timezone.utc).isoformat(),
         "files": written_files,
     }
+    if plan.status == "would_write":
+        return replace(
+            plan,
+            status="written",
+            message="; ".join(f"{file.path} written" for file in plan.files if file.will_change),
+        )
     return plan
 
 

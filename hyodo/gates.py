@@ -652,7 +652,12 @@ def _build_env(env_tokens: tuple[str, ...]) -> dict[str, str] | None:
 
 def _run_one_gate(gate: UserGate, root: Path, *, verbose: bool) -> UserGateResult:
     binary = gate.command[0]
-    if shutil.which(binary) is None:
+    # subprocess runs with cwd=root; a checkout-relative executable must be
+    # probed from that same directory or an existing gate is falsely SKIPped.
+    probe = (
+        str(root.absolute() / binary) if not os.path.isabs(binary) and os.sep in binary else binary
+    )
+    if shutil.which(probe) is None:
         return UserGateResult(gate.name, gate.pillar, "SKIP", f"{binary} not installed")
 
     args = _expand_glob_args(gate.command, root)
