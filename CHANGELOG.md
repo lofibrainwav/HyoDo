@@ -5,6 +5,26 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.22.3] - 2026-10-09
+
+Correctness maintenance for the two reproduced HyoDo defects in #543.
+
+### Fixed
+
+- Resolve a checkout-relative gate executable such as `./gate` against the
+  checked target when probing its presence. This prevents a false `SKIP` when
+  `hyodo check` is invoked from another directory or with `.` as the target.
+- Report `written` after `connect --write` actually writes the connection
+  files. Dry runs remain `would_write`; a repeat remains `up_to_date`.
+
+### Evidence
+
+- Source repair: #543, PR #544, merged as
+  `5fd1fc8e600f3b1926fe3e281f0329c5342c52af`.
+- The release chain remains `UNOBSERVED` in `docs/releases/4.22.3.md` until
+  tag, publication, provenance, and install readback are measured. The source
+  repair does not establish live Claude Code hook enforcement.
+
 ## [4.22.2] - 2026-10-06
 
 Release candidate for code-linked check evidence. Publication remains

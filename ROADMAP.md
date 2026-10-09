@@ -5,16 +5,18 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.22.1 is the latest published release and is measured 9/9 OBSERVED
-in `docs/releases/4.22.1.md`. Its signed tag, GitHub Release, SBOM, PyPI
-OIDC provenance, and install smoke are closed. Prior release receipts remain
-preserved under `docs/releases/`.
+HyoDo 4.22.2 is the latest published release (2026-10-07 UTC). Its GitHub
+Release and PyPI package are present, while the release-chain receipt in
+`docs/releases/4.22.2.md` has not been reconciled. HyoDo 4.22.1 has a
+measured 9/9 OBSERVED release chain in `docs/releases/4.22.1.md`. Prior
+release receipts remain preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.2 is the current release target. HyoDo 4.22.1 remains the latest
-published release. The 4.22.2 candidate carries code-linked check evidence
-(#539); its publication chain is unobserved in `docs/releases/4.22.2.md`.
+HyoDo 4.22.3 is the current release target. HyoDo 4.22.2 remains the latest
+published release. The 4.22.3 candidate carries the two reproduced #543
+correctness repairs; its publication chain is unobserved in
+`docs/releases/4.22.3.md`.
 This does not establish live host integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
@@ -47,12 +49,20 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.2 (release candidate)
+### 4.22.3 (release candidate)
+
+- Repair checkout-relative gate probing and first-write connect reporting
+  (#543) without changing policy authority or adding host enforcement.
+- Publish and verify the package chain before calling this a public baseline;
+  host installation and live use need separate readback.
+
+### 4.22.2 (released 2026-10-07 UTC)
 
 - Carry code-linked gate and target provenance through check, history, and
   dashboard evidence (#539). Keep unknown and stale evidence visibly withheld.
-- Publish and verify the package chain before calling this a public baseline;
-  host installation and live use need separate readback.
+- GitHub Release and PyPI package are published; the in-repository release
+  chain receipt has not yet been reconciled. Host installation and live use
+  need separate readback.
 
 ### 4.22.1 (released 2026-10-05 UTC)
 
