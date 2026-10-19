@@ -21,9 +21,11 @@ Correctness maintenance for the two reproduced HyoDo defects in #543.
 
 - Source repair: #543, PR #544, merged as
   `5fd1fc8e600f3b1926fe3e281f0329c5342c52af`.
-- The release chain remains `UNOBSERVED` in `docs/releases/4.22.3.md` until
-  tag, publication, provenance, and install readback are measured. The source
-  repair does not establish live Claude Code hook enforcement.
+- Signed `v4.22.3` tag targets release merge
+  `917d8ef01ad5b41d11cd0b056001a93aeb190529`. The GitHub Release,
+  SBOM, PyPI provenance, and clean install are measured 9/9 OBSERVED in
+  `docs/releases/4.22.3.md`. This does not establish live Claude Code hook
+  enforcement.
 
 ## [4.22.2] - 2026-10-06
 

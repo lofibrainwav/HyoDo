@@ -65,7 +65,6 @@ jobs:
           set -euo pipefail
           cr-report cosmic-ray-scoring.session --no-show-output --no-show-diff > cosmic-ray-scoring-report.txt
           cr-rate --no-estimate cosmic-ray-scoring.session > cosmic-ray-scoring-rate.txt
-          cr-xml cosmic-ray-scoring.session > cosmic-ray-scoring.xml
           {
             echo "## Cosmic Ray scoring mutation evidence"
             echo
@@ -86,7 +85,6 @@ jobs:
             cosmic-ray-scoring.session
             cosmic-ray-scoring-report.txt
             cosmic-ray-scoring-rate.txt
-            cosmic-ray-scoring.xml
           if-no-files-found: error
           retention-days: 14
 
@@ -133,7 +131,6 @@ jobs:
           set -euo pipefail
           cr-report cosmic-ray-core.session --no-show-output --no-show-diff > cosmic-ray-core-report.txt
           cr-rate --no-estimate cosmic-ray-core.session > cosmic-ray-core-rate.txt
-          cr-xml cosmic-ray-core.session > cosmic-ray-core.xml
           {
             echo "## Cosmic Ray full-core mutation evidence"
             echo
@@ -154,6 +151,5 @@ jobs:
             cosmic-ray-core.session
             cosmic-ray-core-report.txt
             cosmic-ray-core-rate.txt
-            cosmic-ray-core.xml
           if-no-files-found: error
           retention-days: 30
