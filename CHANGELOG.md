@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `hyodo friction score`: deterministic score for human-side friction events
+  (`hyodo.human-friction-event/v1`): re-explanations, duplicate approvals,
+  context losses and runtime abandons. Each event must carry re-checkable
+  pointers, and the observer must differ from the actor. `CLEAN` requires a
+  `hyodo.human-friction-observation/v1` envelope; without one the result is
+  `UNOBSERVED`.
+
 ### Security
 
 - Lock `certifi` 2026.10.19 (PYSEC-2026-4320) and `virtualenv` 21.14.12
