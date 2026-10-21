@@ -5,6 +5,15 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Security
+
+- Lock `certifi` 2026.10.19 (PYSEC-2026-4320) and `virtualenv` 21.14.12
+  (CVE-2026-113725, CVE-2026-113726, CVE-2026-113732, CVE-2026-113776) in
+  `uv.lock` and the MCP v1 compatibility lock. `python-discovery` moves to
+  1.6.4 as a `virtualenv` dependency.
+
 ## [4.22.3] - 2026-10-09
 
 Correctness maintenance for the two reproduced HyoDo defects in #543.
