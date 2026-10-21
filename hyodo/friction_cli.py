@@ -21,6 +21,7 @@ from hyodo.friction import (
     save_friction_state,
     write_friction_export,
 )
+from hyodo.human_friction import score_file
 
 app = typer.Typer(
     name="friction",
@@ -261,3 +262,31 @@ def friction_contract(
     else:
         console.print(json.dumps(contract, indent=2, sort_keys=True), markup=False)
     raise typer.Exit(0)
+
+
+@app.command("score")
+def friction_score(
+    events_path: str = typer.Argument(
+        ..., help="JSONL file of hyodo.human-friction-event/v1 events"
+    ),
+    json_output: bool = typer.Option(True, "--json/--no-json", help="Emit the score as JSON"),
+) -> None:
+    """Score human-side friction events. Exit 0 CLEAN, 1 FRICTION, 2 UNOBSERVED or unreadable."""
+    path = Path(events_path).expanduser()
+    if not path.is_file():
+        console.print(f"[red]Events file not found: {path}[/red]")
+        raise typer.Exit(2)
+    try:
+        result = score_file(path)
+    except (OSError, UnicodeDecodeError) as exc:
+        console.print(f"[red]Events file unreadable: {type(exc).__name__}[/red]")
+        raise typer.Exit(2) from exc
+    text = json.dumps(result, sort_keys=True)
+    if json_output:
+        sys.stdout.write(text + "\n")
+    else:
+        console.print(
+            f"state={result['state']} score={result['score']} counts={result['counts']}",
+            markup=False,
+        )
+    raise typer.Exit({"CLEAN": 0, "FRICTION": 1}.get(result["state"], 2))

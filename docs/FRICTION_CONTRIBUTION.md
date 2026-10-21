@@ -194,3 +194,44 @@ unreadable state file fails closed to OFF/UNOBSERVED.
 Those are separate future product and research decisions. The v1 goal is to
 make the local measurement contract inspectable and testable **before** any
 network collection exists.
+
+## Human-side friction score
+
+Agent-event friction describes what agents report about themselves. A host
+often needs the opposite view: friction the *human* experienced. `hyodo
+friction score EVENTS.jsonl` scores `hyodo.human-friction-event/v1` events of
+exactly four types:
+
+| Type | Required evidence pointers |
+|---|---|
+| `re_explanation` | `message_ref`, `repeats_ref` |
+| `duplicate_approval` | `request_ref`, `prior_request_ref`, `covering_approval_ref` |
+| `context_loss` | `message_ref`, `lost_canon_ref` |
+| `runtime_abandon` | `item_ref`, `last_change_at`, `observed_at`, `threshold_seconds` |
+
+Rules:
+
+- Every event names `observed_by` and `actor`; they must differ, compared
+  trimmed and case-insensitive. An actor never records friction about its own
+  work, and an observer that appears as an actor anywhere in the same file is
+  rejected for every event it recorded.
+- Pointers must be distinct and re-checkable. Events without them are rejected,
+  never counted. A `runtime_abandon` is accepted only when
+  `observed_at - last_change_at >= threshold_seconds`.
+- `CLEAN` needs positive evidence that someone looked. The file must carry one
+  `hyodo.human-friction-observation/v1` envelope line with `observed_by`,
+  `window_start`, `window_end`, `sources_scanned` and an `event_count` that
+  matches the event lines. Without a valid envelope an empty file is
+  `UNOBSERVED` (`no_observation_envelope`), never `CLEAN`.
+- Default weights are 2 / 1.5 / 3 / 2.5 in the order of the table. A host may
+  supply its own; HyoDo does not own the host's lens.
+- State is `CLEAN` (score 0, exit 0), `FRICTION` (score above 0, exit 1) or
+  `UNOBSERVED` (exit 2) when the score is 0 and any event, line or the
+  envelope is missing or unreadable. A positive score stays `FRICTION` when
+  some lines are bad, with `partial: true` because the real count may be
+  higher. Unreadable evidence never folds into `CLEAN`.
+- HyoDo checks pointers by shape only. Re-opening each pointer at its source
+  and keeping the events file append-only are the host's job. On KINGDOM, a
+  separate observer seat writes the file; the seats whose work it describes do
+  not.
+- The score is a review signal. It grants and denies nothing.
