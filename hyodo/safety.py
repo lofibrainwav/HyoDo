@@ -22,7 +22,7 @@ from hyodo.exceptions import (
     load_scan_exceptions,
     safety_exception_reason,
 )
-from hyodo.workspace_io import read_workspace_bytes
+from hyodo.workspace_io import open_workspace_file, open_workspace_root
 
 # Secret-like patterns (high signal, intentionally narrow to limit false positives).
 SECRET_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
@@ -143,7 +143,7 @@ def _looks_binary(path: Path, sniff_bytes: int = _BINARY_SNIFF_BYTES) -> bool:
         return False
 
 
-def is_scannable_file(path: Path) -> bool:
+def is_scannable_file(path: Path, root: Path | None = None) -> bool:
     """Single decision point for "does this file belong in the corpus?".
 
     Both corpus builders call this, so the rule cannot drift between them.
@@ -161,7 +161,15 @@ def is_scannable_file(path: Path) -> bool:
         return False
     if path.suffix.lower() in _BINARY_SUFFIXES:
         return False
-    return not _looks_binary(path)
+    if root is None:
+        return not _looks_binary(path)
+    # Sniff through the same contained, no-follow read the scan uses, so a
+    # swapped link cannot make even the binary probe open a file outside root.
+    try:
+        head = _read_contained_bytes(root, path, _BINARY_SNIFF_BYTES)
+    except OSError:
+        return True  # the caller's contained read fails and reports it
+    return b"\x00" not in head
 
 
 @dataclass(frozen=True)
@@ -201,21 +209,38 @@ def _read_contained_text(root: Path, target: Path, max_bytes: int = 200_000) -> 
     component with ``O_NOFOLLOW`` (see ``hyodo.workspace_io``), so such a swap
     makes the read fail with ``OSError`` instead of reading outside the root.
     """
+    return _read_contained_bytes(root, target, max_bytes).decode("utf-8", errors="replace")
+
+
+def _read_contained_bytes(root: Path, target: Path, max_bytes: int) -> bytes:
+    """Return up to *max_bytes* of *target*, read with *root* pinned by descriptor.
+
+    The root is reopened from ``/`` one component at a time with ``O_NOFOLLOW``
+    (``open_workspace_root``), so a root ancestor swapped for a link after
+    ``resolve()`` fails the open instead of redirecting it. The target is
+    resolved once (links inside the root stay readable) and then read beneath
+    the pinned root without following any link.
+    """
     resolved_root = root.resolve(strict=True)
-    for base in (root, resolved_root):
-        try:
-            relative = target.relative_to(base)
-            break
-        except ValueError:
-            continue
-    else:
-        raise OSError(errno.EPERM, "path escapes the scan root", str(target))
-    data = read_workspace_bytes(resolved_root, relative)[:max_bytes]
-    return data.decode("utf-8", errors="replace")
+    try:
+        relative = target.resolve(strict=True).relative_to(resolved_root)
+    except ValueError as exc:
+        raise OSError(errno.EPERM, "path escapes the scan root", str(target)) from exc
+    _, root_fd = open_workspace_root(resolved_root)
+    try:
+        fd = open_workspace_file(resolved_root, relative, os.O_RDONLY, root_fd=root_fd)
+    finally:
+        os.close(root_fd)
+    with os.fdopen(fd, "rb") as stream:
+        return stream.read(max_bytes)
 
 
-def _iter_files_lexical(root: Path):
-    """Yield directory entries in sorted recursive-path order without materialising a tree."""
+def _iter_files_lexical(root: Path, errors: list[Path] | None = None):
+    """Yield directory entries in sorted recursive-path order without materialising a tree.
+
+    A directory that cannot be listed is appended to *errors* when given, so
+    the caller can report an incomplete corpus instead of a clean one.
+    """
     pending = [(root, True)]
     while pending:
         current, is_directory = pending.pop()
@@ -224,6 +249,8 @@ def _iter_files_lexical(root: Path):
                 with os.scandir(current) as entries:
                     children = sorted(entries, key=lambda entry: entry.name, reverse=True)
             except OSError:
+                if errors is not None:
+                    errors.append(current)
                 continue
             for child in children:
                 if child.name.startswith(".git"):
@@ -277,8 +304,9 @@ def collect_scan_corpus(
             # Keep the old sorted recursive-path order while streaming it.
             # Materialising sorted(target.rglob("*")) enumerates the whole
             # tree before the cap can stop file reads.
-            for file_path in _iter_files_lexical(target):
-                if not is_scannable_file(file_path):
+            unlisted: list[Path] = []
+            for file_path in _iter_files_lexical(target, unlisted):
+                if not is_scannable_file(file_path, target):
                     continue
                 try:
                     chunks.append(_read_contained_text(target, file_path))
@@ -286,7 +314,10 @@ def collect_scan_corpus(
                     return "", f"error:read:{file_path}"
                 count += 1
                 if count >= _DEFAULT_SCAN_CAP:
-                    return "\n".join(chunks), f"dir:{target} ({count} files)"
+                    break
+            if unlisted:
+                # An unlistable subtree means files were never seen: unobserved, not clean.
+                return "", f"error:read:{unlisted[0]}"
             return "\n".join(chunks), f"dir:{target} ({count} files)"
         return "", f"missing:{target}"
 
@@ -382,7 +413,7 @@ def _read_working_tree_files(
             total += 1
             if count >= _DEFAULT_SCAN_CAP:
                 continue
-            if not is_scannable_file(target):
+            if not is_scannable_file(target, resolved_root):
                 continue
             try:
                 chunks.append(_read_contained_text(resolved_root, target))
@@ -785,13 +816,19 @@ def _scan_directory(
     full list costs a directory walk plus the binary sniff already required
     by ``is_scannable_file``; it never reads a file's full body.
     """
+    unlisted: list[str] = []
+    walked: list[Path] = []
+    for dirpath, dirnames, filenames in os.walk(
+        target, onerror=lambda exc: unlisted.append(str(exc.filename))
+    ):
+        walked.extend(Path(dirpath, name) for name in dirnames + filenames)
     corpus_paths = [
         p
-        for p in sorted(target.rglob("*"))
+        for p in sorted(walked)
         if p.is_file()
         and not any(part.startswith(".git") or part in _SKIPPED_DIR_NAMES for part in p.parts)
     ]
-    scannable_paths = [p for p in corpus_paths if is_scannable_file(p)]
+    scannable_paths = [p for p in corpus_paths if is_scannable_file(p, target)]
     # `total_scannable` is a legacy/public result key whose existing semantics are
     # the selected corpus size, including files the built-in text scanner cannot
     # read (for example PNG/ICO). Keep that contract stable and expose the actual
@@ -800,6 +837,10 @@ def _scan_directory(
     total_scannable = len(corpus_paths)
     text_scannable_files = len(scannable_paths)
     scan_targets = scannable_paths if max_files <= 0 else scannable_paths[:max_files]
+    if unlisted:
+        # Files under an unlistable directory were never counted: report the
+        # whole directory scan as unobserved rather than a clean subset.
+        return ([], "", f"error:read:{unlisted[0]}", 0, 0, total_scannable, text_scannable_files)
 
     findings: list[Finding] = []
     chunks: list[str] = []
