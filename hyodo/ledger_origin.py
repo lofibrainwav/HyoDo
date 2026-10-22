@@ -153,6 +153,24 @@ def _prior_seq(anchor: Any, before: bytes | None) -> int:
     return 0
 
 
+def _open_lock_file(directory_fd: int) -> int:
+    """Open (creating once) the anchor lock file beneath the pinned state dir.
+
+    Concurrent ``openat(O_CREAT)`` calls for the same new name can fail with a
+    spurious ENOENT on macOS (seen in about 15% of 6-thread races on APFS), and
+    an ``OSError`` here makes ``append_agent_event`` drop the event. Exclusive
+    creation does not race that way: exactly one writer creates the file and
+    every other writer opens the existing one.
+    """
+    flags = os.O_RDWR | os.O_NOFOLLOW
+    try:
+        return os.open(
+            ".ledger-origin.lock", flags | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory_fd
+        )
+    except FileExistsError:
+        return os.open(".ledger-origin.lock", flags, dir_fd=directory_fd)
+
+
 @contextlib.contextmanager
 def _anchor_lock(root: Path, *, pinned: bool = False) -> Iterator[None]:
     """Serialize append-and-anchor so concurrent writers never race the anchor."""
@@ -161,12 +179,7 @@ def _anchor_lock(root: Path, *, pinned: bool = False) -> Iterator[None]:
         return
     _, directory_fd = open_workspace_state_dir(root, pinned=pinned)
     try:
-        lock_fd = os.open(
-            ".ledger-origin.lock",
-            os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW,
-            0o600,
-            dir_fd=directory_fd,
-        )
+        lock_fd = _open_lock_file(directory_fd)
         try:
             fcntl.flock(lock_fd, fcntl.LOCK_EX)
             try:
