@@ -6,6 +6,7 @@ SAST, dependency audit, tests, or human security review.
 
 from __future__ import annotations
 
+import errno
 import json
 import os
 import re
@@ -21,6 +22,7 @@ from hyodo.exceptions import (
     load_scan_exceptions,
     safety_exception_reason,
 )
+from hyodo.workspace_io import read_workspace_bytes
 
 # Secret-like patterns (high signal, intentionally narrow to limit false positives).
 SECRET_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
@@ -190,6 +192,28 @@ def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
     return data.decode("utf-8", errors="replace")
 
 
+def _read_contained_text(root: Path, target: Path, max_bytes: int = 200_000) -> str:
+    """Read *target* beneath *root* without following a link at read time.
+
+    A containment check by ``resolve()`` followed by a pathname read leaves a
+    window in which a checked parent directory can be swapped for a link that
+    points outside *root*. This reads through descriptors opened component by
+    component with ``O_NOFOLLOW`` (see ``hyodo.workspace_io``), so such a swap
+    makes the read fail with ``OSError`` instead of reading outside the root.
+    """
+    resolved_root = root.resolve(strict=True)
+    for base in (root, resolved_root):
+        try:
+            relative = target.relative_to(base)
+            break
+        except ValueError:
+            continue
+    else:
+        raise OSError(errno.EPERM, "path escapes the scan root", str(target))
+    data = read_workspace_bytes(resolved_root, relative)[:max_bytes]
+    return data.decode("utf-8", errors="replace")
+
+
 def _iter_files_lexical(root: Path):
     """Yield directory entries in sorted recursive-path order without materialising a tree."""
     pending = [(root, True)]
@@ -257,7 +281,7 @@ def collect_scan_corpus(
                 if not is_scannable_file(file_path):
                     continue
                 try:
-                    chunks.append(_read_text_file(file_path))
+                    chunks.append(_read_contained_text(target, file_path))
                 except OSError:
                     return "", f"error:read:{file_path}"
                 count += 1
@@ -337,6 +361,7 @@ def _read_working_tree_files(
     count = 0
     resolved_root = root.resolve()
     total = 0
+    unreadable = 0
     for entry in _porcelain_paths(listing):
         candidate = (root / entry).resolve()
         try:
@@ -360,12 +385,14 @@ def _read_working_tree_files(
             if not is_scannable_file(target):
                 continue
             try:
-                chunks.append(_read_text_file(target))
+                chunks.append(_read_contained_text(resolved_root, target))
             except OSError:
+                # Incomplete, not clean: the caller reports UNOBSERVED.
+                unreadable += 1
                 continue
             count += 1
     if coverage is not None:
-        coverage.update(scanned=count, total=total)
+        coverage.update(scanned=count, total=total, unreadable=unreadable)
     return "\n".join(chunks), count
 
 
@@ -780,7 +807,7 @@ def _scan_directory(
     suppressed_count = 0
     for file_path in scan_targets:
         try:
-            text = _read_text_file(file_path)
+            text = _read_contained_text(target, file_path)
         except OSError:
             return (
                 findings,
@@ -855,6 +882,7 @@ def _result_payload(
     text_scannable_files: int | None = None,
     *,
     scope: str,
+    unreadable_files: int = 0,
 ) -> dict:
     """Assemble the scan result dict from findings — single source of truth.
 
@@ -870,7 +898,7 @@ def _result_payload(
     """
     score = risk_score(findings)
     level, action = _risk_level_action(score)
-    errored = source.startswith(("error:", "missing:"))
+    errored = source.startswith(("error:", "missing:")) or unreadable_files > 0
     if scope == "external":
         coverage = "UNOBSERVED" if source.startswith("error:") else "FULL"
     else:
@@ -965,6 +993,7 @@ def run_safety_scan(
         return _result_payload(f"error:scan-exceptions:{exc}", [], strict, scope="none")
 
     exceptions_applied = 0
+    unreadable_files = 0
     scanned_files: int | None = None
     total_scannable: int | None = None
     text_scannable_files: int | None = None
@@ -1020,6 +1049,7 @@ def run_safety_scan(
         corpus, source = collect_scan_corpus(path=None, cwd=root, coverage=coverage)
         scanned_files = coverage.get("scanned")
         total_scannable = coverage.get("total")
+        unreadable_files = coverage.get("unreadable", 0)
         if source.startswith("git diff"):
             scope = "diff"
         elif source.startswith("git status"):
@@ -1038,6 +1068,7 @@ def run_safety_scan(
         total_scannable=total_scannable,
         text_scannable_files=text_scannable_files,
         scope=scope,
+        unreadable_files=unreadable_files,
     )
     # A repository-authored exceptions file applies only once an operator
     # approved its digest; say so instead of letting withheld entries vanish.
