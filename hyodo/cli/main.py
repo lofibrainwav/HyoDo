@@ -3779,10 +3779,17 @@ def mcp_serve(
 
     try:
         root_path = Path(root)
-        # Resolve before printing an address so a failed root never resembles a live connector.
-        from hyodo.mcp_server import resolve_workspace_root
+        # Validate before announcing readiness. The transport pins its own
+        # descriptor; the preflight descriptor must not leak into that lifetime.
+        from hyodo.workspace_io import open_workspace_root
 
-        resolve_workspace_root(root_path)
+        try:
+            root_path, preflight_fd = open_workspace_root(root_path)
+        except OSError as exc:
+            raise ValueError(
+                "workspace root is not a directory or is not directly accessible"
+            ) from exc
+        os.close(preflight_fd)
         host = tailscale_ip or "127.0.0.1"
         console.print("HyoDo MCP connector ready")
         console.print(f"  transport: {bind}")

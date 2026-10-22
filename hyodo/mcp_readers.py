@@ -1,8 +1,9 @@
 """MCP reader self-registration and cutover census.
 
-A long-running ``hyodo mcp stdio`` process resolves its ``--root`` once, at
-startup.  When a host later points a runtime symlink at a new slot, readers that
-were already running keep measuring the old slot with the code they loaded.
+A long-running ``hyodo mcp stdio`` process pins a concrete ``--root`` directory
+at startup; the MCP server rejects linked roots. A host may resolve its own
+runtime alias before launching a reader. When that alias later points at a new
+slot, existing readers remain pinned to the old slot with the code they loaded.
 Nothing outside the process can ask a stdio reader who it is: its stdin and
 stdout belong to the host that spawned it.
 
@@ -26,9 +27,10 @@ from __future__ import annotations
 import json
 import os
 import re
+import stat
 import subprocess
 import sys
-import tempfile
+import uuid
 from collections.abc import Callable, Iterator
 from contextlib import contextmanager, suppress
 from dataclasses import dataclass
@@ -37,6 +39,7 @@ from pathlib import Path
 from typing import Any
 
 from hyodo import __version__
+from hyodo.workspace_io import open_private_directory
 
 READER_SCHEMA_VERSION = "hyodo.mcp-reader/v1"
 CENSUS_SCHEMA_VERSION = "hyodo.mcp-reader-census/v1"
@@ -256,7 +259,9 @@ class ReaderPin:
         }
 
 
-def build_registration(root_arg: Path, resolved_root: Path, transport: str) -> dict[str, Any]:
+def build_registration(
+    root_arg: Path, resolved_root: Path, transport: str, *, root_fd: int | None = None
+) -> dict[str, Any]:
     """Describe the current process as an MCP reader."""
     pid = os.getpid()
     ppid = os.getppid()
@@ -274,7 +279,7 @@ def build_registration(root_arg: Path, resolved_root: Path, transport: str) -> d
         "tool_source": str(Path(__file__).resolve().parent),
         "root_arg": str(root_arg),
         "resolved_root": str(resolved_root),
-        "runtime_commit": _git_head(resolved_root),
+        "runtime_commit": _git_head(resolved_root) if root_fd is None else None,
     }
 
 
@@ -304,6 +309,7 @@ def prune_retired_registrations(
     directory: Path | None = None,
     start_lookup: Callable[[int], str | None] = process_start,
     exists_lookup: Callable[[int], bool] = _pid_exists,
+    _directory_fd: int | None = None,
 ) -> int:
     """Remove only registrations whose process is provably gone or reused.
 
@@ -312,33 +318,48 @@ def prune_retired_registrations(
     If process identity cannot be observed, the record is kept.
     """
     target_dir = Path(directory) if directory is not None else default_reader_dir()
-    if not target_dir.is_dir():
+    owned_fd = _directory_fd is None
+    try:
+        directory_fd = (
+            _directory_fd if _directory_fd is not None else open_private_directory(target_dir)
+        )
+    except OSError:
         return 0
     removed = 0
-    for path in sorted(target_dir.glob("*.json")):
-        try:
-            record = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            continue
-        if (
-            not isinstance(record, dict)
-            or record.get("schema_version") != READER_SCHEMA_VERSION
-            or not isinstance(record.get("reader_pid"), int)
-            or not isinstance(record.get("process_start"), str)
-        ):
-            continue
-        pid = record["reader_pid"]
-        recorded_start = record["process_start"]
-        alive = exists_lookup(pid)
-        observed_start = start_lookup(pid) if alive else None
-        retired = (not alive) or (observed_start is not None and observed_start != recorded_start)
-        if not retired:
-            continue
-        try:
-            path.unlink()
-        except OSError:
-            continue
-        removed += 1
+    try:
+        for name in sorted(os.listdir(directory_fd)):
+            if not name.endswith(".json"):
+                continue
+            try:
+                fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+                with os.fdopen(fd, "r", encoding="utf-8") as handle:
+                    record = json.load(handle)
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                continue
+            if (
+                not isinstance(record, dict)
+                or record.get("schema_version") != READER_SCHEMA_VERSION
+                or not isinstance(record.get("reader_pid"), int)
+                or not isinstance(record.get("process_start"), str)
+            ):
+                continue
+            pid = record["reader_pid"]
+            recorded_start = record["process_start"]
+            alive = exists_lookup(pid)
+            observed_start = start_lookup(pid) if alive else None
+            retired = (not alive) or (
+                observed_start is not None and observed_start != recorded_start
+            )
+            if not retired:
+                continue
+            try:
+                os.unlink(name, dir_fd=directory_fd)
+            except OSError:
+                continue
+            removed += 1
+    finally:
+        if owned_fd:
+            os.close(directory_fd)
     return removed
 
 
@@ -348,6 +369,8 @@ def register_reader(
     transport: str,
     *,
     directory: Path | None = None,
+    _directory_fd: int | None = None,
+    root_fd: int | None = None,
 ) -> Path | None:
     """Atomically write this reader's record and return its path.
 
@@ -357,31 +380,61 @@ def register_reader(
     """
     # A prior reader may have been terminated by signal/crash and skipped
     # registered_reader's finally block. Clean only provably retired records.
-    prune_retired_registrations(directory=directory)
-    record = build_registration(root_arg, resolved_root, transport)
-    if record["process_start"] is None:
-        print("[hyodo] mcp reader not registered: process start unobservable", file=sys.stderr)
-        return None
     target_dir = Path(directory) if directory is not None else default_reader_dir()
-    destination = target_dir / f"{record['reader_pid']}.json"
-    payload = json.dumps(record, indent=2, sort_keys=True) + "\n"
+    owned_fd = _directory_fd is None
     try:
-        target_dir.mkdir(parents=True, exist_ok=True)
-        fd, temporary = tempfile.mkstemp(prefix=".reader.", suffix=".tmp", dir=target_dir)
+        directory_fd = (
+            _directory_fd
+            if _directory_fd is not None
+            else open_private_directory(target_dir, create=True, private_from=target_dir)
+        )
     except OSError:
         print(f"[hyodo] mcp reader not registered: {target_dir}", file=sys.stderr)
         return None
     try:
-        os.fchmod(fd, 0o600)
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(payload)
-        os.replace(temporary, destination)
-    except OSError:
-        with suppress(OSError):
-            os.unlink(temporary)
-        print(f"[hyodo] mcp reader not registered: {destination}", file=sys.stderr)
-        return None
-    return destination
+        prune_retired_registrations(directory=target_dir, _directory_fd=directory_fd)
+        record = (
+            build_registration(root_arg, resolved_root, transport)
+            if root_fd is None
+            else build_registration(root_arg, resolved_root, transport, root_fd=root_fd)
+        )
+        if record["process_start"] is None:
+            print("[hyodo] mcp reader not registered: process start unobservable", file=sys.stderr)
+            return None
+        destination = target_dir / f"{record['reader_pid']}.json"
+        payload = json.dumps(record, indent=2, sort_keys=True) + "\n"
+        temporary = f".reader.{uuid.uuid4().hex}.tmp"
+        try:
+            fd = os.open(
+                temporary,
+                os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+                0o600,
+                dir_fd=directory_fd,
+            )
+            os.fchmod(fd, 0o600)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                handle.write(payload)
+            try:
+                existing = os.stat(destination.name, dir_fd=directory_fd, follow_symlinks=False)
+            except FileNotFoundError:
+                existing = None
+            if existing is not None and stat.S_ISLNK(existing.st_mode):
+                raise OSError("reader registration target is a symlink")
+            os.replace(
+                temporary,
+                destination.name,
+                src_dir_fd=directory_fd,
+                dst_dir_fd=directory_fd,
+            )
+        except OSError:
+            with suppress(OSError):
+                os.unlink(temporary, dir_fd=directory_fd)
+            print(f"[hyodo] mcp reader not registered: {destination}", file=sys.stderr)
+            return None
+        return destination
+    finally:
+        if owned_fd:
+            os.close(directory_fd)
 
 
 @contextmanager
@@ -390,40 +443,68 @@ def registered_reader(
     transport: str,
     *,
     directory: Path | None = None,
+    root_fd: int | None = None,
 ) -> Iterator[Path | None]:
     """Hold a registration for the lifetime of one reader."""
-    resolved = root.expanduser().resolve()
-    path = register_reader(root, resolved, transport, directory=directory)
+    resolved = root.absolute() if root_fd is not None else root.expanduser().resolve()
+    target_dir = Path(directory) if directory is not None else default_reader_dir()
+    try:
+        directory_fd = open_private_directory(target_dir, create=True, private_from=target_dir)
+    except OSError:
+        directory_fd = None
+    path = (
+        register_reader(
+            root,
+            resolved,
+            transport,
+            directory=target_dir,
+            _directory_fd=directory_fd,
+            root_fd=root_fd,
+        )
+        if directory_fd is not None
+        else None
+    )
     try:
         yield path
     finally:
         if path is not None:
             with suppress(OSError):
-                path.unlink()
+                os.unlink(path.name, dir_fd=directory_fd)
+        if directory_fd is not None:
+            os.close(directory_fd)
 
 
 def load_registrations(directory: Path | None = None) -> tuple[list[dict[str, Any]], int]:
     """Return valid registration records and the number of unreadable ones."""
     target_dir = Path(directory) if directory is not None else default_reader_dir()
-    if not target_dir.is_dir():
+    try:
+        directory_fd = open_private_directory(target_dir)
+    except OSError:
         return [], 0
     records: list[dict[str, Any]] = []
     corrupt = 0
-    for path in sorted(target_dir.glob("*.json")):
-        try:
-            raw = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-            corrupt += 1
-            continue
-        if (
-            not isinstance(raw, dict)
-            or raw.get("schema_version") != READER_SCHEMA_VERSION
-            or not isinstance(raw.get("reader_pid"), int)
-            or not isinstance(raw.get("process_start"), str)
-        ):
-            corrupt += 1
-            continue
-        records.append(raw)
+    try:
+        for name in sorted(os.listdir(directory_fd)):
+            if not name.endswith(".json"):
+                continue
+            try:
+                fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+                with os.fdopen(fd, "r", encoding="utf-8") as handle:
+                    raw = json.load(handle)
+            except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+                corrupt += 1
+                continue
+            if (
+                not isinstance(raw, dict)
+                or raw.get("schema_version") != READER_SCHEMA_VERSION
+                or not isinstance(raw.get("reader_pid"), int)
+                or not isinstance(raw.get("process_start"), str)
+            ):
+                corrupt += 1
+                continue
+            records.append(raw)
+    finally:
+        os.close(directory_fd)
     return records, corrupt
 
 

@@ -41,3 +41,27 @@ passing gate be used as proof that its receipt was stored. Append success is
 not a guarantee of disk durability, independent attestation, host consumption,
 or execution authority. Historical rows and the pinned history schema are
 unchanged.
+
+## MCP reader roots and runtime aliases
+
+MCP readers start on concrete directories, not symlink roots. A host may select
+a slot through its own runtime alias and pass the concrete slot path. The
+census can observe that host alias moving to another slot without making the
+alias an accepted server root or an execution authority.
+
+Reader diagnostics and protected tools share the descriptor-pinned inode
+identity check. Replacing a directory at the same pathname is stale even when
+its resolved path string is unchanged (`root_identity_changed`). Replacing it
+with a symlink also reports `root_moved`. A diagnostic still names its original
+pin, but does not query Git through a pathname already observed as stale.
+Protected tools refuse with `STALE_RUNTIME_RECONNECT_REQUIRED` and exit 2.
+These are per-call observations, not atomic filesystem snapshots or a claim
+that every possible concurrent mutation is covered.
+
+Tests keep startup-link rejection and all protected-tool refusal assertions.
+Registry/census tests with injected process observations are deterministic
+mechanical coverage, not proof of OS process identity. Real subprocess
+registration and startup-GC tests require an observable OS process start time;
+when it is unavailable they are explicitly skipped, not counted as passing.
+The runtime likewise leaves an unobservable reader unregistered rather than
+inventing a start time.

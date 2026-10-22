@@ -264,14 +264,16 @@ def test_census_cli_exit_codes_and_receipt(tmp_path, monkeypatch):
 
 
 def test_live_stdio_reader_registers_itself_and_unregisters_on_exit(tmp_path):
-    """A real reader started through `current` is judged STALE after the swap."""
+    """A real reader pins a directory while census follows the host's alias."""
+    if process_start(os.getpid()) is None:
+        pytest.skip("OS process start is unobservable; live registration is not verified")
     old, new, _current = _slots(tmp_path)
     current = tmp_path / "current-live"
     current.symlink_to(old)
     registry = tmp_path / "registry"
     env = {**os.environ, mcp_readers.READER_DIR_ENV: str(registry)}
     proc = subprocess.Popen(
-        [sys.executable, "-m", "hyodo.cli.main", "mcp", "stdio", "--root", str(current)],
+        [sys.executable, "-m", "hyodo.cli.main", "mcp", "stdio", "--root", str(old)],
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -286,7 +288,7 @@ def test_live_stdio_reader_registers_itself_and_unregisters_on_exit(tmp_path):
         assert record["resolved_root"] == str(old.resolve())
         assert record["process_start"] == process_start(proc.pid)
         assert record["server_version"] == __version__
-        assert record["root_arg"] == str(current)
+        assert record["root_arg"] == str(old)
 
         current.unlink()
         current.symlink_to(new)
@@ -346,26 +348,44 @@ def _tool(server: object, name: str, arguments: dict | None = None) -> dict:
     return asyncio.run(_call(server, name, arguments or {}))
 
 
-def test_reader_refuses_to_measure_after_the_pointer_moves(tmp_path):
-    old, new, _unused = _slots(tmp_path)
+@pytest.mark.parametrize("replacement", ["directory", "symlink"])
+def test_reader_refuses_to_measure_after_the_pointer_moves(tmp_path, monkeypatch, replacement):
+    """Post-start replacement must not redirect diagnostics or protected tools."""
     current = tmp_path / "current-pin"
-    current.symlink_to(old)
+    current.mkdir()
     server = create_server(current)
 
     before = _tool(server, "get_local_context")
     assert before["reader"]["state"] == "CURRENT"
-    assert before["reader"]["pinned_root"] == str(old.resolve())
+    assert before["reader"]["pinned_root"] == str(current)
 
-    current.unlink()
-    current.symlink_to(new)
+    retired = tmp_path / "retired-root"
+    current.rename(retired)
+    if replacement == "symlink":
+        redirected = tmp_path / "redirected-root"
+        redirected.mkdir()
+        current.symlink_to(redirected)
+    else:
+        current.mkdir()
+        redirected = current
 
+    git_calls = []
+    monkeypatch.setattr(
+        "hyodo.mcp_server._run_git",
+        lambda *args: git_calls.append(args) or (True, "outside-marker"),
+    )
     context = _tool(server, "get_local_context")
-    # The diagnostic still answers, from the pinned root, and names the drift.
-    assert context["root"] == str(old.resolve())
+    assert context["root"] == str(current)
     assert context["reader"]["state"] == "STALE"
-    assert context["reader"]["reasons"] == ["root_moved"]
-    assert context["reader"]["configured_root_now"] == str(new.resolve())
+    assert "root_identity_changed" in context["reader"]["reasons"]
+    assert ("root_moved" in context["reader"]["reasons"]) == (replacement == "symlink")
+    assert context["reader"]["configured_root_now"] == str(redirected)
     assert context["reader"]["action"] == "RECONNECT_REQUIRED"
+    assert context["git_observed"] is False
+    assert context["git_status"] == []
+    assert context["git_diff_stat"] == ""
+    assert git_calls == []
+    assert not (redirected / ".hyodo" / "mcp-access.jsonl").exists()
 
     for name, arguments in [
         ("hyodo_check", {}),
@@ -476,14 +496,15 @@ def test_startup_gc_removes_reused_pid_record(tmp_path):
 
 
 def test_reader_start_prunes_dead_registration(tmp_path):
+    """A directly rooted live process prunes records proven to be retired."""
+    if process_start(os.getpid()) is None:
+        pytest.skip("OS process start is unobservable; live startup GC is not verified")
     _old, new, _current = _slots(tmp_path)
-    current = tmp_path / "current-startup-gc"
-    current.symlink_to(new)
     registry = tmp_path / "registry"
     _write(registry, _record(999999, new, start="dead-process"))
     env = {**os.environ, mcp_readers.READER_DIR_ENV: str(registry)}
     proc = subprocess.Popen(
-        [sys.executable, "-m", "hyodo.cli.main", "mcp", "stdio", "--root", str(current)],
+        [sys.executable, "-m", "hyodo.cli.main", "mcp", "stdio", "--root", str(new)],
         stdin=subprocess.PIPE,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.PIPE,
@@ -500,3 +521,77 @@ def test_reader_start_prunes_dead_registration(tmp_path):
         assert proc.stdin is not None
         proc.stdin.close()
         proc.wait(timeout=30)
+
+
+def test_registration_lifecycle_with_injected_process_observation(tmp_path, monkeypatch):
+    """Injected identity tests registry/census mechanics, not OS process evidence."""
+    from hyodo.workspace_io import open_workspace_root
+
+    old, new, current = _slots(tmp_path)
+    current.unlink()
+    current.symlink_to(old)
+    registry = tmp_path / "registry"
+    monkeypatch.setattr(mcp_readers, "process_start", lambda _pid: _START)
+    root, fd = open_workspace_root(old)
+    try:
+        with mcp_readers.registered_reader(root, "stdio", directory=registry, root_fd=fd) as path:
+            assert path is not None
+            record = json.loads(path.read_text())
+            assert record["root_arg"] == str(old)
+            assert record["resolved_root"] == str(old)
+            assert record["process_start"] == _START
+            assert record["server_version"] == __version__
+            current.unlink()
+            current.symlink_to(new)
+            live = [ReaderProcess(os.getpid(), os.getppid(), _START, "stdio")]
+            receipt = _census(current, registry, live)
+            assert receipt["readers"][0]["reader_status"] == "STALE"
+            assert receipt["cutover_status"] == PROMOTION_INCOMPLETE
+        assert not path.exists()
+    finally:
+        os.close(fd)
+
+
+def test_startup_gc_with_injected_process_observation(tmp_path, monkeypatch):
+    """Deterministic liveness inputs cover startup GC without inventing OS facts."""
+    _old, new, _current = _slots(tmp_path)
+    registry = tmp_path / "registry"
+    _write(registry, _record(999999, new, start="dead-process"))
+    monkeypatch.setattr(mcp_readers, "process_start", lambda _pid: _START)
+    real_prune = mcp_readers.prune_retired_registrations
+
+    def observed_prune(**kwargs):
+        return real_prune(
+            **kwargs,
+            exists_lookup=lambda pid: pid != 999999,
+            start_lookup=lambda _pid: _START,
+        )
+
+    monkeypatch.setattr(mcp_readers, "prune_retired_registrations", observed_prune)
+    with mcp_readers.registered_reader(new, "stdio", directory=registry) as path:
+        assert path is not None
+        assert path.exists()
+        assert not (registry / "999999.json").exists()
+    assert not path.exists()
+
+
+def test_unobservable_process_start_never_creates_registration(tmp_path, monkeypatch):
+    """Unavailable process identity remains unregistered, not synthetic CURRENT."""
+    registry = tmp_path / "registry"
+    monkeypatch.setattr(mcp_readers, "process_start", lambda _pid: None)
+    with mcp_readers.registered_reader(tmp_path, "stdio", directory=registry) as path:
+        assert path is None
+        records, corrupt = load_registrations(registry)
+        assert records == []
+        assert corrupt == 0
+
+
+def test_reader_symlink_root_is_still_rejected_before_registration(tmp_path):
+    """Lifecycle reconciliation must not re-enable linked roots at startup."""
+    actual = tmp_path / "actual"
+    actual.mkdir()
+    alias = tmp_path / "alias"
+    alias.symlink_to(actual)
+    with pytest.raises(ValueError, match="workspace root"):
+        create_server(alias)
+    assert not (actual / ".hyodo" / "mcp-access.jsonl").exists()

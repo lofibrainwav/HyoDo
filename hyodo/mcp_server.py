@@ -12,11 +12,12 @@ import os
 import subprocess
 import sys
 import time
+import weakref
 from pathlib import Path
 from secrets import compare_digest
 from typing import Any
 
-from hyodo import __version__
+from hyodo import __version__, mcp_readers
 from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
     constructor_accepts_transport_options,  # pyright: ignore[reportAttributeAccessIssue]
     constructor_accepts_version,  # pyright: ignore[reportAttributeAccessIssue]
@@ -26,18 +27,11 @@ from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
 from hyodo.access_ledger import AccessEntry, record_access_result
 from hyodo.mcp_readers import STALE, STALE_RUNTIME_ERROR, ReaderPin, registered_reader
 from hyodo.pairing import PairingState, load_pairing, touch_last_seen, verify_token
+from hyodo.workspace_io import open_workspace_root
 
 _CLI_TIMEOUT_SECONDS = 120
 _LOOPBACK_HOST = "127.0.0.1"
 _MCP_PATH = "/mcp"
-
-
-def resolve_workspace_root(root: Path) -> Path:
-    """Return one existing workspace directory for the lifetime of the server."""
-    resolved = root.expanduser().resolve()
-    if not resolved.is_dir():
-        raise ValueError(f"workspace root is not a directory: {resolved}")
-    return resolved
 
 
 def _resolve_workspace_path(root: Path, value: str) -> Path:
@@ -104,6 +98,7 @@ def _record_access(
     duration_ms: int,
     caller_id: str | None = None,
     pin: ReaderPin | None = None,
+    root_fd: int | None = None,
 ) -> dict[str, str | None]:
     """Record one MCP invocation while keeping audit loss fail-visible.
 
@@ -126,8 +121,16 @@ def _record_access(
         server_started_at=pin.process_start if pin is not None else None,
         runtime_commit=pin.runtime_commit if pin is not None else None,
     )
+    # Audit persistence must not follow a pre-existing .hyodo directory or
+    # ledger link outside the configured workspace. A failed audit remains
+    # visible in the tool result instead of becoming a false OBSERVED receipt.
+    if root_fd is None:
+        try:
+            _resolve_workspace_path(root, ".hyodo/mcp-access.jsonl")
+        except (ValueError, OSError, RuntimeError):
+            return {"state": "UNOBSERVED", "reason": "audit_path_escape"}
     try:
-        observation = record_access_result(entry, root=root)
+        observation = record_access_result(entry, root=root, root_fd=root_fd)
     except Exception:
         return {"state": "UNOBSERVED", "reason": "record_access_exception"}
     return {"state": observation.state, "reason": observation.reason}
@@ -168,8 +171,13 @@ def create_server(
     the ledger can attribute requests to a workspace without ever recording the
     bearer token itself.
     """
-    workspace = resolve_workspace_root(root)
-    pin = ReaderPin.at_startup(root, workspace)
+    try:
+        workspace, root_fd = open_workspace_root(root)
+    except OSError as exc:
+        raise ValueError("workspace root is not a directory or is not directly accessible") from exc
+    # Runtime source identity is unavailable without reopening a pathname.
+    # Keep that field explicitly unobserved rather than reading a replaced root.
+    pin = ReaderPin(root, workspace, __version__, mcp_readers.process_start(os.getpid()), None)
 
     def _record(tool_name: str, exit_code: int, duration_ms: int) -> dict[str, str | None]:
         return _record_access(
@@ -179,16 +187,30 @@ def create_server(
             duration_ms,
             caller_id=caller_id,
             pin=pin,
+            root_fd=root_fd,
         )
 
-    def _stale(tool_name: str, started_at: float) -> dict[str, Any] | None:
-        """Refuse to measure once this reader's pin no longer holds.
-
-        A stale reader would otherwise keep answering for a retired runtime (or
-        with replaced code) as if it were current.  ``exit_code`` 2 keeps the
-        UNOBSERVED contract; the diagnostic ``get_local_context`` still works.
-        """
+    def _reader_status() -> dict[str, Any]:
+        """Join path/version observations with the descriptor-pinned root identity."""
         reader = pin.status()
+        try:
+            pinned_stat = os.fstat(root_fd)
+            current_stat = os.stat(workspace, follow_symlinks=False)
+            root_replaced = (pinned_stat.st_dev, pinned_stat.st_ino) != (
+                current_stat.st_dev,
+                current_stat.st_ino,
+            )
+        except OSError:
+            root_replaced = True
+        if root_replaced:
+            reader["state"] = STALE
+            reader["reasons"] = [*reader["reasons"], "root_identity_changed"]
+            reader["action"] = "RECONNECT_REQUIRED"
+        return reader
+
+    def _stale(tool_name: str, started_at: float) -> dict[str, Any] | None:
+        """Refuse protected tools once the shared root/code observation is stale."""
+        reader = _reader_status()
         if reader["state"] != STALE:
             return None
         result = {
@@ -225,28 +247,41 @@ def create_server(
         # carries the SDK's version, which is honest about the transport but
         # says nothing about this adapter.
         constructor_kwargs["version"] = __version__
-    server = server_class(
-        "HyoDo",
-        instructions=(
-            "Local HyoDo CLI adapter. Tools act only on the configured host workspace; observe before change; evidence, scores, and receipts never grant authority. "
-            "The six virtues are independent lenses; UNOBSERVED is not GREEN; the host still owns execution and approval."
-        ),
-        **constructor_kwargs,
-    )
+    try:
+        server = server_class(
+            "HyoDo",
+            instructions=(
+                "Local HyoDo CLI adapter. Tools act only on the configured host workspace; observe before change; evidence, scores, and receipts never grant authority. "
+                "The six virtues are independent lenses; UNOBSERVED is not GREEN; the host still owns execution and approval."
+            ),
+            **constructor_kwargs,
+        )
+    except BaseException:
+        os.close(root_fd)
+        raise
+    weakref.finalize(server, os.close, root_fd)
+    server._hyodo_root_fd = root_fd
+    server._hyodo_workspace = workspace
 
     @server.tool()
     def get_local_context() -> dict[str, Any]:
         """Read the configured host workspace root and small git context."""
         t0 = time.monotonic()
-        status_ok, status = _run_git(workspace, "status", "--short")
-        diff_ok, diff = _run_git(workspace, "diff", "--stat")
+        reader = _reader_status()
+        # A stale diagnostic may name its original pin, but must not read Git
+        # facts through a pathname that now identifies a different workspace.
+        status_ok, status = False, ""
+        diff_ok, diff = False, ""
+        if reader["state"] != STALE:
+            status_ok, status = _run_git(workspace, "status", "--short")
+            diff_ok, diff = _run_git(workspace, "diff", "--stat")
         result = {
             "exit_code": 0,
             "root": str(workspace),
             "git_status": status.splitlines() if status_ok else [],
             "git_diff_stat": diff.strip() if diff_ok else "",
             "git_observed": status_ok and diff_ok,
-            "reader": pin.status(),
+            "reader": reader,
         }
         return _finish("get_local_context", result, t0)
 
@@ -296,6 +331,10 @@ def create_server(
         t0 = time.monotonic()
         if (refused := _stale("hyodo_event_record", t0)) is not None:
             return refused
+        try:
+            _resolve_workspace_path(workspace, ".hyodo/agent-events.jsonl")
+        except ValueError as exc:
+            return _finish("hyodo_event_record", {"exit_code": 2, "error": str(exc)}, t0)
         args = ["event", "record", "--stdin", "--root", str(workspace), "--json"]
         if policy_path is not None:
             try:
@@ -352,7 +391,10 @@ def create_server(
         t0 = time.monotonic()
         if (refused := _stale("hyodo_agent_rules", t0)) is not None:
             return refused
-        rules = load_agent_rules(workspace)
+        try:
+            rules = load_agent_rules(workspace, root_fd=root_fd)
+        except ValueError as exc:
+            return _finish("hyodo_agent_rules", {"exit_code": 2, "error": str(exc)}, t0)
         if not rules:
             rules = list(DEFAULT_RULES)
         result: dict[str, Any] = {"rules": [r.to_dict() for r in rules]}
@@ -364,7 +406,7 @@ def create_server(
 def run_stdio(root: Path, *, allow_full_body: bool = False) -> None:
     """Start the M1 local stdio transport. No network listener is created."""
     server = create_server(root, allow_full_body=allow_full_body)
-    with registered_reader(root, "stdio"):
+    with registered_reader(server._hyodo_workspace, "stdio", root_fd=server._hyodo_root_fd):
         server.run(transport="stdio")
 
 
