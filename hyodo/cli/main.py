@@ -152,6 +152,7 @@ from hyodo.host_adapters.codex_response import map_codex_permission_response
 from hyodo.host_adapters.cursor import map_cursor_hook_payload
 from hyodo.host_adapters.cursor_response import map_cursor_permission_response
 from hyodo.identity import build_runtime_identity, write_runtime_identity
+from hyodo.input_snapshot import git_input_digest
 from hyodo.mcp_config import (
     ALL_HOSTS,
     CHATGPT_UNOBSERVED_MESSAGE,
@@ -869,7 +870,11 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
             "fingerprint": dashboard_trust.fingerprint,
         }
     # Record this run before reading the ledger so Yeong includes it.
-    if not append_history_receipt(root, evidence):
+    history_persisted = append_history_receipt(root, evidence)
+    evidence["history_receipt"] = {
+        "persistence": "OBSERVED" if history_persisted else "UNOBSERVED",
+    }
+    if not history_persisted:
         console.print("[yellow]Could not append .hyodo/history.jsonl receipt.[/yellow]")
     evidence["pillars"] = {
         "in": collect_in_evidence(root),
@@ -1910,7 +1915,7 @@ def _verdict_output(
     audience: AudienceProfile | None = None,
     native_response: bool = False,
 ) -> Iterator[None]:
-    """Stream default details; propagate the original command exit unchanged."""
+    """Stream details; withhold successful check exits for unbound input evidence."""
     profile = audience or AudienceProfile(profile="engineer")
     with console.capture() if quiet or json_output else nullcontext() as captured:
         try:
@@ -1951,15 +1956,27 @@ def _verdict_output(
         # Dirty-again mid-run: same commit, dirty before and after, but the
         # actual bytes changed under the gates. The boolean pair cannot see it.
         target_moved = True
+    snapshot = state.get("input_snapshot")
+    snapshot_unobserved = False
+    if isinstance(snapshot, dict):
+        before, after = snapshot["before"], snapshot["after"]
+        snapshot_unobserved = before is None or after is None
+        target_moved = target_moved or (not snapshot_unobserved and before != after)
+        if snapshot_unobserved:
+            snapshot["state"] = "UNOBSERVED"
+    if snapshot_unobserved and decision == "PASS":
+        decision = "UNOBSERVED"
+        detail = "Git input content snapshot could not be observed within its bounds"
     if target_moved:
         state["target_changed_during_run"] = True
     if target_moved and decision == "PASS":
         decision = "UNOBSERVED"
-        detail = "target tree changed during the run (pre/post commit or dirty state differ)"
-    if target_moved and exit_code == 0:
+        detail = "target tree changed during the run (commit, dirty state, or input content differ)"
+    if exit_code == 0 and (target_moved or snapshot_unobserved):
         # Exit 0 means "all executed gates passed" to callers that only read
-        # the process status. A moved target has no valid gates, which is the
-        # exit-2 case (same as "no executed gates"), never a silent zero.
+        # the process status. A moved target, or an input snapshot that could
+        # not be observed, has no valid gates: that is the exit-2 case (same as
+        # "no executed gates"), never a silent zero.
         exit_code = 2
 
     # 4.21 honesty axis. `decision` above stays exactly what 4.20 computed --
@@ -2062,7 +2079,13 @@ def _verdict_output(
             # Rows from a run that crossed a tree change describe no single
             # commit, so they are withheld: emitting them would let consumers
             # attribute lenses to code that never existed as one tree.
-            if "gate_rows" in state and not state.get("target_changed_during_run"):
+            if isinstance(snapshot, dict):
+                payload["input_snapshot"] = snapshot
+            if (
+                "gate_rows" in state
+                and not state.get("target_changed_during_run")
+                and not snapshot_unobserved
+            ):
                 payload["gates"] = {
                     row["name"]: {
                         "status": row["status"],
@@ -2241,9 +2264,24 @@ def check(
 
         if gates_config is not None:
             console.print(f"[cyan]User gates: {check_root / GATES_CONFIG_RELATIVE_PATH}[/cyan]")
+            # Git-backed BYOG checks bind results to bounded input bytes, not
+            # just commit/dirty bits (which miss dirty-to-dirty edits).
+            snapshot_enabled = (
+                verdict_state["provenance"].target_commit is not None
+                and verdict_state["provenance"].validity == "OBSERVED"
+            )
+            snapshot_before = git_input_digest(check_root) if snapshot_enabled else None
             trust, user_results = run_user_gates_with_trust(
                 gates_config, check_root, verbose=verbose
             )
+            if snapshot_enabled:
+                snapshot_after = git_input_digest(check_root)
+                verdict_state["input_snapshot"] = {
+                    "scope": "git-tracked-and-unignored-plus-byog-config/v1",
+                    "state": "OBSERVED",
+                    "before": snapshot_before,
+                    "after": snapshot_after,
+                }
             checkout_receipt_ignored = checkout_shadow(check_root, GATES_TRUST_RELATIVE_PATH)
             verdict_state.update(
                 observed=sum(r.status in {"PASS", "FAIL"} for r in user_results),
