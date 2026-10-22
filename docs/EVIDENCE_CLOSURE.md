@@ -65,3 +65,18 @@ registration and startup-GC tests require an observable OS process start time;
 when it is unavailable they are explicitly skipped, not counted as passing.
 The runtime likewise leaves an unobservable reader unregistered rather than
 inventing a start time.
+
+## Closing an environment-only verification gap
+
+A runner that cannot observe OS process identity must report the affected real
+process checks as unobserved, not as passed. When the operator authorizes the
+same bounded checks on a host-owned terminal, keep their original assertions
+and capture actual subprocess identity, registry/census readback, exit cleanup,
+and startup dead-record cleanup. Require test counts, zero skips, exit status,
+source preservation, and residual test-process inspection. A terminal launch
+receipt alone is not completion.
+
+Record the authorized host run separately from the restricted-runner result.
+Do not rewrite an earlier skipped test into a pass or present two runs as one
+full-suite execution. This procedure does not authorize permission bypass,
+production restarts, release, or deployment.
