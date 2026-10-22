@@ -28,9 +28,11 @@ import hashlib
 import json
 import os
 import stat
-import tempfile
+import uuid
 from pathlib import Path
 from typing import Any
+
+from hyodo.workspace_io import open_private_directory
 
 USER_STATE_ENV_VAR = "HYODO_STATE_HOME"
 WORKSPACE_IDENTITY_PREFIX = "sha256:"
@@ -44,15 +46,15 @@ def user_state_home() -> Path:
     return Path.home() / ".hyodo" / "state"
 
 
-def workspace_identity(root: Path) -> str:
+def workspace_identity(root: Path, *, pinned: bool = False) -> str:
     """Return ``sha256:<hex>`` of the resolved checkout path."""
-    resolved = str(root.expanduser().resolve())
+    resolved = str(root.absolute() if pinned else root.expanduser().resolve())
     return WORKSPACE_IDENTITY_PREFIX + hashlib.sha256(resolved.encode("utf-8")).hexdigest()
 
 
-def workspace_state_dir(root: Path) -> Path:
+def workspace_state_dir(root: Path, *, pinned: bool = False) -> Path:
     """Return the private per-user directory holding *root*'s authority state."""
-    digest = workspace_identity(root).removeprefix(WORKSPACE_IDENTITY_PREFIX)
+    digest = workspace_identity(root, pinned=pinned).removeprefix(WORKSPACE_IDENTITY_PREFIX)
     return user_state_home() / "workspaces" / digest[:32]
 
 
@@ -62,18 +64,19 @@ def ensure_workspace_state_dir(root: Path) -> Path:
     ``mkdir(parents=True, mode=...)`` applies the mode to the leaf only, which
     would leave the list of workspaces readable to other local users.
     """
-    home = user_state_home()
-    directory = workspace_state_dir(root)
-    directory.mkdir(parents=True, exist_ok=True, mode=0o700)
-    current = directory
-    while True:
-        with contextlib.suppress(OSError):
-            if stat.S_IMODE(current.stat().st_mode) != 0o700:
-                os.chmod(current, 0o700)
-        if current == home or current.parent == current:
-            break
-        current = current.parent
+    directory, fd = open_workspace_state_dir(root)
+    os.close(fd)
     return directory
+
+
+def open_workspace_state_dir(
+    root: Path, *, create: bool = True, pinned: bool = False
+) -> tuple[Path, int]:
+    """Return the private workspace state path and a pinned directory handle."""
+    home = user_state_home().absolute()
+    directory = workspace_state_dir(root, pinned=pinned).absolute()
+    fd = open_private_directory(directory, create=create, private_from=home)
+    return directory, fd
 
 
 def workspace_state_path(root: Path, name: str) -> Path:
@@ -108,7 +111,23 @@ def read_json(path: Path) -> tuple[Any, str | None]:
         return None, "invalid"
 
 
-def write_json_private(root: Path, name: str, payload: Any) -> Path:
+def read_json_private(root: Path, name: str, *, pinned: bool = False) -> tuple[Any, str | None]:
+    """Read a workspace state JSON file through its pinned private directory."""
+    try:
+        _, directory_fd = open_workspace_state_dir(root, create=False, pinned=pinned)
+        try:
+            fd = os.open(name, os.O_RDONLY | os.O_NOFOLLOW, dir_fd=directory_fd)
+            with os.fdopen(fd, "r", encoding="utf-8") as handle:
+                return json.load(handle), None
+        finally:
+            os.close(directory_fd)
+    except FileNotFoundError:
+        return None, "missing"
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None, "invalid"
+
+
+def write_json_private(root: Path, name: str, payload: Any, *, pinned: bool = False) -> Path:
     """Atomically write *payload* as owner-only JSON into *root*'s state dir.
 
     Raises ``OSError`` when the state cannot be written; callers decide
@@ -116,27 +135,50 @@ def write_json_private(root: Path, name: str, payload: Any) -> Path:
     state so a person reading ``~/.hyodo/state`` can tell which checkout a
     directory belongs to.
     """
-    directory = ensure_workspace_state_dir(root)
-    marker = directory / "workspace.json"
-    if not marker.exists():
-        _atomic_write(
-            marker,
-            {"root": str(root.expanduser().resolve()), "workspace_id": workspace_identity(root)},
-        )
-    path = directory / name
-    _atomic_write(path, payload)
-    return path
+    directory, directory_fd = open_workspace_state_dir(root, pinned=pinned)
+    try:
+        try:
+            marker = os.stat("workspace.json", dir_fd=directory_fd, follow_symlinks=False)
+        except FileNotFoundError:
+            marker = None
+        if marker is not None and stat.S_ISLNK(marker.st_mode):
+            raise OSError("private state marker is a symlink")
+        if marker is None:
+            _atomic_write_at(
+                directory_fd,
+                "workspace.json",
+                {
+                    "root": str(root.absolute() if pinned else root.expanduser().resolve()),
+                    "workspace_id": workspace_identity(root, pinned=pinned),
+                },
+            )
+        _atomic_write_at(directory_fd, name, payload)
+        return directory / name
+    finally:
+        os.close(directory_fd)
 
 
-def _atomic_write(path: Path, payload: Any) -> None:
-    text = json.dumps(payload, indent=2, sort_keys=True) + "\n"
-    fd, tmp = tempfile.mkstemp(dir=path.parent, prefix=f".{path.name}.", suffix=".tmp")
+def _atomic_write_at(directory_fd: int, name: str, payload: Any) -> None:
+    if not name or name in {".", ".."} or "/" in name:
+        raise OSError("invalid private state filename")
+    try:
+        existing = os.stat(name, dir_fd=directory_fd, follow_symlinks=False)
+    except FileNotFoundError:
+        existing = None
+    if existing is not None and stat.S_ISLNK(existing.st_mode):
+        raise OSError("private state file is a symlink")
+    temporary = f".{name}.{uuid.uuid4().hex}.tmp"
+    fd = os.open(
+        temporary,
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+        0o600,
+        dir_fd=directory_fd,
+    )
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            handle.write(text)
-        os.chmod(tmp, 0o600)
-        os.replace(tmp, path)
+            handle.write(json.dumps(payload, indent=2, sort_keys=True) + "\n")
+        os.replace(temporary, name, src_dir_fd=directory_fd, dst_dir_fd=directory_fd)
     except BaseException:
         with contextlib.suppress(OSError):
-            os.unlink(tmp)
+            os.unlink(temporary, dir_fd=directory_fd)
         raise

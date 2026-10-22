@@ -204,6 +204,17 @@ def _iter_files_lexical(root: Path):
             for child in children:
                 if child.name.startswith(".git"):
                     continue
+                if child.is_symlink():
+                    # Directory traversal never follows links. Resolve a file
+                    # link only when its target remains in the scan root.
+                    resolved = Path(child.path).resolve()
+                    try:
+                        resolved.relative_to(root.resolve())
+                    except ValueError:
+                        continue
+                    if resolved.is_file():
+                        pending.append((resolved, False))
+                    continue
                 child_is_directory = child.is_dir(follow_symlinks=False)
                 if child_is_directory and child.name in _SKIPPED_DIR_NAMES:
                     continue
@@ -337,6 +348,11 @@ def _read_working_tree_files(
         targets = sorted(candidate.rglob("*")) if candidate.is_dir() else [candidate]
         for target in targets:
             if target.is_dir():
+                continue
+            try:
+                target = target.resolve()
+                target.relative_to(resolved_root)
+            except ValueError:
                 continue
             total += 1
             if count >= _DEFAULT_SCAN_CAP:

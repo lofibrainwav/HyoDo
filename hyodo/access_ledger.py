@@ -52,13 +52,20 @@ class AccessReadResult:
     reason: str | None = None
 
 
-def record_access_result(entry: AccessEntry, root: Path | None = None) -> AccessWriteResult:
+def record_access_result(
+    entry: AccessEntry, root: Path | None = None, *, root_fd: int | None = None
+) -> AccessWriteResult:
     """Append one access entry while making persistence loss observable."""
     if root is None:
         root = Path(".")
     path = root / ACCESS_LEDGER_PATH
     try:
-        anchored_append(root, ACCESS_LEDGER_PATH, json.dumps(asdict(entry), sort_keys=True) + "\n")
+        anchored_append(
+            root,
+            ACCESS_LEDGER_PATH,
+            json.dumps(asdict(entry), sort_keys=True) + "\n",
+            root_fd=root_fd,
+        )
     except OSError:
         print(f"[hyodo] access ledger write failed: {path}", file=sys.stderr)
         return AccessWriteResult(path=path, state="UNOBSERVED", reason="write_failed")

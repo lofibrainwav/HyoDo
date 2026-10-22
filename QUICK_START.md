@@ -41,6 +41,19 @@ executable gates run, **1** when a gate fails, and **0** only when at least one
 gate ran and all passed. See the
 [gate configuration reference](./docs/GATES_SYNTAX.md).
 
+For example, `init` on a project containing only `pyproject.toml` and a README
+creates the example config but no live gates. A subsequent `check --json`
+reports `sampled: true`, `project_coverage: SAMPLED`, `complete: false`, and
+exits **2** because the sample found no executable gate. CI jobs that treated
+this file-only case as exit 0 must supply reviewed live gates or handle exit 2
+as an unobserved result; it is not a pass.
+
+This sampled case is separate from the BYOG compatibility contract. With one
+approved BYOG gate passing and another skipped, JSON keeps the 4.20 machine
+`status: PASS` and exit **0**, while `effective: UNOBSERVED` states that the
+result is incomplete. An observed BYOG failure remains exit **1**, and a
+changed, unapproved command set remains exit **2**.
+
 ## Optional integrations
 
 For agent event and policy checks:

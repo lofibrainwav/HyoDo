@@ -88,6 +88,7 @@ def test_full_coverage_pass_is_unchanged(tmp_path: Path, trusted: None) -> None:
     assert payload["status"] == "PASS"
     assert payload["gates_ran"] == 1
     assert payload["gates_total"] == 1
+    assert payload["failed"] == []
     assert payload["coverage"] == "FULL"
     assert payload["complete"] is True
     assert payload["effective"] == "PASS"
@@ -249,8 +250,11 @@ def test_second_run_reports_previously_approved(tmp_path: Path, trusted: None) -
 def test_unpersistable_trust_receipt_does_not_rewrite_gate_results(
     tmp_path: Path, trusted: None, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A receipt that cannot be stored is surfaced, never charged to a gate."""
+    """B4: fail the current per-user state path, never charge it to a gate."""
     _write_gates(tmp_path, _gate("ok", "true"))
+    # An old checkout receipt is only an ignored shadow. Its presence cannot
+    # substitute for a successful write to the current authority store.
+    (tmp_path / ".hyodo" / "gates-trust.json").write_text("{}\n", encoding="utf-8")
     # Structurally impossible state root: deterministic across existing parent
     # directories and independent of permission behavior/root privileges.
     blocked_state_home = tmp_path / "state-home-is-a-file"
@@ -263,9 +267,29 @@ def test_unpersistable_trust_receipt_does_not_rewrite_gate_results(
     assert exit_code == 0
     assert payload["status"] == "PASS"
     assert payload["gates_ran"] == 1
+    assert payload["gates_total"] == 1
+    assert payload["failed"] == []
+    assert payload["coverage"] == "FULL"
     assert payload["effective"] == "PASS"
     assert payload["trust"]["via"] == f"env:{GATES_TRUST_ENV_VAR}"
     assert payload["trust"]["persistence"] == "UNOBSERVED"
+    assert payload["trust"]["checkout_receipt_ignored"] is True
+
+
+def test_checkout_receipt_shadow_does_not_block_user_state_persistence(
+    tmp_path: Path, trusted: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Positive control: the dead checkout path cannot simulate a B4 failure."""
+    _write_gates(tmp_path, _gate("ok", "true"))
+    (tmp_path / ".hyodo" / "gates-trust.json").write_text("{}\n", encoding="utf-8")
+    monkeypatch.setenv(USER_STATE_ENV_VAR, str(tmp_path / "writable-user-state"))
+
+    exit_code, payload = _check_json(tmp_path)
+
+    assert exit_code == 0
+    assert payload["status"] == "PASS"
+    assert payload["trust"]["persistence"] == "OBSERVED"
+    assert payload["trust"]["checkout_receipt_ignored"] is True
 
 
 # --------------------------------------------------------------------------
@@ -305,6 +329,24 @@ def test_sampled_fallback_survives_zero_gate_init(tmp_path: Path) -> None:
     assert exit_code == 0
     assert payload["sampled"] is True
     assert payload["gates_ran"] >= 1
+
+
+def test_zero_detection_file_only_project_is_sampled_but_exits_two(tmp_path: Path) -> None:
+    """A generated example is not an executable gate or a CI success."""
+    (tmp_path / "pyproject.toml").write_text('[project]\nname = "demo"\n', encoding="utf-8")
+    (tmp_path / "README.md").write_text("fixture\n", encoding="utf-8")
+    assert runner.invoke(app, ["init", str(tmp_path)]).exit_code == 0
+    assert not (tmp_path / GATES_CONFIG_RELATIVE_PATH).exists()
+
+    exit_code, payload = _check_json(tmp_path)
+
+    assert exit_code == payload["exit_code"] == 2
+    assert payload["status"] == payload["effective"] == "UNOBSERVED"
+    assert payload["sampled"] is True
+    assert payload["project_coverage"] == "SAMPLED"
+    assert payload["complete"] is False
+    assert payload["gates_ran"] == 0
+    assert "trust" not in payload  # No BYOG config was created by zero detection.
 
 
 def test_product_identity_wording_is_aligned() -> None:
