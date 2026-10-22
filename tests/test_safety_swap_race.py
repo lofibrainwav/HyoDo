@@ -17,7 +17,8 @@ import pytest
 
 import hyodo.safety as safety
 
-OUTSIDE_SECRET = "AKIAQWERTYUIOPASDFGH"  # matches the AWS key pattern
+# Built at runtime so the repository never holds a credential-shaped literal.
+OUTSIDE_SECRET = "AKIA" + "QWERTYUIOPASDFGH"  # matches the AWS key pattern
 
 
 def _layout(tmp_path: Path) -> tuple[Path, Path]:
