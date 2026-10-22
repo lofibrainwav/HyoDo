@@ -88,4 +88,11 @@ review before they run.
   lost, it is simply no longer counted as locally observed.
 - **Sampled checks are not complete.** `hyodo check --json` on built-in
   sampled gates now reports `complete: false` and `project_coverage: SAMPLED`.
-  `coverage` keeps its 4.21 meaning (gate coverage).
+  `coverage` keeps its 4.21 meaning (gate coverage). If zero-detection `init`
+  leaves only `gates.toml.example` and the project has no supported source
+  files, no sampled gate executes: `check` exits 2 with `UNOBSERVED`. CI that
+  expected exit 0 for this file-only case must add reviewed live gates or
+  handle the unobserved outcome explicitly. This does not change BYOG's 4.20
+  machine exit contract: one passing gate beside a skipped gate still exits 0
+  with `status: PASS`, while `effective: UNOBSERVED` disallows a green reading;
+  an observed failure exits 1 and an unapproved changed command set exits 2.

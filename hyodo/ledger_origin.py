@@ -33,18 +33,19 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import os
 from collections.abc import Iterator
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from hyodo.user_state import (
-    ensure_workspace_state_dir,
-    read_json,
+    open_workspace_state_dir,
+    read_json_private,
     workspace_identity,
-    workspace_state_path,
     write_json_private,
 )
+from hyodo.workspace_io import append_workspace_bytes, read_workspace_bytes
 
 try:
     import fcntl
@@ -72,12 +73,12 @@ def _digest_bytes(data: bytes) -> str:
     return "sha256:" + hashlib.sha256(data).hexdigest()
 
 
-def _load_anchors(root: Path) -> dict[str, Any]:
-    data, _error = read_json(workspace_state_path(root, LEDGER_ORIGIN_STATE_NAME))
+def _load_anchors(root: Path, *, pinned: bool = False) -> dict[str, Any]:
+    data, _error = read_json_private(root, LEDGER_ORIGIN_STATE_NAME, pinned=pinned)
     if (
         not isinstance(data, dict)
         or data.get("schema") != LEDGER_ORIGIN_SCHEMA
-        or data.get("workspace_id") != workspace_identity(root)
+        or data.get("workspace_id") != workspace_identity(root, pinned=pinned)
         or not isinstance(data.get("ledgers"), dict)
     ):
         return {}
@@ -152,35 +153,61 @@ def _prior_seq(anchor: Any, before: bytes | None) -> int:
     return 0
 
 
+def _open_lock_file(directory_fd: int) -> int:
+    """Open (creating once) the anchor lock file beneath the pinned state dir.
+
+    Concurrent ``openat(O_CREAT)`` calls for the same new name can fail with a
+    spurious ENOENT on macOS (seen in about 15% of 6-thread races on APFS), and
+    an ``OSError`` here makes ``append_agent_event`` drop the event. Exclusive
+    creation does not race that way: exactly one writer creates the file and
+    every other writer opens the existing one.
+    """
+    flags = os.O_RDWR | os.O_NOFOLLOW
+    try:
+        return os.open(
+            ".ledger-origin.lock", flags | os.O_CREAT | os.O_EXCL, 0o600, dir_fd=directory_fd
+        )
+    except FileExistsError:
+        return os.open(".ledger-origin.lock", flags, dir_fd=directory_fd)
+
+
 @contextlib.contextmanager
-def _anchor_lock(root: Path) -> Iterator[None]:
+def _anchor_lock(root: Path, *, pinned: bool = False) -> Iterator[None]:
     """Serialize append-and-anchor so concurrent writers never race the anchor."""
     if fcntl is None:  # pragma: no cover - non-POSIX platforms
         yield
         return
-    directory = ensure_workspace_state_dir(root)
-    with (directory / ".ledger-origin.lock").open("a") as handle:
-        fcntl.flock(handle.fileno(), fcntl.LOCK_EX)
+    _, directory_fd = open_workspace_state_dir(root, pinned=pinned)
+    try:
+        lock_fd = _open_lock_file(directory_fd)
         try:
-            yield
+            fcntl.flock(lock_fd, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(lock_fd, fcntl.LOCK_UN)
         finally:
-            fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+            os.close(lock_fd)
+    finally:
+        os.close(directory_fd)
 
 
-def anchored_append(root: Path, relative: Path, line: str) -> None:
+def anchored_append(root: Path, relative: Path, line: str, *, root_fd: int | None = None) -> None:
     """Append *line* to the ledger and move its local anchor forward.
 
     Raises ``OSError`` when the ledger cannot be written. A failure to write
     the anchor itself is swallowed: the ledger line is still recorded, and the
     next reader sees ``DIVERGED`` rather than a false ``VERIFIED``.
     """
-    resolved = root.expanduser().resolve()
-    path = resolved / relative
+    resolved = root.absolute() if root_fd is not None else root.expanduser().resolve()
+    pinned = root_fd is not None
     key = relative.as_posix()
-    with _anchor_lock(resolved):
-        anchors = _load_anchors(resolved)
+    with _anchor_lock(resolved, pinned=pinned):
+        anchors = _load_anchors(resolved, pinned=pinned)
         try:
-            before = path.read_bytes() if path.exists() else b""
+            before = read_workspace_bytes(resolved, relative, root_fd=root_fd)
+        except FileNotFoundError:
+            before = b""
         except OSError:
             before = None
         previous = anchors.get(key)
@@ -198,11 +225,9 @@ def anchored_append(root: Path, relative: Path, line: str) -> None:
             # Bytes that were not verifiably ours stay unverified forever:
             # appending one honest line must never launder a shipped ledger.
             tainted = _classify(anchors.get(key), before) != ORIGIN_VERIFIED
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a", encoding="utf-8") as handle:
-            handle.write(line)
+        append_workspace_bytes(resolved, relative, line.encode("utf-8"), root_fd=root_fd)
         try:
-            content = path.read_bytes()
+            content = read_workspace_bytes(resolved, relative, root_fd=root_fd)
             # Anything other than exactly "what was there + our line" means a
             # writer outside this lock touched the file; never fold its bytes
             # into an anchor as if HyoDo wrote them.
@@ -228,9 +253,10 @@ def anchored_append(root: Path, relative: Path, line: str) -> None:
                 LEDGER_ORIGIN_STATE_NAME,
                 {
                     "schema": LEDGER_ORIGIN_SCHEMA,
-                    "workspace_id": workspace_identity(resolved),
+                    "workspace_id": workspace_identity(resolved, pinned=pinned),
                     "ledgers": anchors,
                 },
+                pinned=pinned,
             )
         except OSError:
             pass

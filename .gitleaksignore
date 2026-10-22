@@ -52,3 +52,5 @@ tests/test_mcp_stdio.py:aws-access-token:251
 # that one historical fake finding; it does not suppress the rule, file, or
 # current working tree.
 da09cda6564f1ff8637868261cd0718616b93b1f:tests/test_secret_scan_contract.py:github-pat:108
+7d3a1c65ac8f399c34db59b8bb433b1cbe67daeb:tests/test_safety_swap_race.py:aws-access-token:19
+761ea42a0338aef187aece60a2b75a16e0751d05:tests/test_safety_swap_race.py:aws-access-token:20

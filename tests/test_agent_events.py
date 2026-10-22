@@ -172,7 +172,7 @@ def test_append_unwritable_returns_false(tmp_path: Path, monkeypatch: pytest.Mon
     def boom(*_a, **_k):
         raise OSError("read-only")
 
-    monkeypatch.setattr(Path, "mkdir", boom)
+    monkeypatch.setattr("hyodo.ledger_origin.append_workspace_bytes", boom)
     assert append_agent_event(tmp_path, event) is False
 
 

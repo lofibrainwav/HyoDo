@@ -37,7 +37,7 @@ def test_successful_write_is_observed(tmp_path: Path) -> None:
 
 
 def test_write_failure_is_explicit_and_non_fatal(tmp_path: Path) -> None:
-    with patch("pathlib.Path.open", side_effect=OSError("read only")):
+    with patch("hyodo.ledger_origin.append_workspace_bytes", side_effect=OSError("read only")):
         result = record_access_result(entry(), root=tmp_path)
     assert result.state == "UNOBSERVED"
     assert result.reason == "write_failed"

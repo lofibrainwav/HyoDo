@@ -12,9 +12,12 @@ error.
 
 from __future__ import annotations
 
+import errno
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal
+
+from hyodo.workspace_io import read_workspace_bytes
 
 try:
     import tomllib  # pyright: ignore[reportMissingImports]
@@ -106,20 +109,22 @@ DEFAULT_RULES: frozenset[AgentRule] = frozenset(
 )
 
 
-def load_agent_rules(root: Path) -> list[AgentRule]:
+def load_agent_rules(root: Path, *, root_fd: int | None = None) -> list[AgentRule]:
     """Load agent rules from ``.hyodo/agent-rules.toml`` under *root*.
 
     Returns an empty list when the file is missing (opt-in, not required).
     Returns an empty list when the file has an unsupported schema.
     """
-    path = root / AGENT_RULES_PATH
-    if not path.exists():
-        return []
-
     try:
-        raw_text = path.read_text(encoding="utf-8")
-    except OSError:
+        raw_text = read_workspace_bytes(root, AGENT_RULES_PATH, root_fd=root_fd).decode("utf-8")
+    except FileNotFoundError:
         return []
+    except (OSError, UnicodeError) as exc:
+        if isinstance(exc, OSError) and (
+            exc.errno == errno.EPERM or (root_fd is not None and exc.errno == errno.ELOOP)
+        ):
+            raise ValueError("agent rules path escapes the locked workspace") from exc
+        raise ValueError("agent rules path is unreadable") from exc
 
     try:
         raw = tomllib.loads(raw_text)

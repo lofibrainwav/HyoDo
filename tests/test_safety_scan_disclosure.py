@@ -156,14 +156,14 @@ def test_default_status_coverage(monkeypatch, tmp_path):
     (tmp_path / "a.py").write_text("print('hello')")
     (tmp_path / "b.png").write_bytes(b"\x00image")
     (tmp_path / "c.py").write_text("unreadable")
-    read = safety._read_text_file
+    read = safety._read_contained_text
 
-    def read_file(path):
+    def read_file(root, path):
         if path.name == "c.py":
             raise OSError("unreadable")
-        return read(path)
+        return read(root, path)
 
-    monkeypatch.setattr(safety, "_read_text_file", read_file)
+    monkeypatch.setattr(safety, "_read_contained_text", read_file)
     monkeypatch.setattr(
         safety.subprocess,
         "run",
@@ -173,6 +173,8 @@ def test_default_status_coverage(monkeypatch, tmp_path):
     )
     result = run_safety_scan(cwd=tmp_path)
     assert (result["scanned_files"], result["total_scannable"]) == (1, 3)
+    # An unreadable file is an incomplete read, not a clean one.
+    assert result["coverage"] == "UNOBSERVED"
 
 
 def test_single_file_coverage(tmp_path):
