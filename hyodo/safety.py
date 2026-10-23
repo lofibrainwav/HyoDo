@@ -33,7 +33,7 @@ SECRET_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
     (
         "generic_api_key_assignment",
         re.compile(
-            r"(?i)\b(api[_-]?key|secret[_-]?key|access[_-]?token|password)\b\s*[:=]\s*['\"](?P<value>[^'\"]{8,})['\"]"
+            r"(?i)\b(api[_-]?key|secret[_-]?key|access[_-]?token|password)\b\s*[:=]\s*['\"](?P<value>[^'\"]{8,128})['\"]"
         ),
     ),
 )
