@@ -7,6 +7,11 @@ from pathlib import Path
 
 import yaml
 
+try:
+    import tomllib
+except ModuleNotFoundError:  # Python 3.10 retains the public package's supported floor.
+    import tomli as tomllib
+
 ROOT = Path(__file__).resolve().parents[1]
 
 
@@ -88,6 +93,13 @@ def test_ci_precommit_is_private_dependency_group() -> None:
     assert ci_group is not None
     assert re.search(r'"pre-commit==[^\"]+"', ci_group.group("dependencies"))
     assert "uv sync --locked --group ci --no-default-groups" in workflow
+
+
+def test_ci_tooling_python_floor_preserves_product_compatibility() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert project["project"]["requires-python"] == ">=3.10"
+    ci_settings = project.get("tool", {}).get("uv", {}).get("dependency-groups", {}).get("ci", {})
+    assert ci_settings.get("requires-python") == ">=3.11"
 
 
 def test_dependabot_keeps_mcp_v1_lock_on_compatible_major() -> None:
