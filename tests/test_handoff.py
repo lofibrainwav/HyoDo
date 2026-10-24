@@ -355,7 +355,7 @@ def test_receipt_readback_is_bounded_and_no_follow(tmp_path):
     path.unlink()
     (tmp_path / "actual").write_bytes(b"{}")
     path.symlink_to(tmp_path / "actual")
-    with pytest.raises(OSError, match="(?i)symbolic|symlink"):
+    with pytest.raises(OSError, match=r"(?i)symbolic|symlink"):
         receipt_matches(path, b"{}")
 
 
