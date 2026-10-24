@@ -36,3 +36,16 @@ def test_advisory_partial_remains_advisory(tmp_path):
     result = CliRunner().invoke(app, ["safe", str(tmp_path), "--max-files", "1", "--json"])
     assert result.exit_code == 0
     assert json.loads(result.output)["coverage"] == "PARTIAL"
+
+
+@pytest.mark.parametrize("json_mode", [False, True])
+def test_strict_partial_with_high_finding_is_incomplete_exit_two(tmp_path, json_mode):
+    (tmp_path / "0.txt").write_text("git push --force\n")
+    (tmp_path / "1.txt").write_text("safe\n")
+    args = ["safe", str(tmp_path), "--strict", "--max-files", "1"]
+    if json_mode:
+        args.append("--json")
+    result = CliRunner().invoke(app, args)
+    assert result.exit_code == 2, result.output
+    if json_mode:
+        assert json.loads(result.output)["coverage"] == "PARTIAL"

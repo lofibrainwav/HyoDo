@@ -80,6 +80,10 @@ def _relative(value):
 
 def _read(root, relative):
     relative = _relative(relative)
+    _require(
+        all(hasattr(os, name) for name in ("O_NONBLOCK", "O_NOFOLLOW", "O_DIRECTORY")),
+        "descriptor_primitives_unavailable",
+    )
     _, root_fd = open_workspace_root(root)
     try:
         fd = open_workspace_file(root, relative, os.O_RDONLY | os.O_NONBLOCK, root_fd=root_fd)
@@ -241,15 +245,23 @@ def inspect_handoff(
         # Detect mutation during verification, including plan or observation edits.
         for relative, digest in snapshots.items():
             _require(_sha(_read(root, relative)) == digest, "changed_during_verification")
+        final_now = time.time() if now is None else now
+        _require(current <= final_now <= created + age, "expired_during_verification")
         result.update(
             status="VERIFIED_EVIDENCE",
             kind=kind,
             run_id=expected_run_id,
             plan_sha256=expected_plan_sha256,
             artifact_digests=observed,
-            checked_at=current,
+            checked_at=final_now,
             expires_at=created + age,
         )
     except (Hold, OSError, ValueError, TypeError, KeyError, OverflowError, RecursionError):
         result["reason"] = "missing_invalid_stale_or_failed_evidence"
     return result
+
+
+def receipt_matches(path: Path, expected: bytes) -> bool:
+    """Read back a bounded regular receipt without following symlinks."""
+    absolute = Path(path).absolute()
+    return _read(absolute.parent, absolute.name) == expected

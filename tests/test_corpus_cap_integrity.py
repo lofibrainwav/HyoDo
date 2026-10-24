@@ -63,3 +63,43 @@ def test_oversize_text_is_unobserved_not_full(tmp_path):
         corpus, source = collect_scan_corpus(str(target))
         assert corpus == ""
         assert source.startswith("error:read:")
+
+
+def test_symlink_loop_after_cap_is_structured_unobserved(tmp_path):
+    for n in range(40):
+        (tmp_path / f"{n:03}.txt").write_text("safe\n")
+    loop = tmp_path / "z-loop"
+    loop.symlink_to(loop)
+    corpus, source = collect_scan_corpus(str(tmp_path))
+    assert corpus == ""
+    assert source == f"error:read:{loop}"
+
+
+def test_entry_metadata_failure_after_cap_is_structured_unobserved(tmp_path):
+    import os
+
+    for n in range(40):
+        (tmp_path / f"{n:03}.txt").write_text("safe\n")
+    broken = tmp_path / "z-broken"
+    broken.write_text("safe\n")
+    original = os.scandir
+
+    class BrokenEntry:
+        name = "z-broken"
+        path = str(broken)
+
+        def is_symlink(self):
+            raise OSError("synthetic metadata failure")
+
+    class Entries:
+        def __enter__(self):
+            self.entries = original(tmp_path)
+            return iter([e for e in self.entries if e.name != "z-broken"] + [BrokenEntry()])
+
+        def __exit__(self, *args):
+            self.entries.close()
+
+    with patch("hyodo.safety.os.scandir", return_value=Entries()):
+        corpus, source = collect_scan_corpus(str(tmp_path))
+    assert corpus == ""
+    assert source == f"error:read:{broken}"

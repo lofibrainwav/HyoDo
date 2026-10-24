@@ -1,4 +1,4 @@
-# Exact-artifact handoff evidence gate (local candidate)
+# Exact-artifact handoff evidence gate
 
 `hyodo report` READY means report rendering succeeded, NOT work verified. Use the separate read-only `hyodo handoff` command before delivering a verified result. It executes no agents and never authorizes sending, filing, signing, purchasing or deployment.
 
@@ -31,4 +31,4 @@ Regression tests cover 41st-file hazards, late listing errors, empty trees, outs
 
 ## Deployment
 
-This is a local candidate based on upstream 7b96cc61 (4.22.3), plus locally tested patches from open PRs 565, 566, 567 and 568. It is not a new official release and these PRs are not reported merged. The old editable 4.8.2 checkout and its four edits are preserved separately. Upgrade/binding and rollback must preserve existing professional and external-action approvals. No new service, provider or schedule is required.
+Reconcile this change with current upstream main and other pending fixes before building a runtime. Upgrade/binding and rollback must preserve existing professional and external-action approvals and local edits. No new service, provider or schedule is required. A merged source change is not an official package release or proof that any particular host has activated its delivery gate. Follow CHANGE_INTEGRATION.md for exact-tree verification and safe handling of dependent pull requests.

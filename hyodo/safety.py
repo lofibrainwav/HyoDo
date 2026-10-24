@@ -261,23 +261,27 @@ def _iter_files_lexical(root: Path, errors: list[Path] | None = None):
                     errors.append(current)
                 continue
             for child in children:
-                if child.name.startswith(".git"):
-                    continue
-                if child.is_symlink():
-                    # Directory traversal never follows links. Resolve a file
-                    # link only when its target remains in the scan root.
-                    resolved = Path(child.path).resolve()
-                    try:
-                        resolved.relative_to(root.resolve())
-                    except ValueError:
+                try:
+                    if child.name.startswith(".git"):
                         continue
-                    if resolved.is_file():
-                        pending.append((resolved, False))
-                    continue
-                child_is_directory = child.is_dir(follow_symlinks=False)
-                if child_is_directory and child.name in _SKIPPED_DIR_NAMES:
-                    continue
-                pending.append((Path(child.path), child_is_directory))
+                    if child.is_symlink():
+                        # Directory traversal never follows links. Resolve a file
+                        # link only when its target remains in the scan root.
+                        resolved = Path(child.path).resolve()
+                        try:
+                            resolved.relative_to(root.resolve())
+                        except ValueError:
+                            continue
+                        if resolved.is_file():
+                            pending.append((resolved, False))
+                        continue
+                    child_is_directory = child.is_dir(follow_symlinks=False)
+                    if child_is_directory and child.name in _SKIPPED_DIR_NAMES:
+                        continue
+                    pending.append((Path(child.path), child_is_directory))
+                except (OSError, RuntimeError):
+                    if errors is not None:
+                        errors.append(Path(child.path))
             continue
         yield current
 

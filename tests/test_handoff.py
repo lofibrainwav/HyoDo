@@ -280,3 +280,140 @@ def test_cli_persists_hold_if_final_reinspection_fails(tmp_path, monkeypatch):
     assert result.exit_code == 2, result.output
     assert json.loads(result.output)["status"] == "HOLD"
     assert json.loads(receipt.read_bytes())["status"] == "HOLD"
+
+
+def test_verification_expiring_during_reads_holds(tmp_path, monkeypatch):
+    import hyodo.handoff as module
+
+    plan = bundle(tmp_path)
+    pin = save(tmp_path / "plan.json", plan)
+    stamps = iter([1002, 1061])
+    monkeypatch.setattr(module.time, "time", lambda: next(stamps))
+    result = inspect_handoff(tmp_path, tmp_path / "plan.json", pin, "fresh-run")
+    assert result["status"] == "HOLD"
+
+
+def test_cli_expiring_during_final_receipt_readback_holds(tmp_path, monkeypatch):
+    import time
+
+    from typer.testing import CliRunner
+
+    import hyodo.handoff as module
+    from hyodo.cli.main import app
+
+    plan = bundle(tmp_path)
+    created = time.time()
+    plan["created_at"] = created
+    plan["max_age_seconds"] = 1
+    for item in plan["checks"]:
+        row = json.loads((tmp_path / item["path"]).read_bytes())
+        row["observed_at"] = created
+        item["sha256"] = save(tmp_path / item["path"], row)
+    pin = save(tmp_path / "plan.json", plan)
+    receipt = tmp_path / "receipt.json"
+    original = module.receipt_matches
+    delayed = []
+
+    def read(path, raw):
+        matched = original(path, raw)
+        if path == receipt and json.loads(raw).get("status") == "VERIFIED_EVIDENCE" and not delayed:
+            delayed.append(True)
+            time.sleep(1.1)
+        return matched
+
+    monkeypatch.setattr(module, "receipt_matches", read)
+    result = CliRunner().invoke(
+        app,
+        [
+            "handoff",
+            "--root",
+            str(tmp_path),
+            "--plan",
+            str(tmp_path / "plan.json"),
+            "--plan-sha256",
+            pin,
+            "--run-id",
+            "fresh-run",
+            "--receipt",
+            str(receipt),
+        ],
+    )
+    assert result.exit_code == 2, result.output
+    assert json.loads(result.output)["status"] == "HOLD"
+    assert json.loads(receipt.read_bytes())["status"] == "HOLD"
+
+
+def test_receipt_readback_is_bounded_and_no_follow(tmp_path):
+    from hyodo.handoff import MAX_BYTES, Hold, receipt_matches
+
+    path = tmp_path / "receipt"
+    path.write_bytes(b"{}")
+    assert receipt_matches(path, b"{}")
+    path.write_bytes(b"x" * (MAX_BYTES + 1))
+    with pytest.raises(Hold):
+        receipt_matches(path, b"{}")
+    path.unlink()
+    (tmp_path / "actual").write_bytes(b"{}")
+    path.symlink_to(tmp_path / "actual")
+    with pytest.raises(OSError, match="(?i)symbolic|symlink"):
+        receipt_matches(path, b"{}")
+
+
+def test_missing_descriptor_primitive_holds(tmp_path, monkeypatch):
+    import hyodo.handoff as module
+
+    plan = bundle(tmp_path)
+    monkeypatch.delattr(module.os, "O_NONBLOCK")
+    assert run(tmp_path, plan)["status"] == "HOLD"
+
+
+@pytest.mark.parametrize("extra", [0, 1])
+def test_evidence_size_boundary(tmp_path, extra):
+    from hyodo.handoff import MAX_BYTES
+
+    plan = bundle(tmp_path)
+    data = b"x" * (MAX_BYTES + extra)
+    (tmp_path / "source.txt").write_bytes(data)
+    plan["artifacts"][0]["sha256"] = sha(data)
+    for item in plan["checks"]:
+        row = json.loads((tmp_path / item["path"]).read_bytes())
+        row["artifact_digests"]["source.txt"] = sha(data)
+        item["sha256"] = save(tmp_path / item["path"], row)
+    assert run(tmp_path, plan)["status"] == ("HOLD" if extra else "VERIFIED_EVIDENCE")
+
+
+def test_cli_success_and_existing_receipt_rejection(tmp_path):
+    import time
+
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+
+    plan = bundle(tmp_path)
+    plan["created_at"] = time.time() - 1
+    for item in plan["checks"]:
+        row = json.loads((tmp_path / item["path"]).read_bytes())
+        row["observed_at"] = time.time()
+        item["sha256"] = save(tmp_path / item["path"], row)
+    pin = save(tmp_path / "plan.json", plan)
+    receipt = tmp_path / "receipt.json"
+    args = [
+        "handoff",
+        "--root",
+        str(tmp_path),
+        "--plan",
+        str(tmp_path / "plan.json"),
+        "--plan-sha256",
+        pin,
+        "--run-id",
+        "fresh-run",
+        "--receipt",
+        str(receipt),
+    ]
+    result = CliRunner().invoke(app, args)
+    assert result.exit_code == 0, result.output
+    raw = receipt.read_bytes()
+    assert json.loads(raw)["status"] == "VERIFIED_EVIDENCE"
+    second = CliRunner().invoke(app, args)
+    assert second.exit_code == 2
+    assert receipt.read_bytes() == raw

@@ -3172,7 +3172,7 @@ def safe(
         if json_output:
             exit_code = (
                 2
-                if source.startswith(("missing:", "error:"))
+                if source.startswith(("missing:", "error:")) or (strict and coverage != "FULL")
                 else (1 if strict and high_only else unobserved_exit)
             )
             payload = {
@@ -3292,6 +3292,8 @@ def safe(
             f"{coverage_note}Default corpus is git diff/status when no path.[/dim]"
         )
 
+        if strict and coverage != "FULL":
+            raise typer.Exit(2)
         if strict and high_only:
             raise typer.Exit(1)
         raise typer.Exit(unobserved_exit)
@@ -4377,34 +4379,49 @@ def handoff_command(
     builder. Report READY, code-scan PASS and same-account hashes are not proof
     of authentic execution or professional approval.
     """
-    from hyodo.handoff import inspect_handoff
+    import time
+
+    from hyodo.handoff import inspect_handoff, receipt_matches
 
     result = inspect_handoff(root, plan, plan_sha256, run_id)
+    hold = {
+        "status": "HOLD",
+        "reason": "receipt_or_final_freshness_failed",
+        "external_action_allowed": False,
+    }
     try:
         with receipt.open("x+b") as stream:
-            raw = (json.dumps(result, sort_keys=True, allow_nan=False) + "\n").encode()
-            stream.write(raw)
-            stream.flush()
-            os.fsync(stream.fileno())
-            if result["status"] == "VERIFIED_EVIDENCE":
-                fresh = inspect_handoff(root, plan, plan_sha256, run_id)
-                if fresh["status"] != "VERIFIED_EVIDENCE":
-                    result = fresh
-                    raw = (json.dumps(result, sort_keys=True, allow_nan=False) + "\n").encode()
-                    # Persist the final HOLD too, through our still-open descriptor.
-                    stream.seek(0)
-                    stream.write(raw)
-                    stream.truncate()
-                    stream.flush()
-                    os.fsync(stream.fileno())
-            if receipt.read_bytes() != raw:
-                raise ValueError("receipt readback mismatch")
-    except (OSError, ValueError):
-        result = {
-            "status": "HOLD",
-            "reason": "receipt_write_or_readback_failed",
-            "external_action_allowed": False,
-        }
+
+            def _persist(value):
+                raw = (json.dumps(value, sort_keys=True, allow_nan=False) + "\n").encode()
+                stream.seek(0)
+                stream.write(raw)
+                stream.truncate()
+                stream.flush()
+                os.fsync(stream.fileno())
+                if not receipt_matches(receipt, raw):
+                    raise ValueError("receipt readback mismatch")
+
+            try:
+                _persist(
+                    {
+                        "status": "HOLD",
+                        "reason": "verification_pending",
+                        "external_action_allowed": False,
+                    }
+                )
+                if result["status"] == "VERIFIED_EVIDENCE":
+                    result = inspect_handoff(root, plan, plan_sha256, run_id)
+                _persist(result)
+                if result["status"] == "VERIFIED_EVIDENCE" and time.time() > result["expires_at"]:
+                    result = hold
+                    _persist(result)
+            except (OSError, ValueError, TypeError):
+                result = hold
+                _persist(result)
+    except (OSError, ValueError, TypeError):
+        result = hold
+
     console.print_json(json.dumps(result))
     raise typer.Exit(0 if result["status"] == "VERIFIED_EVIDENCE" else 2)
 
