@@ -1066,6 +1066,23 @@ _CORS_ELIGIBLE_PATHS = frozenset(
 )
 
 
+def _header_safe_value(value: str) -> bool:
+    """True when ``value`` can be sent as an HTTP header value verbatim.
+
+    Header framing is CRLF-delimited, so a value carrying CR, LF, NUL, or any
+    other control/DEL byte can split the response. Only printable ASCII is
+    accepted here, and the empty string is rejected. Browser origins are ASCII
+    (IDN hosts arrive punycode-encoded), so this does not narrow the accepted
+    allow-list.
+    """
+    return bool(value) and all(0x20 < ord(char) < 0x7F for char in value)
+
+
+def _validated_origins(values: tuple[str, ...]) -> frozenset[str]:
+    """The configured origins that are safe to echo back as a header value."""
+    return frozenset(value for value in values if _header_safe_value(value))
+
+
 def make_dashboard_handler(
     state: DashboardState,
     refresh: Callable[[], dict[str, object]] | None = None,
@@ -1091,7 +1108,7 @@ def make_dashboard_handler(
     When ``root`` is omitted, both routes 404 (this handler's behaviour
     before the graph viewer shipped).
     """
-    allowed_origins = frozenset(allow_origins)
+    allowed_origins = _validated_origins(allow_origins)
 
     class DashboardHandler(BaseHTTPRequestHandler):
         """Serve the dashboard's current loopback snapshot over HTTP."""
@@ -1174,7 +1191,7 @@ def make_dashboard_handler(
             if self._path() not in _CORS_ELIGIBLE_PATHS or not allowed_origins:
                 return []
             origin = self.headers.get("Origin")
-            if not origin or origin not in allowed_origins:
+            if not origin or not _header_safe_value(origin) or origin not in allowed_origins:
                 return []
             return [("Access-Control-Allow-Origin", origin), ("Vary", "Origin")]
 
@@ -3151,7 +3168,7 @@ def safe(
         else:
             verdict_state["decision"] = "PASS"
         # --strict is a CI gate: an unobserved scan cannot satisfy it.
-        unobserved_exit = 2 if strict and nothing_observed else 0
+        unobserved_exit = 2 if strict and coverage != "FULL" else 0
         if json_output:
             exit_code = (
                 2
@@ -4344,6 +4361,52 @@ def skill_eval_command(
     else:
         console.print(f"[red]{verdict['status']}[/red] skill eval: {verdict.get('reason')}")
     raise typer.Exit(0 if verdict["status"] == "PASS" else 1 if verdict["status"] == "FAIL" else 2)
+
+
+@app.command("handoff")
+def handoff_command(
+    plan: Path = typer.Option(..., "--plan", help="Trusted, pinned verification plan"),  # noqa: B008
+    plan_sha256: str = typer.Option(..., "--plan-sha256", help="Out-of-band plan SHA-256"),
+    run_id: str = typer.Option(..., "--run-id", help="Fresh run id held by the caller"),
+    root: Path = typer.Option(Path("."), "--root", help="Contained evidence root"),  # noqa: B008
+    receipt: Path = typer.Option(..., "--receipt", help="New local receipt path (never overwrite)"),  # noqa: B008
+):
+    """Check required exact-artifact evidence. Never grants send/file authority.
+
+    Runner observations and the plan pin must be trusted independently of the
+    builder. Report READY, code-scan PASS and same-account hashes are not proof
+    of authentic execution or professional approval.
+    """
+    from hyodo.handoff import inspect_handoff
+
+    result = inspect_handoff(root, plan, plan_sha256, run_id)
+    try:
+        with receipt.open("x+b") as stream:
+            raw = (json.dumps(result, sort_keys=True, allow_nan=False) + "\n").encode()
+            stream.write(raw)
+            stream.flush()
+            os.fsync(stream.fileno())
+            if result["status"] == "VERIFIED_EVIDENCE":
+                fresh = inspect_handoff(root, plan, plan_sha256, run_id)
+                if fresh["status"] != "VERIFIED_EVIDENCE":
+                    result = fresh
+                    raw = (json.dumps(result, sort_keys=True, allow_nan=False) + "\n").encode()
+                    # Persist the final HOLD too, through our still-open descriptor.
+                    stream.seek(0)
+                    stream.write(raw)
+                    stream.truncate()
+                    stream.flush()
+                    os.fsync(stream.fileno())
+            if receipt.read_bytes() != raw:
+                raise ValueError("receipt readback mismatch")
+    except (OSError, ValueError):
+        result = {
+            "status": "HOLD",
+            "reason": "receipt_write_or_readback_failed",
+            "external_action_allowed": False,
+        }
+    console.print_json(json.dumps(result))
+    raise typer.Exit(0 if result["status"] == "VERIFIED_EVIDENCE" else 2)
 
 
 @app.command("report")

@@ -56,7 +56,9 @@ DANGEROUS_COMMAND_PATTERNS: Sequence[tuple[str, re.Pattern[str]]] = (
     # line are detected (the previous trailing `\b` missed non-word-ending targets).
     # Relative targets (`./build`, `build/`) never start with `/` or `~`, so they
     # stay undetected.
-    ("rm_rf_root", re.compile(r"\brm\s+(-[a-zA-Z]*f[a-zA-Z]*\s+|--force\s+)*[/~]\S*")),
+    # Split flags at their first lowercase f: excluding f from the prefix avoids
+    # retrying every possible split of a long force flag when no target follows.
+    ("rm_rf_root", re.compile(r"\brm\s+(-[a-eg-zA-Z]*f[a-zA-Z]*\s+|--force\s+)*[/~]\S*")),
     ("git_reset_hard", re.compile(r"\bgit\s+reset\s+--hard\b")),
     ("git_push_force", re.compile(r"\bgit\s+push\b[^\n]*\s--force\b")),
     ("drop_database", re.compile(r"(?i)\bDROP\s+(DATABASE|SCHEMA)\b")),
@@ -196,7 +198,10 @@ def _is_obvious_placeholder(value: str) -> bool:
 
 def _read_text_file(path: Path, max_bytes: int = 200_000) -> str:
     """Read file text. Propagates OSError so scan failures are not silent."""
-    data = path.read_bytes()[:max_bytes]
+    with path.open("rb") as stream:
+        data = stream.read(max_bytes + 1)
+    if len(data) > max_bytes:
+        raise OSError(errno.EFBIG, "text exceeds bounded scan size", str(path))
     return data.decode("utf-8", errors="replace")
 
 
@@ -209,7 +214,10 @@ def _read_contained_text(root: Path, target: Path, max_bytes: int = 200_000) -> 
     component with ``O_NOFOLLOW`` (see ``hyodo.workspace_io``), so such a swap
     makes the read fail with ``OSError`` instead of reading outside the root.
     """
-    return _read_contained_bytes(root, target, max_bytes).decode("utf-8", errors="replace")
+    data = _read_contained_bytes(root, target, max_bytes + 1)
+    if len(data) > max_bytes:
+        raise OSError(errno.EFBIG, "text exceeds bounded scan size", str(target))
+    return data.decode("utf-8", errors="replace")
 
 
 def _read_contained_bytes(root: Path, target: Path, max_bytes: int) -> bytes:
@@ -301,11 +309,16 @@ def collect_scan_corpus(
         if target.is_dir():
             chunks: list[str] = []
             count = 0
-            # Keep the old sorted recursive-path order while streaming it.
-            # Materialising sorted(target.rglob("*")) enumerates the whole
-            # tree before the cap can stop file reads.
+            omitted = 0
+            # Continue listing after the body-read cap. Otherwise a late unreadable
+            # subtree disappears and a capped corpus looks complete (#562).
             unlisted: list[Path] = []
             for file_path in _iter_files_lexical(target, unlisted):
+                if count >= _DEFAULT_SCAN_CAP:
+                    # Listing only: no binary sniff or file-body read after the cap.
+                    # Omitted count is conservative and may include binary files.
+                    omitted += 1
+                    continue
                 if not is_scannable_file(file_path, target):
                     continue
                 try:
@@ -313,11 +326,16 @@ def collect_scan_corpus(
                 except OSError:
                     return "", f"error:read:{file_path}"
                 count += 1
-                if count >= _DEFAULT_SCAN_CAP:
-                    break
+            if coverage is not None:
+                coverage.update(scanned=count, total=count + omitted, omitted=omitted)
             if unlisted:
-                # An unlistable subtree means files were never seen: unobserved, not clean.
+                if coverage is not None:
+                    coverage["unreadable"] = len(unlisted)
                 return "", f"error:read:{unlisted[0]}"
+            if omitted:
+                return "\n".join(
+                    chunks
+                ), f"error:partial:dir:{target} ({count} files; {omitted} omitted)"
             return "\n".join(chunks), f"dir:{target} ({count} files)"
         return "", f"missing:{target}"
 

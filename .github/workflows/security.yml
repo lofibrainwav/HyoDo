@@ -85,6 +85,14 @@ jobs:
             --no-hashes --no-annotate --format requirements-txt \
             > /tmp/requirements.runtime.txt
           diff -u requirements.runtime.txt /tmp/requirements.runtime.txt
+      - name: Verify hash-locked runtime requirements
+        run: |
+          # The interactive installer consumes this file with --require-hashes,
+          # so it must track uv.lock exactly, hashes included.
+          uv export --frozen --no-dev --no-editable --no-emit-project \
+            --no-annotate --format requirements-txt \
+            > /tmp/requirements.runtime.lock
+          diff -u requirements.runtime.lock /tmp/requirements.runtime.lock
       - name: Set up Python
         uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
         with:

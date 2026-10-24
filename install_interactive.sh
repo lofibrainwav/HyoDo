@@ -207,13 +207,16 @@ LOG_LEVEL=INFO
 EOF
     echo -e "${CHECK} .env created"
 
-    if ask_yes_no "Install Python package now (python3 -m pip install .)?" "y"; then
+    if ask_yes_no "Install Python package now (hash-verified)?" "y"; then
         echo -e "${CYAN}Installing package...${NC}"
         cd "$INSTALL_DIR"
-        if python3 -m pip install "." 2>/dev/null; then
+        # Install the local project without letting pip resolve dependency
+        # versions, then install the frozen runtime set with hash verification.
+        if python3 -m pip install --no-deps . 2>/dev/null \
+            && python3 -m pip install --require-hashes -r requirements.runtime.lock 2>/dev/null; then
             echo -e "${CHECK} Package installed"
         else
-            echo -e "${WARN} Package install failed (later: cd $INSTALL_DIR && python3 -m pip install .)"
+            echo -e "${WARN} Package install failed (later: cd $INSTALL_DIR && python3 -m pip install --no-deps . && python3 -m pip install --require-hashes -r requirements.runtime.lock)"
         fi
     fi
     echo ""
@@ -229,7 +232,7 @@ step_finish() {
     echo -e "${CYAN}Install path:${NC} ${INSTALL_DIR}"
     echo ""
     echo -e "${CYAN}Start with the CLI (recommended):${NC}"
-    echo -e "  ${GREEN}cd $INSTALL_DIR && python3 -m pip install .${NC}"
+    echo -e "  ${GREEN}cd $INSTALL_DIR && python3 -m pip install --no-deps . && python3 -m pip install --require-hashes -r requirements.runtime.lock${NC}"
     echo -e "  ${GREEN}hyodo check${NC}"
     echo -e "  ${GREEN}hyodo score --truth 0.9 --goodness 0.9 --beauty 0.9 --benevolence 0.9 --hyo 0.9${NC}"
     echo -e "  ${GREEN}hyodo safe${NC}"

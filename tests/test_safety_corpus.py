@@ -31,8 +31,8 @@ def test_collect_scan_corpus_dir_scan_cap_git_and_binary(tmp_path):
     corpus, source = collect_scan_corpus(path=str(tmp_path))
 
     # 40-file cap holds and is reflected in the source label.
-    assert source.startswith(f"dir:{tmp_path}")
-    assert "(40 files)" in source
+    assert source.startswith(f"error:partial:dir:{tmp_path}")
+    assert "40 files; 1 omitted" in source
 
     # .git contents excluded.
     assert GIT_MARKER not in corpus
