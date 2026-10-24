@@ -19,7 +19,13 @@ from time import sleep
 
 import pytest
 
-from hyodo.cli.main import DASHBOARD_CSP, DashboardState, app, make_dashboard_handler
+from hyodo.cli.main import (
+    DASHBOARD_CSP,
+    DashboardState,
+    _validated_origins,
+    app,
+    make_dashboard_handler,
+)
 from hyodo.dashboard import POLL_SCRIPT, POLL_SCRIPT_SHA256, render_dashboard_html
 
 EVIDENCE: dict[str, object] = {
@@ -627,3 +633,38 @@ def test_runtime_receipt_is_published_before_initial_measurement(tmp_path, monke
         if server_holder:
             server_holder[0].shutdown()
         command.join(timeout=5)
+
+
+def test_cors_allowlist_drops_configured_origins_that_cannot_be_a_header_value():
+    """A configured origin with CR, LF, NUL, or DEL must never be echoed back.
+
+    The request-side ``Origin`` cannot carry those bytes past HTTP framing, so
+    the only path a control character can reach
+    ``Access-Control-Allow-Origin`` is an operator-supplied configured value
+    (CLI flag or environment). CodeQL alert 59
+    (``py/http-response-splitting``) covers that sink; this seals the
+    configured side and keeps the allow-list exact-match.
+    """
+    assert _validated_origins(("http://localhost:5173", "https://hyodo.app")) == frozenset(
+        {"http://localhost:5173", "https://hyodo.app"}
+    )
+    for unsafe in (
+        "http://localhost:5173\r\nX-Injected: 1",
+        "http://localhost:5173\nX-Injected: 1",
+        "http://localhost:5173\rX-Injected: 1",
+        "http://localhost:5173\x00",
+        "http://localhost:5173\x7f",
+        "",
+    ):
+        assert _validated_origins((unsafe,)) == frozenset()
+
+
+def test_cors_header_absent_when_configured_origin_contains_control_characters():
+    """The server drops an unsafe configured origin instead of echoing it."""
+    with _running_server(allow_origins=("http://localhost:5173\r\nX-Injected: 1",)) as port:
+        status, headers, _body = _request_with_origin(
+            port, "/api/evidence", "http://localhost:5173"
+        )
+        assert status == 200
+        assert "Access-Control-Allow-Origin" not in headers
+        assert "Vary" not in headers

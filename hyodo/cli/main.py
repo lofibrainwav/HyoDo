@@ -1066,6 +1066,23 @@ _CORS_ELIGIBLE_PATHS = frozenset(
 )
 
 
+def _header_safe_value(value: str) -> bool:
+    """True when ``value`` can be sent as an HTTP header value verbatim.
+
+    Header framing is CRLF-delimited, so a value carrying CR, LF, NUL, or any
+    other control/DEL byte can split the response. Only printable ASCII is
+    accepted here, and the empty string is rejected. Browser origins are ASCII
+    (IDN hosts arrive punycode-encoded), so this does not narrow the accepted
+    allow-list.
+    """
+    return bool(value) and all(0x20 < ord(char) < 0x7F for char in value)
+
+
+def _validated_origins(values: tuple[str, ...]) -> frozenset[str]:
+    """The configured origins that are safe to echo back as a header value."""
+    return frozenset(value for value in values if _header_safe_value(value))
+
+
 def make_dashboard_handler(
     state: DashboardState,
     refresh: Callable[[], dict[str, object]] | None = None,
@@ -1091,7 +1108,7 @@ def make_dashboard_handler(
     When ``root`` is omitted, both routes 404 (this handler's behaviour
     before the graph viewer shipped).
     """
-    allowed_origins = frozenset(allow_origins)
+    allowed_origins = _validated_origins(allow_origins)
 
     class DashboardHandler(BaseHTTPRequestHandler):
         """Serve the dashboard's current loopback snapshot over HTTP."""
@@ -1174,7 +1191,7 @@ def make_dashboard_handler(
             if self._path() not in _CORS_ELIGIBLE_PATHS or not allowed_origins:
                 return []
             origin = self.headers.get("Origin")
-            if not origin or origin not in allowed_origins:
+            if not origin or not _header_safe_value(origin) or origin not in allowed_origins:
                 return []
             return [("Access-Control-Allow-Origin", origin), ("Vary", "Origin")]
 
