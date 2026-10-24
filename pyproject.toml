@@ -157,6 +157,11 @@ target-version = "py310"
 # setup-uv reads this single SSOT instead of silently tracking the moving latest.
 required-version = "==0.12.13"
 
+[tool.uv.dependency-groups]
+# Patched filelock in the pre-commit toolchain requires Python 3.11+.
+# This private CI group does not change the public package's Python 3.10 floor.
+ci = { requires-python = ">=3.11" }
+
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "UP", "B", "C4", "SIM", "PT", "RUF"]
 # RUF001/RUF002: intentional typography (× multiplication sign, – en dash) in
