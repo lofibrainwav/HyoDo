@@ -5,9 +5,9 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.22.3 is the latest published release (2026-10-09 UTC). Its signed
+HyoDo 4.22.4 is the latest published release (2026-10-27 UTC). Its signed
 tag, GitHub Release, SBOM, PyPI provenance, and install smoke are measured
-9/9 OBSERVED in `docs/releases/4.22.3.md`. The earlier 4.22.2 package was
+9/9 OBSERVED in `docs/releases/4.22.4.md`. The earlier 4.22.2 package was
 published, but its in-repository release-chain receipt has not been
 reconciled. Prior release receipts remain preserved under `docs/releases/`.
 
@@ -49,14 +49,14 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.4 (release candidate 2026-10-27 UTC)
+### 4.22.4 (released 2026-10-27 UTC)
 
 - Publish main up to #577: fail-closed capped/unreadable scans, the read-only
   handoff evidence checker, human-side friction scoring, the MCP reader root
   contract, refreshed locked dependencies, and the Python 3.13+ symlink-loop
   and `ruff:` rule interpreter repairs.
-- Package chain is recorded in `docs/releases/4.22.4.md`; host installation
-  and live use need separate readback.
+- Package chain is measured 9/9 OBSERVED in `docs/releases/4.22.4.md`; host
+  installation and live use need separate readback.
 
 ### 4.22.3 (released 2026-10-09 UTC)
 
