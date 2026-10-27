@@ -5,6 +5,31 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.22.4] - 2026-10-27
+
+Fail-closed coverage, handoff evidence checking and dependency refresh since 4.22.3.
+
+### Added
+
+- Read-only exact-artifact handoff evidence checker with required checks by work kind, source/output pins, fresh run/time binding and receipt readback (54bfd95).
+- Human-side friction events scored with re-checkable pointers (#557).
+- MCP root-locked read surface with serve preflight and the reader root contract (#561).
+
+### Changed
+
+- Strict safety scans that are capped or unobserved now exit 2 as incomplete, including mixed high findings; oversized text is rejected instead of being reported as full coverage (54bfd95).
+- Corpus listing continues after the body-read cap so late unreadable entries stay visible (#562, 54bfd95).
+- Locked runtime and site dependencies moved for new advisories (filelock, GitPython, OpenTelemetry, aiohttp, certifi, virtualenv, undici, zod, fast-uri and others; #556, #558, #566, Dependabot bumps).
+
+### Fixed
+
+- Symlink loops are reported as unreadable on Python 3.13+, where a non-strict `Path.resolve()` no longer raises; `ruff:` skill rules run ruff from the interpreter that hosts hyodo (#577).
+- Bounded regex, CORS header validation and runtime-dependency hash enforcement carried into main (54bfd95); MCP v1 pydantic-core hashes aligned (#576).
+
+### Evidence
+
+- Release chain receipt: `docs/releases/4.22.4.md`.
+
 ## [Unreleased]
 
 ### Added

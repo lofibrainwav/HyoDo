@@ -13,9 +13,10 @@ reconciled. Prior release receipts remain preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.3 is the current release target and latest published release.
-It carries the two reproduced #543 correctness repairs, with the package
-chain measured in `docs/releases/4.22.3.md`.
+HyoDo 4.22.4 is the current release target and latest published release.
+It carries fail-closed safety coverage, the handoff evidence checker and the
+Python 3.13+ symlink-loop repair, with the package chain recorded in
+`docs/releases/4.22.4.md`.
 This does not establish live host integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
@@ -47,6 +48,15 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.22.4 (release candidate 2026-10-27 UTC)
+
+- Publish main up to #577: fail-closed capped/unreadable scans, the read-only
+  handoff evidence checker, human-side friction scoring, the MCP reader root
+  contract, refreshed locked dependencies, and the Python 3.13+ symlink-loop
+  and `ruff:` rule interpreter repairs.
+- Package chain is recorded in `docs/releases/4.22.4.md`; host installation
+  and live use need separate readback.
 
 ### 4.22.3 (released 2026-10-09 UTC)
 
