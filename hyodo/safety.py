@@ -267,7 +267,14 @@ def _iter_files_lexical(root: Path, errors: list[Path] | None = None):
                     if child.is_symlink():
                         # Directory traversal never follows links. Resolve a file
                         # link only when its target remains in the scan root.
-                        resolved = Path(child.path).resolve()
+                        # strict=True: since Python 3.13 a non-strict resolve() returns a
+                        # symlink loop unchanged instead of raising, which would drop the
+                        # entry silently and make a partial corpus look complete. A
+                        # dangling link has nothing to read and is still skipped.
+                        try:
+                            resolved = Path(child.path).resolve(strict=True)
+                        except FileNotFoundError:
+                            continue
                         try:
                             resolved.relative_to(root.resolve())
                         except ValueError:

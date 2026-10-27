@@ -103,3 +103,11 @@ def test_entry_metadata_failure_after_cap_is_structured_unobserved(tmp_path):
         corpus, source = collect_scan_corpus(str(tmp_path))
     assert corpus == ""
     assert source == f"error:read:{broken}"
+
+
+def test_dangling_symlink_is_skipped_not_reported_unreadable(tmp_path):
+    (tmp_path / "a.txt").write_text("safe\n")
+    (tmp_path / "z-dangling").symlink_to(tmp_path / "does-not-exist")
+    corpus, source = collect_scan_corpus(str(tmp_path))
+    assert corpus == "safe\n"
+    assert source == f"dir:{tmp_path} (1 files)"
