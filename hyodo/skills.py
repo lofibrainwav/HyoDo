@@ -15,9 +15,11 @@ Proposal (opt-in only): ``.hyodo/skills/proposed.md``
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 import subprocess
+import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -634,6 +636,18 @@ def _is_probably_text(path: Path) -> str | None:
         return None
 
 
+def _ruff_command() -> list[str]:
+    """Prefer ruff from the interpreter that hosts hyodo, like the check gates do.
+
+    A virtualenv or uv tool install carries ruff as a module but does not put
+    its bin directory on PATH, so a bare ``ruff`` lookup reports the tool as
+    unavailable even though it is installed. Fall back to PATH otherwise.
+    """
+    if importlib.util.find_spec("ruff") is not None:
+        return [sys.executable, "-m", "ruff"]
+    return ["ruff"]
+
+
 def evaluate_compiled_rule(rule: Rule, root: Path) -> RuleStatus:
     """Live-evaluate one compiled rule against the current *root*."""
     compiled = rule.compiled
@@ -685,7 +699,7 @@ def evaluate_compiled_rule(rule: Rule, root: Path) -> RuleStatus:
     if compiled.kind == "ruff":
         try:
             result = subprocess.run(
-                ["ruff", "check", "--select", compiled.arg, "hyodo/"],
+                [*_ruff_command(), "check", "--select", compiled.arg, "hyodo/"],
                 capture_output=True,
                 text=True,
                 timeout=60,
