@@ -145,12 +145,14 @@ from the exception `hyodo check` prints (prefixed with the file path).
 ## Source
 
 - Schema id, valid pillars, default timeout, config path constant:
-  `hyodo/gates.py:59-62`
+  `hyodo/gates.py:69-72`
 - `load_gates_config` (schema/gates-table checks, TOML/read errors):
-  `hyodo/gates.py:124-158`
-- `_parse_gate_spec` (`pillar`/`command`/env-prefix/`timeout` checks):
-  `hyodo/gates.py:161-211`
-- `hyodo check` printing the error and exiting `2`: `hyodo/cli/main.py:1701-1706`
+  `hyodo/gates.py:180-214`
+- `_parse_gate_spec` (`pillar`/`command`/env-prefix/`timeout`/
+  `unobserved_exit_codes` checks): `hyodo/gates.py:217-276`
+- `unobserved_exit_codes` mapping a matching exit to `SKIP`:
+  `hyodo/gates.py:715-719` (`_run_one_gate`)
+- `hyodo check` printing the error and exiting `2`: `hyodo/cli/main.py:2277-2280`
 - Reproduction: each error row above was produced by writing the noted TOML
   to a scratch `.hyodo/gates.toml` and calling
   `hyodo.gates.load_gates_config(Path("."))` directly.
