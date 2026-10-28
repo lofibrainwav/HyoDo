@@ -183,6 +183,21 @@ def test_drift_noninteractive_skips_without_executing(
     assert "UNOBSERVED" in results[0].message
 
 
+def test_unobserved_exit_codes_change_the_fingerprint_only_when_set() -> None:
+    plain = _config(UserGate(name="g", pillar="hyo", command=("true",), timeout=5))
+    unset = _config(
+        UserGate(name="g", pillar="hyo", command=("true",), timeout=5, unobserved_exit_codes=())
+    )
+    declared = _config(
+        UserGate(name="g", pillar="hyo", command=("true",), timeout=5, unobserved_exit_codes=(2,))
+    )
+
+    # Existing approvals keep their fingerprint; declaring codes that turn a
+    # non-zero exit into SKIP is a behavior change and needs re-approval.
+    assert compute_gate_set_fingerprint(unset) == compute_gate_set_fingerprint(plain)
+    assert compute_gate_set_fingerprint(declared) != compute_gate_set_fingerprint(plain)
+
+
 def test_drift_is_detected_via_resolve_gate_trust(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:

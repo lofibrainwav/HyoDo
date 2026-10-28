@@ -82,9 +82,10 @@ value must be a TOML table with these fields:
 
 | Field | Type | Required | Default | Meaning |
 | --- | --- | --- | --- | --- |
-| `pillar` | string | yes | none | One of `truth`, `goodness`, `beauty`, `benevolence`, `hyo`, `eternity`. In practice BYOG absorbs quality tools under truth/goodness/beauty, following `hyodo/virtues.py`: tests, typing, and static checks are `truth`; safety findings and coverage are `goodness`; lint and format are `beauty`. `hyodo init` proposes test runners as `truth`, but a pillar you write here is kept as written. Benevolence/hyo/eternity are measured natively from the checkout (`hyodo/pillars.py`) and are not meant to carry shell commands. |
+| `pillar` | string | yes | none | One of `truth`, `goodness`, `beauty`, `benevolence`, `hyo`, `eternity`. In practice BYOG absorbs quality tools under truth/goodness/beauty, following `hyodo/virtues.py`: tests, typing, and static checks are `truth`; safety findings and coverage are `goodness`; lint and format are `beauty`. `hyodo init` proposes test runners as `truth`, but a pillar you write here is kept as written. Any of the six pillars may carry a command gate. Lens evidence reads only gates, so a pillar with no attributed gate is `UNOBSERVED` there; native pillar metrics (`hyodo/pillars.py`) appear in `hyodo dashboard` only. |
 | `command` | string or array of strings | yes | none | A non-empty string is split with `shlex.split`; an array is used as literal argv (no shell parsing). A leading run of POSIX `KEY=VALUE` tokens is peeled off and applied as environment overrides for that gate — this is not a separate field, it is a prefix on `command`. |
 | `timeout` | integer (seconds) | no | `120` | Must be a positive `int` (a TOML boolean is rejected even though `bool` is technically an `int` subclass). Applied as the `subprocess.run(..., timeout=...)` wall-clock limit; exceeding it produces a `FAIL` (not `SKIP`) with message `"timeout"`. |
+| `unobserved_exit_codes` | array of integers | no | `[]` | Non-zero exit codes (1-255) the command uses to mean "could not observe" rather than "observed a failure". A matching exit becomes `SKIP` with a message starting `UNOBSERVED (exit code N)`, so the lens stays `UNOBSERVED` instead of showing a `FAIL` nobody measured. It can never produce `PASS`. Other non-zero exits stay `FAIL`. Setting it changes the gate-set fingerprint, so it needs trust re-approval. Example: `hyodo friction score` exits `2` when no observer recorded the window. |
 
 Gates always run with `shell=False` (no pipes, no shell globbing except a
 constrained in-root wildcard expansion HyoDo performs itself before exec).
@@ -134,6 +135,7 @@ from the exception `hyodo check` prints (prefixed with the file path).
 | Missing or empty `command` | `command` key absent, or `command = ""` | `gate 'lint' is missing a valid 'command' (non-empty string or array of strings)` |
 | `command` is only `KEY=VALUE` tokens | `command = "FOO=bar"` | `gate 'lint' command has only env assignments; missing executable after them` |
 | Invalid `timeout` (non-int, `<= 0`, or a bool) | `timeout = "60"`, `timeout = 0`, `timeout = true` | `gate 'lint' has invalid timeout <repr of the bad value>` |
+| Invalid `unobserved_exit_codes` (not an array of ints 1-255) | `unobserved_exit_codes = [0]`, `= "2"`, `= [true]` | `gate 'lint' has invalid unobserved_exit_codes <repr>; expected an array of integers from 1 to 255` |
 | Malformed TOML syntax | unterminated string, bad table header, etc. | `invalid TOML: <underlying tomllib.TOMLDecodeError text>` |
 | File exists but cannot be read (permissions, etc.) | n/a | `could not read file: <OSError text>` |
 
