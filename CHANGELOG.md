@@ -7,8 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet. Everything listed under Unreleased before this release
-(`hyodo friction score`, the `certifi`/`virtualenv` locks) shipped in 4.22.4.
+Nothing yet.
 
 ## [4.22.4] - 2026-10-27
 
