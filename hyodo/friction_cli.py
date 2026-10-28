@@ -21,7 +21,7 @@ from hyodo.friction import (
     save_friction_state,
     write_friction_export,
 )
-from hyodo.human_friction import score_file
+from hyodo.human_friction import score_file, weights_for_types
 
 app = typer.Typer(
     name="friction",
@@ -270,14 +270,26 @@ def friction_score(
         ..., help="JSONL file of hyodo.human-friction-event/v1 events"
     ),
     json_output: bool = typer.Option(True, "--json/--no-json", help="Emit the score as JSON"),
+    types: str | None = typer.Option(
+        None,
+        "--types",
+        help="Comma-separated event types to score; the others get weight 0",
+    ),
 ) -> None:
     """Score human-side friction events. Exit 0 CLEAN, 1 FRICTION, 2 UNOBSERVED or unreadable."""
+    weights = None
+    if types is not None:
+        try:
+            weights = weights_for_types([t.strip() for t in types.split(",") if t.strip()])
+        except ValueError as exc:
+            console.print(f"[red]{exc}[/red]")
+            raise typer.Exit(2) from exc
     path = Path(events_path).expanduser()
     if not path.is_file():
         console.print(f"[red]Events file not found: {path}[/red]")
         raise typer.Exit(2)
     try:
-        result = score_file(path)
+        result = score_file(path, weights)
     except (OSError, UnicodeDecodeError) as exc:
         console.print(f"[red]Events file unreadable: {type(exc).__name__}[/red]")
         raise typer.Exit(2) from exc
