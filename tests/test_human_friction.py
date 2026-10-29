@@ -246,3 +246,35 @@ def test_cli_score_exit_codes(tmp_path: Path) -> None:
 
     result = runner.invoke(app, ["friction", "score", str(tmp_path / "missing.jsonl")])
     assert result.exit_code == 2
+
+
+def test_cli_score_types_scores_only_the_named_types(tmp_path: Path) -> None:
+    events = _write(tmp_path, [json.dumps(_envelope(1)), json.dumps(_event("runtime_abandon"))])
+
+    other = runner.invoke(
+        app, ["friction", "score", str(events), "--types", "re_explanation,context_loss"]
+    )
+    assert other.exit_code == 0
+    assert json.loads(other.stdout)["state"] == "CLEAN"
+
+    named = runner.invoke(
+        app, ["friction", "score", str(events), "--types", "duplicate_approval,runtime_abandon"]
+    )
+    assert named.exit_code == 1
+    assert json.loads(named.stdout)["score"] == 2.5
+
+
+def test_cli_score_types_never_cleans_an_unobserved_window(tmp_path: Path) -> None:
+    empty = _write(tmp_path, [])
+    result = runner.invoke(app, ["friction", "score", str(empty), "--types", "re_explanation"])
+    assert result.exit_code == 2
+
+    missing = tmp_path / "missing.jsonl"
+    result = runner.invoke(app, ["friction", "score", str(missing), "--types", "re_explanation"])
+    assert result.exit_code == 2
+
+
+def test_cli_score_types_rejects_unknown_type(tmp_path: Path) -> None:
+    events = _write(tmp_path, [json.dumps(_envelope(0))])
+    result = runner.invoke(app, ["friction", "score", str(events), "--types", "mood"])
+    assert result.exit_code == 2

@@ -7,6 +7,7 @@ suite stays fast and hermetic.
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 import pytest
@@ -24,6 +25,7 @@ from hyodo.gates import (
     render_gates_toml,
     run_user_gates,
 )
+from hyodo.lens_evidence import OBSERVED_GATE_STATUSES
 
 
 @pytest.fixture(autouse=True)
@@ -232,6 +234,77 @@ def test_run_user_gates_fail(tmp_path: Path) -> None:
     assert results[0].name == "bad"
     assert results[0].pillar == "goodness"
     assert results[0].status == "FAIL"
+
+
+def _exit_gate(code: int, *, unobserved: tuple[int, ...] = ()) -> GatesConfig:
+    probe = f"import sys; sys.stderr.write('no observer events'); sys.exit({code})"
+    gate = UserGate(
+        name="friction",
+        pillar="hyo",
+        command=(sys.executable, "-c", probe),
+        timeout=10,
+        unobserved_exit_codes=unobserved,
+    )
+    return GatesConfig(schema=SCHEMA_ID, gates=(gate,))
+
+
+def test_run_user_gates_unobserved_exit_code_is_skip_not_fail(tmp_path: Path) -> None:
+    results = run_user_gates(_exit_gate(2, unobserved=(2,)), tmp_path)
+
+    assert results[0].status == "SKIP"
+    assert results[0].message.startswith("UNOBSERVED (exit code 2)")
+    assert "no observer events" in results[0].message
+    # SKIP is not lens coverage, so the lens stays UNOBSERVED (an empty ring).
+    assert "SKIP" not in OBSERVED_GATE_STATUSES
+
+
+def test_run_user_gates_other_exit_codes_still_fail(tmp_path: Path) -> None:
+    results = run_user_gates(_exit_gate(1, unobserved=(2,)), tmp_path)
+
+    assert results[0].status == "FAIL"
+
+
+def test_run_user_gates_exit_two_fails_without_declaration(tmp_path: Path) -> None:
+    results = run_user_gates(_exit_gate(2), tmp_path)
+
+    assert results[0].status == "FAIL"
+
+
+def test_load_gates_config_unobserved_exit_codes(tmp_path: Path) -> None:
+    _write_gates_toml(
+        tmp_path,
+        f"""
+schema = "{SCHEMA_ID}"
+
+[gates.friction]
+pillar = "hyo"
+command = "hyodo friction score events.jsonl"
+unobserved_exit_codes = [2, 2]
+""",
+    )
+
+    config = load_gates_config(tmp_path)
+
+    assert config is not None
+    assert config.gates[0].unobserved_exit_codes == (2,)
+
+
+@pytest.mark.parametrize("bad", ["[0]", "[256]", "[true]", '"2"', '["2"]'])
+def test_load_gates_config_invalid_unobserved_exit_codes_raises(tmp_path: Path, bad: str) -> None:
+    _write_gates_toml(
+        tmp_path,
+        f"""
+schema = "{SCHEMA_ID}"
+
+[gates.friction]
+pillar = "hyo"
+command = "true"
+unobserved_exit_codes = {bad}
+""",
+    )
+
+    with pytest.raises(GatesConfigError, match="invalid unobserved_exit_codes"):
+        load_gates_config(tmp_path)
 
 
 def test_run_user_gates_skip_missing_binary(tmp_path: Path) -> None:
@@ -510,13 +583,15 @@ dev = ["pytest>=8.0", "ruff"]
         assert gate.timeout == DEFAULT_TIMEOUT_SECONDS
 
 
-def test_render_gates_toml_includes_native_pillar_note() -> None:
+def test_render_gates_toml_header_states_lens_contract() -> None:
     rendered = render_gates_toml(
         {"tests": {"pillar": "goodness", "command": "pytest -q", "source": "manual"}}
     )
 
     assert 'schema = "hyodo.gates/v1"' in rendered
-    assert "HyoDo measures them natively" in rendered
+    assert "Any of the six pillars may take a command gate" in rendered
+    assert "UNOBSERVED" in rendered
+    assert "measures them natively" not in rendered
     assert "[gates.tests]" in rendered
 
 

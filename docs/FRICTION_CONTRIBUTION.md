@@ -225,6 +225,12 @@ Rules:
   `UNOBSERVED` (`no_observation_envelope`), never `CLEAN`.
 - Default weights are 2 / 1.5 / 3 / 2.5 in the order of the table. A host may
   supply its own; HyoDo does not own the host's lens.
+- `--types re_explanation,context_loss` scores only the named types (the
+  others get weight 0). A host can split the four types across lenses and
+  gate each lens from the same file. Every event is still validated, and an
+  unobserved window still exits 2, whichever types are scored. As a gate,
+  declare `unobserved_exit_codes = [2]` (see `GATES_SYNTAX.md`) so an
+  unobserved window stays an empty lens instead of a FAIL.
 - State is `CLEAN` (score 0, exit 0), `FRICTION` (score above 0, exit 1) or
   `UNOBSERVED` (exit 2) when the score is 0 and any event, line or the
   envelope is missing or unreadable. A positive score stays `FRICTION` when

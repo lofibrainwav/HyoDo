@@ -243,6 +243,21 @@ def read_events(path: Path) -> tuple[list[Any], Any, list[dict[str, Any]]]:
     return events, envelope, unreadable
 
 
+def weights_for_types(types: list[str]) -> dict[str, float]:
+    """Default weights with every type outside *types* set to zero.
+
+    A host can split the four types across lenses and score each lens from the
+    same events file. Every event is still validated, so an observer who is an
+    actor anywhere in the file is rejected whichever types are scored.
+    """
+    unknown = sorted(set(types) - set(DEFAULT_WEIGHTS))
+    if not types or unknown:
+        raise ValueError(
+            f"types must name at least one of {sorted(DEFAULT_WEIGHTS)}; unknown: {unknown}"
+        )
+    return {kind: weight if kind in types else 0.0 for kind, weight in DEFAULT_WEIGHTS.items()}
+
+
 def score_file(path: Path, weights: dict[str, float] | None = None) -> dict[str, Any]:
     """Score a JSONL events file; unreadable lines make the result partial."""
     events, envelope, unreadable = read_events(path)

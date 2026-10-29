@@ -130,10 +130,11 @@ _GLOB_CHARS = ("*", "?", "[")
 
 _HEADER_COMMENT = (
     "# HyoDo Bring-Your-Own-Gates: absorb your existing tools as command gates.\n"
-    "# 仁(benevolence, In)/孝(hyo)/永(eternity, Yeong) pillars are not command\n"
-    "# gates -- HyoDo measures them natively from the checkout (see\n"
-    "# hyodo/pillars.py). Command gates below are typically\n"
-    "# truth/goodness/beauty, absorbed from tools this checkout already runs."
+    "# Any of the six pillars may take a command gate. Lens evidence reads only\n"
+    "# gates, so a pillar with no attributed gate is UNOBSERVED there; native\n"
+    "# pillar metrics (hyodo/pillars.py) appear in `hyodo dashboard` only.\n"
+    "# Detected gates below are typically truth/goodness/beauty, absorbed from\n"
+    "# tools this checkout already runs."
 )
 
 
@@ -152,6 +153,10 @@ class UserGate:
     # Leading ``KEY=VALUE`` assignments peeled from the command so shell=False
     # can still honor ``VAR=value bin args``. Empty means no env-prefix syntax.
     env: tuple[str, ...] = ()
+    # Non-zero exit codes the command uses to say "I could not observe" rather
+    # than "I observed a failure". They become SKIP, never PASS, so the lens
+    # stays UNOBSERVED instead of showing a FAIL that was never measured.
+    unobserved_exit_codes: tuple[int, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -252,12 +257,22 @@ def _parse_gate_spec(path: Path, name: str, spec: Any) -> UserGate:
     if isinstance(timeout, bool) or not isinstance(timeout, int) or timeout <= 0:
         raise GatesConfigError(f"{path}: gate {name!r} has invalid timeout {timeout!r}")
 
+    unobserved = spec.get("unobserved_exit_codes", [])
+    if not isinstance(unobserved, list) or not all(
+        type(code) is int and 1 <= code <= 255 for code in unobserved
+    ):
+        raise GatesConfigError(
+            f"{path}: gate {name!r} has invalid unobserved_exit_codes {unobserved!r}; "
+            "expected an array of integers from 1 to 255"
+        )
+
     return UserGate(
         name=name,
         pillar=pillar,
         command=command_tuple,
         timeout=timeout,
         env=tuple(env_tokens),
+        unobserved_exit_codes=tuple(sorted(set(unobserved))),
     )
 
 
@@ -280,13 +295,27 @@ class GateTrustDecision:
 def _fingerprint_payload(config: GatesConfig) -> list[dict[str, list[str]]]:
     """Return the executable-content view of *config* used for hashing.
 
-    Only ``command`` and its leading ``env`` prefix are included -- they are
-    what actually runs. ``name`` and ``pillar`` are labels, not behavior, so
-    renaming a gate without touching its command does not force
-    re-approval. Sorted so TOML key reordering never changes the hash.
+    Only ``command``, its leading ``env`` prefix and any
+    ``unobserved_exit_codes`` are included -- they decide what runs and
+    whether a non-zero exit counts as FAIL. ``name`` and ``pillar`` are
+    labels, not behavior, so renaming a gate without touching its command
+    does not force re-approval. ``unobserved_exit_codes`` appears only when
+    set, so existing approvals keep their fingerprint. Sorted so TOML key
+    reordering never changes the hash.
     """
-    entries = [{"command": list(gate.command), "env": list(gate.env)} for gate in config.gates]
-    entries.sort(key=lambda entry: (entry["command"], entry["env"]))
+    entries: list[dict[str, list[Any]]] = []
+    for gate in config.gates:
+        entry: dict[str, list[Any]] = {"command": list(gate.command), "env": list(gate.env)}
+        if gate.unobserved_exit_codes:
+            entry["unobserved_exit_codes"] = list(gate.unobserved_exit_codes)
+        entries.append(entry)
+    entries.sort(
+        key=lambda entry: (
+            entry["command"],
+            entry["env"],
+            entry.get("unobserved_exit_codes", []),
+        )
+    )
     return entries
 
 
@@ -683,6 +712,11 @@ def _run_one_gate(gate: UserGate, root: Path, *, verbose: bool) -> UserGateResul
         return UserGateResult(gate.name, gate.pillar, "PASS", message or "ok")
 
     message = _tail(completed.stderr) or _tail(completed.stdout)
+    if completed.returncode in gate.unobserved_exit_codes:
+        detail = f"UNOBSERVED (exit code {completed.returncode})"
+        return UserGateResult(
+            gate.name, gate.pillar, "SKIP", f"{detail}: {message}" if message else detail
+        )
     return UserGateResult(
         gate.name, gate.pillar, "FAIL", message or f"exit code {completed.returncode}"
     )
