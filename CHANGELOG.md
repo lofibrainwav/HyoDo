@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- `hyodo check` with `.hyodo/gates.toml` now prints progress on stderr when stderr is a terminal: a start line after trust, `[i/N] name (pillar) ...` per gate, an elapsed-time heartbeat every 30 seconds while a gate runs, and each result. stdout, `--json` and `--quiet` output are unchanged.
 
 ## [4.22.4] - 2026-10-27
 
