@@ -683,10 +683,12 @@ class GateProgress:
                 pass
 
     def run_started(self, total: int, reason: str) -> None:
+        """Announce that the trusted command set is about to run *total* gates."""
         noun = "gate" if total == 1 else "gates"
         self._write(f"HyoDo: command set trusted ({reason}) -- running {total} {noun}")
 
     def gate_started(self, index: int, total: int, gate: UserGate) -> None:
+        """Announce gate *index* of *total* and start its elapsed-time heartbeat."""
         name = _sanitize_for_prompt(gate.name)
         self._write(f"[{index}/{total}] {name} ({gate.pillar}) ...")
         self._started_at = self._clock()
@@ -705,6 +707,7 @@ class GateProgress:
             self._write(f"[{index}/{total}] {name} still running ({_format_elapsed(elapsed)})")
 
     def gate_stopped(self) -> None:
+        """Stop and join the heartbeat so no line follows the gate's result."""
         if self._stop is not None:
             self._stop.set()
         if self._thread is not None:
@@ -713,6 +716,7 @@ class GateProgress:
         self._thread = None
 
     def gate_finished(self, index: int, total: int, result: UserGateResult) -> None:
+        """Report gate *index*'s observed status and elapsed time."""
         elapsed = self._clock() - self._started_at
         name = _sanitize_for_prompt(result.name)
         self._write(f"[{index}/{total}] {name}: {result.status} ({_format_elapsed(elapsed)})")
