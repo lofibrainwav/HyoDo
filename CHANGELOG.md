@@ -5,6 +5,10 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Nothing yet.
+
 ## [4.22.4] - 2026-10-27
 
 Fail-closed coverage, handoff evidence checking and dependency refresh since 4.22.3.
@@ -29,24 +33,6 @@ Fail-closed coverage, handoff evidence checking and dependency refresh since 4.2
 ### Evidence
 
 - Release chain receipt: `docs/releases/4.22.4.md`.
-
-## [Unreleased]
-
-### Added
-
-- `hyodo friction score`: deterministic score for human-side friction events
-  (`hyodo.human-friction-event/v1`): re-explanations, duplicate approvals,
-  context losses and runtime abandons. Each event must carry re-checkable
-  pointers, and the observer must differ from the actor. `CLEAN` requires a
-  `hyodo.human-friction-observation/v1` envelope; without one the result is
-  `UNOBSERVED`.
-
-### Security
-
-- Lock `certifi` 2026.10.19 (PYSEC-2026-4320) and `virtualenv` 21.14.12
-  (CVE-2026-113725, CVE-2026-113726, CVE-2026-113732, CVE-2026-113776) in
-  `uv.lock` and the MCP v1 compatibility lock. `python-discovery` moves to
-  1.6.4 as a `virtualenv` dependency.
 
 ## [4.22.3] - 2026-10-09
 
