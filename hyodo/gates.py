@@ -40,11 +40,13 @@ import shlex
 import shutil
 import subprocess
 import sys
+import threading
+import time
 from collections import deque
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, TextIO
 
 from hyodo.user_state import (
     checkout_shadow,
@@ -609,7 +611,10 @@ def run_user_gates(config: GatesConfig, root: Path, verbose: bool = False) -> li
 
 
 def run_user_gates_with_trust(
-    config: GatesConfig, root: Path, verbose: bool = False
+    config: GatesConfig,
+    root: Path,
+    verbose: bool = False,
+    progress: GateProgress | None = None,
 ) -> tuple[GateTrustDecision, list[UserGateResult]]:
     """Same as `run_user_gates`, also returning how the command set was trusted.
 
@@ -617,13 +622,110 @@ def run_user_gates_with_trust(
     how approval was obtained, whether the receipt persisted, and the exact
     commands that were refused -- none of which survives being flattened into
     a per-gate message.
+
+    *progress*, when given, is told when the run starts and when each gate
+    starts and finishes, so a long gate does not look like a frozen terminal.
+    It only observes; it never changes a result.
     """
     trust = resolve_gate_trust(config, root)
     if not trust.approved:
         return trust, [
             UserGateResult(gate.name, gate.pillar, "SKIP", trust.reason) for gate in config.gates
         ]
-    return trust, [_run_one_gate(gate, root, verbose=verbose) for gate in config.gates]
+    if progress is None:
+        return trust, [_run_one_gate(gate, root, verbose=verbose) for gate in config.gates]
+    total = len(config.gates)
+    progress.run_started(total, trust.reason)
+    results: list[UserGateResult] = []
+    for index, gate in enumerate(config.gates, start=1):
+        progress.gate_started(index, total, gate)
+        try:
+            result = _run_one_gate(gate, root, verbose=verbose)
+        finally:
+            progress.gate_stopped()
+        progress.gate_finished(index, total, result)
+        results.append(result)
+    return trust, results
+
+
+class GateProgress:
+    """Plain-text progress lines for a gate run, written to *stream*.
+
+    The default stream is stderr so stdout (and any ``--json`` document on it)
+    is never touched. While a gate runs, a heartbeat line reports the elapsed
+    time every *heartbeat_seconds*; the subprocess is still captured, so this
+    reports that the gate is running, never what it has done so far.
+    """
+
+    def __init__(
+        self,
+        stream: TextIO | None = None,
+        *,
+        heartbeat_seconds: float = 30.0,
+        clock: Any = time.monotonic,
+    ) -> None:
+        self._stream = stream
+        self._heartbeat_seconds = heartbeat_seconds
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._stop: threading.Event | None = None
+        self._thread: threading.Thread | None = None
+        self._started_at = 0.0
+
+    def _write(self, line: str) -> None:
+        stream = self._stream if self._stream is not None else sys.stderr
+        with self._lock:
+            try:
+                stream.write(line + "\n")
+                stream.flush()
+            except (OSError, ValueError):
+                # A closed or broken progress stream must not fail the gates.
+                pass
+
+    def run_started(self, total: int, reason: str) -> None:
+        """Announce that the trusted command set is about to run *total* gates."""
+        noun = "gate" if total == 1 else "gates"
+        self._write(f"HyoDo: command set trusted ({reason}) -- running {total} {noun}")
+
+    def gate_started(self, index: int, total: int, gate: UserGate) -> None:
+        """Announce gate *index* of *total* and start its elapsed-time heartbeat."""
+        name = _sanitize_for_prompt(gate.name)
+        self._write(f"[{index}/{total}] {name} ({gate.pillar}) ...")
+        self._started_at = self._clock()
+        if self._heartbeat_seconds <= 0:
+            return
+        stop = threading.Event()
+        self._stop = stop
+        self._thread = threading.Thread(
+            target=self._heartbeat, args=(index, total, name, stop), daemon=True
+        )
+        self._thread.start()
+
+    def _heartbeat(self, index: int, total: int, name: str, stop: threading.Event) -> None:
+        while not stop.wait(self._heartbeat_seconds):
+            elapsed = self._clock() - self._started_at
+            self._write(f"[{index}/{total}] {name} still running ({_format_elapsed(elapsed)})")
+
+    def gate_stopped(self) -> None:
+        """Stop and join the heartbeat so no line follows the gate's result."""
+        if self._stop is not None:
+            self._stop.set()
+        if self._thread is not None:
+            self._thread.join()
+        self._stop = None
+        self._thread = None
+
+    def gate_finished(self, index: int, total: int, result: UserGateResult) -> None:
+        """Report gate *index*'s observed status and elapsed time."""
+        elapsed = self._clock() - self._started_at
+        name = _sanitize_for_prompt(result.name)
+        self._write(f"[{index}/{total}] {name}: {result.status} ({_format_elapsed(elapsed)})")
+
+
+def _format_elapsed(seconds: float) -> str:
+    whole = max(0, int(seconds))
+    minutes, secs = divmod(whole, 60)
+    return f"{minutes}m{secs:02d}s" if minutes else f"{secs}s"
 
 
 def _expand_glob_args(args: tuple[str, ...], root: Path) -> list[str]:

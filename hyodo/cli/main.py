@@ -135,6 +135,7 @@ from hyodo.gates import (
     GATES_TRUST_RELATIVE_PATH,
     SCHEMA_ID,
     TRUST_PERSISTENCE_OBSERVED,
+    GateProgress,
     GatesConfigError,
     detect_project_gates,
     detect_project_markers,
@@ -2157,6 +2158,22 @@ def _policy_verdict_state(decision: Any) -> dict[str, Any]:
     }
 
 
+def _gate_progress_for(quiet: bool) -> GateProgress | None:
+    """Progress lines for a BYOG run, or None when nobody is watching.
+
+    Lines go to stderr, so stdout and any --json document stay unchanged.
+    They are shown only when stderr is a terminal and --quiet is off: a CI log
+    or a captured pipe gets the same output it always did.
+    """
+    if quiet:
+        return None
+    try:
+        interactive = sys.stderr.isatty()
+    except (AttributeError, ValueError):
+        interactive = False
+    return GateProgress(sys.stderr) if interactive else None
+
+
 @app.command()
 def check(
     path: str | None = typer.Argument(None, help="Path to file or directory"),
@@ -2289,7 +2306,10 @@ def check(
             )
             snapshot_before = git_input_digest(check_root) if snapshot_enabled else None
             trust, user_results = run_user_gates_with_trust(
-                gates_config, check_root, verbose=verbose
+                gates_config,
+                check_root,
+                verbose=verbose,
+                progress=_gate_progress_for(quiet),
             )
             if snapshot_enabled:
                 snapshot_after = git_input_digest(check_root)
