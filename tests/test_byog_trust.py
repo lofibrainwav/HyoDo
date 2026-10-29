@@ -754,3 +754,151 @@ def test_fingerprint_distinguishes_raw_cr_lf_from_their_display_glyphs() -> None
     raw = _config(UserGate(name="g", pillar="truth", command=("echo", "a\rb\nc"), timeout=5))
     shown = _config(UserGate(name="g", pillar="truth", command=("echo", "a␍b␊c"), timeout=5))
     assert compute_gate_set_fingerprint(raw) != compute_gate_set_fingerprint(shown)
+
+
+# ---------------------------------------------------------------------------
+# host-attested approval (approve_gate_trust / `hyodo gates trust approve`)
+# ---------------------------------------------------------------------------
+
+
+def test_host_approval_binds_one_fingerprint_and_runs_noninteractively(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    marker = tmp_path / "ran.txt"
+    config = _config(_marker_gate("write", marker))
+    _force_noninteractive(monkeypatch)
+    fingerprint = compute_gate_set_fingerprint(config)
+
+    outcome = gates.approve_gate_trust(config, tmp_path, fingerprint, label="req-1")
+
+    assert outcome.approved is True
+    assert outcome.via == "external:req-1"
+    assert outcome.persistence == "OBSERVED"
+    decision = resolve_gate_trust(config, tmp_path)
+    assert decision.approved is True
+    assert run_user_gates(config, tmp_path)[0].status == "PASS"
+    assert marker.read_text() == "ran"
+
+
+def test_host_approval_of_another_set_records_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    shown = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
+    changed = _config(UserGate(name="g", pillar="truth", command=("false",), timeout=5))
+    _force_noninteractive(monkeypatch)
+
+    outcome = gates.approve_gate_trust(
+        changed, tmp_path, compute_gate_set_fingerprint(shown), label="req-1"
+    )
+
+    assert outcome.approved is False
+    assert outcome.expected == compute_gate_set_fingerprint(changed)
+    assert not workspace_state_path(tmp_path, GATES_TRUST_STATE_NAME).exists()
+    assert resolve_gate_trust(changed, tmp_path).approved is False
+
+
+def test_host_approval_keeps_an_earlier_prompt_approval(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
+    _approve_first_use(config, tmp_path, monkeypatch)
+
+    outcome = gates.approve_gate_trust(
+        config, tmp_path, compute_gate_set_fingerprint(config), label="req-1"
+    )
+
+    assert outcome.approved is True
+    assert outcome.via == "prompt"
+
+
+@pytest.mark.parametrize("label", ["", "-x", "a b", "x" * 81, "\x1b[2J"])
+def test_host_approval_rejects_unsafe_labels(tmp_path: Path, label: str) -> None:
+    config = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
+    with pytest.raises(ValueError, match="invalid approval label"):
+        gates.approve_gate_trust(
+            config, tmp_path, compute_gate_set_fingerprint(config), label=label
+        )
+
+
+def test_cli_gates_trust_show_and_approve_from_another_config_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A host can approve the set it showed its operator (config_root) for the
+    checkout that will run it (root), and `show` reports it without prompting."""
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+
+    body = f'schema = "{SCHEMA_ID}"\n\n[gates.ok]\npillar = "truth"\ncommand = "true"\n'
+    reviewed = tmp_path / "reviewed"
+    target = tmp_path / "target"
+    _write_gates_toml(reviewed, body)
+    _write_gates_toml(target, body)
+    _force_noninteractive(monkeypatch)
+    runner = CliRunner()
+
+    shown = runner.invoke(
+        app,
+        ["gates", "trust", "show", "--root", str(target), "--config-root", str(reviewed), "--json"],
+    )
+    assert shown.exit_code == 1, shown.output
+    status = json.loads(shown.output)
+    assert status["approved"] is False
+    assert status["gates"] == [{"name": "ok", "pillar": "truth", "command": "true"}]
+
+    wrong = runner.invoke(
+        app,
+        [
+            "gates",
+            "trust",
+            "approve",
+            "--fingerprint",
+            "0" * 64,
+            "--via",
+            "req-1",
+            "--root",
+            str(target),
+            "--config-root",
+            str(reviewed),
+            "--json",
+        ],
+    )
+    assert wrong.exit_code == 1, wrong.output
+    assert json.loads(wrong.output)["approved"] is False
+
+    approved = runner.invoke(
+        app,
+        [
+            "gates",
+            "trust",
+            "approve",
+            "--fingerprint",
+            status["fingerprint"],
+            "--via",
+            "req-1",
+            "--root",
+            str(target),
+            "--config-root",
+            str(reviewed),
+            "--json",
+        ],
+    )
+    assert approved.exit_code == 0, approved.output
+    assert json.loads(approved.output)["via"] == "external:req-1"
+
+    after = runner.invoke(app, ["gates", "trust", "show", "--root", str(target), "--json"])
+    assert after.exit_code == 0, after.output
+    assert json.loads(after.output)["via"] == "external:req-1"
+    config = load_gates_config(target)
+    assert config is not None
+    assert resolve_gate_trust(config, target).approved is True
+
+
+def test_cli_gates_trust_show_without_gates_toml_is_unobserved(tmp_path: Path) -> None:
+    from typer.testing import CliRunner
+
+    from hyodo.cli.main import app
+
+    result = CliRunner().invoke(app, ["gates", "trust", "show", "--root", str(tmp_path), "--json"])
+    assert result.exit_code == 2, result.output
+    assert json.loads(result.output)["ok"] is False

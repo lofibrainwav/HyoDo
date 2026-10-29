@@ -68,6 +68,25 @@ does not execute the command set and reports it `UNOBSERVED`. Revoking while
 the variable is still set is reported, because the next run would record the
 approval again.
 
+### Approval collected by the host
+
+A host that asks its operator somewhere other than this terminal (a signed
+approval, a review step) can show the exact command set and then record the
+operator's answer for one fingerprint:
+
+```bash
+hyodo gates trust show --json                     # commands, fingerprint, approved?
+hyodo gates trust approve --fingerprint <hex> --via <host-label> --json
+```
+
+`show` is read-only: it never prompts, records or runs anything (exit 0
+approved, 1 not approved, 2 no valid `gates.toml`). `approve` records nothing
+unless `--fingerprint` equals the fingerprint of the named `gates.toml`
+(`--config-root`, default `--root`), so it cannot approve a set the operator
+was not shown; any later change to the file needs a new approval. The record
+says `via: external:<host-label>`. HyoDo cannot verify that a person
+approved: the host owns that, as it owns every other authority decision.
+
 ## Table: top level
 
 | Field | Type | Required | Default | Meaning |
