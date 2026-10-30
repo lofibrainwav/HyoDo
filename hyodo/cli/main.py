@@ -137,14 +137,17 @@ from hyodo.gates import (
     TRUST_PERSISTENCE_OBSERVED,
     GateProgress,
     GatesConfigError,
+    approve_gate_trust,
     detect_project_gates,
     detect_project_markers,
     format_gate_command,
     gate_trust_env_preapproves,
+    gate_trust_status,
     load_gates_config,
     render_gates_toml,
     revoke_gate_trust,
     run_user_gates_with_trust,
+    sanitize_gate_text,
 )
 from hyodo.graph_export import build_graph_export
 from hyodo.graph_view import build_actor_rings
@@ -3573,6 +3576,131 @@ def gates_trust_revoke(
                 f"[yellow]{GATES_TRUST_ENV_VAR} is still set in this environment; the next "
                 "`hyodo check` here will pre-approve and record the command set again.[/yellow]"
             )
+    raise typer.Exit(exit_code)
+
+
+def _gates_config_for_trust(root_path: Path, config_root: str | None) -> tuple[Any, str | None]:
+    """Load the command set a trust command talks about, or say why it cannot."""
+    source = Path(config_root).expanduser().resolve() if config_root else root_path
+    try:
+        config = load_gates_config(source)
+    except GatesConfigError as exc:
+        return None, str(exc)
+    if config is None:
+        return None, f"no {GATES_CONFIG_RELATIVE_PATH} under {source}"
+    return config, None
+
+
+@gates_trust_app.command("show")
+def gates_trust_show(
+    root: str = typer.Option(".", "--root", help="Workspace root whose approvals are read"),
+    config_root: str | None = typer.Option(
+        None,
+        "--config-root",
+        help="Directory whose .hyodo/gates.toml defines the command set (default: --root)",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Show the command set, its fingerprint and whether it is approved here.
+
+    Read-only: it never prompts, records an approval or runs a gate. Exit 0
+    when the set is approved, 1 when it is not, 2 when no valid gates.toml
+    could be read.
+    """
+    root_path = Path(root).expanduser().resolve()
+    config, error = _gates_config_for_trust(root_path, config_root)
+    if config is None:
+        payload = {"ok": False, "reasons": [error], "exit_code": 2}
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]UNOBSERVED[/red] {rich_escape(str(error))}")
+        raise typer.Exit(2)
+    status = gate_trust_status(config, root_path)
+    exit_code = 0 if status["approved"] else 1
+    if json_output:
+        console.print_json(json.dumps({"ok": True, **status, "exit_code": exit_code}))
+    else:
+        label = "[green]APPROVED[/green]" if status["approved"] else "[yellow]NOT APPROVED[/yellow]"
+        console.print(f"{label} fingerprint {status['fingerprint']}")
+        for gate in status["gates"]:
+            name = sanitize_gate_text(gate["name"])
+            command = sanitize_gate_text(gate["command"])
+            console.print(f"  [{gate['pillar']}] {rich_escape(name)}: {rich_escape(command)}")
+        if status["via"]:
+            console.print(f"  via: {rich_escape(status['via'])}")
+    raise typer.Exit(exit_code)
+
+
+@gates_trust_app.command("approve")
+def gates_trust_approve(
+    fingerprint: str = typer.Option(
+        ..., "--fingerprint", help="Fingerprint of the command set the operator approved"
+    ),
+    via: str = typer.Option(
+        ..., "--via", help="Host label recorded with the approval (for example a request id)"
+    ),
+    root: str = typer.Option(".", "--root", help="Workspace root to record the approval for"),
+    config_root: str | None = typer.Option(
+        None,
+        "--config-root",
+        help="Directory whose .hyodo/gates.toml defines the command set (default: --root)",
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit a machine-readable receipt"),
+):
+    """Record a host-attested approval for exactly one command-set fingerprint.
+
+    For a host that collects its operator's consent outside this terminal.
+    Nothing is recorded unless --fingerprint equals the fingerprint of the
+    named gates.toml. HyoDo cannot verify that a person approved; the host
+    owns that. Exit 0 when the approval is on disk, 1 when the fingerprint
+    does not match, 2 when no valid gates.toml could be read or the approval
+    could not be read back.
+    """
+    root_path = Path(root).expanduser().resolve()
+    config, error = _gates_config_for_trust(root_path, config_root)
+    if config is None:
+        payload = {"ok": False, "reasons": [error], "exit_code": 2}
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]UNOBSERVED[/red] {rich_escape(str(error))}")
+        raise typer.Exit(2)
+    try:
+        outcome = approve_gate_trust(config, root_path, fingerprint, label=via)
+    except ValueError as exc:
+        payload = {"ok": False, "reasons": [str(exc)], "exit_code": 1}
+        if json_output:
+            console.print_json(json.dumps(payload))
+        else:
+            console.print(f"[red]REFUSED[/red] {rich_escape(str(exc))}")
+        raise typer.Exit(1) from None
+    if outcome.approved:
+        exit_code = 0
+    elif outcome.fingerprint != outcome.expected:
+        exit_code = 1
+    else:
+        exit_code = 2
+    payload = {
+        "ok": outcome.approved,
+        "approved": outcome.approved,
+        "fingerprint": outcome.fingerprint,
+        "expected": outcome.expected,
+        "via": outcome.via,
+        "persistence": outcome.persistence,
+        "reason": outcome.reason,
+        "exit_code": exit_code,
+    }
+    if json_output:
+        console.print_json(json.dumps(payload))
+    else:
+        label = {0: "[green]APPROVED[/green]", 1: "[red]REFUSED[/red]"}.get(
+            exit_code, "[red]UNOBSERVED[/red]"
+        )
+        console.print(f"{label} {rich_escape(outcome.reason)}")
+        console.print(f"  fingerprint: {outcome.fingerprint}")
+        if exit_code == 1:
+            console.print(f"  expected:    {outcome.expected}")
     raise typer.Exit(exit_code)
 
 

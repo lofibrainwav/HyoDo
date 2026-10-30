@@ -94,6 +94,12 @@ TRUST_VIA_PREVIOUSLY_APPROVED = "previously-approved"
 TRUST_VIA_ENV = f"env:{GATES_TRUST_ENV_VAR}"
 TRUST_VIA_PROMPT = "prompt"
 TRUST_VIA_NONE = "none"
+# A host-attested approval recorded by `approve_gate_trust`, for example a
+# host that collects its operator's consent somewhere other than this terminal.
+# HyoDo records the label the host gives; it cannot verify the consent itself.
+TRUST_VIA_EXTERNAL_PREFIX = "external:"
+_EXTERNAL_LABEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]{0,79}$")
+_FINGERPRINT_RE = re.compile(r"^[0-9a-f]{64}$")
 
 # Whether the trust receipt for this decision is actually on disk. A read-only
 # or full checkout still runs the gates it was told to run; it just cannot
@@ -398,6 +404,109 @@ def _remember_gate_trust(root: Path, store: dict[str, Any], fingerprint: str, *,
 
 
 @dataclass(frozen=True)
+class GateTrustApproval:
+    """Outcome of `approve_gate_trust` for one command-set fingerprint.
+
+    ``approved`` is true only when *fingerprint* is the fingerprint of the
+    command set the caller named and that fingerprint is now recorded as
+    approved. ``persistence`` is `TRUST_PERSISTENCE_OBSERVED` only when a
+    re-read of per-user state shows it.
+    """
+
+    approved: bool
+    fingerprint: str
+    expected: str
+    via: str
+    persistence: str
+    reason: str
+
+
+def approve_gate_trust(
+    config: GatesConfig, root: Path, fingerprint: str, *, label: str
+) -> GateTrustApproval:
+    """Record a host-attested approval for exactly *config*'s command set.
+
+    For hosts that gather their operator's consent outside this terminal (a
+    signed approval, a review step) and need ``hyodo check`` to stop asking.
+    The approval is bound to one fingerprint: *fingerprint* must equal the
+    fingerprint of *config*, the command set the operator was shown, or
+    nothing is written. A later change to ``.hyodo/gates.toml`` produces a
+    new fingerprint, which stays unapproved until approved again.
+
+    This is no wider than `GATES_TRUST_ENV_VAR`, which approves whatever set
+    is present, and it is narrower in one way: it cannot approve a set the
+    operator did not see. HyoDo cannot verify that a person approved; the
+    host owns that, and the recorded ``via`` names the host's label so a
+    reader can tell it apart from a prompt approval. An existing approval of
+    the same fingerprint is kept as recorded and not overwritten.
+    """
+    if not _EXTERNAL_LABEL_RE.match(label):
+        raise ValueError(
+            f"invalid approval label {label!r}: 1-80 characters of letters, digits, '.', "
+            "'_', ':' or '-', starting with a letter or digit"
+        )
+    via = f"{TRUST_VIA_EXTERNAL_PREFIX}{label}"
+    expected = compute_gate_set_fingerprint(config)
+    if not _FINGERPRINT_RE.match(fingerprint) or fingerprint != expected:
+        return GateTrustApproval(
+            False,
+            fingerprint,
+            expected,
+            via=TRUST_VIA_NONE,
+            persistence=TRUST_PERSISTENCE_UNOBSERVED,
+            reason="fingerprint does not match the named command set; nothing was recorded",
+        )
+    store = _load_gate_trust_store(root)
+    prior = store["approved"].get(fingerprint)
+    if prior is not None:
+        prior_via = (
+            str(prior.get("via", TRUST_VIA_NONE)) if isinstance(prior, dict) else TRUST_VIA_NONE
+        )
+        return GateTrustApproval(
+            True,
+            fingerprint,
+            expected,
+            via=prior_via,
+            persistence=TRUST_PERSISTENCE_OBSERVED,
+            reason="command set was already approved; the earlier record is kept",
+        )
+    persistence = _remember_gate_trust(root, store, fingerprint, via=via)
+    return GateTrustApproval(
+        persistence == TRUST_PERSISTENCE_OBSERVED,
+        fingerprint,
+        expected,
+        via=via,
+        persistence=persistence,
+        reason="approved by host attestation"
+        if persistence == TRUST_PERSISTENCE_OBSERVED
+        else "approval could not be read back from per-user state",
+    )
+
+
+def gate_trust_status(config: GatesConfig, root: Path) -> dict[str, Any]:
+    """Describe *config*'s command set and whether *root* has approved it.
+
+    Read-only: never prompts, never records, never runs a gate.
+    """
+    fingerprint = compute_gate_set_fingerprint(config)
+    approved = _load_gate_trust_store(root)["approved"]
+    entry = approved.get(fingerprint)
+    return {
+        "fingerprint": fingerprint,
+        "approved": entry is not None,
+        "via": (
+            str(entry.get("via", TRUST_VIA_NONE)) if isinstance(entry, dict) else TRUST_VIA_NONE
+        )
+        if entry is not None
+        else None,
+        "gates": [
+            {"name": gate.name, "pillar": gate.pillar, "command": format_gate_command(gate)}
+            for gate in config.gates
+        ],
+    }
+
+
+@dataclass(frozen=True)
 class GateTrustRevocation:
     """Outcome of `revoke_gate_trust` for one workspace's BYOG approvals.
 
@@ -478,6 +587,11 @@ def _sanitize_for_prompt(text: str) -> str:
     exact bytes that would execute.
     """
     return _PROMPT_CONTROL_RE.sub(_PROMPT_CONTROL_REPLACEMENT, text).translate(_PROMPT_LINE_BREAKS)
+
+
+def sanitize_gate_text(text: str) -> str:
+    """Render gates.toml text inert for a terminal (same rule as the prompt)."""
+    return _sanitize_for_prompt(text)
 
 
 def _prompt_gate_trust(config: GatesConfig, fingerprint: str) -> bool:
