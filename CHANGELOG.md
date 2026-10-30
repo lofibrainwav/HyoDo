@@ -12,6 +12,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `hyodo gates trust show` (read-only view of the command set, its fingerprint and whether it is approved) and `hyodo gates trust approve --fingerprint --via` (records a host-attested approval for exactly that fingerprint, recorded as `external:<label>`; nothing is written on a mismatch), so a host can collect its operator's approval outside the terminal prompt.
 - `hyodo check` with `.hyodo/gates.toml` now prints progress on stderr when stderr is a terminal: a start line after trust, `[i/N] name (pillar) ...` per gate, an elapsed-time heartbeat every 30 seconds while a gate runs, and each result. stdout, `--json` and `--quiet` output are unchanged.
 
+### Changed
+
+- `hyodo gates trust approve` now names the cause when the approval cannot be recorded because the state home path contains a symlink (for example macOS `/var` -> `/private/var`), instead of only saying it could not be read back. The no-follow guard on per-user state is unchanged: a symlinked state home still records nothing.
+
 ## [4.22.4] - 2026-10-27
 
 Fail-closed coverage, handoff evidence checking and dependency refresh since 4.22.3.

@@ -797,6 +797,28 @@ def test_host_approval_of_another_set_records_nothing(
     assert resolve_gate_trust(changed, tmp_path).approved is False
 
 
+def test_host_approval_names_a_symlinked_state_home(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    real = tmp_path / "real"
+    real.mkdir()
+    (tmp_path / "link").symlink_to(real, target_is_directory=True)
+    monkeypatch.setenv("HYODO_STATE_HOME", str(tmp_path / "link" / "state"))
+    config = _config(UserGate(name="g", pillar="truth", command=("true",), timeout=5))
+    root = tmp_path / "checkout"
+    root.mkdir()
+
+    outcome = gates.approve_gate_trust(
+        config, root, compute_gate_set_fingerprint(config), label="req-1"
+    )
+
+    assert outcome.approved is False
+    assert outcome.persistence == "UNOBSERVED"
+    assert "state home path contains a symlink" in outcome.reason
+    assert str(tmp_path / "link") in outcome.reason
+    assert list(real.iterdir()) == []
+
+
 def test_host_approval_keeps_an_earlier_prompt_approval(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
