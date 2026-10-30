@@ -58,6 +58,24 @@ def workspace_state_dir(root: Path, *, pinned: bool = False) -> Path:
     return user_state_home() / "workspaces" / digest[:32]
 
 
+def state_home_symlink() -> Path | None:
+    """Return the first symlinked component of the state home path, if any.
+
+    Authority state is opened with a no-follow walk from ``/``, so a state
+    home reached through a symlink (for example macOS ``/var`` ->
+    ``/private/var``) cannot be written or read. That refusal is deliberate;
+    this only lets a caller name the cause instead of a bare "unobserved".
+    """
+    current = Path("/")
+    for part in user_state_home().absolute().parts[1:]:
+        current /= part
+        if current.is_symlink():
+            return current
+        if not current.exists():
+            return None
+    return None
+
+
 def ensure_workspace_state_dir(root: Path) -> Path:
     """Create *root*'s state directory with every level owner-only (0700).
 

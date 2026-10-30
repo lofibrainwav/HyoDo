@@ -49,8 +49,10 @@ from pathlib import Path
 from typing import Any, TextIO
 
 from hyodo.user_state import (
+    USER_STATE_ENV_VAR,
     checkout_shadow,
     read_json,
+    state_home_symlink,
     workspace_identity,
     workspace_state_path,
     write_json_private,
@@ -479,8 +481,20 @@ def approve_gate_trust(
         persistence=persistence,
         reason="approved by host attestation"
         if persistence == TRUST_PERSISTENCE_OBSERVED
-        else "approval could not be read back from per-user state",
+        else _unrecorded_reason(),
     )
+
+
+def _unrecorded_reason() -> str:
+    """Name why an approval could not be recorded, when the cause is known."""
+    link = state_home_symlink()
+    if link is not None:
+        return (
+            f"approval was not recorded: the state home path contains a symlink ({link}); "
+            "HyoDo never writes authority state through a symlink. Point "
+            f"{USER_STATE_ENV_VAR} at the resolved path"
+        )
+    return "approval could not be read back from per-user state"
 
 
 def gate_trust_status(config: GatesConfig, root: Path) -> dict[str, Any]:
