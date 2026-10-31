@@ -27,6 +27,7 @@
   },
   "overrides": {
     "markdownlint-cli": {
+      "minimatch": "11.0.1",
       "js-yaml": "5.4.2",
       "smol-toml": "1.9.1"
     },
