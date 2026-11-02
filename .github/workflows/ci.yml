@@ -363,9 +363,12 @@ jobs:
   # Serial evidence for the merged SHA. The PR-time lanes run pytest on
   # parallel workers; bugs that only appear in one execution order would hide
   # there. This job runs the suite the way a default `hyodo check` does.
+  # A manual run on any ref also runs it. A pull request that changes this
+  # workflow cannot lean on the pull_request skip; the host's merge gate then
+  # needs a real serial run on that head, started with workflow_dispatch.
   serial-full-suite:
     name: "Goodness - Serial Full Suite (main)"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -747,7 +750,8 @@ jobs:
             exit 1
           fi
 
-          if [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+          if { [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; } || \
+             [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             check_success "Serial full suite" "$SERIAL_RESULT"
           elif [ "$SERIAL_RESULT" != "skipped" ]; then
             echo "::error::Serial full suite ran outside a main push (result=$SERIAL_RESULT)"
