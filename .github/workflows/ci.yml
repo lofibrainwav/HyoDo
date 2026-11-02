@@ -486,7 +486,9 @@ jobs:
     name: "Public language - commit and PR text"
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    # A manual run checks the branch's commits against main, so a dispatch run on
+    # a PR head reports this check too instead of leaving it skipped.
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
@@ -523,8 +525,12 @@ jobs:
 
           failures = []
 
+          base = os.environ.get("BASE_SHA") or subprocess.run(
+              ["git", "merge-base", "origin/main", os.environ["HEAD_SHA"]],
+              capture_output=True, text=True, check=True,
+          ).stdout.strip()
           revs = subprocess.run(
-              ["git", "rev-list", f"{os.environ['BASE_SHA']}..{os.environ['HEAD_SHA']}"],
+              ["git", "rev-list", f"{base}..{os.environ['HEAD_SHA']}"],
               capture_output=True, text=True, check=True,
           ).stdout.split()
           for sha in revs:
@@ -742,7 +748,7 @@ jobs:
           check_success "Goodness Gate" "$GOODNESS_RESULT"
           check_success "Beauty Gate" "$BEAUTY_RESULT"
 
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             check_success "Public language gate" "$PUBLIC_LANGUAGE_RESULT"
           elif [ "$PUBLIC_LANGUAGE_RESULT" != "skipped" ] && \
                [ "$PUBLIC_LANGUAGE_RESULT" != "success" ]; then
