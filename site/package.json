@@ -29,7 +29,8 @@
     "markdownlint-cli": {
       "minimatch": "11.0.1",
       "js-yaml": "5.4.2",
-      "smol-toml": "1.9.1"
+      "smol-toml": "1.9.1",
+      "re2js": "2.8.8"
     },
     "micromark-extension-math@3.1.0": {
       "katex": "0.18.2"
