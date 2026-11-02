@@ -115,6 +115,7 @@ def test_dependabot_keeps_mcp_v1_lock_on_compatible_major() -> None:
     assert len(entries) == 1
     assert entries[0]["ignore"][0]["dependency-name"] == "mcp"
     assert ">=2" in entries[0]["ignore"][0]["versions"]
+    assert entries[0]["versioning-strategy"] == "lockfile-only"
 
 
 def test_workflow_checkouts_do_not_persist_github_credentials() -> None:
