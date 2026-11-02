@@ -21,6 +21,9 @@ updates:
     directory: "/ci/mcp-v1"
     schedule:
       interval: "weekly"
+    # Refresh only the hashed lock. The .in files keep their audited floors
+    # (tests/test_dependency_workflow_locking.py); a raised floor broke #588.
+    versioning-strategy: "lockfile-only"
     open-pull-requests-limit: 3
     labels:
       - "dependencies"
