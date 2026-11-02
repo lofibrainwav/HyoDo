@@ -363,9 +363,12 @@ jobs:
   # Serial evidence for the merged SHA. The PR-time lanes run pytest on
   # parallel workers; bugs that only appear in one execution order would hide
   # there. This job runs the suite the way a default `hyodo check` does.
+  # A manual run on any ref also runs it. A pull request that changes this
+  # workflow cannot lean on the pull_request skip; the host's merge gate then
+  # needs a real serial run on that head, started with workflow_dispatch.
   serial-full-suite:
     name: "Goodness - Serial Full Suite (main)"
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -483,7 +486,9 @@ jobs:
     name: "Public language - commit and PR text"
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.event_name == 'pull_request' || github.event_name == 'push'
+    # A manual run checks the branch's commits against main, so a dispatch run on
+    # a PR head reports this check too instead of leaving it skipped.
+    if: github.event_name == 'pull_request' || github.event_name == 'push' || github.event_name == 'workflow_dispatch'
 
     steps:
       - name: Checkout
@@ -520,8 +525,12 @@ jobs:
 
           failures = []
 
+          base = os.environ.get("BASE_SHA") or subprocess.run(
+              ["git", "merge-base", "origin/main", os.environ["HEAD_SHA"]],
+              capture_output=True, text=True, check=True,
+          ).stdout.strip()
           revs = subprocess.run(
-              ["git", "rev-list", f"{os.environ['BASE_SHA']}..{os.environ['HEAD_SHA']}"],
+              ["git", "rev-list", f"{base}..{os.environ['HEAD_SHA']}"],
               capture_output=True, text=True, check=True,
           ).stdout.split()
           for sha in revs:
@@ -739,7 +748,7 @@ jobs:
           check_success "Goodness Gate" "$GOODNESS_RESULT"
           check_success "Beauty Gate" "$BEAUTY_RESULT"
 
-          if [ "$EVENT_NAME" = "pull_request" ]; then
+          if [ "$EVENT_NAME" = "pull_request" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             check_success "Public language gate" "$PUBLIC_LANGUAGE_RESULT"
           elif [ "$PUBLIC_LANGUAGE_RESULT" != "skipped" ] && \
                [ "$PUBLIC_LANGUAGE_RESULT" != "success" ]; then
@@ -747,7 +756,8 @@ jobs:
             exit 1
           fi
 
-          if [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; then
+          if { [ "$EVENT_NAME" = "push" ] && [ "$REF" = "refs/heads/main" ]; } || \
+             [ "$EVENT_NAME" = "workflow_dispatch" ]; then
             check_success "Serial full suite" "$SERIAL_RESULT"
           elif [ "$SERIAL_RESULT" != "skipped" ]; then
             echo "::error::Serial full suite ran outside a main push (result=$SERIAL_RESULT)"
