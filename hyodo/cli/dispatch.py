@@ -8,7 +8,9 @@ callback intact.
 
 from hyodo.cli.main import app
 from hyodo.friction_cli import app as friction_app
+from hyodo.lens_evidence_cli import app as lens_evidence_app
 
 app.add_typer(friction_app, name="friction")
+app.add_typer(lens_evidence_app, name="lens-evidence")
 
 __all__ = ["app"]

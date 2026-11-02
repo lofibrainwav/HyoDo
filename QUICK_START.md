@@ -72,6 +72,21 @@ an MCP host, install the optional extra **into the same environment that runs
 [host onboarding guide](./docs/ONBOARDING.md). Host support and remote connector
 status are documented there; remote ChatGPT MCP remains contract-only.
 
+## Emit lens evidence from an existing envelope
+
+Given an existing `hyodo.dashboard-evidence/v2` JSON envelope, emit the six
+canonical `hyodo.lens-evidence/v1` receipts without running project gates or
+writing to the input project:
+
+```bash
+hyodo lens-evidence emit --file dashboard-evidence.json --subject-sha FULL_SUBJECT_SHA
+```
+
+`FULL_SUBJECT_SHA` must be the full 40- or 64-character hexadecimal subject
+digest. The command prints JSON to standard output and fails closed for missing,
+malformed, or unsupported evidence input. Receipts are evidence only: they do
+not represent a PASS, score, decision, or authorization.
+
 ## Command outcomes
 
 | Command | Exit contract |
