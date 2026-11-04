@@ -1,5 +1,6 @@
 """Unit tests for CLI tool invocation helpers and check truth contract."""
 
+import json
 import sys
 from pathlib import Path
 from unittest.mock import MagicMock, patch
@@ -106,6 +107,53 @@ def test_evidence_root_snapshot_does_not_execute_project_gates_or_history(tmp_pa
     assert evidence["gates"]["evidence_graph"]["status"] == "UNOBSERVED"
     assert evidence["safety"]["risk_score_state"] == "not_executed"
     assert not (tmp_path / ".hyodo" / "history.jsonl").exists()
+
+
+def test_evidence_root_snapshot_shows_the_latest_history_receipt_without_running_gates(tmp_path):
+    # 2026-11-04: the Kingdom board served an evidence root, so all six cards read
+    # UNOBSERVED although the host had receipts with real gate outcomes.
+    hyodo_dir = tmp_path / ".hyodo"
+    hyodo_dir.mkdir()
+    (hyodo_dir / "agent-events.jsonl").write_text("{not-json}\n", encoding="utf-8")
+    history = hyodo_dir / "history.jsonl"
+    old = {"measured_at": "2026-11-03T00:00:00+00:00", "gates": {"unit-tests": "FAIL"}}
+    new = {
+        "measured_at": "2026-11-04T10:39:50+00:00",
+        "gates": {"unit-tests": "PASS", "friction-hyo": "FAIL", "odd": "WEIRD"},
+        "pillars": {"unit-tests": "truth", "friction-hyo": "hyo"},
+        "provenance": {"target_commit": "3dc7112de3f828740c71b15328f8b00999ed3e2c"},
+    }
+    history.write_text(json.dumps(old) + "\n" + json.dumps(new) + "\n", encoding="utf-8")
+    before = history.read_text(encoding="utf-8")
+    with (
+        patch("hyodo.cli.main.run_pyright_check") as pyright_mock,
+        patch("hyodo.cli.main.run_pytest_check") as pytest_mock,
+        patch("hyodo.cli.main.run_safety_scan") as safety_mock,
+    ):
+        evidence = collect_evidence_root_snapshot(tmp_path)
+    pyright_mock.assert_not_called()
+    pytest_mock.assert_not_called()
+    safety_mock.assert_not_called()
+    gates = evidence["gates"]
+    assert gates["unit-tests"]["status"] == "PASS"
+    assert gates["unit-tests"]["pillar"] == "truth"
+    assert gates["friction-hyo"]["status"] == "FAIL"
+    assert gates["odd"]["status"] == "UNOBSERVED"
+    assert "2026-11-04T10:39:50" in gates["unit-tests"]["message"]
+    assert "3dc7112de" in gates["unit-tests"]["message"]
+    assert "typecheck" not in gates
+    assert evidence["safety"]["risk_score_state"] == "not_executed"
+    assert history.read_text(encoding="utf-8") == before
+
+
+def test_evidence_root_snapshot_ignores_an_unusable_history_receipt(tmp_path):
+    hyodo_dir = tmp_path / ".hyodo"
+    hyodo_dir.mkdir()
+    (hyodo_dir / "agent-events.jsonl").write_text("{not-json}\n", encoding="utf-8")
+    for body in ("", "{not-json}\n", json.dumps({"gates": {}}) + "\n"):
+        (hyodo_dir / "history.jsonl").write_text(body, encoding="utf-8")
+        evidence = collect_evidence_root_snapshot(tmp_path)
+        assert evidence["gates"]["typecheck"]["status"] == "UNOBSERVED"
 
 
 def test_dashboard_marks_safety_risk_not_measured_for_an_empty_change_set(tmp_path):
