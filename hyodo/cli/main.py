@@ -185,6 +185,7 @@ from hyodo.pairing import (
 )
 from hyodo.phash import phash_distance
 from hyodo.pillars import (
+    HISTORY_RELATIVE_PATH,
     append_history_receipt,
     collect_hyo_evidence,
     collect_in_evidence,
@@ -888,6 +889,58 @@ def collect_dashboard_evidence(root: Path) -> dict[str, object]:
     return evidence
 
 
+_RECEIPT_GATE_STATUSES = frozenset({"PASS", "FAIL", "SKIP", "UNOBSERVED"})
+
+
+@dataclass(frozen=True)
+class _HistoryReceipt:
+    gates: dict[str, str]
+    pillars: dict[str, str]
+    measured_at: str
+    commit: str
+
+
+def _latest_history_receipt(root: Path) -> _HistoryReceipt | None:
+    """Read the newest gate receipt from ``.hyodo/history.jsonl`` without writing.
+
+    Returns None when the ledger is absent, empty or its last line is not a usable
+    receipt, so the evidence-only cards stay UNOBSERVED instead of guessing.
+    """
+    path = root / HISTORY_RELATIVE_PATH
+    try:
+        lines = [line for line in path.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError:
+        return None
+    if not lines:
+        return None
+    try:
+        row = json.loads(lines[-1])
+    except json.JSONDecodeError:
+        return None
+    if not isinstance(row, dict):
+        return None
+    raw_gates = row.get("gates")
+    if not isinstance(raw_gates, dict) or not raw_gates:
+        return None
+    gates = {str(k): v for k, v in raw_gates.items() if isinstance(v, str)}
+    if len(gates) != len(raw_gates):
+        return None
+    raw_pillars = row.get("pillars")
+    pillars = (
+        {str(k): v for k, v in raw_pillars.items() if isinstance(v, str)}
+        if isinstance(raw_pillars, dict)
+        else {}
+    )
+    provenance = row.get("provenance")
+    commit = provenance.get("target_commit") if isinstance(provenance, dict) else None
+    return _HistoryReceipt(
+        gates=gates,
+        pillars=pillars,
+        measured_at=str(row.get("measured_at") or "unknown time"),
+        commit=commit if isinstance(commit, str) else "",
+    )
+
+
 def collect_evidence_root_snapshot(root: Path) -> dict[str, object]:
     """Render a graph-only snapshot for an explicit evidence root.
 
@@ -903,10 +956,28 @@ def collect_evidence_root_snapshot(root: Path) -> dict[str, object]:
         if graph_status == "READY"
         else f"Evidence graph is {graph_status}; project gates were not executed."
     )
-    gates = {
-        name: {"status": "UNOBSERVED", "message": "evidence-only root; gate not executed"}
-        for name in ("typecheck", "tests", "lint_format", "sbom")
-    }
+    receipt = _latest_history_receipt(root)
+    if receipt is None:
+        gates = {
+            name: {"status": "UNOBSERVED", "message": "evidence-only root; gate not executed"}
+            for name in ("typecheck", "tests", "lint_format", "sbom")
+        }
+    else:
+        # The host already ran its gates and appended this receipt; show those outcomes
+        # instead of re-running anything. The message names the receipt so a stale
+        # result is visible as stale, never as a fresh measurement.
+        source = (
+            f"last history receipt {receipt.measured_at}"
+            f" @ {receipt.commit[:9] or 'unknown commit'}; not re-run here"
+        )
+        gates = {
+            name: {
+                "status": status if status in _RECEIPT_GATE_STATUSES else "UNOBSERVED",
+                "message": source,
+                "pillar": receipt.pillars.get(name),
+            }
+            for name, status in receipt.gates.items()
+        }
     gates["evidence_graph"] = {"status": graph_status, "message": graph_message}
     empty_pillar = {"metrics": {}, "sources": ["evidence-only root"]}
     return {
