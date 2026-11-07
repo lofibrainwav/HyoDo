@@ -17,11 +17,11 @@
     "gsap": "3.15.0",
     "lenis": "1.3.27",
     "sharp": "^0.35.5",
-    "three": "0.186.0"
+    "three": "0.187.0"
   },
   "devDependencies": {
     "@astrojs/check": "0.9.12",
-    "@types/three": "0.186.0",
+    "@types/three": "0.187.0",
     "markdownlint-cli": "0.50.0",
     "typescript": "6.0.3"
   },
