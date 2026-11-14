@@ -13,7 +13,7 @@ import stat
 import subprocess
 from pathlib import Path
 
-from hyodo.provenance import _GIT_LOCATION_ENV
+from hyodo.provenance import clean_git_env
 
 MAX_FILES = 20_000
 MAX_BYTES = 128 * 1024 * 1024
@@ -39,7 +39,7 @@ def git_input_digest(root: Path) -> str | None:
             capture_output=True,
             check=False,
             timeout=10,
-            env={k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_ENV},
+            env=clean_git_env(),
         )
         if result.returncode:
             return None

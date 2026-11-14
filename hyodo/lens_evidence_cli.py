@@ -55,4 +55,18 @@ def emit(
     typer.echo(json.dumps(receipts, ensure_ascii=False, indent=2))
 
 
+@app.command()
+def workspace(
+    root: Annotated[
+        Path,
+        typer.Option("--root", help="Workspace root to measure across all six lenses."),
+    ] = Path("."),
+) -> None:
+    """Measure deterministic six-lens evidence plates directly from workspace receipts."""
+    from hyodo.six_lens_runtime import measure_workspace_six_lenses
+
+    measurement = measure_workspace_six_lenses(root)
+    typer.echo(json.dumps(measurement, ensure_ascii=False, indent=2))
+
+
 __all__ = ["app"]

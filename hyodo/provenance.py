@@ -117,10 +117,16 @@ _GIT_LOCATION_ENV = frozenset(
         "GIT_NO_REPLACE_OBJECTS",
         "GIT_REPLACE_REF_BASE",
         "GIT_PREFIX",
+        "GIT_INTERNAL_SUPER_PREFIX",
         "GIT_SHALLOW_FILE",
         "GIT_COMMON_DIR",
     }
 )
+
+
+def clean_git_env() -> dict[str, str]:
+    """Return a copy of ``os.environ`` stripped of git repository-relocation variables."""
+    return {k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_ENV}
 
 
 def _run_git(root: Path, *args: str) -> str | None:
@@ -141,7 +147,7 @@ def _run_git(root: Path, *args: str) -> str | None:
             text=True,
             timeout=_GIT_TIMEOUT_SECONDS,
             check=False,
-            env={k: v for k, v in os.environ.items() if k not in _GIT_LOCATION_ENV},
+            env=clean_git_env(),
         )
     except (OSError, subprocess.SubprocessError):
         return None

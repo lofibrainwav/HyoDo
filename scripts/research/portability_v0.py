@@ -541,10 +541,9 @@ def baseline_arm(fixture: dict) -> dict:
         if ev["gates_ran"] < ev["gates_total"]:
             signals["UNOBSERVED"] = True
             notes.append("some configured gates did not run")
-    elif fid == "SW-12":  # adapter exception 12
-        if ev["gates_ran"] == 0:
-            signals["UNOBSERVED"] = True
-            notes.append("the command ran and no gate was executed")
+    elif fid == "SW-12" and ev["gates_ran"] == 0:  # adapter exception 12
+        signals["UNOBSERVED"] = True
+        notes.append("the command ran and no gate was executed")
 
     state, secondary = _ladder(signals)
     counters = {

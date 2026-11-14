@@ -280,6 +280,9 @@ def _collect_provenance(root: Path) -> dict[str, Any]:
         "git_dirty": None,
         "git_reason": None,
     }
+    from hyodo.provenance import clean_git_env
+
+    git_env = clean_git_env()
     try:
         head = subprocess.run(
             ["git", "rev-parse", "HEAD"],
@@ -288,6 +291,7 @@ def _collect_provenance(root: Path) -> dict[str, Any]:
             timeout=10,
             cwd=str(root),
             check=False,
+            env=git_env,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         provenance["git_reason"] = f"git unavailable: {exc}"
@@ -305,6 +309,7 @@ def _collect_provenance(root: Path) -> dict[str, Any]:
             timeout=10,
             cwd=str(root),
             check=False,
+            env=git_env,
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError) as exc:
         provenance["git_reason"] = f"git status unavailable: {exc}"

@@ -1,0 +1,6 @@
+schema = "hyodo.factory-profile/v1"
+name = "development"
+description = "Root-cause audit, TDD engineering, simplification, independent review/QA, and evaluation"
+active_categories = ["simplification", "engineering", "quality", "security", "evaluation"]
+single_orchestrator = true
+require_independent_verifier = true

@@ -121,7 +121,7 @@ async def _streamable_http_session(url: str, token: str):
     headers = {"Authorization": f"Bearer {token}"}
     if "http_client" in inspect.signature(streamable_http_client).parameters:
         async with (
-            httpx.AsyncClient(headers=headers) as client,
+            httpx.AsyncClient(headers=headers, trust_env=False) as client,
             streamable_http_client(url, http_client=client) as streams,
         ):
             yield (*streams, None) if len(streams) == 2 else streams
