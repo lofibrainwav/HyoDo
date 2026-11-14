@@ -3176,6 +3176,9 @@ def safe(
         )
         if source.startswith(("missing:", "error:")):
             verdict_state["detail"] = "scan target UNOBSERVED"
+            if high_only and isinstance(scanned, int) and scanned > 0:
+                # Findings from the files that were read stay visible in --quiet.
+                verdict_state["detail"] += f"; {len(high_only)} high findings in observed files"
             verdict_state["decision"] = "UNOBSERVED"
         elif strict and high_only:
             verdict_state["decision"] = "FAIL"
@@ -3251,9 +3254,10 @@ def safe(
             console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2)
 
-        def _print_rows_and_findings() -> None:
-            for check_name, status, color in result["rows"]:
-                console.print(f"  [{color}]{status}[/{color}] {check_name}")
+        def _print_rows_and_findings(*, include_rows: bool = True) -> None:
+            if include_rows:
+                for check_name, status, color in result["rows"]:
+                    console.print(f"  [{color}]{status}[/{color}] {check_name}")
 
             high_findings = [f for f in result["findings"] if f.severity in {"high", "medium"}]
             if high_findings:
@@ -3275,8 +3279,10 @@ def safe(
             partial_scanned = result.get("scanned_files")
             if isinstance(partial_scanned, int) and partial_scanned > 0:
                 # The scan continued past an unreadable file: show what it did see
-                # (a finding is never hidden), then refuse to call it a pass.
-                _print_rows_and_findings()
+                # (a finding is never hidden), then refuse to call it a pass. The
+                # per-check rows are omitted: a clean row would read as green for
+                # content that was never scanned.
+                _print_rows_and_findings(include_rows=False)
                 console.print(
                     f"\nRisk (incomplete scan): {result['level']} ({result['risk_score']}/100)"
                 )

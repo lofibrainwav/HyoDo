@@ -72,7 +72,9 @@ examples/factory-loop/
   system. Without one, a skill stops at `TRUSTED` / `ASK_COMMANDER`.
   `.hyodo/factory/trust_state.json` is a cache that any local process can
   rewrite. Its digest detects corruption, not forgery, so execution re-asks
-  the host's verifier every time.
+  the host's verifier every time. The receipt binds the skill's `SKILL.md`
+  hash and permission boundary only, not other files in the module or the
+  command the host runs; bind those in the host's verifier if they matter.
 
 ## Files
 
