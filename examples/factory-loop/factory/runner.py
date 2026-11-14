@@ -33,6 +33,7 @@ import json
 import os
 import re
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
@@ -56,8 +57,10 @@ from factory.contracts import (
 )
 from factory.lifecycle import (
     acquire_run_lock,
+    clear_pending_selective_restore,
     release_run_lock,
     restore_activation_state,
+    save_pending_selective_restore,
     snapshot_activation_state,
 )
 from factory.registry import (
@@ -293,12 +296,38 @@ def _restore_and_detect_writes(
     for rel, content in before.items():
         if rel not in after:
             mutated.append(f"deleted:{rel}")
-            target = workspace_root / rel
-            target.parent.mkdir(parents=True, exist_ok=True)
-            with contextlib.suppress(OSError):
-                target.write_bytes(content)
+            failure = _restore_regular_file(workspace_root, rel, content)
+            if failure is not None:
+                mutated.append(f"restore_failed:{rel}:{failure}")
 
     return sorted(mutated)
+
+
+def _restore_regular_file(workspace_root: Path, rel: str, content: bytes) -> str | None:
+    """Recreate *rel* as a regular file without following anything a skill planted.
+
+    A symlink or file standing where a directory (or the file) used to be is
+    removed first, so the restore never writes through a link to somewhere
+    else. Returns `None` on success or a short failure reason; it never raises.
+    """
+    target = workspace_root / rel
+    try:
+        current = workspace_root
+        for part in Path(rel).parts[:-1]:
+            current = current / part
+            if current.is_symlink() or (current.exists() and not current.is_dir()):
+                current.unlink()
+            if not current.exists():
+                current.mkdir()
+        if target.is_symlink():
+            target.unlink()
+        target.write_bytes(content)
+    except OSError as exc:
+        return type(exc).__name__
+    return None
+
+
+_SYMLINK_MARK = b"\0symlink\0"
 
 
 def _factory_state_snapshot(workspace_root: Path) -> dict[str, bytes]:
@@ -306,42 +335,54 @@ def _factory_state_snapshot(workspace_root: Path) -> dict[str, bytes]:
 
     The workspace guard leaves `.hyodo/` alone, so this harness's own state is
     protected separately: no skill run, read-only or not, may change it.
+    Symlinks are recorded by their target so a planted link counts as a change.
     """
     root = workspace_root / FACTORY_DIR_REL
     snap: dict[str, bytes] = {}
-    if not root.is_dir():
+    if not root.is_dir() or root.is_symlink():
         return snap
     for path in sorted(root.rglob("*")):
-        if path.is_symlink() or not path.is_file():
-            continue
+        rel = path.relative_to(workspace_root).as_posix()
         try:
-            snap[path.relative_to(workspace_root).as_posix()] = path.read_bytes()
+            if path.is_symlink():
+                snap[rel] = _SYMLINK_MARK + os.readlink(path).encode("utf-8", "surrogateescape")
+            elif path.is_file():
+                snap[rel] = path.read_bytes()
         except OSError:
             continue
     return snap
 
 
 def _restore_factory_state(workspace_root: Path, before: dict[str, bytes]) -> list[str]:
-    """Undo any change a skill run made under `.hyodo/factory/`; return what changed."""
+    """Undo any change a skill run made under `.hyodo/factory/`; return what changed.
+
+    Never raises: a path that cannot be restored is reported as `restore_failed`.
+    """
     after = _factory_state_snapshot(workspace_root)
     changed: list[str] = []
     for rel, content in after.items():
         target = workspace_root / rel
         if rel not in before:
             changed.append(f"created:{rel}")
-            with contextlib.suppress(OSError):
+            try:
                 target.unlink()
+            except OSError as exc:
+                changed.append(f"restore_failed:{rel}:{type(exc).__name__}")
         elif before[rel] != content:
             changed.append(f"modified:{rel}")
-            with contextlib.suppress(OSError):
-                target.write_bytes(before[rel])
+            if before[rel].startswith(_SYMLINK_MARK):
+                continue  # a link the host had placed is reported, not re-created
+            failure = _restore_regular_file(workspace_root, rel, before[rel])
+            if failure is not None:
+                changed.append(f"restore_failed:{rel}:{failure}")
     for rel, content in before.items():
         if rel not in after:
             changed.append(f"deleted:{rel}")
-            target = workspace_root / rel
-            with contextlib.suppress(OSError):
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target.write_bytes(content)
+            if content.startswith(_SYMLINK_MARK):
+                continue  # a link the host had placed is reported, not re-created
+            failure = _restore_regular_file(workspace_root, rel, content)
+            if failure is not None:
+                changed.append(f"restore_failed:{rel}:{failure}")
     return sorted(changed)
 
 
@@ -391,6 +432,51 @@ def _discard_exec_snapshot(copy_root: Path) -> None:
     if holder.exists():
         _set_tree_writable(holder, True)
         shutil.rmtree(holder, ignore_errors=True)
+
+
+def _kill_process_group(pgid: int) -> bool:
+    """SIGKILL every process left in the group; True when something was still running."""
+    try:
+        os.killpg(pgid, signal.SIGKILL)
+    except (ProcessLookupError, PermissionError):
+        return False
+    return True
+
+
+def _run_skill_process(
+    cmd: list[str], *, cwd: Path, env: dict[str, str], timeout: float
+) -> tuple[subprocess.CompletedProcess[str], bool]:
+    """Run a skill command in its own process group and kill that whole group afterwards.
+
+    A background descendant (`cmd &`) that outlives the skill would otherwise
+    keep writing after the post-run checks. Returns `(completed, descendants_killed)`.
+    A process that leaves the group (`setsid`) or any other same-user process
+    is outside this guarantee.
+    """
+    proc = subprocess.Popen(
+        cmd,
+        cwd=str(cwd),
+        env=env,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    killed = False
+    try:
+        try:
+            out, err = proc.communicate(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            killed = _kill_process_group(proc.pid)
+            proc.kill()
+            out, err = proc.communicate()
+            raise subprocess.TimeoutExpired(cmd, timeout, output=out, stderr=err) from None
+    finally:
+        killed = _kill_process_group(proc.pid) or killed
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+    return subprocess.CompletedProcess(cmd, proc.returncode, out, err), killed
 
 
 _HYODO_REPO_ROOT = str(Path(__file__).resolve().parents[3])
@@ -1023,6 +1109,8 @@ def execute_modular_run(
             return _run(None)
 
         prior_activation = snapshot_activation_state(workspace_root)
+        # Persisted so a killed run's flags can be restored (`recover-stale-lock`).
+        save_pending_selective_restore(workspace_root, run_id, prior_activation)
         try:
             selective_result = select_and_activate_for_task(
                 workspace_root,
@@ -1040,6 +1128,7 @@ def execute_modular_run(
         except BaseException as run_exc:
             try:
                 restore_activation_state(workspace_root, prior_activation, owner_run_id=run_id)
+                clear_pending_selective_restore(workspace_root)
             except Exception as restore_exc:  # keep the run's own error primary
                 add_note = getattr(run_exc, "add_note", None)  # Python 3.11+
                 if callable(add_note):
@@ -1060,6 +1149,7 @@ def execute_modular_run(
                 "reasons": [*verdict.get("reasons", []), "selective_restore_failed"],
             }
         else:
+            clear_pending_selective_restore(workspace_root)
             selective_result["registry_state_after_run"] = "RESTORED"
             selective_result["restored_skill_flags"] = restored
         return result
@@ -1176,6 +1266,8 @@ def _execute_modular_run_locked(
     # `auto` executions run from a private read-only copy of the module tree that
     # was checked against the approval immediately before the process starts.
     exec_snapshots: dict[str, tuple[Path, str]] = {}
+    # Skills whose process group still had members when the skill exited.
+    descendants_killed: dict[str, bool] = {}
 
     def _auto_block(skill_id: str, reason: str, body: str) -> None:
         permission_violations.append(
@@ -1281,444 +1373,461 @@ def _execute_modular_run_locked(
                     "reason": violation,
                 }
             elif sid in skill_outputs:
-                skill_outputs[sid]["executed_from"] = "MODULE_SNAPSHOT"
+                # The snapshot only covers paths reached through CLAUDE_PLUGIN_ROOT /
+                # CLAUDE_SKILL_DIR. A command that names the original module directory
+                # may have read the original, which can change after the check.
+                original = unit_lookup[sid][0].source_path
+                spellings = {original, original.removeprefix("/private")} - {""}
+                cmd_text = " ".join((skill_commands or {}).get(sid) or [])
+                if any(spelling in cmd_text for spelling in spellings):
+                    skill_outputs[sid]["executed_from"] = "ORIGINAL_PATH_REFERENCED"
+                    skill_outputs[sid]["module_snapshot_coverage"] = "UNOBSERVED"
+                else:
+                    skill_outputs[sid]["executed_from"] = "MODULE_SNAPSHOT"
+        for sid in skill_ids:
+            if descendants_killed.pop(sid, False) and sid in skill_outputs:
+                skill_outputs[sid]["descendants_killed_after_exit"] = True
 
     skill_started_at: dict[str, str] = {}
-    for wave in execution_waves:
-        # First enforce execution_mode (`AUTO_RUN`) trust gate per skill in wave before disclosing/running
-        runnable_wave: list[str] = []
-        wave_ts = utc_now_iso()
-        for skill_id in wave:
-            skill_started_at[skill_id] = wave_ts
-            perm_check = check_execution_permission(
-                workspace_root,
-                skill_id,
-                execution_mode=execution_mode,
-                env_fingerprint=env_fingerprint,
-                authority_verifier=authority_verifier,
-                command=(skill_commands or {}).get(skill_id),
-                host_enforced_restrictions=host_enforced_restrictions,
-            )
-            if perm_check["allowed"] and execution_mode == "auto":
-                # The run executes the unit loaded at run start; it must be the
-                # exact unit whose approval was just verified, or a lock.json
-                # edit between the two reads would widen the boundary.
-                _run_mod, _run_unit = unit_lookup[skill_id]
-                if (
-                    _run_unit.content_sha256 != perm_check.get("verified_content_sha256")
-                    or _run_unit.boundary.to_dict() != perm_check.get("verified_boundary")
-                    or _run_mod.source_path != perm_check.get("verified_module_source_path")
-                ):
-                    perm_check = {
-                        **perm_check,
-                        "allowed": False,
-                        "reason": "AUTO_RUN_BLOCKED_UNIT_CHANGED_SINCE_RUN_START",
-                    }
-            if not perm_check["allowed"]:
-                reason = str(perm_check["reason"] or "AUTO_RUN_BLOCKED")
-                permission_violations.append(
-                    f"PERMISSION_BOUNDARY_VIOLATION:autonomous_exec_unverified:{skill_id}:{reason}"
+    try:
+        for wave in execution_waves:
+            # First enforce execution_mode (`AUTO_RUN`) trust gate per skill in wave before disclosing/running
+            runnable_wave: list[str] = []
+            wave_ts = utc_now_iso()
+            for skill_id in wave:
+                skill_started_at[skill_id] = wave_ts
+                perm_check = check_execution_permission(
+                    workspace_root,
+                    skill_id,
+                    execution_mode=execution_mode,
+                    env_fingerprint=env_fingerprint,
+                    authority_verifier=authority_verifier,
+                    command=(skill_commands or {}).get(skill_id),
+                    host_enforced_restrictions=host_enforced_restrictions,
                 )
-                isolated_faults.append(f"fault_isolated:{skill_id}:AutonomousExecBlocked")
-                skill_outputs[skill_id] = {
-                    "status": "UNOBSERVED",
-                    "registration_state": "REGISTERED",
-                    "disclosure_state": "NONE",
-                    "execution_state": "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION",
-                    "enforcement_mode": "AUTO_RUN_TRUST_GATE",
-                    "gate_verdict": "FAIL",
-                    "trust_stage": perm_check.get("trust_stage"),
-                    "reason": reason,
-                }
-            else:
-                runnable_wave.append(skill_id)
-
-        if not runnable_wave:
-            continue
-
-        wave_bodies: dict[str, str] = {}
-        for skill_id in runnable_wave:
-            mod, unit = unit_lookup[skill_id]
-            body = ""
-            if mod.adapter in ("agent-skills", "claude-plugin"):
-                body = disclose_skill_body(mod, skill_id)
-                disclosed_skills.append(skill_id)
-                context_bytes_disclosed += len(body.encode("utf-8"))
-            wave_bodies[skill_id] = body
-
-        can_parallelize = len(runnable_wave) > 1 and all(
-            (skill_commands or {}).get(sid) is not None
-            and unit_lookup[sid][1].boundary.subprocess_exec
-            and not unit_lookup[sid][1].boundary.filesystem_write
-            for sid in runnable_wave
-        )
-
-        if can_parallelize:
-            parallel_waves_executed += 1
-            # Re-check every skill right before the wave starts; each one then runs
-            # from its own execution snapshot taken at that check.
-            wave_to_run: list[str] = []
-            for sid in runnable_wave:
-                blocked_reason = _auto_pre_exec(sid)
-                if blocked_reason is not None:
-                    _auto_block(sid, blocked_reason, wave_bodies[sid])
-                else:
-                    wave_to_run.append(sid)
-            if not wave_to_run:
-                continue
-            snap_before = _snapshot_workspace_files(workspace_root)
-            factory_before = _factory_state_snapshot(workspace_root)
-
-            def _run_ro_cmd(
-                sid: str,
-            ) -> tuple[str, subprocess.CompletedProcess[str] | Exception]:
-                _m_rec, u = unit_lookup[sid]
-                cmd_args = (skill_commands or {})[sid]
-                try:
-                    proc = subprocess.run(
-                        cmd_args,
-                        cwd=str(workspace_root),
-                        env=_build_isolated_env(
-                            u,
-                            workspace_root,
-                            module_source_path=_exec_module_root(sid),
-                            active_taste_rules=active_taste_rules,
-                        ),
-                        capture_output=True,
-                        text=True,
-                        timeout=timeout_s,
-                        check=False,
-                        start_new_session=True,
+                if perm_check["allowed"] and execution_mode == "auto":
+                    # The run executes the unit loaded at run start; it must be the
+                    # exact unit whose approval was just verified, or a lock.json
+                    # edit between the two reads would widen the boundary.
+                    _run_mod, _run_unit = unit_lookup[skill_id]
+                    if (
+                        _run_unit.content_sha256 != perm_check.get("verified_content_sha256")
+                        or _run_unit.boundary.to_dict() != perm_check.get("verified_boundary")
+                        or _run_mod.source_path != perm_check.get("verified_module_source_path")
+                    ):
+                        perm_check = {
+                            **perm_check,
+                            "allowed": False,
+                            "reason": "AUTO_RUN_BLOCKED_UNIT_CHANGED_SINCE_RUN_START",
+                        }
+                if not perm_check["allowed"]:
+                    reason = str(perm_check["reason"] or "AUTO_RUN_BLOCKED")
+                    permission_violations.append(
+                        f"PERMISSION_BOUNDARY_VIOLATION:autonomous_exec_unverified:{skill_id}:{reason}"
                     )
-                    return sid, proc
-                except Exception as exc:
-                    return sid, exc
+                    isolated_faults.append(f"fault_isolated:{skill_id}:AutonomousExecBlocked")
+                    skill_outputs[skill_id] = {
+                        "status": "UNOBSERVED",
+                        "registration_state": "REGISTERED",
+                        "disclosure_state": "NONE",
+                        "execution_state": "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION",
+                        "enforcement_mode": "AUTO_RUN_TRUST_GATE",
+                        "gate_verdict": "FAIL",
+                        "trust_stage": perm_check.get("trust_stage"),
+                        "reason": reason,
+                    }
+                else:
+                    runnable_wave.append(skill_id)
 
-            with (
-                _readonly_workspace_guard(workspace_root),
-                ThreadPoolExecutor(max_workers=min(4, len(wave_to_run))) as pool,
-            ):
-                results = dict(pool.map(_run_ro_cmd, wave_to_run))
+            if not runnable_wave:
+                continue
 
-            illegal_writes = _restore_and_detect_writes(workspace_root, snap_before)
-            if illegal_writes:
-                # The wave ran concurrently against one snapshot, so which skill
-                # wrote is not observable. Record one wave-level violation and
-                # mark per-skill attribution UNOBSERVED instead of blaming all.
-                wave_label = ",".join(wave_to_run)
-                permission_violations.append(
-                    "PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:"
-                    f"parallel_wave[{wave_label}]:attribution=UNOBSERVED:"
-                    f"{','.join(illegal_writes)}"
-                )
-                isolated_faults.append(
-                    f"fault_isolated:parallel_wave[{wave_label}]:UnattributedWrite"
-                )
-            for skill_id in wave_to_run:
-                _, unit = unit_lookup[skill_id]
+            wave_bodies: dict[str, str] = {}
+            for skill_id in runnable_wave:
+                mod, unit = unit_lookup[skill_id]
+                body = ""
+                if mod.adapter in ("agent-skills", "claude-plugin"):
+                    body = disclose_skill_body(mod, skill_id)
+                    disclosed_skills.append(skill_id)
+                    context_bytes_disclosed += len(body.encode("utf-8"))
+                wave_bodies[skill_id] = body
+
+            can_parallelize = len(runnable_wave) > 1 and all(
+                (skill_commands or {}).get(sid) is not None
+                and unit_lookup[sid][1].boundary.subprocess_exec
+                and not unit_lookup[sid][1].boundary.filesystem_write
+                for sid in runnable_wave
+            )
+
+            if can_parallelize:
+                parallel_waves_executed += 1
+                # Re-check every skill right before the wave starts; each one then runs
+                # from its own execution snapshot taken at that check.
+                wave_to_run: list[str] = []
+                for sid in runnable_wave:
+                    blocked_reason = _auto_pre_exec(sid)
+                    if blocked_reason is not None:
+                        _auto_block(sid, blocked_reason, wave_bodies[sid])
+                    else:
+                        wave_to_run.append(sid)
+                if not wave_to_run:
+                    continue
+                factory_before = _factory_state_snapshot(workspace_root)
+                # Whatever happens below, `.hyodo/factory/` is rolled back and the
+                # execution copies are checked and discarded.
+                try:
+                    snap_before = _snapshot_workspace_files(workspace_root)
+
+                    def _run_ro_cmd(
+                        sid: str,
+                    ) -> tuple[str, subprocess.CompletedProcess[str] | Exception]:
+                        _m_rec, u = unit_lookup[sid]
+                        cmd_args = (skill_commands or {})[sid]
+                        try:
+                            proc, killed = _run_skill_process(
+                                cmd_args,
+                                cwd=workspace_root,
+                                env=_build_isolated_env(
+                                    u,
+                                    workspace_root,
+                                    module_source_path=_exec_module_root(sid),
+                                    active_taste_rules=active_taste_rules,
+                                ),
+                                timeout=timeout_s,
+                            )
+                            descendants_killed[sid] = killed
+                            return sid, proc
+                        except Exception as exc:
+                            return sid, exc
+
+                    with (
+                        _readonly_workspace_guard(workspace_root),
+                        ThreadPoolExecutor(max_workers=min(4, len(wave_to_run))) as pool,
+                    ):
+                        results = dict(pool.map(_run_ro_cmd, wave_to_run))
+
+                    illegal_writes = _restore_and_detect_writes(workspace_root, snap_before)
+                    if illegal_writes:
+                        # The wave ran concurrently against one snapshot, so which skill
+                        # wrote is not observable. Record one wave-level violation and
+                        # mark per-skill attribution UNOBSERVED instead of blaming all.
+                        wave_label = ",".join(wave_to_run)
+                        permission_violations.append(
+                            "PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:"
+                            f"parallel_wave[{wave_label}]:attribution=UNOBSERVED:"
+                            f"{','.join(illegal_writes)}"
+                        )
+                        isolated_faults.append(
+                            f"fault_isolated:parallel_wave[{wave_label}]:UnattributedWrite"
+                        )
+                    for skill_id in wave_to_run:
+                        _, unit = unit_lookup[skill_id]
+                        body = wave_bodies[skill_id]
+                        outcome = results[skill_id]
+                        if isinstance(outcome, subprocess.TimeoutExpired):
+                            isolated_faults.append(f"fault_isolated:{skill_id}:TimeoutExpired")
+                            skill_outputs[skill_id] = {
+                                "status": "UNOBSERVED",
+                                "execution_state": "TIMEOUT",
+                                "gate_verdict": "FAIL",
+                                "reason": str(outcome),
+                            }
+                        elif isinstance(outcome, Exception):
+                            isolated_faults.append(
+                                f"fault_isolated:{skill_id}:{type(outcome).__name__}"
+                            )
+                            skill_outputs[skill_id] = {
+                                "status": "UNOBSERVED",
+                                "execution_state": "EXECUTED_FAIL",
+                                "gate_verdict": "FAIL",
+                                "reason": str(outcome),
+                            }
+                        else:
+                            proc = outcome
+                            stderr_text = proc.stderr.strip()
+                            if illegal_writes:
+                                skill_outputs[skill_id] = {
+                                    "status": "UNOBSERVED",
+                                    "registration_state": "REGISTERED",
+                                    "disclosure_state": "DISCLOSED" if body else "NONE",
+                                    "execution_state": "ROLLED_BACK_ILLEGAL_WRITE",
+                                    "enforcement_mode": "POST_WRITE_SNAPSHOT_ROLLBACK",
+                                    "gate_verdict": "UNOBSERVED",
+                                    "write_attribution": "UNOBSERVED",
+                                    "wave_illegal_writes": list(illegal_writes),
+                                    "exit_code": proc.returncode,
+                                    "reason": "PARALLEL_WAVE_WRITE_ROLLED_BACK:attribution=UNOBSERVED",
+                                }
+                            elif proc.returncode != 0 and (
+                                "PermissionError" in stderr_text
+                                or "Permission denied" in stderr_text
+                            ):
+                                violation = f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_blocked_pre_write:{skill_id}"
+                                permission_violations.append(violation)
+                                isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
+                                skill_outputs[skill_id] = {
+                                    "status": "UNOBSERVED",
+                                    "registration_state": "REGISTERED",
+                                    "disclosure_state": "DISCLOSED" if body else "NONE",
+                                    "execution_state": "BLOCKED_BY_OS_READONLY_MODE",
+                                    "enforcement_mode": "PRE_WRITE_POSIX_CHMOD",
+                                    "gate_verdict": "FAIL",
+                                    "exit_code": proc.returncode,
+                                    "reason": violation,
+                                    "stderr": stderr_text[:400],
+                                }
+                            elif proc.returncode != 0:
+                                isolated_faults.append(
+                                    f"fault_isolated:{skill_id}:SubprocessExit_{proc.returncode}"
+                                )
+                                skill_outputs[skill_id] = {
+                                    "status": "UNOBSERVED",
+                                    "registration_state": "REGISTERED",
+                                    "disclosure_state": "DISCLOSED" if body else "NONE",
+                                    "execution_state": "EXECUTED_FAIL",
+                                    "gate_verdict": "FAIL",
+                                    "exit_code": proc.returncode,
+                                    "stderr": stderr_text[:400],
+                                }
+                            else:
+                                executed_skills.append(skill_id)
+                                skill_outputs[skill_id] = {
+                                    "status": "OBSERVED",
+                                    "registration_state": "REGISTERED",
+                                    "disclosure_state": "DISCLOSED" if body else "NONE",
+                                    "execution_state": "EXECUTED_PASS",
+                                    "gate_verdict": "PASS",
+                                    "exit_code": 0,
+                                    **_stdout_integrity_fields(proc.stdout),
+                                    "role_hint": unit.role_hint,
+                                    "content_sha256": unit.content_sha256,
+                                }
+                finally:
+                    _post_exec_checks(wave_to_run, factory_before, parallel=True)
+                continue
+
+            for skill_id in runnable_wave:
+                mod, unit = unit_lookup[skill_id]
                 body = wave_bodies[skill_id]
-                outcome = results[skill_id]
-                if isinstance(outcome, subprocess.TimeoutExpired):
+                serial_factory_before: dict[str, bytes] | None = None
+                try:
+                    cmd = (skill_commands or {}).get(skill_id)
+                    hook_fn = (skill_hooks or {}).get(skill_id)
+
+                    if cmd is not None or hook_fn is not None:
+                        blocked_reason = (
+                            _auto_pre_exec(skill_id)
+                            if cmd is None or unit.boundary.subprocess_exec
+                            else None
+                        )
+                        if blocked_reason is not None:
+                            _auto_block(skill_id, blocked_reason, body)
+                            continue
+                        serial_factory_before = _factory_state_snapshot(workspace_root)
+
+                    if cmd is not None:
+                        if not unit.boundary.subprocess_exec:
+                            violation = f"PERMISSION_BOUNDARY_VIOLATION:subprocess_exec_forbidden:{skill_id}"
+                            permission_violations.append(violation)
+                            isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
+                            skill_outputs[skill_id] = {
+                                "status": "UNOBSERVED",
+                                "registration_state": "REGISTERED",
+                                "disclosure_state": "DISCLOSED" if body else "NONE",
+                                "execution_state": "BLOCKED_BY_PERMISSION",
+                                "enforcement_mode": "PRE_EXEC_POLICY_GATE",
+                                "gate_verdict": "FAIL",
+                                "reason": violation,
+                            }
+                            continue
+
+                        snap_before = (
+                            _snapshot_workspace_files(workspace_root)
+                            if not unit.boundary.filesystem_write
+                            else {}
+                        )
+                        guard_ctx = (
+                            _readonly_workspace_guard(workspace_root)
+                            if not unit.boundary.filesystem_write
+                            else contextlib.nullcontext()
+                        )
+                        with guard_ctx:
+                            proc, killed = _run_skill_process(
+                                cmd,
+                                cwd=workspace_root,
+                                env=_build_isolated_env(
+                                    unit,
+                                    workspace_root,
+                                    module_source_path=_exec_module_root(skill_id),
+                                    active_taste_rules=active_taste_rules,
+                                ),
+                                timeout=timeout_s,
+                            )
+                            descendants_killed[skill_id] = killed
+                        stderr_text = proc.stderr.strip()
+                        if not unit.boundary.filesystem_write:
+                            illegal_writes = _restore_and_detect_writes(workspace_root, snap_before)
+                            if illegal_writes:
+                                violation = (
+                                    f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:{skill_id}:"
+                                    f"{','.join(illegal_writes)}"
+                                )
+                                permission_violations.append(violation)
+                                isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
+                                skill_outputs[skill_id] = {
+                                    "status": "UNOBSERVED",
+                                    "registration_state": "REGISTERED",
+                                    "disclosure_state": "DISCLOSED" if body else "NONE",
+                                    "execution_state": "ROLLED_BACK_ILLEGAL_WRITE",
+                                    "enforcement_mode": "POST_WRITE_SNAPSHOT_ROLLBACK",
+                                    "gate_verdict": "FAIL",
+                                    "reason": violation,
+                                }
+                                continue
+                            if proc.returncode != 0 and (
+                                "PermissionError" in stderr_text
+                                or "Permission denied" in stderr_text
+                            ):
+                                violation = f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_blocked_pre_write:{skill_id}"
+                                permission_violations.append(violation)
+                                isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
+                                skill_outputs[skill_id] = {
+                                    "status": "UNOBSERVED",
+                                    "registration_state": "REGISTERED",
+                                    "disclosure_state": "DISCLOSED" if body else "NONE",
+                                    "execution_state": "BLOCKED_BY_OS_READONLY_MODE",
+                                    "enforcement_mode": "PRE_WRITE_POSIX_CHMOD",
+                                    "gate_verdict": "FAIL",
+                                    "exit_code": proc.returncode,
+                                    "reason": violation,
+                                    "stderr": stderr_text[:400],
+                                }
+                                continue
+
+                        if proc.returncode != 0:
+                            isolated_faults.append(
+                                f"fault_isolated:{skill_id}:SubprocessExit_{proc.returncode}"
+                            )
+                            skill_outputs[skill_id] = {
+                                "status": "UNOBSERVED",
+                                "registration_state": "REGISTERED",
+                                "disclosure_state": "DISCLOSED" if body else "NONE",
+                                "execution_state": "EXECUTED_FAIL",
+                                "gate_verdict": "FAIL",
+                                "exit_code": proc.returncode,
+                                "stderr": stderr_text[:400],
+                            }
+                        else:
+                            executed_skills.append(skill_id)
+                            skill_outputs[skill_id] = {
+                                "status": "OBSERVED",
+                                "registration_state": "REGISTERED",
+                                "disclosure_state": "DISCLOSED" if body else "NONE",
+                                "execution_state": "EXECUTED_PASS",
+                                "gate_verdict": "PASS",
+                                "exit_code": 0,
+                                **_stdout_integrity_fields(proc.stdout),
+                                "role_hint": unit.role_hint,
+                                "content_sha256": unit.content_sha256,
+                            }
+                    elif hook_fn is not None:
+                        snap_before = (
+                            _snapshot_workspace_files(workspace_root)
+                            if not unit.boundary.filesystem_write
+                            else {}
+                        )
+                        guard_ctx = (
+                            _readonly_workspace_guard(workspace_root)
+                            if not unit.boundary.filesystem_write
+                            else contextlib.nullcontext()
+                        )
+                        with guard_ctx:
+                            hook_res = hook_fn(skill_id, body)
+                        if not unit.boundary.filesystem_write:
+                            illegal_writes = _restore_and_detect_writes(workspace_root, snap_before)
+                            if illegal_writes:
+                                violation = (
+                                    f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:{skill_id}:"
+                                    f"{','.join(illegal_writes)}"
+                                )
+                                permission_violations.append(violation)
+                                isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
+                                skill_outputs[skill_id] = {
+                                    "status": "UNOBSERVED",
+                                    "registration_state": "REGISTERED",
+                                    "disclosure_state": "DISCLOSED" if body else "NONE",
+                                    "execution_state": "ROLLED_BACK_ILLEGAL_WRITE",
+                                    "enforcement_mode": "POST_WRITE_SNAPSHOT_ROLLBACK",
+                                    "gate_verdict": "FAIL",
+                                    "reason": violation,
+                                }
+                                continue
+                        executed_skills.append(skill_id)
+                        skill_outputs[skill_id] = {
+                            "status": "OBSERVED",
+                            "registration_state": "REGISTERED",
+                            "disclosure_state": "DISCLOSED" if body else "NONE",
+                            "execution_state": "EXECUTED_PASS",
+                            "gate_verdict": "PASS",
+                            **hook_res,
+                        }
+                    else:
+                        skill_outputs[skill_id] = {
+                            "status": "OBSERVED",
+                            "registration_state": "REGISTERED",
+                            "disclosure_state": "DISCLOSED" if body else "REGISTERED_ONLY",
+                            "execution_state": "DISCLOSED_ONLY",
+                            "gate_verdict": "UNOBSERVED",
+                            "role_hint": unit.role_hint,
+                            "content_sha256": unit.content_sha256,
+                        }
+                except subprocess.TimeoutExpired as exc:
                     isolated_faults.append(f"fault_isolated:{skill_id}:TimeoutExpired")
                     skill_outputs[skill_id] = {
                         "status": "UNOBSERVED",
                         "execution_state": "TIMEOUT",
                         "gate_verdict": "FAIL",
-                        "reason": str(outcome),
+                        "reason": str(exc),
                     }
-                elif isinstance(outcome, Exception):
-                    isolated_faults.append(f"fault_isolated:{skill_id}:{type(outcome).__name__}")
+                except PermissionError as exc:
+                    violation = f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_blocked_pre_write:{skill_id}"
+                    permission_violations.append(violation)
+                    isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
+                    skill_outputs[skill_id] = {
+                        "status": "UNOBSERVED",
+                        "registration_state": "REGISTERED",
+                        "disclosure_state": "DISCLOSED" if body else "NONE",
+                        "execution_state": "BLOCKED_BY_OS_READONLY_MODE",
+                        "enforcement_mode": "PRE_WRITE_POSIX_CHMOD",
+                        "gate_verdict": "FAIL",
+                        "reason": str(exc),
+                    }
+                except RuntimeError as exc:
+                    if "MID_RUN_SKILL_DRIFT" in str(exc):
+                        raise
+                    isolated_faults.append(f"fault_isolated:{skill_id}:{type(exc).__name__}")
                     skill_outputs[skill_id] = {
                         "status": "UNOBSERVED",
                         "execution_state": "EXECUTED_FAIL",
                         "gate_verdict": "FAIL",
-                        "reason": str(outcome),
+                        "reason": str(exc),
                     }
-                else:
-                    proc = outcome
-                    stderr_text = proc.stderr.strip()
-                    if illegal_writes:
-                        skill_outputs[skill_id] = {
-                            "status": "UNOBSERVED",
-                            "registration_state": "REGISTERED",
-                            "disclosure_state": "DISCLOSED" if body else "NONE",
-                            "execution_state": "ROLLED_BACK_ILLEGAL_WRITE",
-                            "enforcement_mode": "POST_WRITE_SNAPSHOT_ROLLBACK",
-                            "gate_verdict": "UNOBSERVED",
-                            "write_attribution": "UNOBSERVED",
-                            "wave_illegal_writes": list(illegal_writes),
-                            "exit_code": proc.returncode,
-                            "reason": "PARALLEL_WAVE_WRITE_ROLLED_BACK:attribution=UNOBSERVED",
-                        }
-                    elif proc.returncode != 0 and (
-                        "PermissionError" in stderr_text or "Permission denied" in stderr_text
-                    ):
-                        violation = f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_blocked_pre_write:{skill_id}"
-                        permission_violations.append(violation)
-                        isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
-                        skill_outputs[skill_id] = {
-                            "status": "UNOBSERVED",
-                            "registration_state": "REGISTERED",
-                            "disclosure_state": "DISCLOSED" if body else "NONE",
-                            "execution_state": "BLOCKED_BY_OS_READONLY_MODE",
-                            "enforcement_mode": "PRE_WRITE_POSIX_CHMOD",
-                            "gate_verdict": "FAIL",
-                            "exit_code": proc.returncode,
-                            "reason": violation,
-                            "stderr": stderr_text[:400],
-                        }
-                    elif proc.returncode != 0:
-                        isolated_faults.append(
-                            f"fault_isolated:{skill_id}:SubprocessExit_{proc.returncode}"
-                        )
-                        skill_outputs[skill_id] = {
-                            "status": "UNOBSERVED",
-                            "registration_state": "REGISTERED",
-                            "disclosure_state": "DISCLOSED" if body else "NONE",
-                            "execution_state": "EXECUTED_FAIL",
-                            "gate_verdict": "FAIL",
-                            "exit_code": proc.returncode,
-                            "stderr": stderr_text[:400],
-                        }
-                    else:
-                        executed_skills.append(skill_id)
-                        skill_outputs[skill_id] = {
-                            "status": "OBSERVED",
-                            "registration_state": "REGISTERED",
-                            "disclosure_state": "DISCLOSED" if body else "NONE",
-                            "execution_state": "EXECUTED_PASS",
-                            "gate_verdict": "PASS",
-                            "exit_code": 0,
-                            **_stdout_integrity_fields(proc.stdout),
-                            "role_hint": unit.role_hint,
-                            "content_sha256": unit.content_sha256,
-                        }
-            _post_exec_checks(wave_to_run, factory_before, parallel=True)
-            continue
-
-        for skill_id in runnable_wave:
-            mod, unit = unit_lookup[skill_id]
-            body = wave_bodies[skill_id]
-            serial_factory_before: dict[str, bytes] | None = None
-            try:
-                cmd = (skill_commands or {}).get(skill_id)
-                hook_fn = (skill_hooks or {}).get(skill_id)
-
-                if cmd is not None or hook_fn is not None:
-                    blocked_reason = (
-                        _auto_pre_exec(skill_id)
-                        if cmd is None or unit.boundary.subprocess_exec
-                        else None
-                    )
-                    if blocked_reason is not None:
-                        _auto_block(skill_id, blocked_reason, body)
-                        continue
-                    serial_factory_before = _factory_state_snapshot(workspace_root)
-
-                if cmd is not None:
-                    if not unit.boundary.subprocess_exec:
-                        violation = (
-                            f"PERMISSION_BOUNDARY_VIOLATION:subprocess_exec_forbidden:{skill_id}"
-                        )
-                        permission_violations.append(violation)
-                        isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
-                        skill_outputs[skill_id] = {
-                            "status": "UNOBSERVED",
-                            "registration_state": "REGISTERED",
-                            "disclosure_state": "DISCLOSED" if body else "NONE",
-                            "execution_state": "BLOCKED_BY_PERMISSION",
-                            "enforcement_mode": "PRE_EXEC_POLICY_GATE",
-                            "gate_verdict": "FAIL",
-                            "reason": violation,
-                        }
-                        continue
-
-                    snap_before = (
-                        _snapshot_workspace_files(workspace_root)
-                        if not unit.boundary.filesystem_write
-                        else {}
-                    )
-                    guard_ctx = (
-                        _readonly_workspace_guard(workspace_root)
-                        if not unit.boundary.filesystem_write
-                        else contextlib.nullcontext()
-                    )
-                    with guard_ctx:
-                        proc = subprocess.run(
-                            cmd,
-                            cwd=str(workspace_root),
-                            env=_build_isolated_env(
-                                unit,
-                                workspace_root,
-                                module_source_path=_exec_module_root(skill_id),
-                                active_taste_rules=active_taste_rules,
-                            ),
-                            capture_output=True,
-                            text=True,
-                            timeout=timeout_s,
-                            check=False,
-                            start_new_session=True,
-                        )
-                    stderr_text = proc.stderr.strip()
-                    if not unit.boundary.filesystem_write:
-                        illegal_writes = _restore_and_detect_writes(workspace_root, snap_before)
-                        if illegal_writes:
-                            violation = (
-                                f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:{skill_id}:"
-                                f"{','.join(illegal_writes)}"
-                            )
-                            permission_violations.append(violation)
-                            isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
-                            skill_outputs[skill_id] = {
-                                "status": "UNOBSERVED",
-                                "registration_state": "REGISTERED",
-                                "disclosure_state": "DISCLOSED" if body else "NONE",
-                                "execution_state": "ROLLED_BACK_ILLEGAL_WRITE",
-                                "enforcement_mode": "POST_WRITE_SNAPSHOT_ROLLBACK",
-                                "gate_verdict": "FAIL",
-                                "reason": violation,
-                            }
-                            continue
-                        if proc.returncode != 0 and (
-                            "PermissionError" in stderr_text or "Permission denied" in stderr_text
-                        ):
-                            violation = f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_blocked_pre_write:{skill_id}"
-                            permission_violations.append(violation)
-                            isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
-                            skill_outputs[skill_id] = {
-                                "status": "UNOBSERVED",
-                                "registration_state": "REGISTERED",
-                                "disclosure_state": "DISCLOSED" if body else "NONE",
-                                "execution_state": "BLOCKED_BY_OS_READONLY_MODE",
-                                "enforcement_mode": "PRE_WRITE_POSIX_CHMOD",
-                                "gate_verdict": "FAIL",
-                                "exit_code": proc.returncode,
-                                "reason": violation,
-                                "stderr": stderr_text[:400],
-                            }
-                            continue
-
-                    if proc.returncode != 0:
-                        isolated_faults.append(
-                            f"fault_isolated:{skill_id}:SubprocessExit_{proc.returncode}"
-                        )
-                        skill_outputs[skill_id] = {
-                            "status": "UNOBSERVED",
-                            "registration_state": "REGISTERED",
-                            "disclosure_state": "DISCLOSED" if body else "NONE",
-                            "execution_state": "EXECUTED_FAIL",
-                            "gate_verdict": "FAIL",
-                            "exit_code": proc.returncode,
-                            "stderr": stderr_text[:400],
-                        }
-                    else:
-                        executed_skills.append(skill_id)
-                        skill_outputs[skill_id] = {
-                            "status": "OBSERVED",
-                            "registration_state": "REGISTERED",
-                            "disclosure_state": "DISCLOSED" if body else "NONE",
-                            "execution_state": "EXECUTED_PASS",
-                            "gate_verdict": "PASS",
-                            "exit_code": 0,
-                            **_stdout_integrity_fields(proc.stdout),
-                            "role_hint": unit.role_hint,
-                            "content_sha256": unit.content_sha256,
-                        }
-                elif hook_fn is not None:
-                    snap_before = (
-                        _snapshot_workspace_files(workspace_root)
-                        if not unit.boundary.filesystem_write
-                        else {}
-                    )
-                    guard_ctx = (
-                        _readonly_workspace_guard(workspace_root)
-                        if not unit.boundary.filesystem_write
-                        else contextlib.nullcontext()
-                    )
-                    with guard_ctx:
-                        hook_res = hook_fn(skill_id, body)
-                    if not unit.boundary.filesystem_write:
-                        illegal_writes = _restore_and_detect_writes(workspace_root, snap_before)
-                        if illegal_writes:
-                            violation = (
-                                f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:{skill_id}:"
-                                f"{','.join(illegal_writes)}"
-                            )
-                            permission_violations.append(violation)
-                            isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
-                            skill_outputs[skill_id] = {
-                                "status": "UNOBSERVED",
-                                "registration_state": "REGISTERED",
-                                "disclosure_state": "DISCLOSED" if body else "NONE",
-                                "execution_state": "ROLLED_BACK_ILLEGAL_WRITE",
-                                "enforcement_mode": "POST_WRITE_SNAPSHOT_ROLLBACK",
-                                "gate_verdict": "FAIL",
-                                "reason": violation,
-                            }
-                            continue
-                    executed_skills.append(skill_id)
+                except Exception as exc:
+                    isolated_faults.append(f"fault_isolated:{skill_id}:{type(exc).__name__}")
                     skill_outputs[skill_id] = {
-                        "status": "OBSERVED",
-                        "registration_state": "REGISTERED",
-                        "disclosure_state": "DISCLOSED" if body else "NONE",
-                        "execution_state": "EXECUTED_PASS",
-                        "gate_verdict": "PASS",
-                        **hook_res,
+                        "status": "UNOBSERVED",
+                        "execution_state": "EXECUTED_FAIL",
+                        "gate_verdict": "FAIL",
+                        "reason": str(exc),
                     }
-                else:
-                    skill_outputs[skill_id] = {
-                        "status": "OBSERVED",
-                        "registration_state": "REGISTERED",
-                        "disclosure_state": "DISCLOSED" if body else "REGISTERED_ONLY",
-                        "execution_state": "DISCLOSED_ONLY",
-                        "gate_verdict": "UNOBSERVED",
-                        "role_hint": unit.role_hint,
-                        "content_sha256": unit.content_sha256,
-                    }
-            except subprocess.TimeoutExpired as exc:
-                isolated_faults.append(f"fault_isolated:{skill_id}:TimeoutExpired")
-                skill_outputs[skill_id] = {
-                    "status": "UNOBSERVED",
-                    "execution_state": "TIMEOUT",
-                    "gate_verdict": "FAIL",
-                    "reason": str(exc),
-                }
-            except PermissionError as exc:
-                violation = (
-                    f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_blocked_pre_write:{skill_id}"
-                )
-                permission_violations.append(violation)
-                isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
-                skill_outputs[skill_id] = {
-                    "status": "UNOBSERVED",
-                    "registration_state": "REGISTERED",
-                    "disclosure_state": "DISCLOSED" if body else "NONE",
-                    "execution_state": "BLOCKED_BY_OS_READONLY_MODE",
-                    "enforcement_mode": "PRE_WRITE_POSIX_CHMOD",
-                    "gate_verdict": "FAIL",
-                    "reason": str(exc),
-                }
-            except RuntimeError as exc:
-                if "MID_RUN_SKILL_DRIFT" in str(exc):
-                    raise
-                isolated_faults.append(f"fault_isolated:{skill_id}:{type(exc).__name__}")
-                skill_outputs[skill_id] = {
-                    "status": "UNOBSERVED",
-                    "execution_state": "EXECUTED_FAIL",
-                    "gate_verdict": "FAIL",
-                    "reason": str(exc),
-                }
-            except Exception as exc:
-                isolated_faults.append(f"fault_isolated:{skill_id}:{type(exc).__name__}")
-                skill_outputs[skill_id] = {
-                    "status": "UNOBSERVED",
-                    "execution_state": "EXECUTED_FAIL",
-                    "gate_verdict": "FAIL",
-                    "reason": str(exc),
-                }
-            finally:
-                if serial_factory_before is not None:
-                    _post_exec_checks([skill_id], serial_factory_before, parallel=False)
+                finally:
+                    if serial_factory_before is not None:
+                        _post_exec_checks([skill_id], serial_factory_before, parallel=False)
+    finally:
+        # Never leak an execution copy, whatever ended the wave loop.
+        for leftover_root, _approved in list(exec_snapshots.values()):
+            _discard_exec_snapshot(leftover_root)
+        exec_snapshots.clear()
 
     build_receipt: dict[str, Any] = {"state": "UNOBSERVED"}
     if build_cmd is not None:
@@ -2311,6 +2420,7 @@ def get_skill_trust_state(
             "skill_id": skill_id,
             "trust_stage": "VERIFY",
             "drifted": True,
+            "registered": True,
             "demoted_from": prev_stage,
             "demotion_reason": f"DRIFT_DETECTED_REVERIFY_REQUIRED:{','.join(drift_reasons)}",
             "verifier_status": "UNOBSERVED",
@@ -2328,11 +2438,13 @@ def get_skill_trust_state(
         _write_trust_file(workspace_root, trust_doc)
         return demoted
 
+    # No new drift now; an earlier demotion stays visible until re-promotion
+    # rewrites the record.
     return {
         **stored,
         "drifted": False,
-        "demoted_from": None,
-        "demotion_reason": None,
+        "demoted_from": stored.get("demoted_from"),
+        "demotion_reason": stored.get("demotion_reason"),
         "registered": True,
     }
 

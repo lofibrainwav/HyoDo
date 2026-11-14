@@ -59,9 +59,15 @@ The level depends on coverage as well as the score:
   line reports `PARTIAL`, not `PASS`.
 - Coverage `FULL`: the level comes from the score.
 
-The level never changes the exit code: default mode exits 0, `--strict` exits 1
-on a high finding and 2 when coverage is not `FULL`, and a missing or
-unreadable target exits 2.
+The level never changes the exit code. The exit codes are:
+
+- `2` when the target is missing, or when any selected file could not be read
+  (including a file over the size cap), in every mode: the scan is incomplete.
+  Findings in the files that were read are still shown.
+- Otherwise, default mode exits `0` whatever the findings (early warning),
+  including a `PARTIAL` or empty (`UNOBSERVED`) corpus.
+- Otherwise, `--strict` exits `2` when coverage is not `FULL` (even with `high`
+  findings), else `1` on a `high` finding, else `0`.
 
 ## Honest limits
 

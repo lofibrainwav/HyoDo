@@ -799,10 +799,14 @@ def analyze_capability_gaps(
     doctor_report = doctor(workspace_root)
     diag = _extract_doctor_diagnostics(workspace_root, doctor_report=doctor_report)
     # Unobserved provenance makes doctor UNOBSERVED; it is not a skill defect.
-    doctor_issues = list(doctor_report.get("problems", [])) + [
+    # Run-lock and registry-wide findings are not about one module's skills.
+    workspace_level = ("stale_run_lock:", "selective_activation_not_restored:")
+    doctor_issues = [
+        p for p in doctor_report.get("problems", []) if not str(p).startswith(workspace_level)
+    ] + [
         w
         for w in doctor_report.get("warnings", [])
-        if not str(w).startswith(PROVENANCE_UNOBSERVED_PREFIXES)
+        if not str(w).startswith((*PROVENANCE_UNOBSERVED_PREFIXES, "no_modules_registered"))
     ]
     route_plan = route_skills_for_task(
         workspace_root,

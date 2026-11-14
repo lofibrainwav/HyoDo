@@ -13,6 +13,7 @@ import contextlib
 import fcntl
 import json
 import os
+import socket
 from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
@@ -27,7 +28,7 @@ from adapters.agent_skills import (
 from adapters.claude_plugin import load_claude_plugin_module
 from adapters.external_evaluator import load_external_evaluator_module
 
-from factory.contracts import ModuleRecord
+from factory.contracts import ModuleRecord, utc_now_iso
 from factory.registry import (
     ACTIVE_HOOKS_REL,
     LIFECYCLE_FLOCK_REL,
@@ -49,6 +50,11 @@ from hyodo.mcp_config import plan_host as plan_mcp_host
 # doctor status UNOBSERVED but do not degrade the module's skills for routing.
 PROVENANCE_UNOBSERVED_PREFIXES = ("module_origin_unrecorded:", "module_tree_unbindable:")
 
+# Pre-activation flags of a running `--selective` run, removed after its restore.
+SELECTIVE_PENDING_REL = RUN_LOCK_REL.parent / "selective_restore_pending.json"
+# Receipts of stale run locks that were removed after their owner was proven gone.
+LOCK_RECOVERIES_REL = RUN_LOCK_REL.parent / "lock_recoveries.jsonl"
+
 
 @contextlib.contextmanager
 def _lifecycle_flock(workspace_root: Path) -> Iterator[None]:
@@ -64,6 +70,58 @@ def _lifecycle_flock(workspace_root: Path) -> Iterator[None]:
             fcntl.flock(fd, fcntl.LOCK_UN)
         finally:
             os.close(fd)
+
+
+STALE_LOCK_RECOVERY_HINT = (
+    "python examples/factory-loop/hyodo_factory.py --root <workspace> recover-stale-lock"
+)
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # it exists, owned by someone else
+    return True
+
+
+def run_lock_status(workspace_root: Path) -> dict[str, Any] | None:
+    """Describe `.hyodo/factory/run.lock`: `None` when absent, else its owner and state.
+
+    `state` is `STALE` only when the owner is provably gone: the lock names this
+    host and its pid no longer exists. A lock from another host, or without a
+    pid, is `UNKNOWN`, never assumed stale. `LIVE` means the pid exists (a reused
+    pid would also read as live; that errs on the side of not touching it).
+    """
+    lock_file = workspace_root / RUN_LOCK_REL
+    if not lock_file.exists():
+        return None
+    try:
+        held = json.loads(lock_file.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        held = None
+    if not isinstance(held, dict):
+        return {"state": "UNKNOWN", "run_id": None, "pid": None, "host": None}
+    pid = held.get("pid")
+    host = held.get("host")
+    if type(pid) is not int or pid <= 0 or host != socket.gethostname():
+        state = "UNKNOWN"
+    else:
+        state = "LIVE" if _pid_alive(pid) else "STALE"
+    return {"state": state, "run_id": held.get("run_id"), "pid": pid, "host": host}
+
+
+def _lock_held_message(workspace_root: Path, prefix: str) -> str:
+    status = run_lock_status(workspace_root) or {}
+    if status.get("state") == "STALE":
+        return (
+            f"STALE_RUN_LOCK:{status.get('pid')}: {RUN_LOCK_REL} was left by run "
+            f"{status.get('run_id')!r}, whose process no longer exists on this host. "
+            f"Recover with: {STALE_LOCK_RECOVERY_HINT}"
+        )
+    return f"{prefix}: {RUN_LOCK_REL} is held by run {status.get('run_id')!r} (pid {status.get('pid')})"
 
 
 def _run_lock_owned_by(workspace_root: Path, owner_run_id: str | None) -> bool:
@@ -89,12 +147,20 @@ def _check_not_mid_run(workspace_root: Path, owner_run_id: str | None = None) ->
     run_lock = workspace_root / RUN_LOCK_REL
     if run_lock.exists() and not _run_lock_owned_by(workspace_root, owner_run_id):
         raise RuntimeError(
-            "MID_RUN_SKILL_MUTATION_FORBIDDEN: cannot add, remove, update, or toggle skills while a run is active"
+            _lock_held_message(
+                workspace_root,
+                "MID_RUN_SKILL_MUTATION_FORBIDDEN: cannot add, remove, update, or toggle "
+                "skills while a run is active",
+            )
         )
 
 
 def acquire_run_lock(workspace_root: Path, run_id: str) -> Path:
-    """Atomically acquire `.hyodo/factory/run.lock` (`O_CREAT | O_EXCL`) and verify lock integrity."""
+    """Atomically acquire `.hyodo/factory/run.lock` (`O_CREAT | O_EXCL`) and verify lock integrity.
+
+    A lock whose owner is provably gone is reported as `STALE_RUN_LOCK:<pid>`
+    with the recovery command; it is never removed silently.
+    """
     problems = verify_lock_integrity(workspace_root)
     if problems:
         raise RuntimeError(f"MID_RUN_SKILL_DRIFT: {problems}")
@@ -104,11 +170,13 @@ def acquire_run_lock(workspace_root: Path, run_id: str) -> Path:
         fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
     except FileExistsError as exc:
         raise RuntimeError(
-            f"CONCURRENT_RUN_LOCK_HELD: another factory run already holds {RUN_LOCK_REL}"
+            _lock_held_message(
+                workspace_root, "CONCURRENT_RUN_LOCK_HELD: another factory run already holds it"
+            )
         ) from exc
     try:
-        payload = (json.dumps({"run_id": run_id, "pid": os.getpid()}) + "\n").encode("utf-8")
-        os.write(fd, payload)
+        payload = {"run_id": run_id, "pid": os.getpid(), "host": socket.gethostname()}
+        os.write(fd, (json.dumps(payload) + "\n").encode("utf-8"))
         os.fsync(fd)
     finally:
         os.close(fd)
@@ -121,6 +189,89 @@ def release_run_lock(workspace_root: Path) -> None:
     if lock_file.exists():
         with contextlib.suppress(FileNotFoundError):
             lock_file.unlink()
+
+
+def save_pending_selective_restore(
+    workspace_root: Path, run_id: str, snapshot: ActivationSnapshot
+) -> None:
+    """Persist the pre-activation flags so a killed selective run can still be undone."""
+    payload = {
+        "run_id": run_id,
+        "snapshot": {mod: [enabled, flags] for mod, (enabled, flags) in snapshot.items()},
+    }
+    _atomic_write_text(
+        workspace_root / SELECTIVE_PENDING_REL, json.dumps(payload, sort_keys=True) + "\n"
+    )
+
+
+def clear_pending_selective_restore(workspace_root: Path) -> None:
+    with contextlib.suppress(FileNotFoundError):
+        (workspace_root / SELECTIVE_PENDING_REL).unlink()
+
+
+def load_pending_selective_restore(
+    workspace_root: Path,
+) -> tuple[str | None, ActivationSnapshot] | None:
+    path = workspace_root / SELECTIVE_PENDING_REL
+    if not path.is_file():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        snapshot = {
+            str(mod): (bool(pair[0]), {str(k): bool(v) for k, v in dict(pair[1]).items()})
+            for mod, pair in dict(raw["snapshot"]).items()
+        }
+    except (OSError, ValueError, KeyError, TypeError, IndexError):
+        return None, {}
+    return raw.get("run_id"), snapshot
+
+
+def recover_stale_run_lock(workspace_root: Path) -> dict[str, Any]:
+    """Remove a run lock only when its owner is provably gone, and record that it did.
+
+    Also restores the `enabled` flags a killed `--selective` run left behind.
+    Appends a receipt to `.hyodo/factory/lock_recoveries.jsonl`.
+    """
+    with _lifecycle_flock(workspace_root):
+        status = run_lock_status(workspace_root)
+        if status is None:
+            raise RuntimeError("NO_RUN_LOCK: nothing to recover")
+        if status["state"] != "STALE":
+            raise RuntimeError(
+                f"RUN_LOCK_NOT_PROVABLY_STALE:{status['state']}: owner pid {status['pid']} on "
+                f"host {status['host']!r} is not provably gone; not removing {RUN_LOCK_REL}"
+            )
+        lock_text = (workspace_root / RUN_LOCK_REL).read_text(encoding="utf-8")
+        release_run_lock(workspace_root)
+        restored: list[str] = []
+        pending = load_pending_selective_restore(workspace_root)
+        if pending is not None and pending[1]:
+            modules = load_registry_state(workspace_root)
+            for mod_id, mod in list(modules.items()):
+                if mod_id not in pending[1]:
+                    continue
+                mod_enabled, flags = pending[1][mod_id]
+                new_skills = {}
+                for sid, u in mod.skills.items():
+                    want = flags.get(sid, u.enabled)
+                    if want != u.enabled:
+                        restored.append(sid)
+                    new_skills[sid] = replace(u, enabled=want)
+                modules[mod_id] = replace(mod, enabled=mod_enabled, skills=new_skills)
+            save_registry_state(workspace_root, modules)
+        clear_pending_selective_restore(workspace_root)
+        receipt = {
+            "recovered_at": utc_now_iso(),
+            "removed_lock": lock_text.strip(),
+            "owner_state": "STALE",
+            "owner_pid": status["pid"],
+            "host": status["host"],
+            "selective_flags_restored": sorted(restored),
+        }
+        log = workspace_root / LOCK_RECOVERIES_REL
+        with log.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(receipt, sort_keys=True) + "\n")
+        return receipt
 
 
 def detect_adapter_kind(source_path: Path) -> str:
@@ -555,6 +706,18 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
     provenance_unobserved = any(
         state["state"] in ("UNRECORDED", "UNBINDABLE") for state in provenance.values()
     )
+    # An empty registry is nothing observed, not a healthy one.
+    if not modules:
+        warnings.append("no_modules_registered")
+        provenance_unobserved = True
+
+    lock_status = run_lock_status(workspace_root)
+    if lock_status is not None and lock_status["state"] == "STALE":
+        problems.append(f"stale_run_lock:{lock_status['pid']}")
+    pending = load_pending_selective_restore(workspace_root)
+    if pending is not None and (lock_status is None or lock_status["state"] == "STALE"):
+        # A selective run ended without restoring the flags it changed.
+        problems.append(f"selective_activation_not_restored:{pending[0]}")
     if problems:
         status = "DEGRADED"
     elif provenance_unobserved:
@@ -568,6 +731,7 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
         "problems": sorted(set(problems)),
         "warnings": sorted(set(warnings)),
         "module_provenance": provenance,
+        "run_lock": lock_status,
     }
 
 

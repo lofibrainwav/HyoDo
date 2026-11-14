@@ -13,6 +13,7 @@ Commands:
 - `discover`        Discover standard Agent Skills / plugins across search directories
 - `hosts`           Verify host connection & capability matrix (Claude Code, Cursor, Codex, Antigravity)
 - `run <prompt>`    Execute the modular factory loop with real subprocess isolation & verification
+- `recover-stale-lock` Remove a run lock whose owner is provably gone (records a receipt)
 """
 
 from __future__ import annotations
@@ -42,6 +43,7 @@ from factory.lifecycle import (  # noqa: E402
     discover_skills,
     doctor,
     enable_target,
+    recover_stale_run_lock,
     remove_module,
     rollback_module,
     update_module,
@@ -381,6 +383,10 @@ def main(argv: list[str] | None = None) -> int:
     p_trust.add_argument("skill_id")
 
     sub.add_parser("hosts", help="Verify host connection and capability support matrix")
+    sub.add_parser(
+        "recover-stale-lock",
+        help="Remove .hyodo/factory/run.lock only if its owner process is provably gone",
+    )
 
     p_run = sub.add_parser(
         "run", help="Execute a modular factory run with real subprocess isolation"
@@ -467,6 +473,13 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "hosts":
         matrix = verify_host_integrations(root)
         print(json.dumps(matrix, indent=2))
+    elif args.cmd == "recover-stale-lock":
+        try:
+            receipt = recover_stale_run_lock(root)
+        except RuntimeError as exc:
+            print(json.dumps({"recovered": False, "reason": str(exc)}, indent=2))
+            return 2
+        print(json.dumps({"recovered": True, **receipt}, indent=2))
     elif args.cmd == "run":
         b_cmd = shlex.split(args.build_cmd) if args.build_cmd else None
         v_cmd = shlex.split(args.verify_cmd) if args.verify_cmd else None
@@ -523,6 +536,7 @@ __all__ = [
     "main",
     "recommend_skill_lifecycle_action",
     "record_jev_shadow_event",
+    "recover_stale_run_lock",
     "remove_module",
     "rollback_module",
     "route_skills_for_task",

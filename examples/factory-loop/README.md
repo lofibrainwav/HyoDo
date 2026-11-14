@@ -92,7 +92,9 @@ examples/factory-loop/
   the copy is re-hashed after the run and discarded, and a change to it is a
   violation. What remains open: a command that names files of the original
   module by absolute path instead of through those variables reads the
-  original, which can change after the check; a process running as the same
+  original, which can change after the check (such a run reports
+  `executed_from: ORIGINAL_PATH_REFERENCED` and `module_snapshot_coverage:
+  UNOBSERVED` instead of `MODULE_SNAPSHOT`); a process running as the same
   user can make the copy writable again (that is detected afterwards, not
   prevented); and files outside the module tree are not bound at all.
 - What the runner enforces, per skill, is in `boundary_enforcement` on every
@@ -112,9 +114,16 @@ examples/factory-loop/
   orchestration observations (`evidence_refs`). A write that a parallel wave
   makes is rolled back and recorded once for the wave with
   `attribution=UNOBSERVED`, because which skill wrote it is not observable.
-- No skill run, read-only or not, may change `.hyodo/factory/` (registry,
-  lock, trust cache, `host_taste.json`). Any change is rolled back and
-  recorded as `factory_state_write_forbidden`.
+- Every skill command runs in its own process group, and the whole group is
+  killed when the skill exits (`descendants_killed_after_exit: true` when
+  something was still running). Then `.hyodo/factory/` (registry, lock, trust
+  cache, `host_taste.json`) is compared with its state before the skill ran:
+  any change, including a planted symlink, is rolled back and recorded as
+  `factory_state_write_forbidden`. This holds for read-only and write-allowed
+  skills, and also when the wave ends in an exception. It does not cover a
+  process that left the skill's process group (for example with `setsid`) or
+  any other process running as the same user: such a process can still write
+  there later, and that is not detected.
 - `hyodo_factory.py run` exits `0` only when every routed skill actually
   executed and passed and an independent verifier (`--verify-cmd`) ran and
   passed, `1` on a fault, permission violation, failed build or failed/held
@@ -136,10 +145,21 @@ examples/factory-loop/
   commit, dirty flag, and the module tree digest. `doctor` reports
   `module_tree_drift` and `module_origin_drift` for enabled modules and lists
   every module's state in `module_provenance` (`UNCHANGED`, `DRIFTED`,
-  `UNRECORDED`, `UNBINDABLE`). An unrecorded or unbindable module makes
-  `doctor` report `UNOBSERVED` with a warning; the CLI exits `0` HEALTHY, `1`
-  DEGRADED, `2` UNOBSERVED. Nothing here verifies how many external
-  repositories or skills exist anywhere; no such count is claimed.
+  `UNRECORDED`, `UNBINDABLE`). An unrecorded or unbindable module, or an
+  empty registry (`no_modules_registered`), makes `doctor` report
+  `UNOBSERVED` with a warning; the CLI exits `0` HEALTHY, `1` DEGRADED, `2`
+  UNOBSERVED. Nothing here verifies how many external repositories or skills
+  exist anywhere; no such count is claimed.
+- A run that is killed leaves `.hyodo/factory/run.lock` behind. The lock
+  records the owner's pid and host; when that pid no longer exists on this
+  host, the next run fails with `STALE_RUN_LOCK:<pid>` and `doctor` reports
+  `stale_run_lock:<pid>` (plus `selective_activation_not_restored:<run_id>`
+  if a `--selective` run was killed). Recover with
+  `python examples/factory-loop/hyodo_factory.py --root <workspace> recover-stale-lock`:
+  it removes the lock only when the owner is provably gone (same host, pid not
+  running), restores the flags a killed `--selective` run left, and appends a
+  receipt to `.hyodo/factory/lock_recoveries.jsonl`. A lock from another host
+  or a running pid is never removed.
 - `hosts` inspects local connect/MCP configuration plans only. It never runs a
   host, so `live_contract` is `UNOBSERVED` and `verified_live_contract` is
   `false` for every host.
@@ -151,7 +171,7 @@ examples/factory-loop/
 | `queue.md` | host | Frozen feature contracts: goal, non-goals, mock, gate names. |
 | `policy.toml` | host, evaluated by HyoDo | Night-shift fence: `max_steps`, `allowed_tools`, `blocked_path_globs`. |
 | `factory-loop.sh` | host | Reference shell runner. `[HOST]` lines are yours to replace; `[HYODO]` lines call the CLI. |
-| `hyodo_factory.py` | host | Modular skill harness CLI (`add`, `list`, `enable`, `disable`, `update`, `rollback`, `remove`, `doctor`, `route`, `discover`, `hosts`, `run`) and 6-lens workspace bridge. |
+| `hyodo_factory.py` | host | Modular skill harness CLI (`add`, `list`, `enable`, `disable`, `update`, `rollback`, `remove`, `doctor`, `route`, `discover`, `hosts`, `run`, `recover-stale-lock`) and 6-lens workspace bridge. |
 
 ## Modular Skill Lifecycle CLI (`hyodo_factory.py`)
 
