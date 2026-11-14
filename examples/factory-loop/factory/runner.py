@@ -506,7 +506,12 @@ class SkillTimeoutExpired(subprocess.TimeoutExpired):
 
 
 _PRE_EXEC_GATE_SCRIPT = (
-    "import os, sys\n"
+    "import os, signal, sys\n"
+    # Python ignores SIGPIPE and SIGXFSZ at startup and execvp keeps ignored
+    # signals, so restore the defaults a skill would get from a direct spawn.
+    "for name in ('SIGPIPE', 'SIGXFSZ'):\n"
+    "    if hasattr(signal, name):\n"
+    "        signal.signal(getattr(signal, name), signal.SIG_DFL)\n"
     "fd = int(sys.argv[1])\n"
     "try:\n"
     "    b = os.read(fd, 1)\n"

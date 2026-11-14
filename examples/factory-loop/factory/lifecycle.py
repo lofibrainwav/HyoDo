@@ -128,6 +128,28 @@ def _parse_proc_stat_state_and_pgrp(stat_text: str) -> tuple[str, int] | None:
         return None
 
 
+def _proc_zombie_has_live_threads(pid: str | int) -> bool:
+    """True when `/proc/<pid>` is `Z` only because its main thread exited.
+
+    A main thread that calls `pthread_exit` leaves the process listed as `Z`
+    while other threads keep running. Unreadable or unparseable status counts
+    as live threads (fail closed).
+    """
+    try:
+        status = Path(f"/proc/{pid}/status").read_text(encoding="utf-8")
+    except FileNotFoundError:
+        return False
+    except OSError:
+        return True
+    for line in status.splitlines():
+        if line.startswith("Threads:"):
+            try:
+                return int(line.split()[1]) > 1
+            except (IndexError, ValueError):
+                return True
+    return True
+
+
 def _pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -140,10 +162,20 @@ def _pid_alive(pid: int) -> bool:
         try:
             parsed = _parse_proc_stat_state_and_pgrp(proc_stat.read_text(encoding="utf-8"))
         except FileNotFoundError:
-            return False
+            # os.kill just found it: a missing entry means this /proc belongs to
+            # another PID namespace, or the process exited in between. Ask again.
+            try:
+                os.kill(pid, 0)
+            except ProcessLookupError:
+                return False
+            except PermissionError:
+                return True
+            return True
         except OSError:
             return True
-        return not (parsed is not None and parsed[0] in ("Z", "X"))
+        if parsed is None or parsed[0] not in ("Z", "X"):
+            return True
+        return _proc_zombie_has_live_threads(pid)
     try:
         res = subprocess.run(
             ["ps", "-o", "stat=", "-p", str(pid)],
@@ -180,45 +212,65 @@ def _process_group_state(pgid: int) -> str:
     except ProcessLookupError:
         return "GONE"
     except PermissionError:
-        return "INVALID"
+        # macOS answers EPERM for a group whose only members are unreaped zombies,
+        # as well as for another user's group. Only a clean scan that sees nothing
+        # but zombies in the group makes it GONE; anything else stays INVALID.
+        return "GONE" if _ps_group_scan(pgid) == "GONE" else "INVALID"
 
     if Path("/proc/self/stat").is_file():
-        saw_zombie = False
-        saw_uncertain = False
-        try:
-            proc_entries = list(Path("/proc").iterdir())
-        except OSError:
-            return "ALIVE"
-        for entry in proc_entries:
-            if not entry.name.isdigit():
-                continue
-            try:
-                stat_text = (entry / "stat").read_text(encoding="utf-8")
-            except FileNotFoundError:
-                continue
-            except OSError:
-                saw_uncertain = True
-                continue
-            parsed = _parse_proc_stat_state_and_pgrp(stat_text)
-            if parsed is None:
-                saw_uncertain = True
-                continue
-            state, pgrp = parsed
-            if pgrp != pgid:
-                continue
-            if state not in ("Z", "X"):
-                return "ALIVE"
-            saw_zombie = True
-        if saw_zombie and not saw_uncertain:
-            return "GONE"
-        try:
-            os.killpg(pgid, 0)
-        except ProcessLookupError:
-            return "GONE"
-        except PermissionError:
-            return "INVALID"
-        return "ALIVE"
+        # A member that forks and exits between listing and reading could leave
+        # one scan seeing only zombies; GONE needs two scans that agree.
+        first = _proc_group_scan(pgid)
+        return first if first != "GONE" else _proc_group_scan(pgid)
+    return _ps_group_scan(pgid)
 
+
+def _proc_group_scan(pgid: int) -> str:
+    """One `/proc` scan of a group: `ALIVE`, `GONE`, or `INVALID` (EPERM)."""
+    saw_zombie = False
+    saw_uncertain = False
+    try:
+        proc_entries = list(Path("/proc").iterdir())
+    except OSError:
+        return "ALIVE"
+    for entry in proc_entries:
+        if not entry.name.isdigit():
+            continue
+        try:
+            stat_text = (entry / "stat").read_text(encoding="utf-8")
+        except FileNotFoundError:
+            continue
+        except OSError:
+            saw_uncertain = True
+            continue
+        parsed = _parse_proc_stat_state_and_pgrp(stat_text)
+        if parsed is None:
+            saw_uncertain = True
+            continue
+        state, pgrp = parsed
+        if pgrp != pgid:
+            continue
+        if state not in ("Z", "X") or _proc_zombie_has_live_threads(entry.name):
+            return "ALIVE"
+        saw_zombie = True
+    if saw_zombie and not saw_uncertain:
+        return "GONE"
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return "GONE"
+    except PermissionError:
+        return "INVALID"
+    return "ALIVE"
+
+
+def _ps_group_scan(pgid: int) -> str:
+    """`GONE` only when `ps` lists the group and every member is a zombie.
+
+    Any failure, timeout, unparseable line or live member answers `ALIVE`
+    (fail closed); a group `ps` does not list at all is also `ALIVE` here,
+    because `os.killpg` just said it exists.
+    """
     try:
         res = subprocess.run(
             ["ps", "-A", "-o", "pgid=,stat="],
