@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.22.5] - 2026-11-14
+
+Safety scans that keep scanning past oversized files, gate-trust commands for hosts, and factory-example fixes so harness-built approvals, unenforced restrictions and fixed timestamps are never reported as authority or evidence, since 4.22.4.
+
 ### Added
 
 - `hyodo gates trust show` (read-only view of the command set, its fingerprint and whether it is approved) and `hyodo gates trust approve --fingerprint --via` (records a host-attested approval for exactly that fingerprint, recorded as `external:<label>`; nothing is written on a mismatch), so a host can collect its operator's approval outside the terminal prompt.
@@ -32,6 +36,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Factory tests: the real-repository tests no longer pass with nothing attached when hardcoded private paths are missing. They read `HYODO_FACTORY_EXTERNAL_SKILLS_DIR` and skip explicitly when it is unset or holds no skill repositories.
 - `hyodo safe` (text and `--json`) no longer reports `level: "low"` next to `coverage: "UNOBSERVED"`: when coverage is `UNOBSERVED` (nothing scanned, a missing path, or a file that could not be read) a score that would be `low` is reported as `level: "unobserved"`; findings in the files that were read can still raise it. `PARTIAL` coverage (a capped scan) still reports the level from its findings, which can be `low`. Exit codes are unchanged. `docs/SAFE_RULES.md` documents the levels and the exact exit codes.
 - Factory example: skill discovery deduplicates by file identity, so on case-insensitive filesystems (macOS) `SKILL.md` and `skill.md` no longer register the same skill twice and fail with `duplicate_skill_id`. Hard-linked bodies in two skill folders still register as two skills.
+
+### Evidence
+
+- Release chain receipt: `docs/releases/4.22.5.md`.
 
 ## [4.22.4] - 2026-10-27
 
