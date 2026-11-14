@@ -28,7 +28,13 @@ from test_factory_harness import (
 )
 
 FACTORY_DIR = Path(__file__).resolve().parents[1] / "examples" / "factory-loop"
-HOST_ENFORCED = ("network_access", "browser_automation", "filesystem_write")
+HOST_ENFORCED = (
+    "network_access",
+    "browser_automation",
+    "filesystem_write",
+    "allowed_paths",
+    "allowed_tools",
+)
 
 
 def _parse_ts(value: str) -> datetime:
@@ -74,7 +80,12 @@ def _forge_auto_run(
 
     base = factory.get_skill_trust_state(repo, skill_id)
     receipt = factory.issue_host_approval_request(
-        repo, skill_id=skill_id, run_id=run_id, approved_by="host-operator", command=command
+        repo,
+        skill_id=skill_id,
+        run_id=run_id,
+        approved_by="host-operator",
+        command=command,
+        host_enforced_restrictions=HOST_ENFORCED,
     )
     skills = {
         skill_id: {

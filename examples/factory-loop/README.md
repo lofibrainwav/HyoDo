@@ -77,47 +77,69 @@ examples/factory-loop/
   execution re-asks the host's verifier every time.
 - The approval request binds the skill's `SKILL.md` hash, its permission
   boundary, the module source path, a digest of every file in the module tree
-  (relative path, executable bit and content; `.git/` and `.hyodo/` are left
-  out; a symlink anywhere in the tree makes the module unbindable), and the
-  exact command the host will run (`None` for a run with no subprocess
-  command). An `auto` run recomputes the tree digest from disk and compares
-  the command it is about to run; any difference blocks it. A changed module
-  tree or source path also demotes the skill's trust to `VERIFY`. The check
-  happens right before each wave, so a file swapped between that check and the
-  process start is not caught.
+  (relative path, executable bit and content; only the module root's own
+  `.git/` is left out, so nested `.git/` or `.hyodo/` directories are hashed;
+  a symlink anywhere in the tree makes the module unbindable), the exact
+  command the host will run (`None` for a run with no subprocess command), and
+  the restrictions the host attests it enforces. Any difference blocks an
+  `auto` run. A changed module tree or source path also demotes the skill's
+  trust to `VERIFY`.
+- An `auto` run re-checks the permission and every binding immediately before
+  each skill's process starts, not once per wave, because an earlier skill in
+  the same run can change files. A command then runs with
+  `CLAUDE_PLUGIN_ROOT` / `CLAUDE_SKILL_DIR` pointing at a private, read-only
+  copy of the module tree whose digest matched the approval at that moment;
+  the copy is re-hashed after the run and discarded, and a change to it is a
+  violation. What remains open: a command that names files of the original
+  module by absolute path instead of through those variables reads the
+  original, which can change after the check; a process running as the same
+  user can make the copy writable again (that is detected afterwards, not
+  prevented); and files outside the module tree are not bound at all.
 - What the runner enforces, per skill, is in `boundary_enforcement` on every
   skill output: `subprocess_exec` is `ENFORCED` (pre-exec gate for host
   commands); `filesystem_write=false` is `PARTIAL` (workspace files only, by
-  POSIX write bits plus snapshot rollback; `.git/`, `.hyodo/` and paths outside
-  the workspace are not covered); `network_access=false` and
-  `browser_automation=false` are `UNENFORCED` (proxy variables are dropped and
-  `HYODO_FACTORY_NETWORK_DISABLED=1` is set, which stops nothing). `auto`
-  execution is refused while a boundary relies on a `PARTIAL` or `UNENFORCED`
-  restriction, unless the host passes `host_enforced_restrictions` (for
-  example because it runs commands in a network-isolated sandbox); that is
-  reported as `HOST_ATTESTED`, not as something HyoDo observed. A write that a
-  parallel wave makes is rolled back and recorded once for the wave with
+  POSIX write bits plus snapshot rollback; `.git/`, `.hyodo/` other than
+  `.hyodo/factory/`, and paths outside the workspace are not covered); `network_access=false`,
+  `browser_automation=false` and declared `allowed_paths` / `allowed_tools`
+  are `UNENFORCED` (proxy variables are dropped and
+  `HYODO_FACTORY_NETWORK_DISABLED=1` is set, which stops nothing; the
+  allowlists are never evaluated). `auto` execution is refused while a
+  boundary relies on a `PARTIAL` or `UNENFORCED` restriction, unless the host
+  passes `host_enforced_restrictions` (for example because it runs commands in
+  a network-isolated sandbox). Only those five names are accepted; the claim
+  is reported as `HOST_ATTESTED`, not as something HyoDo observed, is bound
+  into the approval request, and is recorded in agent events (`meta.tags`) and
+  orchestration observations (`evidence_refs`). A write that a parallel wave
+  makes is rolled back and recorded once for the wave with
   `attribution=UNOBSERVED`, because which skill wrote it is not observable.
-- `hyodo_factory.py run` exits `0` only when at least one skill actually
+- No skill run, read-only or not, may change `.hyodo/factory/` (registry,
+  lock, trust cache, `host_taste.json`). Any change is rolled back and
+  recorded as `factory_state_write_forbidden`.
+- `hyodo_factory.py run` exits `0` only when every routed skill actually
   executed and passed and an independent verifier (`--verify-cmd`) ran and
   passed, `1` on a fault, permission violation, failed build or failed/held
   verifier, and `2` (UNOBSERVED) otherwise. The result's `run_verdict` says
   which.
 - `--selective` / `selective_activation=True` is task-scoped: it enables only
   the task's skills for the run and restores every module's and skill's
-  previous `enabled` flag afterwards, also when the run raises.
+  previous `enabled` flag afterwards, also when the run raises. The run lock
+  is held from before the activation until after the restore. A failed
+  restore is reported (`registry_state_after_run: RESTORE_FAILED`, verdict
+  `FAIL`) and the run's result is still returned.
 - Personal Taste provenance is reported as it is: only rules from
   `.hyodo/factory/host_taste.json` or explicit feedback are `HOST_CONFIGURED`
   and handed to subprocesses as `HYODO_HOST_PERSONAL_TASTE_JSON`. A chosen
   profile's rules are `PROFILE_DEFAULT`. Gap analysis without `--profile` uses
   no profile (`"profile": "auto"`).
 - `add` and `update` record each module's origin in `lock.json` (`origin`):
-  source path, git remote URL (credentials stripped), commit, dirty flag, and
-  the module tree digest. `doctor` reports `module_tree_drift` and
-  `module_origin_drift` for enabled modules and lists every module's state in
-  `module_provenance` (`UNCHANGED`, `DRIFTED`, `UNRECORDED`, `UNBINDABLE`).
-  Nothing here verifies how many external repositories or skills exist
-  anywhere; no such count is claimed.
+  source path, git remote URL (userinfo, query string and fragment removed),
+  commit, dirty flag, and the module tree digest. `doctor` reports
+  `module_tree_drift` and `module_origin_drift` for enabled modules and lists
+  every module's state in `module_provenance` (`UNCHANGED`, `DRIFTED`,
+  `UNRECORDED`, `UNBINDABLE`). An unrecorded or unbindable module makes
+  `doctor` report `UNOBSERVED` with a warning; the CLI exits `0` HEALTHY, `1`
+  DEGRADED, `2` UNOBSERVED. Nothing here verifies how many external
+  repositories or skills exist anywhere; no such count is claimed.
 - `hosts` inspects local connect/MCP configuration plans only. It never runs a
   host, so `live_contract` is `UNOBSERVED` and `verified_live_contract` is
   `false` for every host.

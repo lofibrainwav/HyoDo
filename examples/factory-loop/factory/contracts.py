@@ -86,9 +86,10 @@ class PermissionBoundary:
     Never grants merge/deploy authority; `execution_authority` is always False.
     `factory/runner.py` enforces `subprocess_exec` (pre-exec gate) and
     `filesystem_write=False` inside the workspace only (POSIX write bits plus
-    snapshot rollback). `network_access=False` and `browser_automation=False`
-    are NOT enforced by the runner; they are advisory and reported as
-    `UNENFORCED` (see `boundary_enforcement_report`).
+    snapshot rollback). `network_access=False`, `browser_automation=False` and
+    the `allowed_paths` / `allowed_tools` allowlists are NOT enforced by the
+    runner; they are advisory and reported as `UNENFORCED` (see
+    `boundary_enforcement_report`).
     """
 
     allowed_tools: tuple[str, ...] = ()

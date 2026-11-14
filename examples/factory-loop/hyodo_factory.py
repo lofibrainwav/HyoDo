@@ -440,7 +440,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "doctor":
         rep = doctor(root)
         print(json.dumps(rep, indent=2))
-        return 0 if rep["status"] == "HEALTHY" else 1
+        return {"HEALTHY": 0, "DEGRADED": 1}.get(rep["status"], 2)
     elif args.cmd == "route":
         plan = route_skills_for_task(
             root,

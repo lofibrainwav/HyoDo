@@ -45,6 +45,10 @@ from hyodo.connect import plan_target as plan_connect_target
 from hyodo.mcp_config import ALL_HOSTS as MCP_ALL_HOSTS
 from hyodo.mcp_config import plan_host as plan_mcp_host
 
+# Doctor warnings about provenance that could not be observed. They make the
+# doctor status UNOBSERVED but do not degrade the module's skills for routing.
+PROVENANCE_UNOBSERVED_PREFIXES = ("module_origin_unrecorded:", "module_tree_unbindable:")
+
 
 @contextlib.contextmanager
 def _lifecycle_flock(workspace_root: Path) -> Iterator[None]:
@@ -62,10 +66,28 @@ def _lifecycle_flock(workspace_root: Path) -> Iterator[None]:
             os.close(fd)
 
 
-def _check_not_mid_run(workspace_root: Path) -> None:
-    """Refuse lifecycle mutations while a task run lock is active (Acceptance Gate #9)."""
+def _run_lock_owned_by(workspace_root: Path, owner_run_id: str | None) -> bool:
+    if owner_run_id is None:
+        return False
+    try:
+        held = json.loads((workspace_root / RUN_LOCK_REL).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(held, dict)
+        and held.get("run_id") == owner_run_id
+        and held.get("pid") == os.getpid()
+    )
+
+
+def _check_not_mid_run(workspace_root: Path, owner_run_id: str | None = None) -> None:
+    """Refuse lifecycle mutations while a task run lock is active (Acceptance Gate #9).
+
+    The run that holds the lock (same `run_id` and process) may still apply its
+    own task-scoped activation and restore it; nobody else may.
+    """
     run_lock = workspace_root / RUN_LOCK_REL
-    if run_lock.exists():
+    if run_lock.exists() and not _run_lock_owned_by(workspace_root, owner_run_id):
         raise RuntimeError(
             "MID_RUN_SKILL_MUTATION_FORBIDDEN: cannot add, remove, update, or toggle skills while a run is active"
         )
@@ -285,10 +307,11 @@ def activate_selected_skills(
     skill_ids: list[str],
     *,
     disable_others: bool = True,
+    owner_run_id: str | None = None,
 ) -> list[str]:
     """Atomically enable only *skill_ids* plus their transitive dependencies in one registry write."""
     with _lifecycle_flock(workspace_root):
-        _check_not_mid_run(workspace_root)
+        _check_not_mid_run(workspace_root, owner_run_id)
         modules = load_registry_state(workspace_root)
         unit_map = {sid: u for mod in modules.values() for sid, u in mod.skills.items()}
         to_enable: set[str] = set()
@@ -335,14 +358,19 @@ def snapshot_activation_state(workspace_root: Path) -> ActivationSnapshot:
     }
 
 
-def restore_activation_state(workspace_root: Path, snapshot: ActivationSnapshot) -> list[str]:
+def restore_activation_state(
+    workspace_root: Path,
+    snapshot: ActivationSnapshot,
+    *,
+    owner_run_id: str | None = None,
+) -> list[str]:
     """Restore the `enabled` flags captured by `snapshot_activation_state` in one write.
 
     Only enablement is restored; skills or modules added since the snapshot are
     left as they are. Returns the skill ids whose flag was changed back.
     """
     with _lifecycle_flock(workspace_root):
-        _check_not_mid_run(workspace_root)
+        _check_not_mid_run(workspace_root, owner_run_id)
         modules = load_registry_state(workspace_root)
         restored: list[str] = []
         for mod_id, mod in list(modules.items()):
@@ -516,9 +544,25 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
                     sink.append(f"module_tree_drift:{mod_id}")
                 else:
                     sink.append(f"module_origin_drift:{mod_id}:{changed}")
+        elif cmp["state"] == "UNRECORDED":
+            warnings.append(f"{PROVENANCE_UNOBSERVED_PREFIXES[0]}{mod_id}")
+        elif cmp["state"] == "UNBINDABLE":
+            error = mod.origin.get("module_tree_error") or "unknown"
+            warnings.append(f"{PROVENANCE_UNOBSERVED_PREFIXES[1]}{mod_id}|{error}")
 
+    # Unrecorded or unbindable provenance is not evidence of health: without
+    # problems the status is UNOBSERVED, never HEALTHY.
+    provenance_unobserved = any(
+        state["state"] in ("UNRECORDED", "UNBINDABLE") for state in provenance.values()
+    )
+    if problems:
+        status = "DEGRADED"
+    elif provenance_unobserved:
+        status = "UNOBSERVED"
+    else:
+        status = "HEALTHY"
     return {
-        "status": "HEALTHY" if not problems else "DEGRADED",
+        "status": status,
         "modules_registered": len(modules),
         "skills_enabled": len(enabled_ids),
         "problems": sorted(set(problems)),

@@ -1009,8 +1009,10 @@ def test_adversarial_all_official_external_and_workspace_repos_real_cli_run(
             f"{sys.executable} -c \"from pathlib import Path; from hyodo.safety import run_safety_scan; r = run_safety_scan(path='.', cwd=Path('.')); assert r['level'] == 'low' and r['coverage'] == 'FULL'\"",
         ]
     )
-    assert rc == 0
     run_payload = json.loads(capsys.readouterr().out)
+    # PASS (0) needs every routed skill executed; other routed skills here are
+    # disclosure-only, which is UNOBSERVED (2), never a failure (1).
+    assert rc == {"PASS": 0, "UNOBSERVED": 2}[run_payload["run_verdict"]["decision"]]
     ui_out = run_payload["skill_outputs"]["ui-ux-pro-max-skill/ui-ux-pro-max"]
     assert ui_out["execution_state"] == "EXECUTED_PASS"
     assert "UI Pro Max Search Results" in ui_out["stdout"]
@@ -1771,7 +1773,13 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
     # network/browser/outside-workspace write restrictions, so `auto` also needs
     # the host to attest that it enforces them.
     approved_cmd = [sys.executable, "-c", "print('AUTO_EXEC_OK')"]
-    host_enforced = ("network_access", "browser_automation", "filesystem_write")
+    host_enforced = (
+        "network_access",
+        "browser_automation",
+        "filesystem_write",
+        "allowed_paths",
+        "allowed_tools",
+    )
     v4 = _make_real_verifier_receipt(repo, sha, run_tag="r4")
     e4 = _make_helped_eval(factory, "auto-guard/tdd", v4, sha, case_id="c4")
     high_risk_ser = factory.issue_host_approval_request(
@@ -1780,6 +1788,7 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         run_id="run-real-4",
         approved_by="host-commander",
         command=approved_cmd,
+        host_enforced_restrictions=host_enforced,
         risk_level="high",
     )
     bad_ser_res = factory.evaluate_and_promote_trust(
@@ -1818,6 +1827,7 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         run_id="run-real-5",
         approved_by="host-commander",
         command=approved_cmd,
+        host_enforced_restrictions=host_enforced,
         risk_level="low",
     )
     host_authority = _host_authority({"run-real-5"})
@@ -1963,12 +1973,20 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
     boundary = base["boundary"]
     # The forger knows every binding (tree digest, source path, command) and can
     # build a structurally perfect request; only the host's authority matters.
+    attested = (
+        "network_access",
+        "browser_automation",
+        "filesystem_write",
+        "allowed_paths",
+        "allowed_tools",
+    )
     forged_receipt = factory.issue_host_approval_request(
         repo,
         skill_id=skill_id,
         run_id="forged-run",
         approved_by="host-commander",
         command=None,
+        host_enforced_restrictions=attested,
     )
     assert forged_receipt["module_tree_sha256"] == base["module_tree_sha256"]
     forged_skills = {
@@ -2010,7 +2028,6 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
     # Digest recomputed by the forger: integrity passes, authority does not.
     write(recomputed)
     assert factory.get_skill_trust_state(repo, skill_id)["trust_stage"] == "AUTO_RUN"
-    attested = ("network_access", "browser_automation", "filesystem_write")
     no_host = factory.check_execution_permission(
         repo, skill_id, execution_mode="auto", host_enforced_restrictions=attested
     )

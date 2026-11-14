@@ -12,12 +12,12 @@ import contextlib
 import hashlib
 import json
 import os
-import re
 import stat
 import subprocess
 import uuid
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit, urlunsplit
 
 from factory.contracts import (
     FACTORY_LOCK_SCHEMA,
@@ -47,11 +47,28 @@ LIFECYCLE_FLOCK_REL = FACTORY_DIR_REL / "lifecycle.flock"
 
 FACTORY_HOOK_MARKER = "# hyodo-factory-hook:"
 
-# Directories never hashed into a module tree digest: git internals change on
-# fetch/gc without changing what a skill runs (the commit and dirty flag are
-# recorded separately), and `.hyodo/` is this harness's own mutable state.
-_TREE_EXCLUDED_DIR_NAMES = frozenset({".git", ".hyodo"})
-_URL_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]+@")
+# The only directory never hashed into a module tree digest is the module
+# root's own `.git/`: git internals change on fetch/gc without changing what a
+# skill runs (the commit and dirty flag are recorded separately). Any other
+# `.git` or `.hyodo` directory (nested, or a `.hyodo/` inside the module) can
+# hold files a skill runs, so it is hashed like everything else.
+_TREE_EXCLUDED_ROOT_DIR = ".git"
+
+
+def redact_remote_url(raw: str) -> str | None:
+    """Strip credentials from a git remote URL: userinfo, query string and fragment.
+
+    Only URLs with a scheme and a host are rewritten; scp-style `host:path`
+    remotes and local paths carry no userinfo field and are returned as is.
+    """
+    raw = raw.strip()
+    if not raw:
+        return None
+    parts = urlsplit(raw)
+    if not parts.scheme or not parts.netloc:
+        return raw
+    host = parts.netloc.rpartition("@")[2]
+    return urlunsplit((parts.scheme, host, parts.path, "", ""))
 
 
 def compute_module_tree_digest(module_root: Path) -> tuple[str | None, int, str | None]:
@@ -69,7 +86,7 @@ def compute_module_tree_digest(module_root: Path) -> tuple[str | None, int, str 
         base = Path(dirpath)
         kept_dirs: list[str] = []
         for name in sorted(dirnames):
-            if name in _TREE_EXCLUDED_DIR_NAMES:
+            if name == _TREE_EXCLUDED_ROOT_DIR and base == module_root:
                 continue
             if (base / name).is_symlink():
                 rel = (base / name).relative_to(module_root).as_posix()
@@ -129,7 +146,7 @@ def observe_module_origin(module_root: Path) -> dict[str, Any]:
     dirty: bool | None = None
     if in_git:
         raw_remote = (_git_out(module_root, "config", "--get", "remote.origin.url") or "").strip()
-        remote_url = _URL_USERINFO_RE.sub(r"\1", raw_remote) or None
+        remote_url = redact_remote_url(raw_remote)
         commit = (_git_out(module_root, "rev-parse", "HEAD") or "").strip() or None
         porcelain = _git_out(
             module_root, "status", "--porcelain", "--untracked-files=normal", "--", "."

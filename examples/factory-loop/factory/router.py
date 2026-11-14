@@ -32,7 +32,12 @@ from factory.contracts import (
     ProfileSpec,
     SkillUnitSpec,
 )
-from factory.lifecycle import activate_selected_skills, discover_skills, doctor
+from factory.lifecycle import (
+    PROVENANCE_UNOBSERVED_PREFIXES,
+    activate_selected_skills,
+    discover_skills,
+    doctor,
+)
 from factory.registry import list_enabled_skills, load_registry_state
 from hyodo.admission_observation import ADMISSION_OBSERVATIONS_RELATIVE_PATH
 from hyodo.connector_contract import build_connector_contract
@@ -708,6 +713,7 @@ def select_and_activate_for_task(
     explicit_taste_feedback: list[str] | None = None,
     deduplicate_by_slot: bool = True,
     disable_others: bool = True,
+    owner_run_id: str | None = None,
 ) -> dict[str, Any]:
     """Select only task-needed skills across all registered modules (even lazy/dormant ones) and activate them atomically."""
     modules = load_registry_state(workspace_root)
@@ -743,6 +749,7 @@ def select_and_activate_for_task(
         workspace_root,
         plan["selected_skills"],
         disable_others=disable_others,
+        owner_run_id=owner_run_id,
     )
     total_skills = sum(len(m.skills) for m in modules.values())
     return {
@@ -791,9 +798,12 @@ def analyze_capability_gaps(
     modules = load_registry_state(workspace_root)
     doctor_report = doctor(workspace_root)
     diag = _extract_doctor_diagnostics(workspace_root, doctor_report=doctor_report)
-    doctor_issues = list(doctor_report.get("problems", [])) + list(
-        doctor_report.get("warnings", [])
-    )
+    # Unobserved provenance makes doctor UNOBSERVED; it is not a skill defect.
+    doctor_issues = list(doctor_report.get("problems", [])) + [
+        w
+        for w in doctor_report.get("warnings", [])
+        if not str(w).startswith(PROVENANCE_UNOBSERVED_PREFIXES)
+    ]
     route_plan = route_skills_for_task(
         workspace_root,
         prompt,
