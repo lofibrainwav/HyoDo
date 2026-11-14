@@ -280,3 +280,36 @@ def test_timeout_reports_that_the_process_group_was_killed(tmp_path: Path) -> No
     assert out["descendants_killed_after_exit"] is True
     assert out["process_group_killed_on_timeout"] is True
     assert left == []
+
+
+def test_zombie_pid_and_process_group_count_as_gone_not_alive(tmp_path: Path) -> None:
+    factory, repo = _scoped(tmp_path)
+    lifecycle = _lifecycle()
+    # A child that exited cleanly but has not yet been reaped stays <defunct> (`Z`).
+    zombie = subprocess.Popen(["true"], start_new_session=True)
+    try:
+        # Wait until the child finishes executing and becomes a zombie (without calling wait()).
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and lifecycle._pid_alive(zombie.pid):
+            time.sleep(0.02)
+        assert lifecycle._pid_alive(zombie.pid) is False
+        assert lifecycle._process_group_state(zombie.pid) == "GONE"
+
+        lock = repo / ".hyodo" / "factory" / "run.lock"
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.write_text(
+            json.dumps(
+                {
+                    "run_id": "zombie-run",
+                    "pid": zombie.pid,
+                    "host": socket.gethostname(),
+                }
+            ),
+            encoding="utf-8",
+        )
+        lifecycle.write_skill_process_groups(repo, "zombie-run", [zombie.pid])
+        receipt = factory.recover_stale_run_lock(repo)
+        assert receipt["owner_state"] == "STALE"
+        assert not lock.exists()
+    finally:
+        zombie.wait()

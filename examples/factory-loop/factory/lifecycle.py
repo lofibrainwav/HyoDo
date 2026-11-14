@@ -15,6 +15,7 @@ import hashlib
 import json
 import os
 import socket
+import subprocess
 import time
 from collections.abc import Iterator
 from dataclasses import replace
@@ -113,6 +114,20 @@ STALE_LOCK_RECOVERY_HINT = (
 )
 
 
+def _parse_proc_stat_state_and_pgrp(stat_text: str) -> tuple[str, int] | None:
+    """Return `(state, pgrp)` from a Linux `/proc/<pid>/stat` payload."""
+    _, sep, after = stat_text.rpartition(") ")
+    if not sep:
+        return None
+    fields = after.split()
+    if len(fields) < 3:
+        return None
+    try:
+        return fields[0], int(fields[2])
+    except ValueError:
+        return None
+
+
 def _pid_alive(pid: int) -> bool:
     try:
         os.kill(pid, 0)
@@ -120,7 +135,29 @@ def _pid_alive(pid: int) -> bool:
         return False
     except PermissionError:
         return True  # it exists, owned by someone else
-    return True
+    proc_stat = Path(f"/proc/{pid}/stat")
+    if Path("/proc/self/stat").is_file():
+        try:
+            parsed = _parse_proc_stat_state_and_pgrp(proc_stat.read_text(encoding="utf-8"))
+        except FileNotFoundError:
+            return False
+        except OSError:
+            return True
+        return not (parsed is not None and parsed[0] in ("Z", "X"))
+    try:
+        res = subprocess.run(
+            ["ps", "-o", "stat=", "-p", str(pid)],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+            check=False,
+        )
+    except OSError:
+        return True
+    if res.returncode != 0:
+        return True
+    stat = res.stdout.strip()
+    return not stat.startswith(("Z", "X"))
 
 
 def _process_group_state(pgid: int) -> str:
@@ -130,6 +167,11 @@ def _process_group_state(pgid: int) -> str:
     so pgid <= 1, the checking process's own group or session, or a group this
     user may not signal (EPERM) cannot be one of them: such an entry is a
     forged or corrupt record, never evidence that a skill is alive.
+
+    Unreaped `<defunct>` zombie processes (`Z`/`X`) also pass `os.killpg(pgid, 0)`
+    in containers whose PID 1 does not reap orphaned children; a group whose
+    members are all dead zombies is reported as `GONE`, while indeterminate
+    reads fail closed as `ALIVE`.
     """
     if pgid <= 1 or pgid in (os.getpgrp(), os.getsid(0)):
         return "INVALID"
@@ -139,7 +181,67 @@ def _process_group_state(pgid: int) -> str:
         return "GONE"
     except PermissionError:
         return "INVALID"
-    return "ALIVE"
+
+    if Path("/proc/self/stat").is_file():
+        saw_zombie = False
+        try:
+            proc_entries = list(Path("/proc").iterdir())
+        except OSError:
+            return "ALIVE"
+        for entry in proc_entries:
+            if not entry.name.isdigit():
+                continue
+            try:
+                parsed = _parse_proc_stat_state_and_pgrp(
+                    (entry / "stat").read_text(encoding="utf-8")
+                )
+            except OSError:
+                continue
+            if parsed is None:
+                continue
+            state, pgrp = parsed
+            if pgrp != pgid:
+                continue
+            if state not in ("Z", "X"):
+                return "ALIVE"
+            saw_zombie = True
+        if saw_zombie:
+            return "GONE"
+        try:
+            os.killpg(pgid, 0)
+        except ProcessLookupError:
+            return "GONE"
+        except PermissionError:
+            return "INVALID"
+        return "ALIVE"
+
+    try:
+        res = subprocess.run(
+            ["ps", "-A", "-o", "pgid=,stat="],
+            capture_output=True,
+            text=True,
+            timeout=2.0,
+            check=False,
+        )
+    except OSError:
+        return "ALIVE"
+    if res.returncode != 0:
+        return "ALIVE"
+    saw_zombie = False
+    for line in res.stdout.splitlines():
+        parts = line.split()
+        if len(parts) < 2:
+            continue
+        try:
+            line_pgid = int(parts[0])
+        except ValueError:
+            continue
+        if line_pgid != pgid:
+            continue
+        if not parts[1].startswith(("Z", "X")):
+            return "ALIVE"
+        saw_zombie = True
+    return "GONE" if saw_zombie else "ALIVE"
 
 
 def _process_group_alive(pgid: int) -> bool:
