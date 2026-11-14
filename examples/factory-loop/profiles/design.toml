@@ -1,0 +1,7 @@
+schema = "hyodo.factory-profile/v1"
+name = "design"
+description = "Architect -> Craft -> Gatekeep -> HyoDo Beauty (美) design suite pipeline"
+active_categories = ["design", "craft", "quality", "creative"]
+design_pipeline = ["architect", "craft", "gatekeep"]
+single_orchestrator = true
+require_independent_verifier = true

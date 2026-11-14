@@ -138,6 +138,8 @@ def _record_access(
 
 def _run_git(root: Path, *args: str) -> tuple[bool, str]:
     """Read a small git fact without treating an unavailable repository as green."""
+    from hyodo.provenance import clean_git_env
+
     try:
         process = subprocess.run(
             ["git", "-C", str(root), *args],
@@ -145,6 +147,7 @@ def _run_git(root: Path, *args: str) -> tuple[bool, str]:
             text=True,
             timeout=15,
             check=False,
+            env=clean_git_env(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return False, ""

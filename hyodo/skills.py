@@ -597,6 +597,8 @@ def store_body(root: Path, digest: str, text: str) -> None:
 
 def _git_tracked_text_files(root: Path) -> list[Path]:
     """Return git-tracked files under *root*, skipping binaries/undecodable ones."""
+    from hyodo.provenance import clean_git_env
+
     try:
         result = subprocess.run(
             ["git", "ls-files"],
@@ -605,6 +607,7 @@ def _git_tracked_text_files(root: Path) -> list[Path]:
             timeout=20,
             cwd=str(root),
             check=False,
+            env=clean_git_env(),
         )
     except (FileNotFoundError, subprocess.TimeoutExpired, OSError):
         return []

@@ -1,4 +1,4 @@
-# Factory loop (host-side example)
+# Factory loop (host-side example & Universal Skill Harness)
 
 An unattended "software factory" takes features from a queue overnight, builds
 each one on its own branch, has an independent reviewer attack it, and opens a
@@ -9,6 +9,38 @@ where HyoDo fits in that loop and, just as importantly, where it does not.
 [queue.md] -> [hyodo policy check] -> [build] -> [independent review]
            -> [hyodo check (fail-closed)] -> [hyodo event record + SARIF]
            -> [pull request] -> [a person merges]
+```
+
+## Architecture: HyoDo Core vs. Pluggable Factory Harness
+
+- **HyoDo Core (`hyodo/`)**: Immutable, host-neutral trust, evidence, policy,
+  and 6-virtue (`眞·善·美·仁·孝·永`) attestation engine. Never coupled to any
+  external skill repository name or path.
+- **Factory Harness (`examples/factory-loop/`)**: Replaceable host-side module
+  manager (`factory/`, `adapters/`, `profiles/`, `hyodo_factory.py`) that mounts
+  and unmounts external skills (`Agent Skills` `SKILL.md`, `Claude Code Plugins`
+  with hooks/binaries like `gstack`, or zero-authority external evaluators like
+  `JEV`) as hot-swappable parts.
+
+```text
+examples/factory-loop/
+├── hyodo_factory.py          # Thin CLI entry point & backward-compatible facade
+├── factory-loop.sh           # Reference unattended shell runner
+├── factory/
+│   ├── contracts.py          # ModuleRecord, SkillUnitSpec, PermissionBoundary
+│   ├── registry.py           # .hyodo/factory/registry.toml & lock.json
+│   ├── lifecycle.py          # add / enable / disable / update / rollback / remove / doctor
+│   ├── router.py             # Progressive Disclosure natural-language router
+│   └── runner.py             # Fault-isolated modular runner
+├── adapters/
+│   ├── agent_skills.py       # Standard SKILL.md / AGENTS.md loader
+│   ├── claude_plugin.py      # Hook / binary / runtime plugin loader
+│   └── external_evaluator.py # Zero-authority external evaluator adapter
+└── profiles/
+    ├── minimal.toml
+    ├── development.toml
+    ├── design.toml
+    └── research.toml
 ```
 
 ## Claims (honest)
@@ -39,9 +71,49 @@ where HyoDo fits in that loop and, just as importantly, where it does not.
 |---|---|---|
 | `queue.md` | host | Frozen feature contracts: goal, non-goals, mock, gate names. |
 | `policy.toml` | host, evaluated by HyoDo | Night-shift fence: `max_steps`, `allowed_tools`, `blocked_path_globs`. |
-| `factory-loop.sh` | host | Reference runner. `[HOST]` lines are yours to replace; `[HYODO]` lines call the CLI. |
+| `factory-loop.sh` | host | Reference shell runner. `[HOST]` lines are yours to replace; `[HYODO]` lines call the CLI. |
+| `hyodo_factory.py` | host | Modular skill harness CLI (`add`, `list`, `enable`, `disable`, `update`, `rollback`, `remove`, `doctor`, `route`, `discover`, `hosts`, `run`) and 6-lens workspace bridge. |
 
-## Quick try
+## Modular Skill Lifecycle CLI (`hyodo_factory.py`)
+
+```bash
+# Discover compatible skill packages across external roots or catalogs
+python examples/factory-loop/hyodo_factory.py discover "security" --search-root /path/to/skills --root .
+
+# Attach external skill repositories or evaluators (auto-detects adapter)
+python examples/factory-loop/hyodo_factory.py add /path/to/gstack --root .
+python examples/factory-loop/hyodo_factory.py add /path/to/mattpocock-skills --root .
+
+# List installed modules and active sub-skills
+python examples/factory-loop/hyodo_factory.py list --root .
+
+# Enable only a specific sub-skill (plus its required intra-module dependencies)
+python examples/factory-loop/hyodo_factory.py enable gstack/qa --only --root .
+
+# Disable a module or sub-skill
+python examples/factory-loop/hyodo_factory.py disable gstack/qa --root .
+
+# Update or rollback a module atomically
+python examples/factory-loop/hyodo_factory.py update gstack --root .
+python examples/factory-loop/hyodo_factory.py rollback gstack --root .
+
+# Verify dependencies, content digests, script syntax, and path containment
+python examples/factory-loop/hyodo_factory.py doctor --root .
+
+# Inspect host connection and support matrix (Claude Code, Cursor, Codex, Antigravity)
+python examples/factory-loop/hyodo_factory.py hosts --root .
+
+# Route a natural-language task using Progressive Disclosure and slot deduplication
+python examples/factory-loop/hyodo_factory.py route "Audit root cause and run browser QA" --root .
+
+# Execute a modular run with isolated subprocesses and independent verification
+python examples/factory-loop/hyodo_factory.py run "Implement feature with TDD" --verify-cmd "pytest -q" --root .
+
+# Detach a module and clean up registered hooks and manifest entries
+python examples/factory-loop/hyodo_factory.py remove gstack --root .
+```
+
+## Quick try (`factory-loop.sh`)
 
 ```bash
 # From a checkout that has .hyodo/gates.toml (run `hyodo init` first):

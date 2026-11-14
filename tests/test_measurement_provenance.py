@@ -1246,3 +1246,40 @@ def test_one_call_asks_git_each_question_once(
             ("status", "--porcelain"),
         ]
     )
+
+
+@requires_git
+def test_sibling_git_callers_ignore_inherited_git_location_variables(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Every git caller across hyodo must strip inherited GIT_DIR/GIT_WORK_TREE."""
+    from hyodo.eval import _collect_provenance
+    from hyodo.independent_verifier import observe_candidate
+    from hyodo.mcp_readers import _git_head
+    from hyodo.mcp_server import _run_git as mcp_run_git
+    from hyodo.safety import collect_scan_corpus
+    from hyodo.skills import _git_tracked_text_files
+
+    target = _write_checkout(tmp_path / "target")
+    target_commit = _git_init(target, "target")
+    decoy = _write_checkout(tmp_path / "decoy")
+    (decoy / "decoy_only.txt").write_text("decoy\n", encoding="utf-8")
+    decoy_commit = _git_init(decoy, "decoy")
+    (decoy / "decoy_only.txt").write_text("dirty-decoy-secret\n", encoding="utf-8")
+    assert target_commit != decoy_commit
+
+    monkeypatch.setenv("GIT_DIR", str(decoy / ".git"))
+    monkeypatch.setenv("GIT_WORK_TREE", str(decoy))
+
+    assert observe_candidate(target) == {"head_sha": target_commit, "worktree": "CLEAN"}
+    assert _git_head(target) == target_commit
+    ok, stdout = mcp_run_git(target, "rev-parse", "HEAD")
+    assert ok is True
+    assert stdout.strip() == target_commit
+    eval_prov = _collect_provenance(target)
+    assert eval_prov["git_head_sha"] == target_commit
+    assert eval_prov["git_dirty"] is False
+    corpus, _ = collect_scan_corpus(cwd=target)
+    assert "dirty-decoy-secret" not in corpus
+    tracked_names = {p.name for p in _git_tracked_text_files(target)}
+    assert "decoy_only.txt" not in tracked_names

@@ -147,9 +147,9 @@ def build_nameplate(
     )
     raw = {
         "schema_version": AGENT_NAMEPLATE_SCHEMA_VERSION,
+        **observations,
         "actor_id": actor_id or observations["actor_id"],
         "role": role or UNOBSERVED,
-        **observations,
         "observed_at": observed_at,
         "repo": repo or UNOBSERVED,
         "exact_artifact_sha": exact_artifact_sha,

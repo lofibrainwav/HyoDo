@@ -104,6 +104,8 @@ def parent_host(ppid: int) -> str | None:
 
 
 def _git_head(root: Path) -> str | None:
+    from hyodo.provenance import clean_git_env
+
     try:
         completed = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "HEAD"],
@@ -111,6 +113,7 @@ def _git_head(root: Path) -> str | None:
             text=True,
             timeout=_PS_TIMEOUT_SECONDS,
             check=False,
+            env=clean_git_env(),
         )
     except (OSError, subprocess.TimeoutExpired):
         return None

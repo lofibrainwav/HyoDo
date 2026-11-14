@@ -351,6 +351,9 @@ def collect_scan_corpus(
         return "", f"missing:{target}"
 
     # Default: prefer unstaged+staged git diff, fall back to working tree snapshot.
+    from hyodo.provenance import clean_git_env
+
+    git_env = clean_git_env()
     try:
         result = subprocess.run(
             ["git", "diff", "HEAD"],
@@ -359,6 +362,7 @@ def collect_scan_corpus(
             timeout=20,
             cwd=str(root),
             check=False,
+            env=git_env,
         )
         if result.returncode == 0 and result.stdout.strip():
             if coverage is not None:
@@ -375,6 +379,7 @@ def collect_scan_corpus(
             timeout=10,
             cwd=str(root),
             check=False,
+            env=git_env,
         )
         if status.returncode == 0:
             listing = status.stdout or ""

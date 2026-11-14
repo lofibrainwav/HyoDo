@@ -1,0 +1,6 @@
+schema = "hyodo.factory-profile/v1"
+name = "minimal"
+description = "Minimal YAGNI implementation and core verification"
+active_categories = ["simplification", "engineering"]
+single_orchestrator = true
+require_independent_verifier = true

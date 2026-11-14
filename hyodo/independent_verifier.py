@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any
 
 from hyodo.nameplate import UNOBSERVED, validate_nameplate_for_artifact
+from hyodo.provenance import clean_git_env
 
 INDEPENDENT_VERIFIER_SCHEMA_VERSION = "hyodo.independent-verifier/v1"
 VERDICTS = frozenset({"PASS", "BLOCK", "UNOBSERVED"})
@@ -26,6 +27,7 @@ def _git(root: Path, *args: str) -> str | None:
             check=True,
             capture_output=True,
             text=True,
+            env=clean_git_env(),
         )
     except (OSError, subprocess.CalledProcessError):
         return None

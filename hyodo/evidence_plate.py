@@ -45,6 +45,8 @@ def extract_evidence_atoms(envelope: dict[str, Any]) -> list[dict[str, Any]]:
         if key in {"exact_artifact_sha", "source", *_FORBIDDEN}:
             continue
         value = envelope[key]
+        if value is None or value == "UNOBSERVED":
+            continue
         encoded = json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
         atom_id = hashlib.sha256(f"{artifact_sha}:{key}:{encoded}".encode()).hexdigest()
         atoms.append({"atom_id": atom_id, "key": key, "value": value})

@@ -1,0 +1,6 @@
+schema = "hyodo.factory-profile/v1"
+name = "research"
+description = "Skill discovery (find-skills/last30days), codebase knowledge graphs (graphify/how-why), and evaluation"
+active_categories = ["research", "knowledge", "evaluation"]
+single_orchestrator = true
+require_independent_verifier = false
