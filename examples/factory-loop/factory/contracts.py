@@ -8,6 +8,7 @@ skills or adapters are added.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,9 @@ FACTORY_LOCK_SCHEMA = "hyodo.factory-lock/v1"
 FACTORY_PROFILE_SCHEMA = "hyodo.factory-profile/v1"
 TRUST_STATE_SCHEMA = "hyodo.factory-trust-state/v1"
 HOST_TASTE_SCHEMA = "hyodo.host-taste/v1"
-SERENITY_RECEIPT_SCHEMA = "kingdom.serenity-approval/v1"
+# An approval *request* built by the factory for the host's own approval
+# authority. HyoDo never issues the approval itself.
+FACTORY_APPROVAL_REQUEST_SCHEMA = "hyodo.factory-approval-request/v1"
 HOST_TASTE_REL_PATH = Path(".hyodo") / "factory" / "host_taste.json"
 
 SKILL_CATEGORIES = (
@@ -60,6 +63,12 @@ GAP_ROOT_CAUSES = (
     "DUPLICATE_SLOT",
 )
 
+
+def utc_now_iso() -> str:
+    """Return the current UTC time as an ISO-8601 `...Z` string (second precision)."""
+    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+
 TRUST_STAGES = (
     "DISCOVER",
     "VERIFY",
@@ -75,7 +84,11 @@ class PermissionBoundary:
     """Explicit runtime permission boundary for a module or skill.
 
     Never grants merge/deploy authority; `execution_authority` is always False.
-    Enforced by `factory/runner.py` around isolated subprocess execution.
+    `factory/runner.py` enforces `subprocess_exec` (pre-exec gate) and
+    `filesystem_write=False` inside the workspace only (POSIX write bits plus
+    snapshot rollback). `network_access=False` and `browser_automation=False`
+    are NOT enforced by the runner; they are advisory and reported as
+    `UNENFORCED` (see `boundary_enforcement_report`).
     """
 
     allowed_tools: tuple[str, ...] = ()
@@ -208,7 +221,11 @@ class ModuleRecord:
     enabled: bool
     skills: dict[str, SkillUnitSpec]
     license_spdx: str = "UNOBSERVED"
-    installed_at: str = "2026-11-13T00:00:00Z"
+    installed_at: str = field(default_factory=utc_now_iso)
+    # Observed origin at add/update time: source path, git remote/commit/dirty
+    # state, and the whole-module file tree digest. Empty for locks written
+    # before origin recording existed (reported by `doctor`).
+    origin: dict[str, Any] = field(default_factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -221,6 +238,7 @@ class ModuleRecord:
             "enabled": self.enabled,
             "license_spdx": self.license_spdx,
             "installed_at": self.installed_at,
+            "origin": dict(self.origin),
             "skills": {k: v.to_dict() for k, v in sorted(self.skills.items())},
         }
 
@@ -239,7 +257,9 @@ class ModuleRecord:
             tree_sha256=str(raw["tree_sha256"]),
             enabled=bool(raw.get("enabled", True)),
             license_spdx=str(raw.get("license_spdx", "UNOBSERVED")),
-            installed_at=str(raw.get("installed_at", "2026-11-13T00:00:00Z")),
+            # A missing install time is unknown, not "now".
+            installed_at=str(raw.get("installed_at", "UNOBSERVED")),
+            origin=dict(raw["origin"]) if isinstance(raw.get("origin"), dict) else {},
             skills=skills,
         )
 

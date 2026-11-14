@@ -84,3 +84,27 @@ def test_safe_json_no_extra_stdout(tmp_path):
     assert isinstance(payload, dict)
     assert result.output.strip().startswith("{")
     assert result.output.strip().endswith("}")
+
+
+def test_safe_json_level_is_not_low_when_nothing_was_observed(tmp_path):
+    """Coverage UNOBSERVED must not ride along with a reassuring `level: low`."""
+    empty = tmp_path / "empty"
+    empty.mkdir()
+
+    result = runner.invoke(app, ["safe", "--json", str(empty)])
+    payload = json.loads(result.output)
+    assert payload["coverage"] == "UNOBSERVED"
+    assert not [f for f in payload["findings"] if f["severity"] in ("high", "medium")]
+    assert payload["level"] == "unobserved"
+    assert "Not observed" in payload["action"]
+    # The exit-code contract is unchanged: default mode is early warning (0),
+    # --strict cannot be satisfied by an unobserved scan (2).
+    assert result.exit_code == payload["exit_code"] == 0
+    strict = runner.invoke(app, ["safe", "--json", "--strict", str(empty)])
+    assert strict.exit_code == json.loads(strict.output)["exit_code"] == 2
+
+    # A fully observed clean scan still reports low.
+    (empty / "notes.txt").write_text("plain notes\n", encoding="utf-8")
+    full = json.loads(runner.invoke(app, ["safe", "--json", str(empty)]).output)
+    assert full["coverage"] == "FULL"
+    assert full["level"] == "low"

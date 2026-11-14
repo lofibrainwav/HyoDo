@@ -8,13 +8,19 @@ Executes tasks with pluggable skills while enforcing:
    disclosure (`DISCLOSED_ONLY` -> `gate_verdict: UNOBSERVED`), and real
    subprocess execution (`EXECUTED_PASS` / `EXECUTED_FAIL`).
 4. Full-stream `stdout` hashing and timing-normalized SHA-256 before preview truncation.
-5. Runtime `PermissionBoundary` enforcement (`subprocess_exec`, `filesystem_write`,
-   `network_access`, `execution_authority=False`) plus `AUTO_RUN` execution permission
-   gating before any autonomous execution.
+5. Runtime `PermissionBoundary` handling: `subprocess_exec` is enforced by a pre-exec
+   gate, `filesystem_write=False` is enforced inside the workspace only (POSIX write
+   bits plus snapshot rollback; `.git/` and `.hyodo/` are not covered), and
+   `network_access` / `browser_automation` restrictions are NOT enforced. Every
+   skill output carries a `boundary_enforcement` report saying which is which, and
+   `auto` execution is refused while a restriction the boundary relies on is
+   unenforced, unless the host attests that it enforces it itself.
 6. Substantive Producer != Independent Verifier separation (`SELF_REVIEW_FORBIDDEN`)
    with genuine `hyodo.independent-verifier/v1` receipt validation in `evaluate_skill_impact`.
-7. Single-step trust progression, evidence anti-replay, and EROS/Serenity verified
-   approval receipt binding (`workspace_id`, `policy_digest`, `risk_level`, `approved_scope`).
+7. Single-step trust progression, evidence anti-replay, and host approval receipt
+   binding (`workspace_id`, `policy_digest`, `risk_level`, `approved_scope`, the
+   whole-module tree digest, the module source path, and the exact command), all
+   re-checked at `auto` execution time and confirmed by the host's authority verifier.
 """
 
 from __future__ import annotations
@@ -35,16 +41,22 @@ from typing import Any
 from adapters.agent_skills import disclose_skill_body
 
 from factory.contracts import (
-    SERENITY_RECEIPT_SCHEMA,
+    FACTORY_APPROVAL_REQUEST_SCHEMA,
     TRUST_STAGES,
     TRUST_STATE_SCHEMA,
     ModuleRecord,
     PermissionBoundary,
     SkillUnitSpec,
     recommend_skill_lifecycle_action,
+    utc_now_iso,
 )
-from factory.lifecycle import acquire_run_lock, release_run_lock
-from factory.registry import load_registry_state
+from factory.lifecycle import (
+    acquire_run_lock,
+    release_run_lock,
+    restore_activation_state,
+    snapshot_activation_state,
+)
+from factory.registry import compute_module_tree_digest, load_registry_state
 from factory.router import (
     TRUST_STATE_REL_PATH,
     analyze_capability_gaps,
@@ -78,10 +90,78 @@ from hyodo.six_lens_runtime import measure_workspace_six_lenses
 from hyodo.skill_eval import evaluate_skill_case
 from hyodo.user_state import workspace_identity
 
-# Host-owned check that a Serenity approval receipt was issued by a real approval
-# authority (for example a passkey-signed approval in KINGDOM). The factory can
-# build an approval *request*, but it can never vouch for who approved it.
+# Host-owned check that an approval receipt was issued by a real approval
+# authority (for example a passkey-signed approval in the host's own system).
+# The factory can build an approval *request*, but it can never vouch for who
+# approved it.
 ApprovalAuthorityVerifier = Callable[[dict[str, Any]], tuple[bool, str | None]]
+
+# Restrictions a `PermissionBoundary` can impose that this runner does not
+# fully enforce. A host that enforces one itself (for example by running the
+# command in a network-isolated sandbox) names it in `host_enforced_restrictions`;
+# that is recorded as `HOST_ATTESTED`, not as something HyoDo observed.
+HOST_ENFORCEABLE_RESTRICTIONS = frozenset(
+    {"network_access", "browser_automation", "filesystem_write"}
+)
+
+# Sentinel: the caller does not ask `verify_host_approval_receipt` to compare the
+# command (trust promotion has no command to compare against).
+_COMMAND_NOT_CHECKED: Any = object()
+
+
+def boundary_enforcement_report(
+    boundary: PermissionBoundary,
+    host_enforced_restrictions: frozenset[str] | set[str] | tuple[str, ...] = (),
+) -> dict[str, str]:
+    """Say, per restriction, what this runner actually enforces. Never overstates.
+
+    Values: `ENFORCED`, `PARTIAL` (workspace only), `UNENFORCED`,
+    `HOST_ATTESTED` (the host says it enforces it; HyoDo did not observe that),
+    `NOT_RESTRICTED` (the boundary allows it), `HOST_DECLARED` (a declaration the
+    runner does not evaluate).
+    """
+    attested = set(host_enforced_restrictions)
+
+    def _state(restricted: bool, own: str, name: str) -> str:
+        if not restricted:
+            return "NOT_RESTRICTED"
+        if own != "ENFORCED" and name in attested:
+            return "HOST_ATTESTED"
+        return own
+
+    return {
+        "execution_authority": "ENFORCED",
+        "subprocess_exec": _state(not boundary.subprocess_exec, "ENFORCED", "subprocess_exec"),
+        "filesystem_write": _state(not boundary.filesystem_write, "PARTIAL", "filesystem_write"),
+        "network_access": _state(not boundary.network_access, "UNENFORCED", "network_access"),
+        "browser_automation": _state(
+            not boundary.browser_automation, "UNENFORCED", "browser_automation"
+        ),
+        "allowed_paths": "HOST_DECLARED" if boundary.allowed_paths else "NOT_RESTRICTED",
+        "allowed_tools": "HOST_DECLARED" if boundary.allowed_tools else "NOT_RESTRICTED",
+    }
+
+
+def _restrictions_relying_on_unenforced(
+    boundary: PermissionBoundary,
+    host_enforced_restrictions: frozenset[str] | set[str] | tuple[str, ...] = (),
+) -> list[str]:
+    report = boundary_enforcement_report(boundary, host_enforced_restrictions)
+    return sorted(k for k, v in report.items() if v in ("UNENFORCED", "PARTIAL"))
+
+
+def _command_digest(command: list[str] | None) -> str:
+    canonical = json.dumps(command, separators=(",", ":"))
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _normalize_command(command: Any) -> tuple[bool, list[str] | None]:
+    if command is None:
+        return True, None
+    if isinstance(command, (list, tuple)) and all(isinstance(a, str) for a in command):
+        return True, list(command)
+    return False, None
+
 
 _PROTECTED_TOP_DIRS = (".git", ".hyodo", "__pycache__", ".pytest_cache")
 
@@ -219,9 +299,12 @@ def _build_isolated_env(
     env = _with_pythonpath(clean_git_env(), workspace_root)
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     if not unit.boundary.network_access:
+        # Advisory only: dropping proxy variables and setting a flag does not
+        # stop a process from opening sockets. Reported as UNENFORCED.
         for k in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy"):
             env.pop(k, None)
         env["HYODO_FACTORY_NETWORK_DISABLED"] = "1"
+        env["HYODO_FACTORY_NETWORK_ENFORCEMENT"] = "UNENFORCED"
     env["HYODO_FACTORY_SKILL_ID"] = unit.skill_id
     env["HYODO_FACTORY_ROLE"] = unit.role_hint
     env["HYODO_FACTORY_EXECUTION_AUTHORITY"] = "false"
@@ -395,35 +478,60 @@ def _scope_covers_boundary(
     return True, None
 
 
-def issue_serenity_approval_receipt(
+def _find_module_and_unit(
+    modules: dict[str, ModuleRecord], skill_id: str
+) -> tuple[ModuleRecord, SkillUnitSpec] | None:
+    for mod in modules.values():
+        if skill_id in mod.skills:
+            return mod, mod.skills[skill_id]
+    return None
+
+
+def issue_host_approval_request(
     workspace_root: Path,
     *,
     skill_id: str,
     run_id: str,
     approved_by: str,
+    command: list[str] | None,
     risk_level: str = "low",
     mandatory_gates_passed: bool = True,
     permission_violations: int = 0,
     reproducible: bool = True,
     require_policy_trust: bool = False,
 ) -> dict[str, Any]:
-    """Build an unsigned Serenity approval *request* bound to workspace, policy digest, skill hash, and run_id.
+    """Build an unsigned approval *request* for the host's own approval authority.
+
+    It binds the workspace, policy digest, `SKILL.md` hash, run_id, the digest of
+    every file in the skill's module tree (symlinks refused), the module source
+    path, and the exact command the host will run (`None` when no subprocess
+    command will run, e.g. disclosure-only or an in-process host hook).
 
     The returned dict is not an approval. Every field is asserted by the caller,
-    and nothing here proves who approved it. `verify_serenity_approval_receipt`
+    and nothing here proves who approved it. `verify_host_approval_receipt`
     accepts it only when the host's `authority_verifier` confirms that a real
     approval authority issued it.
     """
-    modules = load_registry_state(workspace_root)
-    unit = next((m.skills[skill_id] for m in modules.values() if skill_id in m.skills), None)
-    if unit is None:
-        raise KeyError(f"cannot issue Serenity receipt for unregistered skill: {skill_id}")
+    found = _find_module_and_unit(load_registry_state(workspace_root), skill_id)
+    if found is None:
+        raise KeyError(f"cannot build an approval request for unregistered skill: {skill_id}")
+    mod, unit = found
+    ok_cmd, normalized_cmd = _normalize_command(command)
+    if not ok_cmd:
+        raise ValueError("command must be a list of strings or None")
+    tree_digest, _count, tree_error = compute_module_tree_digest(Path(mod.source_path))
+    if tree_digest is None:
+        raise ValueError(f"cannot bind approval: module tree unbindable ({tree_error})")
     return {
-        "schema": SERENITY_RECEIPT_SCHEMA,
+        "schema": FACTORY_APPROVAL_REQUEST_SCHEMA,
         "approved": True,
         "run_id": run_id,
         "skill_id": skill_id,
         "content_sha256": unit.content_sha256,
+        "module_source_path": mod.source_path,
+        "module_tree_sha256": tree_digest,
+        "command": normalized_cmd,
+        "command_sha256": _command_digest(normalized_cmd),
         "workspace_id": workspace_identity(workspace_root),
         "policy_digest": current_policy_digest(workspace_root),
         "approved_by": approved_by,
@@ -436,61 +544,95 @@ def issue_serenity_approval_receipt(
     }
 
 
-def verify_serenity_approval_receipt(
+def verify_host_approval_receipt(
     workspace_root: Path,
-    serenity_receipt: dict[str, Any] | None,
+    approval_receipt: dict[str, Any] | None,
     *,
     skill_id: str,
     unit: SkillUnitSpec,
     content_sha256: str,
     run_id: str,
+    module: ModuleRecord | None = None,
+    command: Any = _COMMAND_NOT_CHECKED,
     authority_verifier: ApprovalAuthorityVerifier | None = None,
 ) -> tuple[bool, list[str]]:
-    """Fail-closed verification of an EROS/Serenity approval receipt (never trusts a bare boolean).
+    """Fail-closed verification of a host approval receipt (never trusts a bare boolean).
 
-    Structural binding is checked here; the issuing authority is checked only by the
-    host-supplied *authority_verifier*. Without one the receipt is never accepted.
+    Structural binding is checked here, including a fresh recomputation of the
+    module tree digest from disk and, when *command* is given, an exact match of
+    the command the host is about to run. The issuing authority is checked only
+    by the host-supplied *authority_verifier*. Without one the receipt is never
+    accepted.
     """
     reasons: list[str] = []
-    if not isinstance(serenity_receipt, dict) or not serenity_receipt:
-        return False, ["SERENITY_RECEIPT_REQUIRED"]
-    if serenity_receipt.get("schema") != SERENITY_RECEIPT_SCHEMA:
-        reasons.append("serenity_schema_invalid")
-    if serenity_receipt.get("approved") is not True:
-        reasons.append("serenity_not_approved")
-    if serenity_receipt.get("skill_id") != skill_id:
-        reasons.append("serenity_skill_mismatch")
-    if serenity_receipt.get("content_sha256") != content_sha256:
-        reasons.append("serenity_content_sha_mismatch")
-    if serenity_receipt.get("run_id") != run_id:
-        reasons.append("serenity_run_id_mismatch")
-    if serenity_receipt.get("workspace_id") != workspace_identity(workspace_root):
-        reasons.append("serenity_workspace_mismatch")
-    if serenity_receipt.get("policy_digest") != current_policy_digest(workspace_root):
-        reasons.append("serenity_policy_digest_changed")
-    approver = serenity_receipt.get("approved_by")
+    if not isinstance(approval_receipt, dict) or not approval_receipt:
+        return False, ["APPROVAL_RECEIPT_REQUIRED"]
+    if approval_receipt.get("schema") != FACTORY_APPROVAL_REQUEST_SCHEMA:
+        reasons.append("approval_schema_invalid")
+    if approval_receipt.get("approved") is not True:
+        reasons.append("approval_not_approved")
+    if approval_receipt.get("skill_id") != skill_id:
+        reasons.append("approval_skill_mismatch")
+    if approval_receipt.get("content_sha256") != content_sha256:
+        reasons.append("approval_content_sha_mismatch")
+    if approval_receipt.get("run_id") != run_id:
+        reasons.append("approval_run_id_mismatch")
+    if approval_receipt.get("workspace_id") != workspace_identity(workspace_root):
+        reasons.append("approval_workspace_mismatch")
+    if approval_receipt.get("policy_digest") != current_policy_digest(workspace_root):
+        reasons.append("approval_policy_digest_changed")
+    approver = approval_receipt.get("approved_by")
     if not isinstance(approver, str) or not approver.strip():
-        reasons.append("serenity_approver_missing")
-    risk = str(serenity_receipt.get("risk_level", "unknown")).lower()
+        reasons.append("approval_approver_missing")
+    risk = str(approval_receipt.get("risk_level", "unknown")).lower()
     if risk not in ("low", "medium"):
-        reasons.append(f"serenity_risk_blocked:{risk}")
-    if serenity_receipt.get("mandatory_gates_passed") is not True:
-        reasons.append("serenity_mandatory_gates_unverified")
-    violations = serenity_receipt.get("permission_violations", 1)
+        reasons.append(f"approval_risk_blocked:{risk}")
+    if approval_receipt.get("mandatory_gates_passed") is not True:
+        reasons.append("approval_mandatory_gates_unverified")
+    violations = approval_receipt.get("permission_violations", 1)
     if type(violations) is not int:
-        reasons.append("serenity_permission_violations_invalid")
+        reasons.append("approval_permission_violations_invalid")
     elif violations != 0:
-        reasons.append("serenity_permission_violations_nonzero")
-    if serenity_receipt.get("reproducible") is not True:
-        reasons.append("serenity_reproducibility_false")
+        reasons.append("approval_permission_violations_nonzero")
+    if approval_receipt.get("reproducible") is not True:
+        reasons.append("approval_reproducibility_false")
+
+    # Module tree, source path and command binding, recomputed now.
+    mod = module
+    if mod is None:
+        found = _find_module_and_unit(load_registry_state(workspace_root), skill_id)
+        mod = found[0] if found is not None else None
+    if mod is None:
+        reasons.append("approval_module_unregistered")
+    else:
+        if approval_receipt.get("module_source_path") != mod.source_path:
+            reasons.append("approval_module_source_path_changed")
+        bound_tree = approval_receipt.get("module_tree_sha256")
+        current_tree, _count, tree_error = compute_module_tree_digest(Path(mod.source_path))
+        if not isinstance(bound_tree, str) or not bound_tree:
+            reasons.append("approval_module_tree_unbound")
+        elif current_tree is None:
+            reasons.append(f"approval_module_tree_unbindable:{tree_error}")
+        elif current_tree != bound_tree:
+            reasons.append("approval_module_tree_changed")
+    if "command" not in approval_receipt:
+        reasons.append("approval_command_unbound")
+    else:
+        ok_bound, bound_cmd = _normalize_command(approval_receipt.get("command"))
+        if not ok_bound or approval_receipt.get("command_sha256") != _command_digest(bound_cmd):
+            reasons.append("approval_command_binding_invalid")
+        elif command is not _COMMAND_NOT_CHECKED:
+            ok_run, run_cmd = _normalize_command(command)
+            if not ok_run or run_cmd != bound_cmd:
+                reasons.append("approval_command_changed")
 
     scope_ok, scope_err = _scope_covers_boundary(
-        serenity_receipt.get("approved_scope"), unit.boundary
+        approval_receipt.get("approved_scope"), unit.boundary
     )
     if not scope_ok and scope_err:
         reasons.append(scope_err)
 
-    if serenity_receipt.get("require_policy_trust") is True:
+    if approval_receipt.get("require_policy_trust") is True:
         pt_state, pt_err = load_policy_trust(workspace_root, scope=SCOPE_POLICY_ASK)
         if pt_state is None or pt_err is not None or pt_state.level < 1:
             reasons.append(f"policy_trust_unverified:{pt_err or 'level_too_low'}")
@@ -500,16 +642,16 @@ def verify_serenity_approval_receipt(
         reasons.append("host_promise_projection_invalid")
 
     if authority_verifier is None:
-        reasons.append("SERENITY_ISSUER_UNVERIFIED:no_host_authority_verifier")
+        reasons.append("APPROVAL_ISSUER_UNVERIFIED:no_host_authority_verifier")
     elif not reasons:
         # Only ask the host's approval authority once the structure is bound, so a
         # malformed request never triggers a real approval check.
         try:
-            issuer_ok, issuer_err = authority_verifier(dict(serenity_receipt))
+            issuer_ok, issuer_err = authority_verifier(dict(approval_receipt))
         except Exception as exc:  # any verifier failure is fail-closed
             issuer_ok, issuer_err = False, f"verifier_error:{type(exc).__name__}"
         if issuer_ok is not True:
-            reasons.append(f"serenity_issuer_rejected:{issuer_err or 'unspecified'}")
+            reasons.append(f"approval_issuer_rejected:{issuer_err or 'unspecified'}")
 
     return len(reasons) == 0, reasons
 
@@ -521,8 +663,19 @@ def check_execution_permission(
     execution_mode: str = "manual",
     env_fingerprint: str | None = None,
     authority_verifier: ApprovalAuthorityVerifier | None = None,
+    command: list[str] | None = None,
+    host_enforced_restrictions: frozenset[str] | set[str] | tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    """Check whether *skill_id* is permitted to execute under *execution_mode* (`manual` | `shadow` | `auto`)."""
+    """Check whether *skill_id* is permitted to execute under *execution_mode* (`manual` | `shadow` | `auto`).
+
+    For `auto`, the trust cache (`trust_stage`, `verifier_status`, `eval_verdict`)
+    is only a precondition: it can block, never authorize. Permission comes from
+    the host's *authority_verifier* accepting a receipt whose bindings (skill
+    hash, boundary, module tree digest recomputed from disk, module source path,
+    and the exact *command* about to run) all still match. `auto` is also refused
+    while the boundary relies on a restriction this runner does not enforce,
+    unless the host names it in *host_enforced_restrictions*.
+    """
     if execution_mode not in ("manual", "shadow", "auto"):
         raise ValueError(f"unsupported execution_mode: {execution_mode}")
 
@@ -589,14 +742,15 @@ def check_execution_permission(
         }
 
     modules = load_registry_state(workspace_root)
-    unit = next((m.skills[skill_id] for m in modules.values() if skill_id in m.skills), None)
-    if unit is None:
+    found = _find_module_and_unit(modules, skill_id)
+    if found is None:
         return {
             "allowed": False,
             "execution_mode": execution_mode,
             "reason": f"AUTO_RUN_BLOCKED_MISSING_UNIT:{skill_id}",
             "trust_stage": stage,
         }
+    mod, unit = found
     scope_ok, scope_err = _scope_covers_boundary(trust_state.get("approved_scope"), unit.boundary)
     if not scope_ok:
         return {
@@ -605,26 +759,40 @@ def check_execution_permission(
             "reason": f"AUTO_RUN_BLOCKED_{scope_err}",
             "trust_stage": stage,
         }
+    unenforced = _restrictions_relying_on_unenforced(unit.boundary, host_enforced_restrictions)
+    if unenforced:
+        return {
+            "allowed": False,
+            "execution_mode": execution_mode,
+            "reason": f"AUTO_RUN_BLOCKED_UNENFORCED_RESTRICTION:{','.join(unenforced)}",
+            "trust_stage": stage,
+            "boundary_enforcement": boundary_enforcement_report(
+                unit.boundary, host_enforced_restrictions
+            ),
+        }
 
     # The trust file is only a cache. Authority is re-checked at execution time
-    # against the current skill content and boundary, by the host's verifier.
-    stored_receipt = trust_state.get("serenity_receipt")
-    approval_ok, approval_reasons = verify_serenity_approval_receipt(
+    # against the current skill content, boundary, module tree, source path and
+    # command, by the host's verifier.
+    stored_receipt = trust_state.get("approval_receipt")
+    approval_ok, approval_reasons = verify_host_approval_receipt(
         workspace_root,
         stored_receipt if isinstance(stored_receipt, dict) else None,
         skill_id=skill_id,
         unit=unit,
+        module=mod,
         content_sha256=unit.content_sha256,
         run_id=str((stored_receipt or {}).get("run_id", ""))
         if isinstance(stored_receipt, dict)
         else "",
+        command=command,
         authority_verifier=authority_verifier,
     )
     if not approval_ok:
         return {
             "allowed": False,
             "execution_mode": execution_mode,
-            "reason": f"AUTO_RUN_BLOCKED_APPROVAL_UNVERIFIED:{approval_reasons[0]}",
+            "reason": f"AUTO_RUN_BLOCKED_APPROVAL_UNVERIFIED:{','.join(approval_reasons)}",
             "trust_stage": stage,
         }
 
@@ -633,8 +801,14 @@ def check_execution_permission(
         "execution_mode": execution_mode,
         "reason": None,
         "trust_stage": stage,
+        "authorized_by": "host_authority_verifier",
         "verified_content_sha256": unit.content_sha256,
         "verified_boundary": unit.boundary.to_dict(),
+        "verified_module_source_path": mod.source_path,
+        "verified_module_tree_sha256": stored_receipt.get("module_tree_sha256")
+        if isinstance(stored_receipt, dict)
+        else None,
+        "verified_command": command,
     }
 
 
@@ -661,13 +835,48 @@ def execute_modular_run(
     execution_mode: str = "manual",
     env_fingerprint: str | None = None,
     authority_verifier: ApprovalAuthorityVerifier | None = None,
+    host_enforced_restrictions: frozenset[str] | set[str] | tuple[str, ...] = (),
 ) -> dict[str, Any]:
-    """Run the modular factory loop with preflight gap analysis, trust gating, subprocess isolation, and Progressive Disclosure."""
+    """Run the modular factory loop with preflight gap analysis, trust gating, subprocess isolation, and Progressive Disclosure.
+
+    `selective_activation=True` is task-scoped: it enables only the task's
+    skills for this run and restores every module's and skill's previous
+    `enabled` flag afterwards, even when the run raises.
+    """
     if execution_mode not in ("manual", "shadow", "auto"):
         raise ValueError(f"unsupported execution_mode: {execution_mode}")
+    unknown_restrictions = set(host_enforced_restrictions) - HOST_ENFORCEABLE_RESTRICTIONS
+    if unknown_restrictions:
+        raise ValueError(f"unknown host_enforced_restrictions: {sorted(unknown_restrictions)}")
 
-    selective_result: dict[str, Any] | None = None
-    if selective_activation:
+    if not selective_activation:
+        return _execute_modular_run_locked(
+            workspace_root,
+            run_id=run_id,
+            prompt=prompt,
+            profile_name=profile_name,
+            skill_hooks=skill_hooks,
+            skill_commands=skill_commands,
+            build_cmd=build_cmd,
+            verify_cmd=verify_cmd,
+            builder_actor=builder_actor,
+            verifier_actor=verifier_actor,
+            builder_session_id=builder_session_id,
+            verifier_session_id=verifier_session_id,
+            timeout_s=timeout_s,
+            deduplicate_by_slot=deduplicate_by_slot,
+            mid_run_callback=mid_run_callback,
+            explicit_taste_feedback=explicit_taste_feedback,
+            external_search_roots=external_search_roots,
+            selective_result=None,
+            execution_mode=execution_mode,
+            env_fingerprint=env_fingerprint,
+            authority_verifier=authority_verifier,
+            host_enforced_restrictions=host_enforced_restrictions,
+        )
+
+    prior_activation = snapshot_activation_state(workspace_root)
+    try:
         selective_result = select_and_activate_for_task(
             workspace_root,
             prompt,
@@ -676,7 +885,62 @@ def execute_modular_run(
             deduplicate_by_slot=deduplicate_by_slot,
             disable_others=True,
         )
+        result = _execute_modular_run_locked(
+            workspace_root,
+            run_id=run_id,
+            prompt=prompt,
+            profile_name=profile_name,
+            skill_hooks=skill_hooks,
+            skill_commands=skill_commands,
+            build_cmd=build_cmd,
+            verify_cmd=verify_cmd,
+            builder_actor=builder_actor,
+            verifier_actor=verifier_actor,
+            builder_session_id=builder_session_id,
+            verifier_session_id=verifier_session_id,
+            timeout_s=timeout_s,
+            deduplicate_by_slot=deduplicate_by_slot,
+            mid_run_callback=mid_run_callback,
+            explicit_taste_feedback=explicit_taste_feedback,
+            external_search_roots=external_search_roots,
+            selective_result=selective_result,
+            execution_mode=execution_mode,
+            env_fingerprint=env_fingerprint,
+            authority_verifier=authority_verifier,
+            host_enforced_restrictions=host_enforced_restrictions,
+        )
+    finally:
+        restored = restore_activation_state(workspace_root, prior_activation)
+    selective_result["registry_state_after_run"] = "RESTORED"
+    selective_result["restored_skill_flags"] = restored
+    return result
 
+
+def _execute_modular_run_locked(
+    workspace_root: Path,
+    *,
+    run_id: str,
+    prompt: str,
+    profile_name: str | None,
+    skill_hooks: dict[str, Callable[[str, str], dict[str, Any]]] | None,
+    skill_commands: dict[str, list[str]] | None,
+    build_cmd: list[str] | None,
+    verify_cmd: list[str] | None,
+    builder_actor: str,
+    verifier_actor: str,
+    builder_session_id: str,
+    verifier_session_id: str,
+    timeout_s: float,
+    deduplicate_by_slot: bool,
+    mid_run_callback: Callable[[Path], None] | None,
+    explicit_taste_feedback: list[str] | None,
+    external_search_roots: list[Path] | None,
+    selective_result: dict[str, Any] | None,
+    execution_mode: str,
+    env_fingerprint: str | None,
+    authority_verifier: ApprovalAuthorityVerifier | None,
+    host_enforced_restrictions: frozenset[str] | set[str] | tuple[str, ...],
+) -> dict[str, Any]:
     acquire_run_lock(workspace_root, run_id)
     t0 = time.monotonic()
     try:
@@ -707,10 +971,19 @@ def execute_modular_run(
                 silent_zero_skill_ids=silent_zero_ids,
             )
 
-        active_taste_rules = [
-            item["rule"]
+        # Only rules the host itself configured (its taste file or explicit
+        # feedback) are handed to subprocesses as host taste; a repo-shipped
+        # profile's defaults are reported separately and never relabelled.
+        taste_items = [
+            item
             for item in preflight_gap_report.get("taste_synthesis", {}).get("personal_taste", [])
             if isinstance(item, dict) and item.get("rule")
+        ]
+        active_taste_rules = [
+            item["rule"] for item in taste_items if item.get("authority") == "HOST_CONFIGURED"
+        ]
+        profile_default_taste_rules = [
+            item["rule"] for item in taste_items if item.get("authority") == "PROFILE_DEFAULT"
         ]
 
         modules = load_registry_state(workspace_root)
@@ -751,25 +1024,32 @@ def execute_modular_run(
         execution_waves = _build_execution_waves(route_plan["selected_skills"], unit_lookup)
         parallel_waves_executed = 0
 
+        skill_started_at: dict[str, str] = {}
         for wave in execution_waves:
             # First enforce execution_mode (`AUTO_RUN`) trust gate per skill in wave before disclosing/running
             runnable_wave: list[str] = []
+            wave_ts = utc_now_iso()
             for skill_id in wave:
+                skill_started_at[skill_id] = wave_ts
                 perm_check = check_execution_permission(
                     workspace_root,
                     skill_id,
                     execution_mode=execution_mode,
                     env_fingerprint=env_fingerprint,
                     authority_verifier=authority_verifier,
+                    command=(skill_commands or {}).get(skill_id),
+                    host_enforced_restrictions=host_enforced_restrictions,
                 )
                 if perm_check["allowed"] and execution_mode == "auto":
                     # The run executes the unit loaded at run start; it must be the
                     # exact unit whose approval was just verified, or a lock.json
                     # edit between the two reads would widen the boundary.
-                    _run_unit = unit_lookup[skill_id][1]
-                    if _run_unit.content_sha256 != perm_check.get(
-                        "verified_content_sha256"
-                    ) or _run_unit.boundary.to_dict() != perm_check.get("verified_boundary"):
+                    _run_mod, _run_unit = unit_lookup[skill_id]
+                    if (
+                        _run_unit.content_sha256 != perm_check.get("verified_content_sha256")
+                        or _run_unit.boundary.to_dict() != perm_check.get("verified_boundary")
+                        or _run_mod.source_path != perm_check.get("verified_module_source_path")
+                    ):
                         perm_check = {
                             **perm_check,
                             "allowed": False,
@@ -850,6 +1130,19 @@ def execute_modular_run(
                     results = dict(pool.map(_run_ro_cmd, runnable_wave))
 
                 illegal_writes = _restore_and_detect_writes(workspace_root, snap_before)
+                if illegal_writes:
+                    # The wave ran concurrently against one snapshot, so which skill
+                    # wrote is not observable. Record one wave-level violation and
+                    # mark per-skill attribution UNOBSERVED instead of blaming all.
+                    wave_label = ",".join(runnable_wave)
+                    permission_violations.append(
+                        "PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:"
+                        f"parallel_wave[{wave_label}]:attribution=UNOBSERVED:"
+                        f"{','.join(illegal_writes)}"
+                    )
+                    isolated_faults.append(
+                        f"fault_isolated:parallel_wave[{wave_label}]:UnattributedWrite"
+                    )
                 for skill_id in runnable_wave:
                     _, unit = unit_lookup[skill_id]
                     body = wave_bodies[skill_id]
@@ -876,20 +1169,17 @@ def execute_modular_run(
                         proc = outcome
                         stderr_text = proc.stderr.strip()
                         if illegal_writes:
-                            violation = (
-                                f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_forbidden:{skill_id}:"
-                                f"{','.join(illegal_writes)}"
-                            )
-                            permission_violations.append(violation)
-                            isolated_faults.append(f"fault_isolated:{skill_id}:PermissionError")
                             skill_outputs[skill_id] = {
                                 "status": "UNOBSERVED",
                                 "registration_state": "REGISTERED",
                                 "disclosure_state": "DISCLOSED" if body else "NONE",
                                 "execution_state": "ROLLED_BACK_ILLEGAL_WRITE",
                                 "enforcement_mode": "POST_WRITE_SNAPSHOT_ROLLBACK",
-                                "gate_verdict": "FAIL",
-                                "reason": violation,
+                                "gate_verdict": "UNOBSERVED",
+                                "write_attribution": "UNOBSERVED",
+                                "wave_illegal_writes": list(illegal_writes),
+                                "exit_code": proc.returncode,
+                                "reason": "PARALLEL_WAVE_WRITE_ROLLED_BACK:attribution=UNOBSERVED",
                             }
                         elif proc.returncode != 0 and (
                             "PermissionError" in stderr_text or "Permission denied" in stderr_text
@@ -1198,12 +1488,13 @@ def execute_modular_run(
                     start_new_session=True,
                 )
                 v_stdout_meta = _stdout_integrity_fields(v_proc.stdout)
+                verified_at = utc_now_iso()
                 verifier_nameplate = build_nameplate(
                     actor_id=verifier_actor,
                     role="verifier",
                     repo=workspace_root.name,
                     exact_artifact_sha=target_sha,
-                    observed_at="2026-11-13T00:00:10Z",
+                    observed_at=verified_at,
                     runtime={"session_id": verifier_session_id, "host": "hyodo-factory-verifier"},
                 )
                 attestation = verify_exact_candidate(
@@ -1218,7 +1509,7 @@ def execute_modular_run(
                             "normalized_stdout_sha256"
                         ],
                     },
-                    observed_at="2026-11-13T00:00:10Z",
+                    observed_at=verified_at,
                 )
                 verifier_receipt = {
                     "state": "OBSERVED",
@@ -1261,7 +1552,7 @@ def execute_modular_run(
                     "event_id": ev_id,
                     "run_id": run_id,
                     "step_index": step_idx,
-                    "ts": "2026-11-13T00:00:05Z",
+                    "ts": skill_started_at.get(skill_id) or utc_now_iso(),
                     "kind": "tool_call",
                     "actor": "agent",
                     "tool": {
@@ -1307,7 +1598,7 @@ def execute_modular_run(
                     "observation_id": obs_id,
                     "run_id": run_id,
                     "event_id": ev_id,
-                    "ts": "2026-11-13T00:00:05Z",
+                    "ts": skill_started_at.get(skill_id) or utc_now_iso(),
                     "node_id": skill_id,
                     "execution": exec_mode,
                     "depends_on": dep_event_ids,
@@ -1324,6 +1615,20 @@ def execute_modular_run(
                 if append_orchestration_observation(workspace_root, obs_payload):
                     orchestration_observations_recorded += 1
             wave_event_ids.append(current_wave_events)
+
+        for skill_id, out in skill_outputs.items():
+            if skill_id in unit_lookup and isinstance(out, dict):
+                out["boundary_enforcement"] = boundary_enforcement_report(
+                    unit_lookup[skill_id][1].boundary, host_enforced_restrictions
+                )
+
+        run_verdict = _compute_run_verdict(
+            executed_skills=executed_skills,
+            isolated_faults=isolated_faults,
+            permission_violations=permission_violations,
+            build_receipt=build_receipt,
+            verifier_receipt=verifier_receipt,
+        )
 
         modes = [str(v.get("execution_state", "")) for v in skill_outputs.values()]
         execution_summary = {
@@ -1361,7 +1666,9 @@ def execute_modular_run(
             "external_action_allowed": False,
             "preflight_gap_report": preflight_gap_report,
             "selective_activation": selective_result,
+            "run_verdict": run_verdict,
             "personal_taste_rules": active_taste_rules,
+            "profile_default_taste_rules": profile_default_taste_rules,
             "route_plan": route_plan,
             "execution_waves": execution_waves,
             "orchestration_observations_recorded": orchestration_observations_recorded,
@@ -1380,6 +1687,40 @@ def execute_modular_run(
         }
     finally:
         release_run_lock(workspace_root)
+
+
+def _compute_run_verdict(
+    *,
+    executed_skills: list[str],
+    isolated_faults: list[str],
+    permission_violations: list[str],
+    build_receipt: dict[str, Any],
+    verifier_receipt: dict[str, Any],
+) -> dict[str, Any]:
+    """Summarize a run as `PASS`, `FAIL` or `UNOBSERVED`. A zero-gate run is never `PASS`.
+
+    `PASS` needs at least one skill that actually executed and passed AND an
+    independent verifier that ran and passed. Anything less is `UNOBSERVED`.
+    """
+    failures: list[str] = []
+    if isolated_faults:
+        failures.append("isolated_faults")
+    if permission_violations:
+        failures.append("permission_violations")
+    if build_receipt.get("state") == "OBSERVED" and build_receipt.get("status") != "PASS":
+        failures.append("build_failed")
+    if verifier_receipt.get("status") in ("FAIL", "HOLD"):
+        failures.append(f"independent_verifier_{str(verifier_receipt['status']).lower()}")
+    if failures:
+        return {"decision": "FAIL", "reasons": failures}
+    unobserved: list[str] = []
+    if not executed_skills:
+        unobserved.append("no_skill_executed")
+    if verifier_receipt.get("state") != "OBSERVED" or verifier_receipt.get("status") != "PASS":
+        unobserved.append("independent_verifier_not_run")
+    if unobserved:
+        return {"decision": "UNOBSERVED", "reasons": unobserved}
+    return {"decision": "PASS", "reasons": []}
 
 
 def evaluate_skill_impact(
@@ -1450,7 +1791,9 @@ def evaluate_skill_impact(
             "reason": verifier_err,
         }
     else:
-        assert isinstance(verifier_receipt, dict)
+        # A real check, not `assert`: it must survive `python -O`.
+        if not isinstance(verifier_receipt, dict):
+            raise TypeError("validated verifier_receipt must be a dict")
         v_status = str(verifier_receipt.get("status", "FAIL"))
         att_evidence = {
             "observed": True,
@@ -1631,6 +1974,7 @@ def get_skill_trust_state(
         }
 
     mod, unit = found
+    current_tree, _tree_count, _tree_error = compute_module_tree_digest(Path(mod.source_path))
     trust_doc = _read_trust_file(workspace_root)
     skills_map: dict[str, Any] = trust_doc["skills"]
     stored = skills_map.get(skill_id)
@@ -1645,6 +1989,8 @@ def get_skill_trust_state(
             "content_sha256": unit.content_sha256,
             "version": mod.version,
             "boundary": unit.boundary.to_dict(),
+            "module_source_path": mod.source_path,
+            "module_tree_sha256": current_tree,
             "env_fingerprint": current_env,
         }
 
@@ -1655,6 +2001,11 @@ def get_skill_trust_state(
         drift_reasons.append("version_changed")
     if stored.get("boundary") != unit.boundary.to_dict():
         drift_reasons.append("permission_boundary_changed")
+    # Any file in the module (scripts, references, run.sh) counts, not only SKILL.md.
+    if current_tree is None or stored.get("module_tree_sha256") != current_tree:
+        drift_reasons.append("module_tree_changed")
+    if stored.get("module_source_path") != mod.source_path:
+        drift_reasons.append("module_source_path_changed")
     if stored.get("env_fingerprint") != current_env:
         drift_reasons.append("environment_fingerprint_changed")
 
@@ -1669,9 +2020,13 @@ def get_skill_trust_state(
             "demotion_reason": f"DRIFT_DETECTED_REVERIFY_REQUIRED:{','.join(drift_reasons)}",
             "verifier_status": "UNOBSERVED",
             "eval_verdict": "UNOBSERVED",
+            "approval_verified": False,
+            "approval_receipt": None,
             "content_sha256": unit.content_sha256,
             "version": mod.version,
             "boundary": unit.boundary.to_dict(),
+            "module_source_path": mod.source_path,
+            "module_tree_sha256": current_tree,
             "env_fingerprint": current_env,
         }
         skills_map[skill_id] = demoted
@@ -1694,13 +2049,13 @@ def evaluate_and_promote_trust(
     target_stage: str | None = None,
     eval_receipt: dict[str, Any] | None = None,
     verifier_receipt: dict[str, Any] | None = None,
-    serenity_receipt: dict[str, Any] | None = None,
-    serenity_gate_approved: bool = False,
+    approval_receipt: dict[str, Any] | None = None,
+    approved_flag: bool = False,
     builder_actor: str | None = None,
     builder_session_id: str | None = None,
     s_score: float | None = None,
     run_id: str = "trust-eval-01",
-    source: str = "kingdom.agent-loop.eros-gate",
+    source: str = "hyodo-factory.trust-ladder",
     env_fingerprint: str | None = None,
     authority_verifier: ApprovalAuthorityVerifier | None = None,
 ) -> dict[str, Any]:
@@ -1712,10 +2067,11 @@ def evaluate_and_promote_trust(
       and fresh `verifier_receipt`; reusing prior evidence is blocked.
     - Genuine `hyodo.independent-verifier/v1` receipt required (never accepts bare mocks).
     - A high `s_score` NEVER overrides failed or `UNOBSERVED` mandatory gates.
-    - `AUTO_RUN` rejects a bare `serenity_gate_approved=True` boolean without a verified
-      `serenity_receipt` bound to `workspace_id`, `policy_digest`, `risk_level`, `approved_scope`,
-      `content_sha256`, and `run_id`, and confirmed by the host's *authority_verifier*.
-      A receipt built by `issue_serenity_approval_receipt` alone never reaches `AUTO_RUN`.
+    - `AUTO_RUN` rejects a bare `approved_flag=True` boolean without a verified
+      `approval_receipt` bound to `workspace_id`, `policy_digest`, `risk_level`, `approved_scope`,
+      `content_sha256`, `run_id`, the module tree digest, the module source path and the
+      command, and confirmed by the host's *authority_verifier*.
+      A request built by `issue_host_approval_request` alone never reaches `AUTO_RUN`.
     """
     current_state = get_skill_trust_state(workspace_root, skill_id, env_fingerprint=env_fingerprint)
     if not current_state.get("registered", False):
@@ -1792,16 +2148,17 @@ def evaluate_and_promote_trust(
         s_score is not None and s_score >= 9.0 and not mandatory_gates_passed
     )
 
-    serenity_verified, serenity_reasons = verify_serenity_approval_receipt(
+    approval_verified, approval_reasons = verify_host_approval_receipt(
         workspace_root,
-        serenity_receipt,
+        approval_receipt,
         skill_id=skill_id,
         unit=unit,
+        module=mod,
         content_sha256=unit.content_sha256,
         run_id=run_id,
         authority_verifier=authority_verifier,
     )
-    bare_boolean_rejected = bool(serenity_gate_approved and not serenity_verified)
+    bare_boolean_rejected = bool(approved_flag and not approval_verified)
 
     promotion_blocked_reason: str | None = None
     if replay_blocked:
@@ -1832,7 +2189,7 @@ def evaluate_and_promote_trust(
     else:
         candidate_stage = stage_order[desired_idx]
         if candidate_stage == "AUTO_RUN":
-            if serenity_verified and interventions_delta <= 0:
+            if approval_verified and interventions_delta <= 0:
                 new_stage = "AUTO_RUN"
                 decision = "AUTO_RUN"
                 admitted = True
@@ -1841,7 +2198,7 @@ def evaluate_and_promote_trust(
                 decision = "ASK_COMMANDER"
                 admitted = False
                 promotion_blocked_reason = (
-                    ",".join(serenity_reasons) if serenity_reasons else "SERENITY_RECEIPT_INVALID"
+                    ",".join(approval_reasons) if approval_reasons else "APPROVAL_RECEIPT_INVALID"
                 )
         else:
             new_stage = candidate_stage
@@ -1860,10 +2217,11 @@ def evaluate_and_promote_trust(
         consumed_verifier_digests.append(verifier_digest)
 
     approved_scope = (
-        serenity_receipt.get("approved_scope")
-        if serenity_verified and isinstance(serenity_receipt, dict)
+        approval_receipt.get("approved_scope")
+        if approval_verified and isinstance(approval_receipt, dict)
         else unit.boundary.to_dict()
     )
+    current_tree, _tree_count, _tree_error = compute_module_tree_digest(Path(mod.source_path))
 
     record = {
         "skill_id": skill_id,
@@ -1873,8 +2231,7 @@ def evaluate_and_promote_trust(
         "verifier_status": v_status,
         "eval_verdict": e_verdict,
         "reproducible": reproducible,
-        "serenity_verified": serenity_verified,
-        "serenity_gate_approved": serenity_verified,
+        "approval_verified": approval_verified,
         "bare_boolean_rejected": bare_boolean_rejected,
         "replay_blocked": replay_blocked,
         "stage_skip_blocked": stage_skip_blocked,
@@ -1887,10 +2244,12 @@ def evaluate_and_promote_trust(
         "workspace_id": workspace_identity(workspace_root),
         "policy_digest": current_policy_digest(workspace_root),
         "approved_scope": approved_scope,
-        "serenity_receipt": serenity_receipt if serenity_verified else None,
+        "approval_receipt": approval_receipt if approval_verified else None,
         "content_sha256": unit.content_sha256,
         "version": mod.version,
         "boundary": unit.boundary.to_dict(),
+        "module_source_path": mod.source_path,
+        "module_tree_sha256": current_tree,
         "env_fingerprint": current_env,
     }
     trust_doc["skills"][skill_id] = record
@@ -1909,7 +2268,7 @@ def evaluate_and_promote_trust(
         "execution_attempted": False,
         "execution_observed": False,
         "source": source,
-        "ts": "2026-11-13T00:00:15Z",
+        "ts": utc_now_iso(),
         "observation_identity": {
             "skill_id": skill_id,
             "trust_stage": new_stage,
@@ -1918,9 +2277,10 @@ def evaluate_and_promote_trust(
             "score_override_blocked": score_override_blocked,
             "replay_blocked": replay_blocked,
             "stage_skip_blocked": stage_skip_blocked,
-            "serenity_verified": serenity_verified,
+            "approval_verified": approval_verified,
         },
     }
+
     admission_obs = append_admission_observation(workspace_root, obs_raw)
     return {
         **record,

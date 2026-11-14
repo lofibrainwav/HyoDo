@@ -12,6 +12,9 @@ import contextlib
 import hashlib
 import json
 import os
+import re
+import stat
+import subprocess
 import uuid
 from pathlib import Path
 from typing import Any
@@ -21,7 +24,9 @@ from factory.contracts import (
     FACTORY_REGISTRY_SCHEMA,
     ModuleRecord,
     SkillUnitSpec,
+    utc_now_iso,
 )
+from hyodo.provenance import clean_git_env
 from hyodo.skills import (
     compile_rule,
     content_digest,
@@ -41,6 +46,135 @@ RUN_LOCK_REL = FACTORY_DIR_REL / "run.lock"
 LIFECYCLE_FLOCK_REL = FACTORY_DIR_REL / "lifecycle.flock"
 
 FACTORY_HOOK_MARKER = "# hyodo-factory-hook:"
+
+# Directories never hashed into a module tree digest: git internals change on
+# fetch/gc without changing what a skill runs (the commit and dirty flag are
+# recorded separately), and `.hyodo/` is this harness's own mutable state.
+_TREE_EXCLUDED_DIR_NAMES = frozenset({".git", ".hyodo"})
+_URL_USERINFO_RE = re.compile(r"^([A-Za-z][A-Za-z0-9+.-]*://)[^/@]+@")
+
+
+def compute_module_tree_digest(module_root: Path) -> tuple[str | None, int, str | None]:
+    """Digest every regular file under *module_root* (relative path, exec bit, content).
+
+    Symlinks (files or directories) and non-regular files are refused: the
+    digest is then `None` with a reason, because a binding that cannot see what
+    a link points to at run time binds nothing. Returns `(digest, file_count, error)`.
+    """
+    if module_root.is_symlink() or not module_root.is_dir():
+        return None, 0, "module_root_missing_or_symlink"
+    hasher = hashlib.sha256()
+    count = 0
+    for dirpath, dirnames, filenames in os.walk(module_root, followlinks=False):
+        base = Path(dirpath)
+        kept_dirs: list[str] = []
+        for name in sorted(dirnames):
+            if name in _TREE_EXCLUDED_DIR_NAMES:
+                continue
+            if (base / name).is_symlink():
+                rel = (base / name).relative_to(module_root).as_posix()
+                return None, count, f"symlink_refused:{rel}"
+            kept_dirs.append(name)
+        dirnames[:] = kept_dirs
+        for name in sorted(filenames):
+            full = base / name
+            rel = full.relative_to(module_root).as_posix()
+            try:
+                st = full.lstat()
+            except OSError:
+                return None, count, f"unreadable:{rel}"
+            if stat.S_ISLNK(st.st_mode):
+                return None, count, f"symlink_refused:{rel}"
+            if not stat.S_ISREG(st.st_mode):
+                return None, count, f"non_regular_file_refused:{rel}"
+            file_hasher = hashlib.sha256()
+            try:
+                with full.open("rb") as fh:
+                    while chunk := fh.read(1 << 20):
+                        file_hasher.update(chunk)
+            except OSError:
+                return None, count, f"unreadable:{rel}"
+            exec_flag = "x" if st.st_mode & 0o111 else "-"
+            hasher.update(f"{rel}\0{exec_flag}\0{file_hasher.hexdigest()}\n".encode())
+            count += 1
+    return hasher.hexdigest(), count, None
+
+
+def _git_out(root: Path, *args: str) -> str | None:
+    try:
+        proc = subprocess.run(
+            ["git", "-C", str(root), *args],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+            env=clean_git_env(),
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return proc.stdout if proc.returncode == 0 else None
+
+
+def observe_module_origin(module_root: Path) -> dict[str, Any]:
+    """Record where a module came from, as observed now (never inferred).
+
+    Git fields are `None` when *module_root* is not inside a git work tree.
+    Credentials embedded in a remote URL are stripped before recording.
+    """
+    tree_digest, file_count, tree_error = compute_module_tree_digest(module_root)
+    inside = (_git_out(module_root, "rev-parse", "--is-inside-work-tree") or "").strip()
+    in_git = inside == "true"
+    remote_url: str | None = None
+    commit: str | None = None
+    dirty: bool | None = None
+    if in_git:
+        raw_remote = (_git_out(module_root, "config", "--get", "remote.origin.url") or "").strip()
+        remote_url = _URL_USERINFO_RE.sub(r"\1", raw_remote) or None
+        commit = (_git_out(module_root, "rev-parse", "HEAD") or "").strip() or None
+        porcelain = _git_out(
+            module_root, "status", "--porcelain", "--untracked-files=normal", "--", "."
+        )
+        dirty = None if porcelain is None else bool(porcelain.strip())
+    return {
+        "source_path": str(module_root),
+        "git_repo": in_git,
+        "git_remote_url": remote_url,
+        "git_commit": commit,
+        "git_dirty": dirty,
+        "module_tree_sha256": tree_digest,
+        "module_tree_file_count": file_count,
+        "module_tree_error": tree_error,
+        "recorded_at": utc_now_iso(),
+    }
+
+
+def compare_module_origin(mod: ModuleRecord) -> dict[str, Any]:
+    """Compare the origin recorded in `lock.json` with what is on disk now.
+
+    `state` is `UNCHANGED`, `DRIFTED` (with `changed_fields`), `UNRECORDED`
+    (a lock written before origins were recorded) or `UNBINDABLE` (the tree
+    could not be digested at add time, e.g. it contains a symlink).
+    """
+    recorded = mod.origin
+    if not recorded:
+        return {"state": "UNRECORDED", "changed_fields": [], "current": None}
+    current = observe_module_origin(Path(mod.source_path))
+    changed: list[str] = []
+    if recorded.get("source_path") != mod.source_path:
+        changed.append("source_path")
+    for key in ("git_remote_url", "git_commit"):
+        if recorded.get(key) != current.get(key):
+            changed.append(key)
+    recorded_tree = recorded.get("module_tree_sha256")
+    if recorded_tree is not None and current.get("module_tree_sha256") != recorded_tree:
+        changed.append("module_tree_sha256")
+    if changed:
+        state = "DRIFTED"
+    elif recorded_tree is None:
+        state = "UNBINDABLE"
+    else:
+        state = "UNCHANGED"
+    return {"state": state, "changed_fields": changed, "current": current}
 
 
 def _atomic_write_text(target: Path, content: str) -> None:
@@ -76,6 +210,11 @@ def _render_registry_toml(modules: dict[str, ModuleRecord]) -> str:
         lines.append(f'license_spdx = "{mod.license_spdx}"')
         lines.append(f'git_commit = "{mod.git_commit or "UNOBSERVED"}"')
         lines.append(f'tree_sha256 = "{mod.tree_sha256}"')
+        origin = mod.origin or {}
+        lines.append(f"git_remote_url = {json.dumps(origin.get('git_remote_url') or 'UNOBSERVED')}")
+        dirty = origin.get("git_dirty")
+        lines.append(f'git_dirty = "{"UNOBSERVED" if dirty is None else str(dirty).lower()}"')
+        lines.append(f'module_tree_sha256 = "{origin.get("module_tree_sha256") or "UNOBSERVED"}"')
         lines.append(f"enabled = {'true' if mod.enabled else 'false'}")
         lines.append(f"enabled_skills = {json.dumps(enabled_skills)}")
         lines.append("")

@@ -65,16 +65,62 @@ examples/factory-loop/
   HyoDo observes, validates, records, and measures. It never authorizes a
   merge. See [`docs/PRODUCT_BOUNDARY.md`](../../docs/PRODUCT_BOUNDARY.md).
 - The trust ladder's `AUTO_RUN` stage is not authority either. The harness can
-  build a Serenity approval *request* (`issue_serenity_approval_receipt`), but
-  it cannot vouch for who approved it. `AUTO_RUN` promotion and every `auto`
-  execution require an `authority_verifier` callable supplied by the host, for
-  example one that checks a passkey-signed approval in the host's own approval
-  system. Without one, a skill stops at `TRUSTED` / `ASK_COMMANDER`.
+  build an approval *request* (`issue_host_approval_request`, schema
+  `hyodo.factory-approval-request/v1`), but it cannot vouch for who approved
+  it. `AUTO_RUN` promotion and every `auto` execution require an
+  `authority_verifier` callable supplied by the host, for example one that
+  checks a passkey-signed approval in the host's own approval system. Without
+  one, a skill stops at `TRUSTED` / `ASK_COMMANDER`.
   `.hyodo/factory/trust_state.json` is a cache that any local process can
-  rewrite. Its digest detects corruption, not forgery, so execution re-asks
-  the host's verifier every time. The receipt binds the skill's `SKILL.md`
-  hash and permission boundary only, not other files in the module or the
-  command the host runs; bind those in the host's verifier if they matter.
+  rewrite. Its digest detects corruption, not forgery. Its `trust_stage`,
+  `verifier_status` and `eval_verdict` can only block a run, never allow one:
+  execution re-asks the host's verifier every time.
+- The approval request binds the skill's `SKILL.md` hash, its permission
+  boundary, the module source path, a digest of every file in the module tree
+  (relative path, executable bit and content; `.git/` and `.hyodo/` are left
+  out; a symlink anywhere in the tree makes the module unbindable), and the
+  exact command the host will run (`None` for a run with no subprocess
+  command). An `auto` run recomputes the tree digest from disk and compares
+  the command it is about to run; any difference blocks it. A changed module
+  tree or source path also demotes the skill's trust to `VERIFY`. The check
+  happens right before each wave, so a file swapped between that check and the
+  process start is not caught.
+- What the runner enforces, per skill, is in `boundary_enforcement` on every
+  skill output: `subprocess_exec` is `ENFORCED` (pre-exec gate for host
+  commands); `filesystem_write=false` is `PARTIAL` (workspace files only, by
+  POSIX write bits plus snapshot rollback; `.git/`, `.hyodo/` and paths outside
+  the workspace are not covered); `network_access=false` and
+  `browser_automation=false` are `UNENFORCED` (proxy variables are dropped and
+  `HYODO_FACTORY_NETWORK_DISABLED=1` is set, which stops nothing). `auto`
+  execution is refused while a boundary relies on a `PARTIAL` or `UNENFORCED`
+  restriction, unless the host passes `host_enforced_restrictions` (for
+  example because it runs commands in a network-isolated sandbox); that is
+  reported as `HOST_ATTESTED`, not as something HyoDo observed. A write that a
+  parallel wave makes is rolled back and recorded once for the wave with
+  `attribution=UNOBSERVED`, because which skill wrote it is not observable.
+- `hyodo_factory.py run` exits `0` only when at least one skill actually
+  executed and passed and an independent verifier (`--verify-cmd`) ran and
+  passed, `1` on a fault, permission violation, failed build or failed/held
+  verifier, and `2` (UNOBSERVED) otherwise. The result's `run_verdict` says
+  which.
+- `--selective` / `selective_activation=True` is task-scoped: it enables only
+  the task's skills for the run and restores every module's and skill's
+  previous `enabled` flag afterwards, also when the run raises.
+- Personal Taste provenance is reported as it is: only rules from
+  `.hyodo/factory/host_taste.json` or explicit feedback are `HOST_CONFIGURED`
+  and handed to subprocesses as `HYODO_HOST_PERSONAL_TASTE_JSON`. A chosen
+  profile's rules are `PROFILE_DEFAULT`. Gap analysis without `--profile` uses
+  no profile (`"profile": "auto"`).
+- `add` and `update` record each module's origin in `lock.json` (`origin`):
+  source path, git remote URL (credentials stripped), commit, dirty flag, and
+  the module tree digest. `doctor` reports `module_tree_drift` and
+  `module_origin_drift` for enabled modules and lists every module's state in
+  `module_provenance` (`UNCHANGED`, `DRIFTED`, `UNRECORDED`, `UNBINDABLE`).
+  Nothing here verifies how many external repositories or skills exist
+  anywhere; no such count is claimed.
+- `hosts` inspects local connect/MCP configuration plans only. It never runs a
+  host, so `live_contract` is `UNOBSERVED` and `verified_live_contract` is
+  `false` for every host.
 
 ## Files
 

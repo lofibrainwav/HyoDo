@@ -34,7 +34,9 @@ from factory.registry import (
     RUN_LOCK_REL,
     SNAPSHOTS_DIR_REL,
     _atomic_write_text,
+    compare_module_origin,
     load_registry_state,
+    observe_module_origin,
     save_registry_state,
     verify_lock_integrity,
 )
@@ -126,12 +128,16 @@ def _load_module_with_adapter(
 ) -> ModuleRecord:
     kind = adapter or detect_adapter_kind(source_path)
     if kind == "external-evaluator":
-        return load_external_evaluator_module(source_path, module_id=module_id, version=version)
-    if kind == "claude-plugin":
-        return load_claude_plugin_module(source_path, module_id=module_id, version=version)
-    if kind == "agent-skills":
-        return load_agent_skills_module(source_path, module_id=module_id, version=version)
-    raise ValueError(f"unsupported adapter kind: {kind}")
+        record = load_external_evaluator_module(source_path, module_id=module_id, version=version)
+    elif kind == "claude-plugin":
+        record = load_claude_plugin_module(source_path, module_id=module_id, version=version)
+    elif kind == "agent-skills":
+        record = load_agent_skills_module(source_path, module_id=module_id, version=version)
+    else:
+        raise ValueError(f"unsupported adapter kind: {kind}")
+    # Record the module's real origin (path, git remote/commit/dirty, whole-tree
+    # digest) at add/update time so `doctor` can report later drift.
+    return replace(record, origin=observe_module_origin(Path(record.source_path)))
 
 
 def add_module(
@@ -317,6 +323,43 @@ def activate_selected_skills(
         return sorted(to_enable)
 
 
+ActivationSnapshot = dict[str, tuple[bool, dict[str, bool]]]
+
+
+def snapshot_activation_state(workspace_root: Path) -> ActivationSnapshot:
+    """Capture every module's and skill's `enabled` flag (for task-scoped activation)."""
+    modules = load_registry_state(workspace_root)
+    return {
+        mod_id: (mod.enabled, {sid: u.enabled for sid, u in mod.skills.items()})
+        for mod_id, mod in modules.items()
+    }
+
+
+def restore_activation_state(workspace_root: Path, snapshot: ActivationSnapshot) -> list[str]:
+    """Restore the `enabled` flags captured by `snapshot_activation_state` in one write.
+
+    Only enablement is restored; skills or modules added since the snapshot are
+    left as they are. Returns the skill ids whose flag was changed back.
+    """
+    with _lifecycle_flock(workspace_root):
+        _check_not_mid_run(workspace_root)
+        modules = load_registry_state(workspace_root)
+        restored: list[str] = []
+        for mod_id, mod in list(modules.items()):
+            if mod_id not in snapshot:
+                continue
+            mod_enabled, skill_flags = snapshot[mod_id]
+            new_skills = {}
+            for sid, u in mod.skills.items():
+                want = skill_flags.get(sid, u.enabled)
+                if want != u.enabled:
+                    restored.append(sid)
+                new_skills[sid] = replace(u, enabled=want)
+            modules[mod_id] = replace(mod, enabled=mod_enabled, skills=new_skills)
+        save_registry_state(workspace_root, modules)
+        return sorted(restored)
+
+
 def update_module(
     workspace_root: Path,
     module_id: str,
@@ -448,12 +491,39 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
                         f"unverified_hook_silent_zero:{sid}:frontmatter_hook_exits_0_when_script_missing"
                     )
 
+    # Origin/tree drift: what would run is no longer what was registered.
+    # Drift is a problem for enabled modules and a warning for dormant ones.
+    # Unrecorded/unbindable origins are reported here only, never as healthy
+    # evidence and never as drift.
+    provenance: dict[str, dict[str, Any]] = {}
+    for mod_id, mod in sorted(modules.items()):
+        if not Path(mod.source_path).is_dir():
+            continue
+        cmp = compare_module_origin(mod)
+        current = cmp["current"] or {}
+        provenance[mod_id] = {
+            "state": cmp["state"],
+            "changed_fields": cmp["changed_fields"],
+            "recorded_git_commit": mod.origin.get("git_commit"),
+            "recorded_git_remote_url": mod.origin.get("git_remote_url"),
+            "git_dirty_now": current.get("git_dirty"),
+            "module_tree_error": mod.origin.get("module_tree_error"),
+        }
+        if cmp["state"] == "DRIFTED":
+            sink = problems if mod.enabled else warnings
+            for changed in cmp["changed_fields"]:
+                if changed == "module_tree_sha256":
+                    sink.append(f"module_tree_drift:{mod_id}")
+                else:
+                    sink.append(f"module_origin_drift:{mod_id}:{changed}")
+
     return {
         "status": "HEALTHY" if not problems else "DEGRADED",
         "modules_registered": len(modules),
         "skills_enabled": len(enabled_ids),
         "problems": sorted(set(problems)),
         "warnings": sorted(set(warnings)),
+        "module_provenance": provenance,
     }
 
 
@@ -530,8 +600,18 @@ def discover_skills(
     return results[:max_results]
 
 
+_LIVE_CONTRACT_UNOBSERVED_REASON = (
+    "no live host session was exercised; only local connect/MCP config plans were inspected"
+)
+
+
 def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
-    """Inspect and verify exact host connection mechanics and support boundaries across Claude Code, Cursor, Codex, and Antigravity."""
+    """Report host connection mechanics and support boundaries across Claude Code, Cursor, Codex, and Antigravity.
+
+    This inspects local configuration plans only. It never runs a host, so the
+    live host contract is reported as `UNOBSERVED` (`verified_live_contract: False`)
+    for every host.
+    """
     root = workspace_root.resolve()
     connect_plans = {t: plan_connect_target(t, root, shadow=True) for t in CONNECT_TARGETS}
     mcp_plans = {h: plan_mcp_host(h, root) for h in MCP_ALL_HOSTS}
@@ -556,7 +636,9 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
             else "UNOBSERVED",
             "mcp_config_path": ".mcp.json",
             "skill_directories": (".claude/skills/", ".claude-plugin/plugin.json", "SKILL.md"),
-            "verified_live_contract": True,
+            "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("claude-code"),
         },
         "cursor": {
@@ -565,7 +647,9 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
             "mcp_stdio": "OBSERVED" if mcp_plans["cursor"].status != "unobserved" else "UNOBSERVED",
             "mcp_config_path": ".cursor/mcp.json",
             "skill_directories": (".cursor/skills/", ".cursor-plugin/plugin.json", "SKILL.md"),
-            "verified_live_contract": True,
+            "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("cursor"),
         },
         "codex": {
@@ -580,6 +664,8 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
                 "SKILL.md",
             ),
             "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("codex"),
         },
         "antigravity": {
@@ -592,7 +678,9 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
                 ".antigravity-plugin/plugin.json",
                 "SKILL.md",
             ),
-            "verified_live_contract": True,
+            "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("antigravity"),
         },
     }
