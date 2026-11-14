@@ -4,3 +4,9 @@ description = "Minimal YAGNI implementation and core verification"
 active_categories = ["simplification", "engineering"]
 single_orchestrator = true
 require_independent_verifier = true
+personal_taste_rules = [
+    "yagni_ladder_first: stop at the first rung that holds",
+    "zero_unrequested_abstraction: no new dependencies or wrapper layers",
+]
+inferred_taste_hypotheses = []
+domain_taste_focus = ["code_quality", "simplification"]

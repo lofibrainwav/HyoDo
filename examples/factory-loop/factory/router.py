@@ -10,6 +10,7 @@ orchestrators or competing design/TDD skills) are never stacked blindly.
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 try:
@@ -18,10 +19,22 @@ except ModuleNotFoundError:  # pragma: no cover - Python 3.10 fallback
     import tomli as tomllib  # type: ignore[no-redef]
 from typing import Any
 
-from factory.contracts import ProfileSpec, SkillUnitSpec
+from factory.contracts import (
+    CAPABILITY_STATES,
+    GAP_ROOT_CAUSES,
+    ProfileSpec,
+    SkillUnitSpec,
+)
+from factory.lifecycle import discover_skills, doctor
 from factory.registry import list_enabled_skills, load_registry_state
+from hyodo.admission_observation import ADMISSION_OBSERVATIONS_RELATIVE_PATH
+from hyodo.connector_contract import build_connector_contract
+from hyodo.continuity import measure_continuity
+from hyodo.orchestration_observation import read_orchestration_observations
 
 PROFILES_DIR = Path(__file__).resolve().parents[1] / "profiles"
+TRUST_STATE_REL_PATH = Path(".hyodo") / "factory" / "trust_state.json"
+
 
 _INTENT_KEYWORDS: dict[str, tuple[str, ...]] = {
     "simplification": (
@@ -153,6 +166,9 @@ def load_profile(profile_name: str, profiles_dir: Path | None = None) -> Profile
         excluded_skills=tuple(raw.get("excluded_skills", ())),
         single_orchestrator=bool(raw.get("single_orchestrator", True)),
         require_independent_verifier=bool(raw.get("require_independent_verifier", True)),
+        personal_taste_rules=tuple(raw.get("personal_taste_rules", ())),
+        inferred_taste_hypotheses=tuple(raw.get("inferred_taste_hypotheses", ())),
+        domain_taste_focus=tuple(raw.get("domain_taste_focus", ())),
     )
 
 
@@ -192,22 +208,39 @@ def _functional_slot(unit: SkillUnitSpec) -> str:
     return f"category:{unit.category}:{unit.role_hint}"
 
 
+def _trust_priority_rank(
+    unit: SkillUnitSpec,
+    trust_map: dict[str, dict[str, Any]],
+) -> int:
+    rec = trust_map.get(unit.skill_id)
+    if not isinstance(rec, dict):
+        return 9
+    if rec.get("content_sha256") != unit.content_sha256:
+        return 9
+    if rec.get("verifier_status") != "PASS":
+        return 9
+    ranks = {"AUTO_RUN": 0, "TRUSTED": 1, "SHADOW": 2, "MANUAL": 3}
+    return ranks.get(str(rec.get("trust_stage", "")), 9)
+
+
 def _score_candidate(
     unit: SkillUnitSpec,
     prompt_lower: str,
     eval_recs: list[str],
     pref_set: set[str],
-) -> tuple[int, int, int, int, str]:
+    trust_map: dict[str, dict[str, Any]] | None = None,
+) -> tuple[int, int, int, int, int, str]:
     """Return a deterministic sort key (smaller is higher priority) for candidate ranking."""
     eval_idx = eval_recs.index(unit.skill_id) if unit.skill_id in eval_recs else 999
     is_pref = 0 if unit.skill_id in pref_set else 1
     explicit_mention = (
         0 if (unit.name.lower() in prompt_lower or unit.module_id.lower() in prompt_lower) else 1
     )
+    trust_rank = _trust_priority_rank(unit, trust_map or {})
     haystack = f"{unit.name} {unit.description} {' '.join(unit.capabilities)}".lower()
     prompt_words = [w for w in prompt_lower.replace("/", " ").split() if len(w) >= 2]
     kw_hits = sum(1 for w in prompt_words if w in haystack)
-    return (eval_idx, is_pref, explicit_mention, -kw_hits, unit.skill_id)
+    return (eval_idx, is_pref, explicit_mention, trust_rank, -kw_hits, unit.skill_id)
 
 
 def route_skills_for_task(
@@ -237,6 +270,7 @@ def route_skills_for_task(
 
     enabled_units = list_enabled_skills(workspace_root)
     modules = load_registry_state(workspace_root)
+    trust_map = _load_trust_ledger_map(workspace_root)
     by_id = {u.skill_id: u for u in enabled_units}
 
     eval_recs = list(evaluator_recommendations or [])
@@ -306,7 +340,7 @@ def route_skills_for_task(
         for u in enabled_units
         if u.category in allowed_cats or u.skill_id in pref_set or u.skill_id in eval_recs
     ]
-    candidates.sort(key=lambda u: _score_candidate(u, prompt_lower, eval_recs, pref_set))
+    candidates.sort(key=lambda u: _score_candidate(u, prompt_lower, eval_recs, pref_set, trust_map))
 
     for unit in candidates:
         _try_add(unit)
@@ -335,4 +369,271 @@ def route_skills_for_task(
         "deduplicated_skills": deduplicated_skills,
         "bodies_disclosed": 0,  # Progressive Disclosure: 0 bodies loaded during routing!
         "modules_available": len(modules),
+    }
+
+
+def _load_trust_ledger_map(workspace_root: Path) -> dict[str, dict[str, Any]]:
+    path = workspace_root / TRUST_STATE_REL_PATH
+    if not path.is_file():
+        return {}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    skills = raw.get("skills", {})
+    return skills if isinstance(skills, dict) else {}
+
+
+def analyze_capability_gaps(
+    workspace_root: Path,
+    prompt: str,
+    *,
+    profile_name: str | None = None,
+    external_search_roots: list[Path] | None = None,
+    explicit_taste_feedback: list[str] | None = None,
+    inferred_taste_hypotheses: list[str] | None = None,
+) -> dict[str, Any]:
+    """Compare task requirements against verified capabilities (`知己 -> 知彼 -> 差異`).
+
+    Classifies every registered skill and required category into the 6 canonical
+    states (`VERIFIED`, `UNVERIFIED`, `MISSING`, `DEGRADED`, `REDUNDANT`, `UNKNOWN`)
+    with explicit root-cause attribution (`NONE`, `CAPABILITY_MISSING`,
+    `WIRING_DISCONNECTED`, `VERIFICATION_MISSING`,
+    `ENVIRONMENT_OR_SYNTAX_DEGRADED`, `DUPLICATE_SLOT`), while synthesizing:
+    - Personal Taste (explicit host rules & feedback; never hardcoded into `hyodo/`)
+    - Professional Taste (domain-specific skills selected for the task)
+    - Inferred Hypotheses (marked `hypothesis=True`, `authority="UNOBSERVED"`)
+    - System Awareness (`build_connector_contract`, `measure_continuity`, ledger counts)
+    """
+    inferred_cats = infer_intent_categories(prompt)
+    profile = load_profile(profile_name) if profile_name else load_profile("development")
+    route_plan = route_skills_for_task(
+        workspace_root,
+        prompt,
+        profile_name=profile_name,
+    )
+    modules = load_registry_state(workspace_root)
+    doctor_report = doctor(workspace_root)
+    doctor_issues = list(doctor_report.get("problems", [])) + list(
+        doctor_report.get("warnings", [])
+    )
+    trust_map = _load_trust_ledger_map(workspace_root)
+
+    # Check if simple task fast-path applies (avoid unnecessary metacognitive overhead)
+    word_count = len(prompt.strip().split())
+    enabled_cats = {
+        unit.category
+        for mod in modules.values()
+        if mod.enabled
+        for unit in mod.skills.values()
+        if unit.enabled
+    }
+    missing_cats_initial = [c for c in inferred_cats if c not in enabled_cats]
+    is_simple_task = word_count <= 6 and len(inferred_cats) <= 2 and not missing_cats_initial
+    metacognition_mode = "FAST_PATH_SIMPLE_TASK" if is_simple_task else "FULL_METACOGNITIVE_LOOP"
+
+    dedup_entries = list(route_plan.get("deduplicated_skills", []))
+    conflict_entries = list(route_plan.get("conflicts_skipped", []))
+
+    skill_assessments: dict[str, dict[str, Any]] = {}
+    for mod_id, mod in sorted(modules.items()):
+        for skill_id, unit in sorted(mod.skills.items()):
+            has_doctor_issue = any(
+                f":{skill_id}" in issue or f":{mod_id}:" in issue or issue.endswith(f":{mod_id}")
+                for issue in doctor_issues
+            )
+            is_redundant_slot = any(
+                f"redundant_slot_skipped:{skill_id}(" in entry for entry in dedup_entries
+            ) or any(f":{skill_id}" in entry for entry in conflict_entries)
+            t_rec = trust_map.get(skill_id)
+            drift_detected = False
+            if isinstance(t_rec, dict) and (
+                t_rec.get("content_sha256") != unit.content_sha256
+                or t_rec.get("version") != mod.version
+                or t_rec.get("boundary") != unit.boundary.to_dict()
+            ):
+                drift_detected = True
+
+            if has_doctor_issue:
+                state = "DEGRADED"
+                root_cause = "ENVIRONMENT_OR_SYNTAX_DEGRADED"
+                trust_stage = "VERIFY"
+            elif not mod.enabled or not unit.enabled:
+                state = "UNVERIFIED"
+                root_cause = "WIRING_DISCONNECTED"
+                trust_stage = "DISCOVER"
+            elif is_redundant_slot:
+                state = "REDUNDANT"
+                root_cause = "DUPLICATE_SLOT"
+                trust_stage = (
+                    str(t_rec.get("trust_stage", "VERIFY"))
+                    if isinstance(t_rec, dict) and not drift_detected
+                    else "VERIFY"
+                )
+            elif isinstance(t_rec, dict) and not drift_detected:
+                trust_stage = str(t_rec.get("trust_stage", "VERIFY"))
+                v_status = str(t_rec.get("verifier_status", "UNOBSERVED"))
+                e_verdict = str(t_rec.get("eval_verdict", "UNOBSERVED"))
+                if v_status == "UNKNOWN" or e_verdict == "INCONCLUSIVE":
+                    state = "UNKNOWN"
+                    root_cause = "VERIFICATION_MISSING"
+                elif v_status == "PASS" and trust_stage in (
+                    "MANUAL",
+                    "SHADOW",
+                    "TRUSTED",
+                    "AUTO_RUN",
+                ):
+                    state = "VERIFIED"
+                    root_cause = "NONE"
+                else:
+                    state = "UNVERIFIED"
+                    root_cause = "VERIFICATION_MISSING"
+            else:
+                state = "UNVERIFIED"
+                root_cause = "VERIFICATION_MISSING"
+                trust_stage = "VERIFY"
+
+            assert state in CAPABILITY_STATES
+            assert root_cause in GAP_ROOT_CAUSES
+            skill_assessments[skill_id] = {
+                "skill_id": skill_id,
+                "module_id": mod_id,
+                "category": unit.category,
+                "state": state,
+                "root_cause": root_cause,
+                "trust_stage": trust_stage,
+                "drift_detected": drift_detected,
+                "selected_for_task": skill_id in route_plan["selected_skills"],
+            }
+
+    category_assessments: dict[str, dict[str, Any]] = {}
+    external_candidates: dict[str, list[dict[str, Any]]] = {}
+    for cat in inferred_cats:
+        cat_skills = [info for info in skill_assessments.values() if info["category"] == cat]
+        if not cat_skills:
+            c_state = "MISSING"
+            c_cause = "CAPABILITY_MISSING"
+            if external_search_roots and not is_simple_task:
+                found = discover_skills(external_search_roots, query=cat)
+                if not found:
+                    cat_kws = _INTENT_KEYWORDS.get(cat, (cat,))
+                    found = [
+                        item
+                        for item in discover_skills(external_search_roots)
+                        if any(
+                            kw
+                            in f"{item.get('name', '')} {' '.join(item.get('sample_skills', []))}".lower()
+                            for kw in cat_kws
+                        )
+                    ]
+                external_candidates[cat] = found
+
+        elif all(s["state"] == "DEGRADED" for s in cat_skills):
+            c_state = "DEGRADED"
+            c_cause = "ENVIRONMENT_OR_SYNTAX_DEGRADED"
+        elif all(s["root_cause"] == "WIRING_DISCONNECTED" for s in cat_skills):
+            c_state = "UNVERIFIED"
+            c_cause = "WIRING_DISCONNECTED"
+        elif any(s["state"] == "VERIFIED" for s in cat_skills):
+            c_state = "VERIFIED"
+            c_cause = "NONE"
+        elif any(s["state"] == "UNKNOWN" for s in cat_skills):
+            c_state = "UNKNOWN"
+            c_cause = "VERIFICATION_MISSING"
+        else:
+            c_state = "UNVERIFIED"
+            c_cause = "VERIFICATION_MISSING"
+
+        category_assessments[cat] = {
+            "category": cat,
+            "state": c_state,
+            "root_cause": c_cause,
+            "registered_skills": [s["skill_id"] for s in cat_skills],
+            "external_candidates_count": len(external_candidates.get(cat, [])),
+        }
+
+    # System Awareness (Bridge M5-B + Cross-host continuity + Orchestration/Admission ledgers)
+    connector = build_connector_contract(workspace_root)
+    continuity = measure_continuity(workspace_root)
+    orch_rows = read_orchestration_observations(workspace_root)
+    adm_path = workspace_root / ADMISSION_OBSERVATIONS_RELATIVE_PATH
+    adm_count = 0
+    if adm_path.is_file():
+        with adm_path.open("r", encoding="utf-8") as handle:
+            adm_count = sum(1 for line in handle if line.strip())
+
+    wiring_gaps: list[str] = []
+    if len(orch_rows) == 0:
+        wiring_gaps.append("orchestration_sidecar_unobserved")
+    if adm_count == 0:
+        wiring_gaps.append("admission_ledger_unobserved")
+    for sid, info in skill_assessments.items():
+        if info["root_cause"] == "WIRING_DISCONNECTED":
+            wiring_gaps.append(f"skill_disabled:{sid}")
+
+    # Taste x Metacognition synthesis
+    explicit_rules = list(profile.personal_taste_rules) + list(explicit_taste_feedback or [])
+    hypotheses = list(profile.inferred_taste_hypotheses) + list(inferred_taste_hypotheses or [])
+    taste_synthesis = {
+        "personal_taste": [
+            {
+                "rule": rule,
+                "source": "explicit_user_rule_or_feedback",
+                "hypothesis": False,
+                "authority": "HOST_CONFIGURED",
+            }
+            for rule in explicit_rules
+        ],
+        "professional_taste": {
+            "domain_focus": list(profile.domain_taste_focus),
+            "active_taste_skills": [
+                sid
+                for sid in route_plan["selected_skills"]
+                if skill_assessments.get(sid, {}).get("category")
+                in ("design", "craft", "simplification", "engineering", "quality")
+            ],
+            "design_pipeline": route_plan["design_pipeline"],
+            "source": "external_professional_skill",
+            "hypothesis": False,
+        },
+        "inferred_hypotheses": [
+            {
+                "preference": hyp,
+                "source": "ai_inferred_preference",
+                "hypothesis": True,
+                "authority": "UNOBSERVED",
+                "must_yield_to_explicit_feedback": True,
+            }
+            for hyp in hypotheses
+        ],
+        "hardcoded_in_hyodo_core": False,
+    }
+
+    state_counts = {
+        st: sum(1 for info in skill_assessments.values() if info["state"] == st)
+        for st in CAPABILITY_STATES
+    }
+
+    return {
+        "schema": "hyodo.capability-gap-report/v1",
+        "prompt": prompt,
+        "profile": profile.name,
+        "metacognition_mode": metacognition_mode,
+        "is_simple_task": is_simple_task,
+        "inferred_categories": inferred_cats,
+        "state_counts": state_counts,
+        "category_assessments": category_assessments,
+        "skill_assessments": skill_assessments,
+        "external_candidates": external_candidates,
+        "taste_synthesis": taste_synthesis,
+        "system_awareness": {
+            "connector_overall_status": connector.get("overall_status", "UNOBSERVED"),
+            "connector_summary": connector.get("summary", {}),
+            "continuity_status": continuity.get("status", "UNOBSERVED"),
+            "continuity_value": continuity.get("value"),
+            "orchestration_observations_count": len(orch_rows),
+            "admission_observations_count": adm_count,
+            "wiring_gaps": wiring_gaps,
+        },
+        "route_plan": route_plan,
     }

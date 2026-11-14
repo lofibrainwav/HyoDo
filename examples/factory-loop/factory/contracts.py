@@ -13,6 +13,7 @@ from typing import Any
 FACTORY_REGISTRY_SCHEMA = "hyodo.factory-registry/v1"
 FACTORY_LOCK_SCHEMA = "hyodo.factory-lock/v1"
 FACTORY_PROFILE_SCHEMA = "hyodo.factory-profile/v1"
+TRUST_STATE_SCHEMA = "hyodo.factory-trust-state/v1"
 
 SKILL_CATEGORIES = (
     "engineering",
@@ -36,6 +37,33 @@ ADAPTER_KINDS = ("agent-skills", "claude-plugin", "external-evaluator")
 ROLE_HINTS = ("builder", "verifier", "observer", "router")
 
 EVAL_VERDICTS = ("HELPED", "NEUTRAL", "HURT", "INCONCLUSIVE")
+
+CAPABILITY_STATES = (
+    "VERIFIED",
+    "UNVERIFIED",
+    "MISSING",
+    "DEGRADED",
+    "REDUNDANT",
+    "UNKNOWN",
+)
+
+GAP_ROOT_CAUSES = (
+    "NONE",
+    "CAPABILITY_MISSING",
+    "WIRING_DISCONNECTED",
+    "VERIFICATION_MISSING",
+    "ENVIRONMENT_OR_SYNTAX_DEGRADED",
+    "DUPLICATE_SLOT",
+)
+
+TRUST_STAGES = (
+    "DISCOVER",
+    "VERIFY",
+    "MANUAL",
+    "SHADOW",
+    "TRUSTED",
+    "AUTO_RUN",
+)
 
 
 @dataclass(frozen=True)
@@ -214,7 +242,7 @@ class ModuleRecord:
 
 @dataclass(frozen=True)
 class ProfileSpec:
-    """Task profile selecting active categories and resolving orchestrator conflicts."""
+    """Task profile selecting active categories, host taste rules, and resolving orchestrator conflicts."""
 
     name: str
     description: str
@@ -223,6 +251,9 @@ class ProfileSpec:
     excluded_skills: tuple[str, ...] = ()
     single_orchestrator: bool = True
     require_independent_verifier: bool = True
+    personal_taste_rules: tuple[str, ...] = ()
+    inferred_taste_hypotheses: tuple[str, ...] = ()
+    domain_taste_focus: tuple[str, ...] = ()
 
 
 def recommend_skill_lifecycle_action(

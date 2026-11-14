@@ -194,6 +194,7 @@ def _parse_simple_frontmatter(text: str) -> dict[str, Any]:
     meta: dict[str, Any] = {}
     frontmatter_hooks: list[str] = []
     in_hooks = False
+    current_list_key: str | None = None
     for raw_line in block.splitlines():
         line = raw_line.strip()
         if not line or line.startswith("#"):
@@ -203,6 +204,7 @@ def _parse_simple_frontmatter(text: str) -> dict[str, Any]:
             key = key.strip().lower()
             val = val.strip().strip("\"'")
             in_hooks = key == "hooks"
+            current_list_key = None
             if key == "hooks":
                 continue
             if val.startswith("[") and val.endswith("]"):
@@ -212,6 +214,9 @@ def _parse_simple_frontmatter(text: str) -> dict[str, Any]:
                     if item.strip().strip("\"'")
                 ]
                 meta[key] = items
+            elif val == "":
+                meta[key] = []
+                current_list_key = key
             else:
                 meta[key] = val
         elif in_hooks:
@@ -223,6 +228,14 @@ def _parse_simple_frontmatter(text: str) -> dict[str, Any]:
                 cmd_val = line.partition(":")[2].strip().strip("\"'")
                 if "exit 0" in cmd_val and ("not found" in cmd_val or "missing" in cmd_val):
                     meta["hook_silent_zero_fallback"] = True
+        elif (
+            raw_line.startswith((" ", "\t"))
+            and line.startswith("- ")
+            and current_list_key is not None
+        ):
+            item_val = line[2:].strip().strip("\"'")
+            if item_val and isinstance(meta.get(current_list_key), list):
+                meta[current_list_key].append(item_val)
         elif raw_line.startswith((" ", "\t")) and ":" in line:
             sub_k, _, sub_v = line.partition(":")
             if sub_k.strip().lower() == "version" and "version" not in meta:

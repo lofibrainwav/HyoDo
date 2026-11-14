@@ -46,8 +46,13 @@ from factory.lifecycle import (  # noqa: E402
     verify_host_integrations,
 )
 from factory.registry import load_registry_state  # noqa: E402
-from factory.router import route_skills_for_task  # noqa: E402
-from factory.runner import evaluate_skill_impact, execute_modular_run  # noqa: E402
+from factory.router import analyze_capability_gaps, route_skills_for_task  # noqa: E402
+from factory.runner import (  # noqa: E402
+    evaluate_and_promote_trust,
+    evaluate_skill_impact,
+    execute_modular_run,
+    get_skill_trust_state,
+)
 
 from hyodo.events import AGENT_EVENT_SCHEMA_VERSION  # noqa: E402
 from hyodo.handoff import inspect_handoff  # noqa: E402
@@ -339,6 +344,20 @@ def main(argv: list[str] | None = None) -> int:
     p_disc.add_argument("query", nargs="?", default=None)
     p_disc.add_argument("--search-root", action="append", type=Path, default=None)
 
+    p_gaps = sub.add_parser(
+        "gaps",
+        help="Analyze capability gaps (VERIFIED/UNVERIFIED/MISSING/DEGRADED/REDUNDANT/UNKNOWN) and Taste x System Awareness",
+    )
+    p_gaps.add_argument("prompt")
+    p_gaps.add_argument("--profile", default=None)
+    p_gaps.add_argument("--search-root", action="append", type=Path, default=None)
+
+    p_trust = sub.add_parser(
+        "trust",
+        help="Inspect or promote skill trust state (DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN)",
+    )
+    p_trust.add_argument("skill_id")
+
     sub.add_parser("hosts", help="Verify host connection and capability support matrix")
 
     p_run = sub.add_parser(
@@ -395,6 +414,17 @@ def main(argv: list[str] | None = None) -> int:
         s_roots = args.search_root or [root.parent]
         found = discover_skills(s_roots, query=args.query)
         print(json.dumps({"discovered": found}, indent=2, ensure_ascii=False))
+    elif args.cmd == "gaps":
+        gap_rep = analyze_capability_gaps(
+            root,
+            args.prompt,
+            profile_name=args.profile,
+            external_search_roots=args.search_root,
+        )
+        print(json.dumps(gap_rep, indent=2, ensure_ascii=False))
+    elif args.cmd == "trust":
+        t_state = get_skill_trust_state(root, args.skill_id)
+        print(json.dumps(t_state, indent=2))
     elif args.cmd == "hosts":
         matrix = verify_host_integrations(root)
         print(json.dumps(matrix, indent=2))
@@ -432,13 +462,16 @@ if __name__ == "__main__":
 
 __all__ = [
     "add_module",
+    "analyze_capability_gaps",
     "build_and_verify_handoff",
     "disable_target",
     "discover_skills",
     "doctor",
     "enable_target",
+    "evaluate_and_promote_trust",
     "evaluate_skill_impact",
     "execute_modular_run",
+    "get_skill_trust_state",
     "ingest_jev_skill_routing",
     "main",
     "recommend_skill_lifecycle_action",
