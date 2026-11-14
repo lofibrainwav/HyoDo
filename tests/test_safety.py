@@ -71,3 +71,20 @@ def test_run_safety_scan_read_error_source(tmp_path):
     with patch("hyodo.safety._read_text_file", side_effect=PermissionError("denied")):
         result = run_safety_scan(path=str(sample), strict=True, cwd=tmp_path)
     assert result["source"].startswith("error:read:")
+
+
+def test_directory_scan_continues_past_oversize_file_and_stays_unobserved(tmp_path):
+    """An oversize file must not blind the scan to findings in later files."""
+    (tmp_path / "a_registry.json").write_text("x" * 200_001, encoding="utf-8")
+    (tmp_path / "z_config.txt").write_text(
+        "token = ghp_abcdefghijklmnopqrstuvwxyz012345\n", encoding="utf-8"
+    )
+    result = run_safety_scan(path=str(tmp_path), cwd=tmp_path, max_files=0)
+    assert result["coverage"] == "UNOBSERVED"
+    assert "over the scan size cap" in result["source"]
+    assert "a_registry.json" in result["source"]
+    assert result["scanned_files"] == 1
+    later = [f for f in result["findings"] if f.path and f.path.endswith("z_config.txt")]
+    assert later, result["findings"]
+    assert later[0].severity == "high"
+    assert result["level"] != "low"

@@ -1294,6 +1294,21 @@ def test_orchestration_observations_and_graph_export_integration(tmp_path: Path)
     assert len(graph["nodes"]) == 3
 
 
+def _host_authority(approved_run_ids: set[str]) -> Any:
+    """Stand-in for the host's real approval authority (e.g. a passkey-verified approval).
+
+    It accepts only receipts whose run_id the host actually approved; the factory
+    cannot add to that set.
+    """
+
+    def verify(receipt: dict[str, Any]) -> tuple[bool, str | None]:
+        if receipt.get("run_id") in approved_run_ids:
+            return True, None
+        return False, "not_issued_by_host_authority"
+
+    return verify
+
+
 def _make_helped_eval(
     factory: Any,
     skill_id: str,
@@ -1422,6 +1437,7 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
         repo,
         skill_id="trust-pack/refactor-bot",
         run_id="run-step-auto",
+        approved_by="host-commander",
         risk_level="low",
     )
     s_auto = factory.evaluate_and_promote_trust(
@@ -1433,6 +1449,7 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
         serenity_receipt=ser_receipt,
         s_score=9.5,
         run_id="run-step-auto",
+        authority_verifier=_host_authority({"run-step-auto"}),
     )
     assert s_auto["trust_stage"] == "AUTO_RUN"
     assert s_auto["admission_decision"] == "AUTO_RUN"
@@ -1723,7 +1740,11 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
     v4 = _make_real_verifier_receipt(repo, sha, run_tag="r4")
     e4 = _make_helped_eval(factory, "auto-guard/tdd", v4, sha, case_id="c4")
     high_risk_ser = factory.issue_serenity_approval_receipt(
-        repo, skill_id="auto-guard/tdd", run_id="run-real-4", risk_level="high"
+        repo,
+        skill_id="auto-guard/tdd",
+        run_id="run-real-4",
+        approved_by="host-commander",
+        risk_level="high",
     )
     bad_ser_res = factory.evaluate_and_promote_trust(
         repo,
@@ -1733,6 +1754,7 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         verifier_receipt=v4,
         serenity_receipt=high_risk_ser,
         run_id="run-real-4",
+        authority_verifier=_host_authority({"run-real-4"}),
     )
     assert bad_ser_res["trust_stage"] == "TRUSTED"
     assert bad_ser_res["admitted"] is False
@@ -1755,8 +1777,30 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
     v5 = _make_real_verifier_receipt(repo, sha, run_tag="r5")
     e5 = _make_helped_eval(factory, "auto-guard/tdd", v5, sha, case_id="c5")
     valid_ser = factory.issue_serenity_approval_receipt(
-        repo, skill_id="auto-guard/tdd", run_id="run-real-5", risk_level="low"
+        repo,
+        skill_id="auto-guard/tdd",
+        run_id="run-real-5",
+        approved_by="host-commander",
+        risk_level="low",
     )
+    host_authority = _host_authority({"run-real-5"})
+
+    # 7a. The factory's own receipt without the host's authority verifier never reaches AUTO_RUN.
+    self_issued = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="auto-guard/tdd",
+        target_stage="AUTO_RUN",
+        eval_receipt=e5,
+        verifier_receipt=v5,
+        serenity_receipt=valid_ser,
+        run_id="run-real-5-self",
+    )
+    assert self_issued["trust_stage"] == "TRUSTED"
+    assert self_issued["admitted"] is False
+    assert "SERENITY_ISSUER_UNVERIFIED" in str(self_issued["promotion_blocked_reason"])
+
+    v5 = _make_real_verifier_receipt(repo, sha, run_tag="r5b")
+    e5 = _make_helped_eval(factory, "auto-guard/tdd", v5, sha, case_id="c5b")
     auto_res = factory.evaluate_and_promote_trust(
         repo,
         skill_id="auto-guard/tdd",
@@ -1765,6 +1809,7 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         verifier_receipt=v5,
         serenity_receipt=valid_ser,
         run_id="run-real-5",
+        authority_verifier=host_authority,
     )
     assert auto_res["trust_stage"] == "AUTO_RUN"
     assert auto_res["admitted"] is True
@@ -1774,9 +1819,70 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         run_id="run-auto-allowed",
         prompt="implement tdd",
         execution_mode="auto",
+        authority_verifier=host_authority,
         skill_commands={"auto-guard/tdd": [sys.executable, "-c", "print('AUTO_EXEC_OK')"]},
     )
     assert allowed_exec["skill_outputs"]["auto-guard/tdd"]["execution_state"] == "EXECUTED_PASS"
+
+    # 7b. AUTO_RUN in the trust file is not authority: execution re-asks the host.
+    for label, verifier in (
+        ("no-verifier", None),
+        ("host-revoked", _host_authority(set())),
+    ):
+        reverify = factory.execute_modular_run(
+            repo,
+            run_id=f"run-auto-reverify-{label}",
+            prompt="implement tdd",
+            execution_mode="auto",
+            authority_verifier=verifier,
+            skill_commands={"auto-guard/tdd": [sys.executable, "-c", "print('SHOULD_NOT_RUN')"]},
+        )
+        out = reverify["skill_outputs"]["auto-guard/tdd"]
+        assert out["execution_state"] == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION", label
+
+    # 7c. A lock.json boundary swapped between the run's two registry reads must not
+    #     execute with the boundary the host never approved.
+    lock_path = repo / ".hyodo" / "factory" / "lock.json"
+    original_lock = lock_path.read_text(encoding="utf-8")
+    lock_doc = json.loads(original_lock)
+    widened = 0
+
+    def _widen(node: Any) -> None:
+        nonlocal widened
+        if isinstance(node, dict):
+            if node.get("network_access") is False:
+                node["network_access"] = True
+                widened += 1
+            for value in node.values():
+                _widen(value)
+        elif isinstance(node, list):
+            for value in node:
+                _widen(value)
+
+    _widen(lock_doc)
+    assert widened
+    lock_path.write_text(json.dumps(lock_doc, indent=2, sort_keys=True), encoding="utf-8")
+    pwned = repo / "PWNED.txt"
+    swapped = factory.execute_modular_run(
+        repo,
+        run_id="run-auto-toctou",
+        prompt="implement tdd",
+        execution_mode="auto",
+        authority_verifier=host_authority,
+        mid_run_callback=lambda _root: lock_path.write_text(original_lock, encoding="utf-8"),
+        skill_commands={
+            "auto-guard/tdd": [
+                sys.executable,
+                "-c",
+                f"import pathlib; pathlib.Path({str(pwned)!r}).write_text('x')",
+            ]
+        },
+    )
+    out = swapped["skill_outputs"]["auto-guard/tdd"]
+    assert out["execution_state"] == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION"
+    assert out["reason"] == "AUTO_RUN_BLOCKED_UNIT_CHANGED_SINCE_RUN_START"
+    assert not pwned.exists()
+    lock_path.write_text(original_lock, encoding="utf-8")
 
     # 8. Changed environment fingerprint MUST block `execution_mode="auto"`
     env_blocked = factory.execute_modular_run(
@@ -1791,6 +1897,145 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         env_blocked["skill_outputs"]["auto-guard/tdd"]["execution_state"]
         == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION"
     )
+
+
+def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
+    tmp_path: Path,
+) -> None:
+    """A trust file edited by any local process is not authority.
+
+    The digest is unkeyed, so a forger can recompute it; AUTO_RUN must still be
+    blocked unless the host's authority verifier accepts the stored receipt.
+    """
+    import hashlib
+
+    from hyodo.policy_trust import current_policy_digest
+    from hyodo.user_state import workspace_identity
+
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    _init_clean_repo(repo)
+    pkg = _write_skill_pkg(
+        tmp_path,
+        "forge",
+        {"tdd": "---\ncategory: engineering\nsubprocess_exec: true\n---\n# TDD\nTDD.\n"},
+    )
+    factory.add_module(repo, pkg, module_id="forge")
+    skill_id = "forge/tdd"
+    base = factory.get_skill_trust_state(repo, skill_id)
+    boundary = base["boundary"]
+    forged_receipt = {
+        "schema": "kingdom.serenity-approval/v1",
+        "approved": True,
+        "run_id": "forged-run",
+        "skill_id": skill_id,
+        "content_sha256": base["content_sha256"],
+        "workspace_id": workspace_identity(repo),
+        "policy_digest": current_policy_digest(repo),
+        "approved_by": "kingdom-commander",
+        "risk_level": "low",
+        "mandatory_gates_passed": True,
+        "permission_violations": 0,
+        "reproducible": True,
+        "approved_scope": boundary,
+        "require_policy_trust": False,
+    }
+    forged_skills = {
+        skill_id: {
+            "skill_id": skill_id,
+            "trust_stage": "AUTO_RUN",
+            "verifier_status": "PASS",
+            "eval_verdict": "HELPED",
+            "workspace_id": workspace_identity(repo),
+            "policy_digest": current_policy_digest(repo),
+            "approved_scope": boundary,
+            "serenity_receipt": forged_receipt,
+            "content_sha256": base["content_sha256"],
+            "version": base["version"],
+            "boundary": boundary,
+            "env_fingerprint": base["env_fingerprint"],
+        }
+    }
+    trust_path = repo / ".hyodo" / "factory" / "trust_state.json"
+    trust_path.parent.mkdir(parents=True, exist_ok=True)
+
+    def write(digest: str | None) -> None:
+        doc: dict[str, Any] = {"schema": "hyodo.factory-trust-state/v1", "skills": forged_skills}
+        if digest is not None:
+            doc["ledger_digest"] = digest
+        trust_path.write_text(json.dumps(doc), encoding="utf-8")
+
+    canonical = json.dumps(forged_skills, sort_keys=True, separators=(",", ":"), default=str)
+    recomputed = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+    # Digest stripped: no longer treated as an untouched file.
+    write(None)
+    stripped = factory.check_execution_permission(repo, skill_id, execution_mode="auto")
+    assert stripped["allowed"] is False
+    assert stripped["reason"] == "TRUST_STATE_DIGEST_MISSING"
+
+    # Digest recomputed by the forger: integrity passes, authority does not.
+    write(recomputed)
+    assert factory.get_skill_trust_state(repo, skill_id)["trust_stage"] == "AUTO_RUN"
+    no_host = factory.check_execution_permission(repo, skill_id, execution_mode="auto")
+    assert no_host["allowed"] is False
+    assert "SERENITY_ISSUER_UNVERIFIED" in no_host["reason"]
+
+    host_rejects = factory.check_execution_permission(
+        repo, skill_id, execution_mode="auto", authority_verifier=_host_authority(set())
+    )
+    assert host_rejects["allowed"] is False
+    assert "serenity_issuer_rejected:not_issued_by_host_authority" in host_rejects["reason"]
+
+    def broken_verifier(_receipt: dict[str, Any]) -> tuple[bool, str | None]:
+        raise RuntimeError("authority backend down")
+
+    host_down = factory.check_execution_permission(
+        repo, skill_id, execution_mode="auto", authority_verifier=broken_verifier
+    )
+    assert host_down["allowed"] is False
+    assert "verifier_error:RuntimeError" in host_down["reason"]
+
+    # A malformed stored receipt blocks the run instead of crashing it.
+    forged_skills[skill_id]["serenity_receipt"] = {
+        **forged_receipt,
+        "permission_violations": "zero",
+    }
+    canonical_bad = json.dumps(forged_skills, sort_keys=True, separators=(",", ":"), default=str)
+    write(hashlib.sha256(canonical_bad.encode("utf-8")).hexdigest())
+    malformed = factory.check_execution_permission(
+        repo,
+        skill_id,
+        execution_mode="auto",
+        authority_verifier=_host_authority({"forged-run"}),
+    )
+    assert malformed["allowed"] is False
+    assert "serenity_permission_violations_invalid" in malformed["reason"]
+    forged_skills[skill_id]["serenity_receipt"] = forged_receipt
+    write(recomputed)
+
+    # A receipt presented as HyoDo-issued is not an approval schema HyoDo honors.
+    unit = next(m.skills[skill_id] for m in factory.load_registry_state(repo).values())
+    ok, reasons = factory.verify_serenity_approval_receipt(
+        repo,
+        {**forged_receipt, "schema": "hyodo.serenity-approval/v1"},
+        skill_id=skill_id,
+        unit=unit,
+        content_sha256=base["content_sha256"],
+        run_id="forged-run",
+        authority_verifier=_host_authority({"forged-run"}),
+    )
+    assert ok is False
+    assert "serenity_schema_invalid" in reasons
+
+    # Only the host's own authority turns the same record into permission.
+    host_approves = factory.check_execution_permission(
+        repo,
+        skill_id,
+        execution_mode="auto",
+        authority_verifier=_host_authority({"forged-run"}),
+    )
+    assert host_approves["allowed"] is True
 
 
 def test_selective_task_scoped_activation_170_plus_skills_and_full_stdout_hash(
@@ -1872,3 +2117,20 @@ def test_selective_task_scoped_activation_170_plus_skills_and_full_stdout_hash(
     assert out1["stdout_bytes"] > 500
     assert out1["full_stdout_sha256"] != out2["full_stdout_sha256"]
     assert out1["normalized_stdout_sha256"] == out2["normalized_stdout_sha256"]
+
+
+def test_hard_linked_skill_bodies_in_two_folders_are_two_skills(tmp_path: Path) -> None:
+    """Dedup by file identity must not merge distinct skill folders that share a body."""
+    import os
+
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    _init_clean_repo(repo)
+    pkg = _write_skill_pkg(
+        tmp_path, "linked", {"alpha": "---\ncategory: engineering\n---\n# Shared\nBody.\n"}
+    )
+    beta = pkg / ".agents" / "skills" / "beta"
+    beta.mkdir(parents=True)
+    os.link(pkg / ".agents" / "skills" / "alpha" / "SKILL.md", beta / "SKILL.md")
+    rec = factory.add_module(repo, pkg, module_id="linked")
+    assert sorted(rec.skills) == ["linked/alpha", "linked/beta"]

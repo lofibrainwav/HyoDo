@@ -16,6 +16,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `hyodo gates trust approve` now names the cause when the approval cannot be recorded because the state home path contains a symlink (for example macOS `/var` -> `/private/var`), instead of only saying it could not be read back. The no-follow guard on per-user state is unchanged: a symlinked state home still records nothing.
 
+### Fixed
+
+- `hyodo safe <dir>` no longer stops at the first file over the 200,000-byte read cap. It counts that file as unreadable, keeps scanning, and reports findings in the files after it, in both the plain and `--json` output. Coverage stays `UNOBSERVED`, the source keeps its `error:read:` prefix, and the exit code stays 2 ("Scan incomplete ... not a validation pass"). Before, one large file (for example a factory `lock.json` with about 120 or more skills) hid every finding in the files sorted after it. Other read errors, such as a path swapped mid-scan, still abort the scan.
+- Factory example (`examples/factory-loop`): a receipt built by `issue_serenity_approval_receipt` is no longer treated as an approval. `AUTO_RUN` promotion and every `auto` execution now need a host-supplied `authority_verifier` that confirms who issued the receipt, and execution re-checks the stored receipt against the current skill content and boundary. An `auto` run also refuses a skill whose `lock.json` content or boundary changed between the run's start and that check, and a malformed stored receipt blocks the run instead of crashing it. Without a verifier, a skill stops at `TRUSTED` / `ASK_COMMANDER`. `approved_by` no longer has a default, and the `hyodo.serenity-approval/v1` schema is no longer accepted, because HyoDo does not issue approvals. A trust file without `ledger_digest` now fails the integrity check instead of passing it.
+- Factory example: skill discovery deduplicates by file identity, so on case-insensitive filesystems (macOS) `SKILL.md` and `skill.md` no longer register the same skill twice and fail with `duplicate_skill_id`. Hard-linked bodies in two skill folders still register as two skills.
+
 ## [4.22.4] - 2026-10-27
 
 Fail-closed coverage, handoff evidence checking and dependency refresh since 4.22.3.

@@ -78,6 +78,11 @@ from hyodo.six_lens_runtime import measure_workspace_six_lenses
 from hyodo.skill_eval import evaluate_skill_case
 from hyodo.user_state import workspace_identity
 
+# Host-owned check that a Serenity approval receipt was issued by a real approval
+# authority (for example a passkey-signed approval in KINGDOM). The factory can
+# build an approval *request*, but it can never vouch for who approved it.
+ApprovalAuthorityVerifier = Callable[[dict[str, Any]], tuple[bool, str | None]]
+
 _PROTECTED_TOP_DIRS = (".git", ".hyodo", "__pycache__", ".pytest_cache")
 
 _VOLATILE_TIMING_PATTERNS: tuple[tuple[re.Pattern[str], str], ...] = (
@@ -348,11 +353,14 @@ def _verify_trust_file_integrity(workspace_root: Path) -> tuple[bool, str | None
         return False, "TRUST_STATE_CORRUPT_JSON"
     if not isinstance(raw, dict) or not isinstance(raw.get("skills"), dict):
         return False, "TRUST_STATE_MALFORMED"
+    # The digest is unkeyed: it detects corruption and naive edits, not forgery.
+    # Forgery resistance for AUTO_RUN comes from re-verifying the stored approval
+    # receipt with the host's authority verifier at execution time.
     stored_digest = raw.get("ledger_digest")
-    if stored_digest is not None:
-        expected = _compute_trust_ledger_digest(raw["skills"])
-        if stored_digest != expected:
-            return False, "TRUST_STATE_TAMPERED_DIGEST_MISMATCH"
+    if stored_digest is None:
+        return False, "TRUST_STATE_DIGEST_MISSING"
+    if stored_digest != _compute_trust_ledger_digest(raw["skills"]):
+        return False, "TRUST_STATE_TAMPERED_DIGEST_MISMATCH"
     return True, None
 
 
@@ -392,14 +400,20 @@ def issue_serenity_approval_receipt(
     *,
     skill_id: str,
     run_id: str,
-    approved_by: str = "kingdom-commander",
+    approved_by: str,
     risk_level: str = "low",
     mandatory_gates_passed: bool = True,
     permission_violations: int = 0,
     reproducible: bool = True,
     require_policy_trust: bool = False,
 ) -> dict[str, Any]:
-    """Build a structured EROS/Serenity approval receipt bound to workspace, policy digest, skill hash, and run_id."""
+    """Build an unsigned Serenity approval *request* bound to workspace, policy digest, skill hash, and run_id.
+
+    The returned dict is not an approval. Every field is asserted by the caller,
+    and nothing here proves who approved it. `verify_serenity_approval_receipt`
+    accepts it only when the host's `authority_verifier` confirms that a real
+    approval authority issued it.
+    """
     modules = load_registry_state(workspace_root)
     unit = next((m.skills[skill_id] for m in modules.values() if skill_id in m.skills), None)
     if unit is None:
@@ -430,15 +444,17 @@ def verify_serenity_approval_receipt(
     unit: SkillUnitSpec,
     content_sha256: str,
     run_id: str,
+    authority_verifier: ApprovalAuthorityVerifier | None = None,
 ) -> tuple[bool, list[str]]:
-    """Fail-closed verification of an EROS/Serenity approval receipt (never trusts a bare boolean)."""
+    """Fail-closed verification of an EROS/Serenity approval receipt (never trusts a bare boolean).
+
+    Structural binding is checked here; the issuing authority is checked only by the
+    host-supplied *authority_verifier*. Without one the receipt is never accepted.
+    """
     reasons: list[str] = []
     if not isinstance(serenity_receipt, dict) or not serenity_receipt:
         return False, ["SERENITY_RECEIPT_REQUIRED"]
-    if serenity_receipt.get("schema") not in (
-        SERENITY_RECEIPT_SCHEMA,
-        "hyodo.serenity-approval/v1",
-    ):
+    if serenity_receipt.get("schema") != SERENITY_RECEIPT_SCHEMA:
         reasons.append("serenity_schema_invalid")
     if serenity_receipt.get("approved") is not True:
         reasons.append("serenity_not_approved")
@@ -460,7 +476,10 @@ def verify_serenity_approval_receipt(
         reasons.append(f"serenity_risk_blocked:{risk}")
     if serenity_receipt.get("mandatory_gates_passed") is not True:
         reasons.append("serenity_mandatory_gates_unverified")
-    if int(serenity_receipt.get("permission_violations", 1)) != 0:
+    violations = serenity_receipt.get("permission_violations", 1)
+    if type(violations) is not int:
+        reasons.append("serenity_permission_violations_invalid")
+    elif violations != 0:
         reasons.append("serenity_permission_violations_nonzero")
     if serenity_receipt.get("reproducible") is not True:
         reasons.append("serenity_reproducibility_false")
@@ -480,6 +499,18 @@ def verify_serenity_approval_receipt(
     if host_promise is not None and host_promise.get("state") != "OBSERVED":
         reasons.append("host_promise_projection_invalid")
 
+    if authority_verifier is None:
+        reasons.append("SERENITY_ISSUER_UNVERIFIED:no_host_authority_verifier")
+    elif not reasons:
+        # Only ask the host's approval authority once the structure is bound, so a
+        # malformed request never triggers a real approval check.
+        try:
+            issuer_ok, issuer_err = authority_verifier(dict(serenity_receipt))
+        except Exception as exc:  # any verifier failure is fail-closed
+            issuer_ok, issuer_err = False, f"verifier_error:{type(exc).__name__}"
+        if issuer_ok is not True:
+            reasons.append(f"serenity_issuer_rejected:{issuer_err or 'unspecified'}")
+
     return len(reasons) == 0, reasons
 
 
@@ -489,6 +520,7 @@ def check_execution_permission(
     *,
     execution_mode: str = "manual",
     env_fingerprint: str | None = None,
+    authority_verifier: ApprovalAuthorityVerifier | None = None,
 ) -> dict[str, Any]:
     """Check whether *skill_id* is permitted to execute under *execution_mode* (`manual` | `shadow` | `auto`)."""
     if execution_mode not in ("manual", "shadow", "auto"):
@@ -574,11 +606,35 @@ def check_execution_permission(
             "trust_stage": stage,
         }
 
+    # The trust file is only a cache. Authority is re-checked at execution time
+    # against the current skill content and boundary, by the host's verifier.
+    stored_receipt = trust_state.get("serenity_receipt")
+    approval_ok, approval_reasons = verify_serenity_approval_receipt(
+        workspace_root,
+        stored_receipt if isinstance(stored_receipt, dict) else None,
+        skill_id=skill_id,
+        unit=unit,
+        content_sha256=unit.content_sha256,
+        run_id=str((stored_receipt or {}).get("run_id", ""))
+        if isinstance(stored_receipt, dict)
+        else "",
+        authority_verifier=authority_verifier,
+    )
+    if not approval_ok:
+        return {
+            "allowed": False,
+            "execution_mode": execution_mode,
+            "reason": f"AUTO_RUN_BLOCKED_APPROVAL_UNVERIFIED:{approval_reasons[0]}",
+            "trust_stage": stage,
+        }
+
     return {
         "allowed": True,
         "execution_mode": execution_mode,
         "reason": None,
         "trust_stage": stage,
+        "verified_content_sha256": unit.content_sha256,
+        "verified_boundary": unit.boundary.to_dict(),
     }
 
 
@@ -604,6 +660,7 @@ def execute_modular_run(
     selective_activation: bool = False,
     execution_mode: str = "manual",
     env_fingerprint: str | None = None,
+    authority_verifier: ApprovalAuthorityVerifier | None = None,
 ) -> dict[str, Any]:
     """Run the modular factory loop with preflight gap analysis, trust gating, subprocess isolation, and Progressive Disclosure."""
     if execution_mode not in ("manual", "shadow", "auto"):
@@ -703,7 +760,21 @@ def execute_modular_run(
                     skill_id,
                     execution_mode=execution_mode,
                     env_fingerprint=env_fingerprint,
+                    authority_verifier=authority_verifier,
                 )
+                if perm_check["allowed"] and execution_mode == "auto":
+                    # The run executes the unit loaded at run start; it must be the
+                    # exact unit whose approval was just verified, or a lock.json
+                    # edit between the two reads would widen the boundary.
+                    _run_unit = unit_lookup[skill_id][1]
+                    if _run_unit.content_sha256 != perm_check.get(
+                        "verified_content_sha256"
+                    ) or _run_unit.boundary.to_dict() != perm_check.get("verified_boundary"):
+                        perm_check = {
+                            **perm_check,
+                            "allowed": False,
+                            "reason": "AUTO_RUN_BLOCKED_UNIT_CHANGED_SINCE_RUN_START",
+                        }
                 if not perm_check["allowed"]:
                     reason = str(perm_check["reason"] or "AUTO_RUN_BLOCKED")
                     permission_violations.append(
@@ -1631,6 +1702,7 @@ def evaluate_and_promote_trust(
     run_id: str = "trust-eval-01",
     source: str = "kingdom.agent-loop.eros-gate",
     env_fingerprint: str | None = None,
+    authority_verifier: ApprovalAuthorityVerifier | None = None,
 ) -> dict[str, Any]:
     """Evaluate mandatory evidence gates and advance/demote trust along `DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN`.
 
@@ -1642,7 +1714,8 @@ def evaluate_and_promote_trust(
     - A high `s_score` NEVER overrides failed or `UNOBSERVED` mandatory gates.
     - `AUTO_RUN` rejects a bare `serenity_gate_approved=True` boolean without a verified
       `serenity_receipt` bound to `workspace_id`, `policy_digest`, `risk_level`, `approved_scope`,
-      `content_sha256`, and `run_id`.
+      `content_sha256`, and `run_id`, and confirmed by the host's *authority_verifier*.
+      A receipt built by `issue_serenity_approval_receipt` alone never reaches `AUTO_RUN`.
     """
     current_state = get_skill_trust_state(workspace_root, skill_id, env_fingerprint=env_fingerprint)
     if not current_state.get("registered", False):
@@ -1726,6 +1799,7 @@ def evaluate_and_promote_trust(
         unit=unit,
         content_sha256=unit.content_sha256,
         run_id=run_id,
+        authority_verifier=authority_verifier,
     )
     bare_boolean_rejected = bool(serenity_gate_approved and not serenity_verified)
 
@@ -1813,6 +1887,7 @@ def evaluate_and_promote_trust(
         "workspace_id": workspace_identity(workspace_root),
         "policy_digest": current_policy_digest(workspace_root),
         "approved_scope": approved_scope,
+        "serenity_receipt": serenity_receipt if serenity_verified else None,
         "content_sha256": unit.content_sha256,
         "version": mod.version,
         "boundary": unit.boundary.to_dict(),

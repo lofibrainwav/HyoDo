@@ -466,7 +466,12 @@ def discover_skill_files(module_root: Path) -> list[Path]:
     mirrored copies of the same skill for multiple hosts (e.g., `impeccable`).
     """
     candidates: list[Path] = []
-    seen_resolved: set[Path] = set()
+    # Keyed by (st_dev, st_ino): on case-insensitive filesystems (macOS APFS default)
+    # `skills/*/SKILL.md` and `skills/*/skill.md` match the same file under two
+    # spellings that `resolve()` does not normalize. The parent directory is part
+    # of the key because it names the skill: hard-linked bodies in two skill
+    # folders are still two skills.
+    seen_files: set[tuple[Path, int, int]] = set()
     canonical_names_seen: dict[str, str] = {}
 
     # Ordered from canonical source locations to host-specific mirror locations
@@ -508,8 +513,9 @@ def discover_skill_files(module_root: Path) -> list[Path]:
                 )
             ):
                 continue
-            resolved = path.resolve()
-            if resolved in seen_resolved:
+            st = path.stat()
+            file_key = (path.parent.resolve(), st.st_dev, st.st_ino)
+            if file_key in seen_files:
                 continue
 
             sub_key = (
@@ -521,7 +527,7 @@ def discover_skill_files(module_root: Path) -> list[Path]:
                 # Already discovered canonical or higher-priority host copy of this skill
                 continue
 
-            seen_resolved.add(resolved)
+            seen_files.add(file_key)
             canonical_names_seen[sub_key] = str(path.relative_to(module_root))
             candidates.append(path)
 

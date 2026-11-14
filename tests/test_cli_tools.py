@@ -507,3 +507,15 @@ def test_safe_unreadable_file_exit_2(tmp_path):
     assert result.exit_code == 2
     assert "not a validation pass" in result.output.lower()
     assert "Scan failed" in result.output or "error:read:" in result.output
+
+
+def test_safe_dir_with_oversize_file_shows_later_findings_and_is_not_a_pass(tmp_path):
+    (tmp_path / "a_big.txt").write_text("x" * 200_001, encoding="utf-8")
+    (tmp_path / "b_tok.txt").write_text(
+        "token = ghp_abcdefghijklmnopqrstuvwxyz012345\n", encoding="utf-8"
+    )
+    result = runner.invoke(app, ["safe", str(tmp_path), "--max-files", "0"])
+    assert result.exit_code == 2
+    assert "b_tok.txt" in result.output
+    assert "Scan incomplete" in result.output
+    assert "This is not a validation pass." in result.output
