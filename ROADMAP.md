@@ -5,17 +5,15 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.22.4 is the latest published release (2026-10-27 UTC). Its signed
+HyoDo 4.22.5 is the latest published release (2026-11-14 UTC). Its signed
 tag, GitHub Release, SBOM, PyPI provenance, and install smoke are measured
-9/9 OBSERVED in `docs/releases/4.22.4.md`. The earlier 4.22.2 package was
+9/9 OBSERVED in `docs/releases/4.22.5.md`. The earlier 4.22.2 package was
 published, but its in-repository release-chain receipt has not been
 reconciled. Prior release receipts remain preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.5 is the current release target. It is not published yet: until
-its package chain records publication in `docs/releases/4.22.5.md`, the
-public baseline above (4.22.4) stays the latest published package.
+HyoDo 4.22.5 is the current release target and latest published release.
 It carries safety scans that keep scanning past oversized files, the host
 gate-trust commands and the factory-example approval, provenance and evidence
 fixes, with the package chain recorded in `docs/releases/4.22.5.md`.
@@ -51,7 +49,7 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.5 (release target)
+### 4.22.5 (released 2026-11-14 UTC)
 
 - Publish main up to #630: `hyodo safe` keeps scanning past files over the read
   cap and reports `level: unobserved` when nothing was observed, `hyodo gates
@@ -59,8 +57,12 @@ evidence is not converted into a pass.
   example's host-verified approvals, module-tree binding, honest enforcement,
   fail-closed zombie stale-lock checks, pre-exec PGID registration gate, and
   provenance reporting.
-- Package chain is measured in `docs/releases/4.22.5.md` after publication; host
+- Package chain is measured 9/9 OBSERVED in `docs/releases/4.22.5.md`; host
   installation and live use need separate readback.
+- Known issue, factory example only: on macOS two stale-lock tests fail and a
+  zombie-only process group is refused as `INVALID` (fail closed), and gated
+  skills inherit an ignored `SIGPIPE`. The `hyodo` package is unaffected; the
+  fix is #631, unreleased.
 
 ### 4.22.4 (released 2026-10-27 UTC)
 
