@@ -7,7 +7,9 @@ capability-gap / doctor health diagnostics, profile constraints (`minimal`,
 recommendations (e.g. `JEV`), without loading full `SKILL.md` bodies until
 activation.
 Enforces functional slot deduplication and task-scoped selective activation so
-170+ registered skills never need to be enabled globally all at once.
+a large registry (the tests register 182 synthetic skills) never needs to be
+enabled globally all at once. No count of real external repositories or skills
+is verified by this code; any such number is UNOBSERVED here.
 """
 
 from __future__ import annotations
@@ -30,7 +32,12 @@ from factory.contracts import (
     ProfileSpec,
     SkillUnitSpec,
 )
-from factory.lifecycle import activate_selected_skills, discover_skills, doctor
+from factory.lifecycle import (
+    PROVENANCE_UNOBSERVED_PREFIXES,
+    activate_selected_skills,
+    discover_skills,
+    doctor,
+)
 from factory.registry import list_enabled_skills, load_registry_state
 from hyodo.admission_observation import ADMISSION_OBSERVATIONS_RELATIVE_PATH
 from hyodo.connector_contract import build_connector_contract
@@ -263,24 +270,38 @@ def _collect_effective_taste(
     explicit_taste_feedback: list[str] | None,
 ) -> dict[str, Any]:
     host_cfg = load_host_taste_config(workspace_root)
-    explicit_rules: list[str] = []
+    # (rule, source, authority). Only the host's own taste file and explicit
+    # feedback are HOST_CONFIGURED; a repo-shipped profile's rules are defaults.
+    tagged_rules: list[tuple[str, str, str]] = []
     if profile is not None:
-        explicit_rules.extend(profile.personal_taste_rules)
-    explicit_rules.extend(host_cfg["rules"])
-    for skill in host_cfg["prefer_skills"]:
-        explicit_rules.append(f"prefer:{skill}")
-    for skill in host_cfg["avoid_skills"]:
-        explicit_rules.append(f"avoid:{skill}")
-    for term in host_cfg["prefer_terms"]:
-        explicit_rules.append(f"prefer_term:{term}")
+        tagged_rules.extend(
+            (r, f"profile_default:{profile.name}", "PROFILE_DEFAULT")
+            for r in profile.personal_taste_rules
+        )
+    host_file_rules = [
+        *host_cfg["rules"],
+        *(f"prefer:{skill}" for skill in host_cfg["prefer_skills"]),
+        *(f"avoid:{skill}" for skill in host_cfg["avoid_skills"]),
+        *(f"prefer_term:{term}" for term in host_cfg["prefer_terms"]),
+    ]
+    tagged_rules.extend((r, "host_taste_file", "HOST_CONFIGURED") for r in host_file_rules)
     if explicit_taste_feedback:
-        explicit_rules.extend(str(r) for r in explicit_taste_feedback if str(r).strip())
+        tagged_rules.extend(
+            (str(r), "explicit_taste_feedback", "HOST_CONFIGURED")
+            for r in explicit_taste_feedback
+            if str(r).strip()
+        )
 
-    # Deduplicate while preserving deterministic order
+    # Deduplicate while preserving deterministic order; a rule the host also
+    # configured keeps the host label.
     seen_rules: list[str] = []
-    for r in explicit_rules:
+    rule_provenance: dict[str, dict[str, str]] = {}
+    for r, source, authority in tagged_rules:
         if r not in seen_rules:
             seen_rules.append(r)
+            rule_provenance[r] = {"source": source, "authority": authority}
+        elif authority == "HOST_CONFIGURED":
+            rule_provenance[r] = {"source": source, "authority": authority}
 
     prefer_tokens: list[str] = []
     avoid_tokens: list[str] = []
@@ -315,6 +336,13 @@ def _collect_effective_taste(
     return {
         "host_taste_file_present": host_cfg["present"],
         "rules": seen_rules,
+        "rule_provenance": rule_provenance,
+        "host_configured_rules": [
+            r for r in seen_rules if rule_provenance[r]["authority"] == "HOST_CONFIGURED"
+        ],
+        "profile_default_rules": [
+            r for r in seen_rules if rule_provenance[r]["authority"] == "PROFILE_DEFAULT"
+        ],
         "prefer_tokens": prefer_tokens,
         "avoid_tokens": avoid_tokens,
         "boost_keywords": sorted(boost_keywords),
@@ -345,7 +373,9 @@ def _extract_doctor_diagnostics(
     silent_zero_details: dict[str, str] = {}
 
     for prob in rep.get("problems", []):
-        if prob.startswith("missing_module_source:"):
+        if prob.startswith(
+            ("missing_module_source:", "module_tree_drift:", "module_origin_drift:")
+        ):
             parts = prob.split(":")
             if len(parts) >= 2:
                 degraded_modules.add(parts[1])
@@ -377,6 +407,12 @@ def _extract_doctor_diagnostics(
                     silent_zero_details[sid] = "HOST_ENV_UNBOUND_SILENT_ZERO_FALLBACK"
                 else:
                     silent_zero_details[sid] = "HOOK_SCRIPT_MISSING_SILENT_ZERO"
+
+    # A degraded module degrades every skill in it, so routing skips them too.
+    if degraded_modules:
+        for mod_id, mod in load_registry_state(workspace_root).items():
+            if mod_id in degraded_modules:
+                degraded_ids.update(mod.skills)
 
     return {
         "doctor_report": rep,
@@ -653,6 +689,8 @@ def route_skills_for_task(
         "taste_applied": {
             "host_taste_file_present": taste_info["host_taste_file_present"],
             "explicit_rules_count": len(taste_info["rules"]),
+            "host_configured_rules_count": len(taste_info["host_configured_rules"]),
+            "profile_default_rules_count": len(taste_info["profile_default_rules"]),
             "prefer_tokens": taste_info["prefer_tokens"],
             "avoid_tokens": taste_info["avoid_tokens"],
             "boost_keywords": taste_info["boost_keywords"],
@@ -675,6 +713,7 @@ def select_and_activate_for_task(
     explicit_taste_feedback: list[str] | None = None,
     deduplicate_by_slot: bool = True,
     disable_others: bool = True,
+    owner_run_id: str | None = None,
 ) -> dict[str, Any]:
     """Select only task-needed skills across all registered modules (even lazy/dormant ones) and activate them atomically."""
     modules = load_registry_state(workspace_root)
@@ -710,6 +749,7 @@ def select_and_activate_for_task(
         workspace_root,
         plan["selected_skills"],
         disable_others=disable_others,
+        owner_run_id=owner_run_id,
     )
     total_skills = sum(len(m.skills) for m in modules.values())
     return {
@@ -752,13 +792,27 @@ def analyze_capability_gaps(
     task-scoped wiring gaps from intentionally dormant out-of-scope skills.
     """
     inferred_cats = infer_intent_categories(prompt)
-    profile = load_profile(profile_name) if profile_name else load_profile("development")
+    # No silent default: without a caller-chosen profile the analysis uses no
+    # profile at all, exactly like `route_skills_for_task` does.
+    profile = load_profile(profile_name) if profile_name else None
     modules = load_registry_state(workspace_root)
     doctor_report = doctor(workspace_root)
     diag = _extract_doctor_diagnostics(workspace_root, doctor_report=doctor_report)
-    doctor_issues = list(doctor_report.get("problems", [])) + list(
-        doctor_report.get("warnings", [])
+    # Unobserved provenance makes doctor UNOBSERVED; it is not a skill defect.
+    # Run-lock and registry-wide findings are not about one module's skills.
+    workspace_level = (
+        "stale_run_lock:",
+        "orphaned_skill_processes:",
+        "run_state_record_invalid:",
+        "selective_activation_not_restored:",
     )
+    doctor_issues = [
+        p for p in doctor_report.get("problems", []) if not str(p).startswith(workspace_level)
+    ] + [
+        w
+        for w in doctor_report.get("warnings", [])
+        if not str(w).startswith((*PROVENANCE_UNOBSERVED_PREFIXES, "no_modules_registered"))
+    ]
     route_plan = route_skills_for_task(
         workspace_root,
         prompt,
@@ -871,8 +925,11 @@ def analyze_capability_gaps(
                 root_cause = "VERIFICATION_MISSING"
                 trust_stage = "VERIFY"
 
-            assert state in CAPABILITY_STATES
-            assert root_cause in GAP_ROOT_CAUSES
+            # Real checks, not `assert`: they must survive `python -O`.
+            if state not in CAPABILITY_STATES:
+                raise ValueError(f"invalid capability state for {skill_id}: {state}")
+            if root_cause not in GAP_ROOT_CAUSES:
+                raise ValueError(f"invalid gap root cause for {skill_id}: {root_cause}")
             item: dict[str, Any] = {
                 "skill_id": skill_id,
                 "module_id": mod_id,
@@ -958,19 +1015,21 @@ def analyze_capability_gaps(
 
     # Taste x Metacognition synthesis
     taste_info = _collect_effective_taste(workspace_root, profile, explicit_taste_feedback)
-    hypotheses = list(profile.inferred_taste_hypotheses) + list(inferred_taste_hypotheses or [])
+    profile_hypotheses = list(profile.inferred_taste_hypotheses) if profile else []
+    hypotheses = profile_hypotheses + list(inferred_taste_hypotheses or [])
     taste_synthesis = {
         "personal_taste": [
             {
                 "rule": rule,
-                "source": "explicit_user_rule_or_feedback",
+                "source": taste_info["rule_provenance"][rule]["source"],
                 "hypothesis": False,
-                "authority": "HOST_CONFIGURED",
+                "authority": taste_info["rule_provenance"][rule]["authority"],
             }
             for rule in taste_info["rules"]
         ],
+        "host_taste_file_present": taste_info["host_taste_file_present"],
         "professional_taste": {
-            "domain_focus": list(profile.domain_taste_focus),
+            "domain_focus": list(profile.domain_taste_focus) if profile else [],
             "active_taste_skills": [
                 sid
                 for sid in route_plan["selected_skills"]
@@ -1015,7 +1074,7 @@ def analyze_capability_gaps(
     return {
         "schema": "hyodo.capability-gap-report/v1",
         "prompt": prompt,
-        "profile": profile.name,
+        "profile": profile.name if profile else "auto",
         "metacognition_mode": metacognition_mode,
         "is_simple_task": is_simple_task,
         "inferred_categories": inferred_cats,

@@ -47,6 +47,28 @@ Each `high` finding adds 40 to the risk score, each `medium` adds 15, each
 `low` adds 5, capped at 100. `risk_score >= 31` is `high` (review required),
 `>= 11` is `caution`, otherwise `low`. See `hyodo/safety.py:219-292`.
 
+The level depends on coverage as well as the score:
+
+- Coverage `UNOBSERVED` (nothing scanned, a missing path, or a scan that could
+  not read every file): a score that would be `low` is reported as level
+  `unobserved` instead, because the absence of findings in content that was not
+  read is not low risk. Findings in the files that were read can still raise
+  the level to `caution` or `high`.
+- Coverage `PARTIAL` (a capped scan): the level comes from the score as usual,
+  so it can be `low`. That `low` covers only the observed files; the verdict
+  line reports `PARTIAL`, not `PASS`.
+- Coverage `FULL`: the level comes from the score.
+
+The level never changes the exit code. The exit codes are:
+
+- `2` when the target is missing, or when any selected file could not be read
+  (including a file over the size cap), in every mode: the scan is incomplete.
+  Findings in the files that were read are still shown.
+- Otherwise, default mode exits `0` whatever the findings (early warning),
+  including a `PARTIAL` or empty (`UNOBSERVED`) corpus.
+- Otherwise, `--strict` exits `2` when coverage is not `FULL` (even with `high`
+  findings), else `1` on a `high` finding, else `0`.
+
 ## Honest limits
 
 - **Directory scans cap at 40 files** (`hyodo/safety.py:97-123`, override with

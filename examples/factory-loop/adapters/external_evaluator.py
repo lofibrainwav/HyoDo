@@ -11,7 +11,7 @@ import hashlib
 from pathlib import Path
 from typing import Any
 
-from factory.contracts import ModuleRecord, PermissionBoundary, SkillUnitSpec
+from factory.contracts import ModuleRecord, PermissionBoundary, SkillUnitSpec, utc_now_iso
 
 from adapters.agent_skills import (
     _ensure_safe_subpath,
@@ -127,7 +127,7 @@ def evaluator_routing_to_hyodo_retrieval(
     evaluator_node: str,
     observation: dict[str, Any],
     candidate_rules: list[dict[str, str]],
-    ingested_at: str = "2026-11-13T00:00:00Z",
+    ingested_at: str | None = None,
 ) -> dict[str, Any]:
     """Convert an external evaluator's routing observation into `hyodo.skill-retrieval/v1`.
 
@@ -167,7 +167,7 @@ def evaluator_routing_to_hyodo_retrieval(
         raise ValueError(f"invalid skill retrieval payload: {reasons}")
 
     rules = node_rules_for(retrieval)
-    entry = node_manifest_entry(retrieval, rules, ingested_at=ingested_at)
+    entry = node_manifest_entry(retrieval, rules, ingested_at=ingested_at or utc_now_iso())
     manifest, status = load_manifest(workspace_root)
     existing = list(manifest.get("skills", [])) if manifest and status == "ok" else []
     existing = [row for row in existing if row.get("source") != entry["source"]]

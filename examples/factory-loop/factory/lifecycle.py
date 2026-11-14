@@ -11,8 +11,11 @@ from __future__ import annotations
 import ast
 import contextlib
 import fcntl
+import hashlib
 import json
 import os
+import socket
+import time
 from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
@@ -27,14 +30,16 @@ from adapters.agent_skills import (
 from adapters.claude_plugin import load_claude_plugin_module
 from adapters.external_evaluator import load_external_evaluator_module
 
-from factory.contracts import ModuleRecord
+from factory.contracts import ModuleRecord, utc_now_iso
 from factory.registry import (
     ACTIVE_HOOKS_REL,
     LIFECYCLE_FLOCK_REL,
     RUN_LOCK_REL,
     SNAPSHOTS_DIR_REL,
     _atomic_write_text,
+    compare_module_origin,
     load_registry_state,
+    observe_module_origin,
     save_registry_state,
     verify_lock_integrity,
 )
@@ -43,51 +48,297 @@ from hyodo.connect import plan_target as plan_connect_target
 from hyodo.mcp_config import ALL_HOSTS as MCP_ALL_HOSTS
 from hyodo.mcp_config import plan_host as plan_mcp_host
 
+# Doctor warnings about provenance that could not be observed. They make the
+# doctor status UNOBSERVED but do not degrade the module's skills for routing.
+PROVENANCE_UNOBSERVED_PREFIXES = ("module_origin_unrecorded:", "module_tree_unbindable:")
+
+# Pre-activation flags of each running `--selective` run (one file per run id),
+# removed after that run's restore.
+SELECTIVE_PENDING_DIR_REL = RUN_LOCK_REL.parent / "selective_pending"
+# Per-run records of skill process groups. Outside `.hyodo/factory/` because a
+# record is written while a skill runs and that directory must not change then.
+RUN_STATE_DIR_REL = Path(".hyodo") / "factory-run-state"
+# Receipts of stale run locks that were removed after their owner was proven gone.
+LOCK_RECOVERIES_REL = RUN_LOCK_REL.parent / "lock_recoveries.jsonl"
+# Upper bound on waiting for the lifecycle lock (overridable per process with
+# HYODO_FACTORY_LOCK_TIMEOUT_S).
+LIFECYCLE_LOCK_TIMEOUT_S = 30.0
+
+
+def _lifecycle_lock_timeout_s() -> float:
+    raw = os.environ.get("HYODO_FACTORY_LOCK_TIMEOUT_S", "").strip()
+    try:
+        return max(0.0, float(raw)) if raw else LIFECYCLE_LOCK_TIMEOUT_S
+    except ValueError:
+        return LIFECYCLE_LOCK_TIMEOUT_S
+
 
 @contextlib.contextmanager
 def _lifecycle_flock(workspace_root: Path) -> Iterator[None]:
-    """Acquire an OS-level exclusive advisory file lock for atomic registry mutations."""
+    """Acquire the exclusive lifecycle lock, retrying for a bounded time.
+
+    A process that holds the lock indefinitely (for example a skill that left
+    its process group) must not stall every run: after the timeout
+    (`HYODO_FACTORY_LOCK_TIMEOUT_S`, default 30 s) this fails with
+    `LIFECYCLE_LOCK_BUSY` instead of waiting forever.
+    """
     flock_path = workspace_root / LIFECYCLE_FLOCK_REL
     flock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(flock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
-    finally:
+        timeout = _lifecycle_lock_timeout_s()
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        f"LIFECYCLE_LOCK_BUSY: another process has held {LIFECYCLE_FLOCK_REL} "
+                        f"for more than {timeout:g}s. Inspect it with `lsof {flock_path}`; "
+                        "set HYODO_FACTORY_LOCK_TIMEOUT_S to wait longer."
+                    ) from None
+                time.sleep(0.05)
         try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            yield
         finally:
-            os.close(fd)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
 
 
-def _check_not_mid_run(workspace_root: Path) -> None:
-    """Refuse lifecycle mutations while a task run lock is active (Acceptance Gate #9)."""
+STALE_LOCK_RECOVERY_HINT = (
+    "python examples/factory-loop/hyodo_factory.py --root <workspace> recover-stale-lock"
+)
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True  # it exists, owned by someone else
+    return True
+
+
+def _process_group_state(pgid: int) -> str:
+    """`ALIVE`, `GONE`, or `INVALID` for a recorded skill process group.
+
+    A skill's group is created by this harness for a process of the same user,
+    so pgid <= 1, the checking process's own group or session, or a group this
+    user may not signal (EPERM) cannot be one of them: such an entry is a
+    forged or corrupt record, never evidence that a skill is alive.
+    """
+    if pgid <= 1 or pgid in (os.getpgrp(), os.getsid(0)):
+        return "INVALID"
+    try:
+        os.killpg(pgid, 0)
+    except ProcessLookupError:
+        return "GONE"
+    except PermissionError:
+        return "INVALID"
+    return "ALIVE"
+
+
+def _process_group_alive(pgid: int) -> bool:
+    return _process_group_state(pgid) == "ALIVE"
+
+
+def _run_key(run_id: str) -> str:
+    """A filename-safe key for one run id (the run id itself is stored inside)."""
+    return hashlib.sha256(run_id.encode("utf-8")).hexdigest()[:24]
+
+
+def _process_groups_path(workspace_root: Path, run_id: str) -> Path:
+    return workspace_root / RUN_STATE_DIR_REL / f"{_run_key(run_id)}.process_groups.json"
+
+
+def process_groups_record_rel(run_id: str) -> str:
+    """The workspace-relative path of a run's process-group record."""
+    return (RUN_STATE_DIR_REL / f"{_run_key(run_id)}.process_groups.json").as_posix()
+
+
+def write_skill_process_groups(workspace_root: Path, run_id: str, pgids: list[int]) -> bytes:
+    """Write the run's full list of skill process groups and return the bytes written.
+
+    The caller keeps the authoritative list in memory and always writes all of
+    it, so whatever a skill put in the file is never read back and merged.
+    """
+    data = (json.dumps({"run_id": run_id, "pgids": list(pgids)}) + "\n").encode("utf-8")
+    _atomic_write_text(_process_groups_path(workspace_root, run_id), data.decode("utf-8"))
+    return data
+
+
+def recorded_process_groups(workspace_root: Path, run_id: str) -> list[int] | None:
+    """The process groups a run recorded; `None` when the record is unreadable."""
+    path = _process_groups_path(workspace_root, run_id)
+    if not path.exists():
+        return []
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if raw.get("run_id") != run_id:
+            return None
+        return [int(g) for g in raw["pgids"]]
+    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        return None
+
+
+def clear_skill_process_groups(workspace_root: Path, run_id: str) -> None:
+    with contextlib.suppress(FileNotFoundError):
+        _process_groups_path(workspace_root, run_id).unlink()
+
+
+def run_lock_status(workspace_root: Path) -> dict[str, Any] | None:
+    """Describe `.hyodo/factory/run.lock`: `None` when absent, else its owner and state.
+
+    `state` is `STALE` only when the owner is provably gone: the lock names this
+    host, its pid no longer exists, and no process group the run recorded for
+    its skills still has a member. `ORPHANED_SKILLS` means the owner is gone but
+    a recorded skill process group is still running. `UNKNOWN` (never assumed
+    stale) covers a lock from another host or without a pid
+    (`unknown_reason: owner_unverifiable`), an unreadable lock
+    (`lock_unreadable`), and an unreadable or invalid process-group record
+    (`process_group_record_invalid`, e.g. pgid 1). `LIVE` means the pid exists
+    (a reused pid also reads as live; that errs on the side of not touching it).
+
+    The process-group record can be written by any same-user process: erasing
+    it can make a lock look STALE while skills still run, and forging it can
+    block recovery. See `recover_stale_run_lock(discard_process_group_record=...)`.
+    """
+    lock_file = workspace_root / RUN_LOCK_REL
+    if not lock_file.exists():
+        return None
+    base: dict[str, Any] = {
+        "run_id": None,
+        "pid": None,
+        "host": None,
+        "owner_gone": False,
+        "alive_process_groups": [],
+        "invalid_process_groups": [],
+        "unknown_reason": None,
+        "lock_text": None,
+    }
+    try:
+        raw_text = lock_file.read_text(encoding="utf-8")
+        held = json.loads(raw_text)
+    except (OSError, json.JSONDecodeError):
+        raw_text, held = None, None
+    base["lock_text"] = raw_text
+    if not isinstance(held, dict):
+        return {**base, "state": "UNKNOWN", "unknown_reason": "lock_unreadable"}
+    pid = held.get("pid")
+    host = held.get("host")
+    run_id = held.get("run_id")
+    base.update(run_id=run_id, pid=pid, host=host)
+    if type(pid) is not int or pid <= 0 or host != socket.gethostname():
+        return {**base, "state": "UNKNOWN", "unknown_reason": "owner_unverifiable"}
+    if _pid_alive(pid):
+        return {**base, "state": "LIVE"}
+    base["owner_gone"] = True
+    groups = recorded_process_groups(workspace_root, str(run_id))
+    if groups is None:
+        return {**base, "state": "UNKNOWN", "unknown_reason": "process_group_record_invalid"}
+    states = {g: _process_group_state(g) for g in groups}
+    invalid = [g for g, st in states.items() if st == "INVALID"]
+    alive = [g for g, st in states.items() if st == "ALIVE"]
+    base.update(alive_process_groups=alive, invalid_process_groups=invalid)
+    if invalid:
+        return {**base, "state": "UNKNOWN", "unknown_reason": "process_group_record_invalid"}
+    return {**base, "state": "ORPHANED_SKILLS" if alive else "STALE"}
+
+
+_INSPECT_HINT = "ps -A -o pid,pgid,command"
+
+
+def _lock_held_message(workspace_root: Path, prefix: str) -> str:
+    status = run_lock_status(workspace_root) or {}
+    if status.get("state") == "STALE":
+        return (
+            f"STALE_RUN_LOCK:{status.get('pid')}: {RUN_LOCK_REL} was left by run "
+            f"{status.get('run_id')!r}, whose process no longer exists on this host. "
+            f"Recover with: {STALE_LOCK_RECOVERY_HINT}"
+        )
+    if status.get("state") == "ORPHANED_SKILLS":
+        groups = ",".join(str(g) for g in status.get("alive_process_groups", []))
+        return (
+            f"ORPHANED_SKILL_PROCESSES:{status.get('pid')}: the run {status.get('run_id')!r} "
+            f"that holds {RUN_LOCK_REL} is gone, but process groups {groups} from its record "
+            f"are still running. Inspect them with `{_INSPECT_HINT}` (PGID column), then "
+            f"stop them yourself if they are this run's skills; then: {STALE_LOCK_RECOVERY_HINT}"
+        )
+    if status.get("unknown_reason") == "process_group_record_invalid":
+        return (
+            f"RUN_STATE_RECORD_INVALID:{status.get('pid')}: the run {status.get('run_id')!r} "
+            f"that holds {RUN_LOCK_REL} is gone, but its process-group record is unreadable "
+            f"or names groups no skill can have ({status.get('invalid_process_groups')}). "
+            f"Inspect with `{_INSPECT_HINT}`; after inspection: "
+            f"{STALE_LOCK_RECOVERY_HINT} --discard-process-group-record"
+        )
+    return f"{prefix}: {RUN_LOCK_REL} is held by run {status.get('run_id')!r} (pid {status.get('pid')})"
+
+
+def _run_lock_owned_by(workspace_root: Path, owner_run_id: str | None) -> bool:
+    if owner_run_id is None:
+        return False
+    try:
+        held = json.loads((workspace_root / RUN_LOCK_REL).read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    return (
+        isinstance(held, dict)
+        and held.get("run_id") == owner_run_id
+        and held.get("pid") == os.getpid()
+    )
+
+
+def _check_not_mid_run(workspace_root: Path, owner_run_id: str | None = None) -> None:
+    """Refuse lifecycle mutations while a task run lock is active (Acceptance Gate #9).
+
+    The run that holds the lock (same `run_id` and process) may still apply its
+    own task-scoped activation and restore it; nobody else may.
+    """
     run_lock = workspace_root / RUN_LOCK_REL
-    if run_lock.exists():
+    if run_lock.exists() and not _run_lock_owned_by(workspace_root, owner_run_id):
         raise RuntimeError(
-            "MID_RUN_SKILL_MUTATION_FORBIDDEN: cannot add, remove, update, or toggle skills while a run is active"
+            _lock_held_message(
+                workspace_root,
+                "MID_RUN_SKILL_MUTATION_FORBIDDEN: cannot add, remove, update, or toggle "
+                "skills while a run is active",
+            )
         )
 
 
 def acquire_run_lock(workspace_root: Path, run_id: str) -> Path:
-    """Atomically acquire `.hyodo/factory/run.lock` (`O_CREAT | O_EXCL`) and verify lock integrity."""
+    """Atomically acquire `.hyodo/factory/run.lock` and verify lock integrity.
+
+    The lock is created under the lifecycle lock, so it can never be taken in
+    the middle of `recover_stale_run_lock`. A lock whose owner is provably gone
+    is reported as `STALE_RUN_LOCK:<pid>` with the recovery command; it is never
+    removed silently.
+    """
     problems = verify_lock_integrity(workspace_root)
     if problems:
         raise RuntimeError(f"MID_RUN_SKILL_DRIFT: {problems}")
     lock_file = workspace_root / RUN_LOCK_REL
     lock_file.parent.mkdir(parents=True, exist_ok=True)
-    try:
-        fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
-    except FileExistsError as exc:
-        raise RuntimeError(
-            f"CONCURRENT_RUN_LOCK_HELD: another factory run already holds {RUN_LOCK_REL}"
-        ) from exc
-    try:
-        payload = (json.dumps({"run_id": run_id, "pid": os.getpid()}) + "\n").encode("utf-8")
-        os.write(fd, payload)
-        os.fsync(fd)
-    finally:
-        os.close(fd)
+    with _lifecycle_flock(workspace_root):
+        try:
+            fd = os.open(lock_file, os.O_CREAT | os.O_EXCL | os.O_WRONLY, 0o600)
+        except FileExistsError as exc:
+            raise RuntimeError(
+                _lock_held_message(
+                    workspace_root,
+                    "CONCURRENT_RUN_LOCK_HELD: another factory run already holds it",
+                )
+            ) from exc
+        try:
+            payload = {"run_id": run_id, "pid": os.getpid(), "host": socket.gethostname()}
+            os.write(fd, (json.dumps(payload) + "\n").encode("utf-8"))
+            os.fsync(fd)
+        finally:
+            os.close(fd)
     return lock_file
 
 
@@ -97,6 +348,154 @@ def release_run_lock(workspace_root: Path) -> None:
     if lock_file.exists():
         with contextlib.suppress(FileNotFoundError):
             lock_file.unlink()
+
+
+def _pending_path(workspace_root: Path, run_id: str) -> Path:
+    return workspace_root / SELECTIVE_PENDING_DIR_REL / f"{_run_key(run_id)}.json"
+
+
+def save_pending_selective_restore(
+    workspace_root: Path, run_id: str, snapshot: ActivationSnapshot
+) -> None:
+    """Persist the pre-activation flags so a killed selective run can still be undone.
+
+    One file per run id: a run can only ever load or clear its own record.
+    """
+    payload = {
+        "run_id": run_id,
+        "snapshot": {mod: [enabled, flags] for mod, (enabled, flags) in snapshot.items()},
+    }
+    _atomic_write_text(
+        _pending_path(workspace_root, run_id), json.dumps(payload, sort_keys=True) + "\n"
+    )
+
+
+def clear_pending_selective_restore(workspace_root: Path, run_id: str) -> None:
+    with contextlib.suppress(FileNotFoundError):
+        _pending_path(workspace_root, run_id).unlink()
+
+
+def load_pending_selective_restore(workspace_root: Path, run_id: str) -> ActivationSnapshot | None:
+    """The flags saved for *run_id*; `None` when that run left no (readable) record."""
+    path = _pending_path(workspace_root, run_id)
+    if not path.is_file():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if raw.get("run_id") != run_id:
+            return None
+        return {
+            str(mod): (bool(pair[0]), {str(k): bool(v) for k, v in dict(pair[1]).items()})
+            for mod, pair in dict(raw["snapshot"]).items()
+        }
+    except (OSError, ValueError, KeyError, TypeError, IndexError, AttributeError):
+        return None
+
+
+def pending_selective_runs(workspace_root: Path) -> list[str]:
+    """Run ids that saved pre-activation flags and have not restored them yet."""
+    folder = workspace_root / SELECTIVE_PENDING_DIR_REL
+    if not folder.is_dir():
+        return []
+    run_ids: list[str] = []
+    for path in sorted(folder.glob("*.json")):
+        with contextlib.suppress(OSError, ValueError, AttributeError):
+            run_id = json.loads(path.read_text(encoding="utf-8")).get("run_id")
+            if isinstance(run_id, str):
+                run_ids.append(run_id)
+    return run_ids
+
+
+def recover_stale_run_lock(
+    workspace_root: Path, *, discard_process_group_record: bool = False
+) -> dict[str, Any]:
+    """Remove a run lock only when its owner is provably gone, and record that it did.
+
+    Everything happens under the lifecycle lock (which `acquire_run_lock` also
+    takes), in this order: confirm the lock is still the same stale lock and
+    that none of the run's recorded skill process groups is running, restore
+    the flags that run's `--selective` activation left, clear that run's own
+    pending record, write a receipt to `.hyodo/factory/lock_recoveries.jsonl`,
+    and remove the lock last.
+
+    The process-group record is writable by any same-user process. When the
+    owner pid is gone on this host but the record is unreadable, invalid, or
+    names groups the operator has inspected and found not to be this run's
+    skills, `discard_process_group_record=True` (CLI:
+    `--discard-process-group-record`) ignores it. That is an operator decision:
+    the receipt records it with the discarded record's content. It is never
+    applied automatically.
+    """
+    with _lifecycle_flock(workspace_root):
+        status = run_lock_status(workspace_root)
+        if status is None:
+            raise RuntimeError("NO_RUN_LOCK: nothing to recover")
+        discarded_record: str | None = None
+        discardable = status["owner_gone"] and (
+            status["state"] == "ORPHANED_SKILLS"
+            or status["unknown_reason"] == "process_group_record_invalid"
+        )
+        if discard_process_group_record and discardable:
+            record = workspace_root / process_groups_record_rel(str(status["run_id"]))
+            discarded_record = "<missing>"
+            with contextlib.suppress(OSError):
+                discarded_record = record.read_text(encoding="utf-8", errors="replace")
+        elif status["state"] != "STALE":
+            detail = ""
+            if status["alive_process_groups"]:
+                groups = ",".join(str(g) for g in status["alive_process_groups"])
+                detail = (
+                    f"; process groups from its record still running: {groups} "
+                    f"(inspect with `{_INSPECT_HINT}`)"
+                )
+            if status["unknown_reason"]:
+                detail += f"; {status['unknown_reason']}"
+            if discardable:
+                detail += "; after inspecting, --discard-process-group-record ignores the record"
+            raise RuntimeError(
+                f"RUN_LOCK_NOT_PROVABLY_STALE:{status['state']}: owner pid {status['pid']} on "
+                f"host {status['host']!r} is not provably gone{detail}; not removing "
+                f"{RUN_LOCK_REL}"
+            )
+        run_id = str(status["run_id"])
+        restored: list[str] = []
+        pending = load_pending_selective_restore(workspace_root, run_id)
+        if pending:
+            modules = load_registry_state(workspace_root)
+            for mod_id, mod in list(modules.items()):
+                if mod_id not in pending:
+                    continue
+                mod_enabled, flags = pending[mod_id]
+                new_skills = {}
+                for sid, u in mod.skills.items():
+                    want = flags.get(sid, u.enabled)
+                    if want != u.enabled:
+                        restored.append(sid)
+                    new_skills[sid] = replace(u, enabled=want)
+                modules[mod_id] = replace(mod, enabled=mod_enabled, skills=new_skills)
+            save_registry_state(workspace_root, modules)
+        clear_pending_selective_restore(workspace_root, run_id)
+        clear_skill_process_groups(workspace_root, run_id)
+        receipt = {
+            "recovered_at": utc_now_iso(),
+            "removed_lock": str(status["lock_text"] or "").strip(),
+            "run_id": run_id,
+            "owner_state": "STALE" if discarded_record is None else status["state"],
+            "process_group_record_discarded": discarded_record is not None,
+            "discarded_process_group_record": discarded_record,
+            "owner_pid": status["pid"],
+            "host": status["host"],
+            "selective_flags_restored": sorted(restored),
+        }
+        log = workspace_root / LOCK_RECOVERIES_REL
+        with log.open("a", encoding="utf-8") as fh:
+            fh.write(json.dumps(receipt, sort_keys=True) + "\n")
+        # Last: the lock is removed only if it is still exactly the stale lock.
+        lock_file = workspace_root / RUN_LOCK_REL
+        if lock_file.read_text(encoding="utf-8") != status["lock_text"]:
+            raise RuntimeError("RUN_LOCK_CHANGED_DURING_RECOVERY: not removing it")
+        lock_file.unlink()
+        return receipt
 
 
 def detect_adapter_kind(source_path: Path) -> str:
@@ -126,12 +525,16 @@ def _load_module_with_adapter(
 ) -> ModuleRecord:
     kind = adapter or detect_adapter_kind(source_path)
     if kind == "external-evaluator":
-        return load_external_evaluator_module(source_path, module_id=module_id, version=version)
-    if kind == "claude-plugin":
-        return load_claude_plugin_module(source_path, module_id=module_id, version=version)
-    if kind == "agent-skills":
-        return load_agent_skills_module(source_path, module_id=module_id, version=version)
-    raise ValueError(f"unsupported adapter kind: {kind}")
+        record = load_external_evaluator_module(source_path, module_id=module_id, version=version)
+    elif kind == "claude-plugin":
+        record = load_claude_plugin_module(source_path, module_id=module_id, version=version)
+    elif kind == "agent-skills":
+        record = load_agent_skills_module(source_path, module_id=module_id, version=version)
+    else:
+        raise ValueError(f"unsupported adapter kind: {kind}")
+    # Record the module's real origin (path, git remote/commit/dirty, whole-tree
+    # digest) at add/update time so `doctor` can report later drift.
+    return replace(record, origin=observe_module_origin(Path(record.source_path)))
 
 
 def add_module(
@@ -279,10 +682,11 @@ def activate_selected_skills(
     skill_ids: list[str],
     *,
     disable_others: bool = True,
+    owner_run_id: str | None = None,
 ) -> list[str]:
     """Atomically enable only *skill_ids* plus their transitive dependencies in one registry write."""
     with _lifecycle_flock(workspace_root):
-        _check_not_mid_run(workspace_root)
+        _check_not_mid_run(workspace_root, owner_run_id)
         modules = load_registry_state(workspace_root)
         unit_map = {sid: u for mod in modules.values() for sid, u in mod.skills.items()}
         to_enable: set[str] = set()
@@ -315,6 +719,48 @@ def activate_selected_skills(
 
         save_registry_state(workspace_root, modules)
         return sorted(to_enable)
+
+
+ActivationSnapshot = dict[str, tuple[bool, dict[str, bool]]]
+
+
+def snapshot_activation_state(workspace_root: Path) -> ActivationSnapshot:
+    """Capture every module's and skill's `enabled` flag (for task-scoped activation)."""
+    modules = load_registry_state(workspace_root)
+    return {
+        mod_id: (mod.enabled, {sid: u.enabled for sid, u in mod.skills.items()})
+        for mod_id, mod in modules.items()
+    }
+
+
+def restore_activation_state(
+    workspace_root: Path,
+    snapshot: ActivationSnapshot,
+    *,
+    owner_run_id: str | None = None,
+) -> list[str]:
+    """Restore the `enabled` flags captured by `snapshot_activation_state` in one write.
+
+    Only enablement is restored; skills or modules added since the snapshot are
+    left as they are. Returns the skill ids whose flag was changed back.
+    """
+    with _lifecycle_flock(workspace_root):
+        _check_not_mid_run(workspace_root, owner_run_id)
+        modules = load_registry_state(workspace_root)
+        restored: list[str] = []
+        for mod_id, mod in list(modules.items()):
+            if mod_id not in snapshot:
+                continue
+            mod_enabled, skill_flags = snapshot[mod_id]
+            new_skills = {}
+            for sid, u in mod.skills.items():
+                want = skill_flags.get(sid, u.enabled)
+                if want != u.enabled:
+                    restored.append(sid)
+                new_skills[sid] = replace(u, enabled=want)
+            modules[mod_id] = replace(mod, enabled=mod_enabled, skills=new_skills)
+        save_registry_state(workspace_root, modules)
+        return sorted(restored)
 
 
 def update_module(
@@ -448,12 +894,80 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
                         f"unverified_hook_silent_zero:{sid}:frontmatter_hook_exits_0_when_script_missing"
                     )
 
+    # Origin/tree drift: what would run is no longer what was registered.
+    # Drift is a problem for enabled modules and a warning for dormant ones.
+    # Unrecorded/unbindable origins are reported here only, never as healthy
+    # evidence and never as drift.
+    provenance: dict[str, dict[str, Any]] = {}
+    for mod_id, mod in sorted(modules.items()):
+        if not Path(mod.source_path).is_dir():
+            continue
+        cmp = compare_module_origin(mod)
+        current = cmp["current"] or {}
+        provenance[mod_id] = {
+            "state": cmp["state"],
+            "changed_fields": cmp["changed_fields"],
+            "recorded_git_commit": mod.origin.get("git_commit"),
+            "recorded_git_remote_url": mod.origin.get("git_remote_url"),
+            "git_dirty_now": current.get("git_dirty"),
+            "module_tree_error": mod.origin.get("module_tree_error"),
+        }
+        if cmp["state"] == "DRIFTED":
+            sink = problems if mod.enabled else warnings
+            for changed in cmp["changed_fields"]:
+                if changed == "module_tree_sha256":
+                    sink.append(f"module_tree_drift:{mod_id}")
+                else:
+                    sink.append(f"module_origin_drift:{mod_id}:{changed}")
+        elif cmp["state"] == "UNRECORDED":
+            warnings.append(f"{PROVENANCE_UNOBSERVED_PREFIXES[0]}{mod_id}")
+        elif cmp["state"] == "UNBINDABLE":
+            error = mod.origin.get("module_tree_error") or "unknown"
+            warnings.append(f"{PROVENANCE_UNOBSERVED_PREFIXES[1]}{mod_id}|{error}")
+
+    # Unrecorded or unbindable provenance is not evidence of health: without
+    # problems the status is UNOBSERVED, never HEALTHY.
+    provenance_unobserved = any(
+        state["state"] in ("UNRECORDED", "UNBINDABLE") for state in provenance.values()
+    )
+    # An empty registry is nothing observed, not a healthy one.
+    if not modules:
+        warnings.append("no_modules_registered")
+        provenance_unobserved = True
+
+    lock_status = run_lock_status(workspace_root)
+    if lock_status is not None and lock_status["state"] == "STALE":
+        problems.append(f"stale_run_lock:{lock_status['pid']}")
+    elif lock_status is not None and lock_status["state"] == "ORPHANED_SKILLS":
+        groups = ",".join(str(g) for g in lock_status["alive_process_groups"])
+        problems.append(f"orphaned_skill_processes:{lock_status['pid']}|{groups}")
+    elif (
+        lock_status is not None and lock_status["unknown_reason"] == "process_group_record_invalid"
+    ):
+        problems.append(f"run_state_record_invalid:{lock_status['pid']}")
+    live_run = (
+        lock_status["run_id"]
+        if lock_status is not None and lock_status["state"] == "LIVE"
+        else None
+    )
+    for pending_run in pending_selective_runs(workspace_root):
+        if pending_run != live_run:
+            # A selective run ended without restoring the flags it changed.
+            problems.append(f"selective_activation_not_restored:{pending_run}")
+    if problems:
+        status = "DEGRADED"
+    elif provenance_unobserved:
+        status = "UNOBSERVED"
+    else:
+        status = "HEALTHY"
     return {
-        "status": "HEALTHY" if not problems else "DEGRADED",
+        "status": status,
         "modules_registered": len(modules),
         "skills_enabled": len(enabled_ids),
         "problems": sorted(set(problems)),
         "warnings": sorted(set(warnings)),
+        "module_provenance": provenance,
+        "run_lock": lock_status,
     }
 
 
@@ -530,8 +1044,18 @@ def discover_skills(
     return results[:max_results]
 
 
+_LIVE_CONTRACT_UNOBSERVED_REASON = (
+    "no live host session was exercised; only local connect/MCP config plans were inspected"
+)
+
+
 def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
-    """Inspect and verify exact host connection mechanics and support boundaries across Claude Code, Cursor, Codex, and Antigravity."""
+    """Report host connection mechanics and support boundaries across Claude Code, Cursor, Codex, and Antigravity.
+
+    This inspects local configuration plans only. It never runs a host, so the
+    live host contract is reported as `UNOBSERVED` (`verified_live_contract: False`)
+    for every host.
+    """
     root = workspace_root.resolve()
     connect_plans = {t: plan_connect_target(t, root, shadow=True) for t in CONNECT_TARGETS}
     mcp_plans = {h: plan_mcp_host(h, root) for h in MCP_ALL_HOSTS}
@@ -556,7 +1080,9 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
             else "UNOBSERVED",
             "mcp_config_path": ".mcp.json",
             "skill_directories": (".claude/skills/", ".claude-plugin/plugin.json", "SKILL.md"),
-            "verified_live_contract": True,
+            "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("claude-code"),
         },
         "cursor": {
@@ -565,7 +1091,9 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
             "mcp_stdio": "OBSERVED" if mcp_plans["cursor"].status != "unobserved" else "UNOBSERVED",
             "mcp_config_path": ".cursor/mcp.json",
             "skill_directories": (".cursor/skills/", ".cursor-plugin/plugin.json", "SKILL.md"),
-            "verified_live_contract": True,
+            "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("cursor"),
         },
         "codex": {
@@ -580,6 +1108,8 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
                 "SKILL.md",
             ),
             "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("codex"),
         },
         "antigravity": {
@@ -592,7 +1122,9 @@ def verify_host_integrations(workspace_root: Path) -> dict[str, dict[str, Any]]:
                 ".antigravity-plugin/plugin.json",
                 "SKILL.md",
             ),
-            "verified_live_contract": True,
+            "verified_live_contract": False,
+            "live_contract": "UNOBSERVED",
+            "live_contract_reason": _LIVE_CONTRACT_UNOBSERVED_REASON,
             "compatible_modules": _mods_for_host("antigravity"),
         },
     }

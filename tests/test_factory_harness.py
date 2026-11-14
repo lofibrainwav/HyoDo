@@ -12,13 +12,14 @@ Verifies all 12 Phase 2 Acceptance Gates:
 9. Mid-run skill mutation and content drift blocking (`MID_RUN_SKILL_MUTATION_FORBIDDEN` / `MID_RUN_SKILL_DRIFT`).
 10. Substantive producer vs independent verifier separation (`SELF_REVIEW_FORBIDDEN` / `HOLD`).
 11. `UNOBSERVED` is never `GREEN`, and `skill-eval` lifecycle recommendations never expand authority.
-12. Real mounted workspace repositories (`gstack`, `mattpocock-skills`, `improve`, `ponytail`, `jev-private-worker`) attach, route, and detach cleanly, plus CLI compatibility (`hyodo lens-evidence workspace` & `hyodo_factory.py`).
+12. External skill repositories under `HYODO_FACTORY_EXTERNAL_SKILLS_DIR` attach, route, and detach cleanly (skipped explicitly when the variable is unset or the directory holds no skill repos), plus CLI compatibility (`hyodo lens-evidence workspace` & `hyodo_factory.py`).
 """
 
 from __future__ import annotations
 
 import importlib.util
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -506,57 +507,78 @@ def test_gate_10_and_11_self_review_blocked_and_eval_never_expands_authority(
         )
 
 
-def test_gate_12_real_mounted_repos_attach_route_and_detach_plus_cli(
+EXTERNAL_SKILLS_ENV = "HYODO_FACTORY_EXTERNAL_SKILLS_DIR"
+
+
+def _external_skill_repos() -> tuple[Path, list[Path]]:
+    """Return the host-provided external skills directory and its skill repos, or skip.
+
+    These tests exercise real third-party skill repositories, which are not part of
+    this checkout. They run only when `HYODO_FACTORY_EXTERNAL_SKILLS_DIR` points at a
+    directory whose children are skill repositories; otherwise they skip explicitly
+    instead of passing with nothing attached.
+    """
+    raw = os.environ.get(EXTERNAL_SKILLS_ENV, "").strip()
+    if not raw:
+        pytest.skip(f"{EXTERNAL_SKILLS_ENV} is not set; no external skill repositories to attach")
+    base = Path(raw)
+    if not base.is_dir():
+        pytest.skip(f"{EXTERNAL_SKILLS_ENV} is not a directory")
+    factory = _load_factory_module()
+    repos = [Path(item["path"]) for item in factory.discover_skills([base], max_results=1000)]
+    repos = [p for p in repos if p != base.resolve()]
+    if not repos:
+        pytest.skip(f"no skill repositories found under {EXTERNAL_SKILLS_ENV}")
+    return base, repos
+
+
+def test_gate_12_external_skill_repos_attach_route_and_detach_via_cli(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Gate 12: Attach real workspace repositories (`gstack`, `mattpocock-skills`, `improve`, `ponytail`, `jev-private-worker`), route, run CLI, and detach cleanly."""
+    """Gate 12: attach every external skill repo under `HYODO_FACTORY_EXTERNAL_SKILLS_DIR`, route, and detach cleanly."""
+    _base, real_repos = _external_skill_repos()
     factory = _load_factory_module()
     repo = tmp_path / "workspace"
-    sha = _init_clean_repo(repo)
+    _init_clean_repo(repo)
 
-    workspace_parent = Path("/home/antigravity/lofibrainwav")
-    real_repos = [
-        workspace_parent / "gstack",
-        workspace_parent / "mattpocock-skills",
-        workspace_parent / "improve",
-        workspace_parent / "ponytail",
-        workspace_parent / "jev-private-worker",
-    ]
     attached_ids: list[str] = []
     for path in real_repos:
-        if path.is_dir():
-            assert factory.main(["--root", str(repo), "add", str(path)]) == 0
-            attached_ids.append(path.name.lower())
-    capsys.readouterr()
+        assert factory.main(["--root", str(repo), "add", str(path)]) == 0
+        attached_ids.append(json.loads(capsys.readouterr().out)["module_id"])
+    assert attached_ids
 
-    if attached_ids:
-        assert factory.main(["--root", str(repo), "doctor"]) == 0
-        doc_out = json.loads(capsys.readouterr().out)
-        assert doc_out["status"] == "HEALTHY"
-        assert doc_out["modules_registered"] == len(attached_ids)
+    assert factory.main(["--root", str(repo), "doctor"]) == 0
+    doc_out = json.loads(capsys.readouterr().out)
+    assert doc_out["status"] == "HEALTHY"
+    assert doc_out["modules_registered"] == len(attached_ids)
 
-        assert (
-            factory.main(
-                [
-                    "--root",
-                    str(repo),
-                    "route",
-                    "\uc774 \uc571 \uc804\uccb4\ub97c \ubd84\uc11d\ud574\uc11c \uadfc\ubcf8 \uc6d0\uc778\uc744 \uc7a1\uace0 UI\uae4c\uc9c0 \uac1c\uc120\ud574.",
-                    "--profile",
-                    "development",
-                ]
-            )
-            == 0
+    assert (
+        factory.main(
+            [
+                "--root",
+                str(repo),
+                "route",
+                "\uc774 \uc571 \uc804\uccb4\ub97c \ubd84\uc11d\ud574\uc11c \uadfc\ubcf8 \uc6d0\uc778\uc744 \uc7a1\uace0 UI\uae4c\uc9c0 \uac1c\uc120\ud574.",
+                "--profile",
+                "development",
+            ]
         )
-        route_out = json.loads(capsys.readouterr().out)
-        assert len(route_out["selected_skills"]) > 0
-        assert route_out["bodies_disclosed"] == 0
+        == 0
+    )
+    route_out = json.loads(capsys.readouterr().out)
+    assert len(route_out["selected_skills"]) > 0
+    assert route_out["bodies_disclosed"] == 0
 
-        for mod_id in attached_ids:
-            assert factory.main(["--root", str(repo), "remove", mod_id]) == 0
-            capsys.readouterr()
+    for mod_id in attached_ids:
+        assert factory.main(["--root", str(repo), "remove", mod_id]) == 0
+        capsys.readouterr()
+    assert factory.doctor(repo)["modules_registered"] == 0
 
-    # Verify `hyodo lens-evidence workspace --root <repo>` CLI command
+
+def test_gate_12_lens_evidence_cli_reports_the_workspace_head(tmp_path: Path) -> None:
+    """Gate 12 (CLI half): `hyodo lens-evidence workspace --root <repo>` reports the exact HEAD."""
+    repo = tmp_path / "workspace"
+    sha = _init_clean_repo(repo)
     runner = CliRunner()
     cli_res = runner.invoke(hyodo_cli_app, ["lens-evidence", "workspace", "--root", str(repo)])
     assert cli_res.exit_code == 0
@@ -929,10 +951,8 @@ def test_adversarial_slot_deduplication_discover_hosts_and_before_after_eval(
 def test_adversarial_all_official_external_and_workspace_repos_real_cli_run(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
-    """Adversarial Gate 12: Attach all 8 official upstream skill repositories + 5 workspace repositories, execute `ui-ux-pro-max` search.py via `hyodo-factory run` CLI, and detach cleanly."""
-    ext_dir = Path("/home/antigravity/lofibrainwav/external-skills")
-    if not ext_dir.is_dir():
-        pytest.skip("external-skills directory not present in this environment")
+    """Adversarial Gate 12: attach the named upstream skill repositories found under `HYODO_FACTORY_EXTERNAL_SKILLS_DIR`, execute `ui-ux-pro-max` search.py via `hyodo-factory run` CLI, and detach cleanly."""
+    ext_dir, _repos = _external_skill_repos()
 
     factory = _load_factory_module()
     repo = tmp_path / "workspace"
@@ -956,6 +976,8 @@ def test_adversarial_all_official_external_and_workspace_repos_real_cli_run(
             attached.append(rec.module_id)
             assert rec.license_spdx in ("MIT", "Apache-2.0")
             assert len(rec.skills) >= 1
+    if not attached:
+        pytest.skip(f"none of {expected_external} is present under {EXTERNAL_SKILLS_ENV}")
 
     search_candidates = [
         ext_dir
@@ -968,27 +990,33 @@ def test_adversarial_all_official_external_and_workspace_repos_real_cli_run(
         ext_dir / "ui-ux-pro-max-skill" / "src" / "ui-ux-pro-max" / "scripts" / "search.py",
     ]
     search_script = next((p for p in search_candidates if p.is_file()), None)
-    if search_script is not None:
-        rc = factory.main(
-            [
-                "--root",
-                str(repo),
-                "run",
-                "ui-ux-pro-max-skill/ui-ux-pro-max \ub514\uc790\uc778 \uc2a4\ud0c0\uc77c \uac80\uc0c9 \ubc0f \uac80\uc99d",
-                "--run-id",
-                "cli-e2e-real-script",
-                "--skill-cmd",
-                f"ui-ux-pro-max-skill/ui-ux-pro-max={sys.executable} {search_script} 'fintech Minimal' --domain style -n 1",
-                "--verify-cmd",
-                f"{sys.executable} -c \"from pathlib import Path; from hyodo.safety import run_safety_scan; r = run_safety_scan(path='.', cwd=Path('.')); assert r['level'] == 'low' and r['coverage'] == 'FULL'\"",
-            ]
-        )
-        assert rc == 0
-        run_payload = json.loads(capsys.readouterr().out)
-        ui_out = run_payload["skill_outputs"]["ui-ux-pro-max-skill/ui-ux-pro-max"]
-        assert ui_out["execution_state"] == "EXECUTED_PASS"
-        assert "UI Pro Max Search Results" in ui_out["stdout"]
-        assert run_payload["independent_verifier_receipt"]["status"] == "PASS"
+    if search_script is None:
+        for mod_id in attached:
+            factory.remove_module(repo, mod_id)
+        assert factory.doctor(repo)["modules_registered"] == 0
+        pytest.skip("ui-ux-pro-max search.py is not present; the CLI run half was not exercised")
+    rc = factory.main(
+        [
+            "--root",
+            str(repo),
+            "run",
+            "ui-ux-pro-max-skill/ui-ux-pro-max \ub514\uc790\uc778 \uc2a4\ud0c0\uc77c \uac80\uc0c9 \ubc0f \uac80\uc99d",
+            "--run-id",
+            "cli-e2e-real-script",
+            "--skill-cmd",
+            f"ui-ux-pro-max-skill/ui-ux-pro-max={sys.executable} {search_script} 'fintech Minimal' --domain style -n 1",
+            "--verify-cmd",
+            f"{sys.executable} -c \"from pathlib import Path; from hyodo.safety import run_safety_scan; r = run_safety_scan(path='.', cwd=Path('.')); assert r['level'] == 'low' and r['coverage'] == 'FULL'\"",
+        ]
+    )
+    run_payload = json.loads(capsys.readouterr().out)
+    # PASS (0) needs every routed skill executed; other routed skills here are
+    # disclosure-only, which is UNOBSERVED (2), never a failure (1).
+    assert rc == {"PASS": 0, "UNOBSERVED": 2}[run_payload["run_verdict"]["decision"]]
+    ui_out = run_payload["skill_outputs"]["ui-ux-pro-max-skill/ui-ux-pro-max"]
+    assert ui_out["execution_state"] == "EXECUTED_PASS"
+    assert "UI Pro Max Search Results" in ui_out["stdout"]
+    assert run_payload["independent_verifier_receipt"]["status"] == "PASS"
 
     for mod_id in attached:
         factory.remove_module(repo, mod_id)
@@ -1063,9 +1091,11 @@ def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Pa
         "yagni-audit",
         "---\nname: yagni-audit\ndescription: Root cause audit and YAGNI simplification\n---\n# YAGNI\n",
     )
-    # 3. Create a quality verifier skill that will be mutated on disk (DEGRADED / ENVIRONMENT_OR_SYNTAX_DEGRADED)
+    # 3. Create a quality verifier skill that will be mutated on disk (DEGRADED / ENVIRONMENT_OR_SYNTAX_DEGRADED).
+    #    It lives in its own module: a changed file degrades its whole module tree.
+    mod_b = tmp_path / "mod-b"
     _write_skill(
-        mod_a,
+        mod_b,
         "qa-gate",
         "---\nname: qa-gate\ndescription: Independent QA verifier\n---\n# QA Gate\n",
     )
@@ -1076,6 +1106,7 @@ def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Pa
         "---\nname: sec-guard\ndescription: Security vulnerability guard\n---\n# Sec Guard\n",
     )
     factory.add_module(repo, mod_a, module_id="mod-a")
+    factory.add_module(repo, mod_b, module_id="mod-b")
 
     # Promote `mod-a/tdd-primary` to VERIFIED (MANUAL stage with real PASS verifier & HELPED impact)
     real_ver_tdd = _make_real_verifier_receipt(repo, sha, run_tag="tdd-01")
@@ -1130,8 +1161,8 @@ def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Pa
     # Disable `mod-a/yagni-audit` -> WIRING_DISCONNECTED
     factory.disable_target(repo, "mod-a/yagni-audit")
 
-    # Tamper with `mod-a/qa-gate` on disk -> DEGRADED (`skill_hash_drift`)
-    (mod_a / "skills" / "qa-gate" / "SKILL.md").write_text(
+    # Tamper with `mod-b/qa-gate` on disk -> DEGRADED (`skill_hash_drift`)
+    (mod_b / "skills" / "qa-gate" / "SKILL.md").write_text(
         "---\nname: qa-gate\ndescription: Tampered\n---\n# Tampered\n",
         encoding="utf-8",
     )
@@ -1168,8 +1199,8 @@ def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Pa
     assert skills["mod-a/yagni-audit"]["state"] == "UNVERIFIED"
     assert skills["mod-a/yagni-audit"]["root_cause"] == "WIRING_DISCONNECTED"
 
-    assert skills["mod-a/qa-gate"]["state"] == "DEGRADED"
-    assert skills["mod-a/qa-gate"]["root_cause"] == "ENVIRONMENT_OR_SYNTAX_DEGRADED"
+    assert skills["mod-b/qa-gate"]["state"] == "DEGRADED"
+    assert skills["mod-b/qa-gate"]["root_cause"] == "ENVIRONMENT_OR_SYNTAX_DEGRADED"
 
     assert skills["mod-a/sec-guard"]["state"] == "UNKNOWN"
     assert skills["mod-a/sec-guard"]["root_cause"] == "VERIFICATION_MISSING"
@@ -1351,7 +1382,7 @@ def _make_helped_eval(
 def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
     tmp_path: Path,
 ) -> None:
-    """Verify `DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN` accumulates distinct runs (no replay, no stage-skipping, no bare boolean Serenity bypass) and demotes on drift."""
+    """Verify `DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN` accumulates distinct runs (no replay, no stage-skipping, no bare boolean approval bypass) and demotes on drift."""
     factory = _load_factory_module()
     repo = tmp_path / "workspace"
     sha = _init_clean_repo(repo)
@@ -1372,7 +1403,7 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
     initial = factory.get_skill_trust_state(repo, "trust-pack/refactor-bot")
     assert initial["trust_stage"] == "VERIFY"
 
-    # 3. High `s_score` (9.99) + bare `serenity_gate_approved=True` MUST NOT override a failed verifier gate!
+    # 3. High `s_score` (9.99) + bare `approved_flag=True` MUST NOT override a failed verifier gate!
     v_fail = _make_real_verifier_receipt(repo, sha, run_tag="fail-01", status="FAIL")
     e_fail = _make_helped_eval(factory, "trust-pack/refactor-bot", v_fail, sha, case_id="case-fail")
     blocked = factory.evaluate_and_promote_trust(
@@ -1381,7 +1412,7 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
         target_stage="AUTO_RUN",
         eval_receipt=e_fail,
         verifier_receipt=v_fail,
-        serenity_gate_approved=True,
+        approved_flag=True,
         s_score=9.99,
         run_id="run-score-override-attempt",
     )
@@ -1408,36 +1439,37 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
         assert promoted["trust_stage"] == exp_stage
         assert promoted["admission_decision"] == "ASK_COMMANDER"
 
-    # Bare `serenity_gate_approved=True` without a verified `serenity_receipt` MUST stay at TRUSTED!
+    # Bare `approved_flag=True` without a verified `approval_receipt` MUST stay at TRUSTED!
     v_no_ser = _make_real_verifier_receipt(repo, sha, run_tag="no-ser", status="PASS")
     e_no_ser = _make_helped_eval(
         factory, "trust-pack/refactor-bot", v_no_ser, sha, case_id="case-no-ser"
     )
-    s_no_serenity = factory.evaluate_and_promote_trust(
+    s_no_approval = factory.evaluate_and_promote_trust(
         repo,
         skill_id="trust-pack/refactor-bot",
         target_stage="AUTO_RUN",
         eval_receipt=e_no_ser,
         verifier_receipt=v_no_ser,
-        serenity_gate_approved=True,
+        approved_flag=True,
         s_score=9.5,
-        run_id="run-step-no-serenity",
+        run_id="run-step-no-approval",
     )
-    assert s_no_serenity["trust_stage"] == "TRUSTED"
-    assert s_no_serenity["admission_decision"] == "ASK_COMMANDER"
-    assert s_no_serenity["admitted"] is False
-    assert s_no_serenity["bare_boolean_rejected"] is True
+    assert s_no_approval["trust_stage"] == "TRUSTED"
+    assert s_no_approval["admission_decision"] == "ASK_COMMANDER"
+    assert s_no_approval["admitted"] is False
+    assert s_no_approval["bare_boolean_rejected"] is True
 
-    # With a bound `serenity_receipt` + fresh PASS verifier + HELPED eval -> promotes to AUTO_RUN
+    # With a bound `approval_receipt` + fresh PASS verifier + HELPED eval -> promotes to AUTO_RUN
     v_auto = _make_real_verifier_receipt(repo, sha, run_tag="auto-05", status="PASS")
     e_auto = _make_helped_eval(
         factory, "trust-pack/refactor-bot", v_auto, sha, case_id="case-auto-05"
     )
-    ser_receipt = factory.issue_serenity_approval_receipt(
+    ser_receipt = factory.issue_host_approval_request(
         repo,
         skill_id="trust-pack/refactor-bot",
         run_id="run-step-auto",
         approved_by="host-commander",
+        command=None,
         risk_level="low",
     )
     s_auto = factory.evaluate_and_promote_trust(
@@ -1446,7 +1478,7 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
         target_stage="AUTO_RUN",
         eval_receipt=e_auto,
         verifier_receipt=v_auto,
-        serenity_receipt=ser_receipt,
+        approval_receipt=ser_receipt,
         s_score=9.5,
         run_id="run-step-auto",
         authority_verifier=_host_authority({"run-step-auto"}),
@@ -1454,7 +1486,7 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
     assert s_auto["trust_stage"] == "AUTO_RUN"
     assert s_auto["admission_decision"] == "AUTO_RUN"
     assert s_auto["admitted"] is True
-    assert s_auto["serenity_verified"] is True
+    assert s_auto["approval_verified"] is True
     assert s_auto["admission_observation"]["execution_attempted"] is False
     assert s_auto["admission_observation"]["execution_observed"] is False
 
@@ -1621,7 +1653,7 @@ def test_preflight_gap_analyzer_auto_invoked_and_blocks_degraded_in_execute_run(
 def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
     tmp_path: Path,
 ) -> None:
-    """Reqs #3, #4, #5, #6: Reject receipt replay, stage skipping, unverified skill eval, invalid Serenity receipts, and block unverified/tampered/drifted AUTO_RUN execution."""
+    """Reqs #3, #4, #5, #6: Reject receipt replay, stage skipping, unverified skill eval, invalid approval receipts, and block unverified/tampered/drifted AUTO_RUN execution."""
     factory = _load_factory_module()
     repo = tmp_path / "workspace"
     sha = _init_clean_repo(repo)
@@ -1736,14 +1768,27 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         )
         assert prom["trust_stage"] == st
 
-    # 6. High-risk Serenity receipt MUST be rejected from AUTO_RUN
+    # 6. High-risk approval receipt MUST be rejected from AUTO_RUN
+    # The approval binds this exact command; the runner does not enforce
+    # network/browser/outside-workspace write restrictions, so `auto` also needs
+    # the host to attest that it enforces them.
+    approved_cmd = [sys.executable, "-c", "print('AUTO_EXEC_OK')"]
+    host_enforced = (
+        "network_access",
+        "browser_automation",
+        "filesystem_write",
+        "allowed_paths",
+        "allowed_tools",
+    )
     v4 = _make_real_verifier_receipt(repo, sha, run_tag="r4")
     e4 = _make_helped_eval(factory, "auto-guard/tdd", v4, sha, case_id="c4")
-    high_risk_ser = factory.issue_serenity_approval_receipt(
+    high_risk_ser = factory.issue_host_approval_request(
         repo,
         skill_id="auto-guard/tdd",
         run_id="run-real-4",
         approved_by="host-commander",
+        command=approved_cmd,
+        host_enforced_restrictions=host_enforced,
         risk_level="high",
     )
     bad_ser_res = factory.evaluate_and_promote_trust(
@@ -1752,13 +1797,13 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         target_stage="AUTO_RUN",
         eval_receipt=e4,
         verifier_receipt=v4,
-        serenity_receipt=high_risk_ser,
+        approval_receipt=high_risk_ser,
         run_id="run-real-4",
         authority_verifier=_host_authority({"run-real-4"}),
     )
     assert bad_ser_res["trust_stage"] == "TRUSTED"
     assert bad_ser_res["admitted"] is False
-    assert "serenity_risk_blocked:high" in str(bad_ser_res["promotion_blocked_reason"])
+    assert "approval_risk_blocked:high" in str(bad_ser_res["promotion_blocked_reason"])
 
     # Still blocked at TRUSTED in `execution_mode="auto"`
     blocked_trusted = factory.execute_modular_run(
@@ -1773,14 +1818,16 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION"
     )
 
-    # 7. Valid low-risk Serenity receipt -> AUTO_RUN admitted & execution allowed under clean env
+    # 7. Valid low-risk approval receipt -> AUTO_RUN admitted & execution allowed under clean env
     v5 = _make_real_verifier_receipt(repo, sha, run_tag="r5")
     e5 = _make_helped_eval(factory, "auto-guard/tdd", v5, sha, case_id="c5")
-    valid_ser = factory.issue_serenity_approval_receipt(
+    valid_ser = factory.issue_host_approval_request(
         repo,
         skill_id="auto-guard/tdd",
         run_id="run-real-5",
         approved_by="host-commander",
+        command=approved_cmd,
+        host_enforced_restrictions=host_enforced,
         risk_level="low",
     )
     host_authority = _host_authority({"run-real-5"})
@@ -1792,12 +1839,12 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         target_stage="AUTO_RUN",
         eval_receipt=e5,
         verifier_receipt=v5,
-        serenity_receipt=valid_ser,
+        approval_receipt=valid_ser,
         run_id="run-real-5-self",
     )
     assert self_issued["trust_stage"] == "TRUSTED"
     assert self_issued["admitted"] is False
-    assert "SERENITY_ISSUER_UNVERIFIED" in str(self_issued["promotion_blocked_reason"])
+    assert "APPROVAL_ISSUER_UNVERIFIED" in str(self_issued["promotion_blocked_reason"])
 
     v5 = _make_real_verifier_receipt(repo, sha, run_tag="r5b")
     e5 = _make_helped_eval(factory, "auto-guard/tdd", v5, sha, case_id="c5b")
@@ -1807,7 +1854,7 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         target_stage="AUTO_RUN",
         eval_receipt=e5,
         verifier_receipt=v5,
-        serenity_receipt=valid_ser,
+        approval_receipt=valid_ser,
         run_id="run-real-5",
         authority_verifier=host_authority,
     )
@@ -1820,9 +1867,12 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         prompt="implement tdd",
         execution_mode="auto",
         authority_verifier=host_authority,
-        skill_commands={"auto-guard/tdd": [sys.executable, "-c", "print('AUTO_EXEC_OK')"]},
+        host_enforced_restrictions=host_enforced,
+        skill_commands={"auto-guard/tdd": approved_cmd},
     )
-    assert allowed_exec["skill_outputs"]["auto-guard/tdd"]["execution_state"] == "EXECUTED_PASS"
+    allowed_out = allowed_exec["skill_outputs"]["auto-guard/tdd"]
+    assert allowed_out["execution_state"] == "EXECUTED_PASS"
+    assert allowed_out["boundary_enforcement"]["network_access"] == "HOST_ATTESTED"
 
     # 7b. AUTO_RUN in the trust file is not authority: execution re-asks the host.
     for label, verifier in (
@@ -1835,7 +1885,8 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
             prompt="implement tdd",
             execution_mode="auto",
             authority_verifier=verifier,
-            skill_commands={"auto-guard/tdd": [sys.executable, "-c", "print('SHOULD_NOT_RUN')"]},
+            host_enforced_restrictions=host_enforced,
+            skill_commands={"auto-guard/tdd": approved_cmd},
         )
         out = reverify["skill_outputs"]["auto-guard/tdd"]
         assert out["execution_state"] == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION", label
@@ -1869,18 +1920,14 @@ def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
         prompt="implement tdd",
         execution_mode="auto",
         authority_verifier=host_authority,
+        host_enforced_restrictions=host_enforced,
         mid_run_callback=lambda _root: lock_path.write_text(original_lock, encoding="utf-8"),
-        skill_commands={
-            "auto-guard/tdd": [
-                sys.executable,
-                "-c",
-                f"import pathlib; pathlib.Path({str(pwned)!r}).write_text('x')",
-            ]
-        },
+        skill_commands={"auto-guard/tdd": approved_cmd},
     )
     out = swapped["skill_outputs"]["auto-guard/tdd"]
     assert out["execution_state"] == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION"
     assert out["reason"] == "AUTO_RUN_BLOCKED_UNIT_CHANGED_SINCE_RUN_START"
+    assert "stdout" not in out
     assert not pwned.exists()
     lock_path.write_text(original_lock, encoding="utf-8")
 
@@ -1924,22 +1971,24 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
     skill_id = "forge/tdd"
     base = factory.get_skill_trust_state(repo, skill_id)
     boundary = base["boundary"]
-    forged_receipt = {
-        "schema": "kingdom.serenity-approval/v1",
-        "approved": True,
-        "run_id": "forged-run",
-        "skill_id": skill_id,
-        "content_sha256": base["content_sha256"],
-        "workspace_id": workspace_identity(repo),
-        "policy_digest": current_policy_digest(repo),
-        "approved_by": "kingdom-commander",
-        "risk_level": "low",
-        "mandatory_gates_passed": True,
-        "permission_violations": 0,
-        "reproducible": True,
-        "approved_scope": boundary,
-        "require_policy_trust": False,
-    }
+    # The forger knows every binding (tree digest, source path, command) and can
+    # build a structurally perfect request; only the host's authority matters.
+    attested = (
+        "network_access",
+        "browser_automation",
+        "filesystem_write",
+        "allowed_paths",
+        "allowed_tools",
+    )
+    forged_receipt = factory.issue_host_approval_request(
+        repo,
+        skill_id=skill_id,
+        run_id="forged-run",
+        approved_by="host-commander",
+        command=None,
+        host_enforced_restrictions=attested,
+    )
+    assert forged_receipt["module_tree_sha256"] == base["module_tree_sha256"]
     forged_skills = {
         skill_id: {
             "skill_id": skill_id,
@@ -1949,10 +1998,12 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
             "workspace_id": workspace_identity(repo),
             "policy_digest": current_policy_digest(repo),
             "approved_scope": boundary,
-            "serenity_receipt": forged_receipt,
+            "approval_receipt": forged_receipt,
             "content_sha256": base["content_sha256"],
             "version": base["version"],
             "boundary": boundary,
+            "module_source_path": base["module_source_path"],
+            "module_tree_sha256": base["module_tree_sha256"],
             "env_fingerprint": base["env_fingerprint"],
         }
     }
@@ -1977,27 +2028,37 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
     # Digest recomputed by the forger: integrity passes, authority does not.
     write(recomputed)
     assert factory.get_skill_trust_state(repo, skill_id)["trust_stage"] == "AUTO_RUN"
-    no_host = factory.check_execution_permission(repo, skill_id, execution_mode="auto")
+    no_host = factory.check_execution_permission(
+        repo, skill_id, execution_mode="auto", host_enforced_restrictions=attested
+    )
     assert no_host["allowed"] is False
-    assert "SERENITY_ISSUER_UNVERIFIED" in no_host["reason"]
+    assert "APPROVAL_ISSUER_UNVERIFIED" in no_host["reason"]
 
     host_rejects = factory.check_execution_permission(
-        repo, skill_id, execution_mode="auto", authority_verifier=_host_authority(set())
+        repo,
+        skill_id,
+        execution_mode="auto",
+        authority_verifier=_host_authority(set()),
+        host_enforced_restrictions=attested,
     )
     assert host_rejects["allowed"] is False
-    assert "serenity_issuer_rejected:not_issued_by_host_authority" in host_rejects["reason"]
+    assert "approval_issuer_rejected:not_issued_by_host_authority" in host_rejects["reason"]
 
     def broken_verifier(_receipt: dict[str, Any]) -> tuple[bool, str | None]:
         raise RuntimeError("authority backend down")
 
     host_down = factory.check_execution_permission(
-        repo, skill_id, execution_mode="auto", authority_verifier=broken_verifier
+        repo,
+        skill_id,
+        execution_mode="auto",
+        authority_verifier=broken_verifier,
+        host_enforced_restrictions=attested,
     )
     assert host_down["allowed"] is False
     assert "verifier_error:RuntimeError" in host_down["reason"]
 
     # A malformed stored receipt blocks the run instead of crashing it.
-    forged_skills[skill_id]["serenity_receipt"] = {
+    forged_skills[skill_id]["approval_receipt"] = {
         **forged_receipt,
         "permission_violations": "zero",
     }
@@ -2008,15 +2069,16 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
         skill_id,
         execution_mode="auto",
         authority_verifier=_host_authority({"forged-run"}),
+        host_enforced_restrictions=attested,
     )
     assert malformed["allowed"] is False
-    assert "serenity_permission_violations_invalid" in malformed["reason"]
-    forged_skills[skill_id]["serenity_receipt"] = forged_receipt
+    assert "approval_permission_violations_invalid" in malformed["reason"]
+    forged_skills[skill_id]["approval_receipt"] = forged_receipt
     write(recomputed)
 
     # A receipt presented as HyoDo-issued is not an approval schema HyoDo honors.
     unit = next(m.skills[skill_id] for m in factory.load_registry_state(repo).values())
-    ok, reasons = factory.verify_serenity_approval_receipt(
+    ok, reasons = factory.verify_host_approval_receipt(
         repo,
         {**forged_receipt, "schema": "hyodo.serenity-approval/v1"},
         skill_id=skill_id,
@@ -2026,7 +2088,7 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
         authority_verifier=_host_authority({"forged-run"}),
     )
     assert ok is False
-    assert "serenity_schema_invalid" in reasons
+    assert "approval_schema_invalid" in reasons
 
     # Only the host's own authority turns the same record into permission.
     host_approves = factory.check_execution_permission(
@@ -2034,6 +2096,7 @@ def test_forged_trust_file_and_self_issued_receipt_never_authorize_auto_run(
         skill_id,
         execution_mode="auto",
         authority_verifier=_host_authority({"forged-run"}),
+        host_enforced_restrictions=attested,
     )
     assert host_approves["allowed"] is True
 
