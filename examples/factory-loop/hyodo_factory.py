@@ -383,9 +383,18 @@ def main(argv: list[str] | None = None) -> int:
     p_trust.add_argument("skill_id")
 
     sub.add_parser("hosts", help="Verify host connection and capability support matrix")
-    sub.add_parser(
+    p_rec = sub.add_parser(
         "recover-stale-lock",
         help="Remove .hyodo/factory/run.lock only if its owner process is provably gone",
+    )
+    p_rec.add_argument(
+        "--discard-process-group-record",
+        action="store_true",
+        help=(
+            "After inspecting the processes yourself: ignore the dead run's process-group "
+            "record (unreadable, invalid, or naming groups that are not its skills); "
+            "recorded in the receipt"
+        ),
     )
 
     p_run = sub.add_parser(
@@ -475,7 +484,9 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(matrix, indent=2))
     elif args.cmd == "recover-stale-lock":
         try:
-            receipt = recover_stale_run_lock(root)
+            receipt = recover_stale_run_lock(
+                root, discard_process_group_record=args.discard_process_group_record
+            )
         except RuntimeError as exc:
             print(json.dumps({"recovered": False, "reason": str(exc)}, indent=2))
             return 2

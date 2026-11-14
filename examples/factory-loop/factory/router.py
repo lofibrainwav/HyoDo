@@ -803,6 +803,7 @@ def analyze_capability_gaps(
     workspace_level = (
         "stale_run_lock:",
         "orphaned_skill_processes:",
+        "run_state_record_invalid:",
         "selective_activation_not_restored:",
     )
     doctor_issues = [

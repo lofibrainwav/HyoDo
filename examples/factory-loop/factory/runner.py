@@ -38,6 +38,7 @@ import stat
 import subprocess
 import sys
 import tempfile
+import threading
 import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -57,14 +58,16 @@ from factory.contracts import (
     utc_now_iso,
 )
 from factory.lifecycle import (
+    RUN_STATE_DIR_REL,
     acquire_run_lock,
     clear_pending_selective_restore,
     clear_skill_process_groups,
-    record_skill_process_group,
+    process_groups_record_rel,
     release_run_lock,
     restore_activation_state,
     save_pending_selective_restore,
     snapshot_activation_state,
+    write_skill_process_groups,
 )
 from factory.registry import (
     FACTORY_DIR_REL,
@@ -365,34 +368,52 @@ def _restore_regular_file(
 _SYMLINK_MARK = b"\0symlink\0"
 
 
+# Harness state no skill run may change: the registry/lock/trust/taste
+# directory and the per-run process-group records.
+_PROTECTED_STATE_DIRS = (FACTORY_DIR_REL, RUN_STATE_DIR_REL)
+
+
 def _factory_state_snapshot(workspace_root: Path) -> dict[str, bytes]:
-    """Snapshot `.hyodo/factory/` (registry, lock, trust cache, host taste) around a skill run.
+    """Snapshot `.hyodo/factory/` and `.hyodo/factory-run-state/` around a skill run.
 
     The workspace guard leaves `.hyodo/` alone, so this harness's own state is
     protected separately: no skill run, read-only or not, may change it.
     Symlinks are recorded by their target so a planted link counts as a change.
     """
-    root = workspace_root / FACTORY_DIR_REL
     snap: dict[str, bytes] = {}
-    if not root.is_dir() or root.is_symlink():
-        return snap
-    for path in sorted(root.rglob("*")):
-        rel = path.relative_to(workspace_root).as_posix()
-        try:
-            if path.is_symlink():
-                snap[rel] = _SYMLINK_MARK + os.readlink(path).encode("utf-8", "surrogateescape")
-            elif path.is_file():
-                snap[rel] = path.read_bytes()
-        except OSError:
+    for rel_root in _PROTECTED_STATE_DIRS:
+        root = workspace_root / rel_root
+        if root.is_symlink():
+            snap[rel_root.as_posix()] = _SYMLINK_MARK + os.readlink(root).encode(
+                "utf-8", "surrogateescape"
+            )
             continue
+        if not root.is_dir():
+            continue
+        for path in sorted(root.rglob("*")):
+            rel = path.relative_to(workspace_root).as_posix()
+            try:
+                if path.is_symlink():
+                    snap[rel] = _SYMLINK_MARK + os.readlink(path).encode("utf-8", "surrogateescape")
+                elif path.is_file():
+                    snap[rel] = path.read_bytes()
+            except OSError:
+                continue
     return snap
 
 
-def _restore_factory_state(workspace_root: Path, before: dict[str, bytes]) -> list[str]:
-    """Undo any change a skill run made under `.hyodo/factory/`; return what changed.
+def _restore_factory_state(
+    workspace_root: Path,
+    before: dict[str, bytes],
+    harness_written: dict[str, bytes] | None = None,
+) -> list[str]:
+    """Undo any change a skill run made to protected harness state; return what changed.
 
+    *harness_written* holds what the harness itself wrote during the run (the
+    process-group record); those writes are the expected state, not a change.
     Never raises: a path that cannot be restored is reported as `restore_failed`.
     """
+    before = {**before, **(harness_written or {})}
     after = _factory_state_snapshot(workspace_root)
     changed: list[str] = []
     for rel, content in after.items():
@@ -1332,8 +1353,33 @@ def _execute_modular_run_locked(
     # Skills whose process group still had members when the skill exited.
     descendants_killed: dict[str, bool] = {}
 
+    # The run's authoritative list of skill process groups lives in memory; the
+    # file is rewritten from it, never read back, and each harness write becomes
+    # the expected state for the post-run comparison.
+    run_groups: list[int] = []
+    harness_written: dict[str, bytes] = {}
+    run_state_tampering: list[str] = []
+    record_rel = process_groups_record_rel(run_id)
+    record_lock = threading.Lock()
+
     def _record_group(pgid: int) -> None:
-        record_skill_process_group(workspace_root, run_id, pgid)
+        with record_lock:
+            record_path = workspace_root / record_rel
+            expected = harness_written.get(record_rel)
+            try:
+                current = record_path.read_bytes() if record_path.exists() else None
+            except OSError:
+                current = None
+            if current != expected:
+                run_state_tampering.append(record_rel)
+            run_groups.append(pgid)
+            harness_written[record_rel] = write_skill_process_groups(
+                workspace_root, run_id, run_groups
+            )
+
+    def _harness_written_now() -> dict[str, bytes]:
+        with record_lock:
+            return dict(harness_written)
 
     def _auto_block(skill_id: str, reason: str, body: str) -> None:
         permission_violations.append(
@@ -1394,7 +1440,11 @@ def _execute_modular_run_locked(
         skill_ids: list[str], factory_before: dict[str, bytes], *, parallel: bool
     ) -> None:
         """Roll back `.hyodo/factory/` changes and check the execution snapshots."""
-        changes = _restore_factory_state(workspace_root, factory_before)
+        changes = _restore_factory_state(workspace_root, factory_before, _harness_written_now())
+        with record_lock:
+            if run_state_tampering:
+                changes = sorted({*changes, *(f"modified:{r}" for r in run_state_tampering)})
+                run_state_tampering.clear()
         if changes:
             label = f"parallel_wave[{','.join(skill_ids)}]" if parallel else skill_ids[0]
             attribution = ":attribution=UNOBSERVED" if parallel else ""

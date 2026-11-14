@@ -15,7 +15,7 @@ import hashlib
 import json
 import os
 import socket
-import threading
+import time
 from collections.abc import Iterator
 from dataclasses import replace
 from pathlib import Path
@@ -60,22 +60,52 @@ SELECTIVE_PENDING_DIR_REL = RUN_LOCK_REL.parent / "selective_pending"
 RUN_STATE_DIR_REL = Path(".hyodo") / "factory-run-state"
 # Receipts of stale run locks that were removed after their owner was proven gone.
 LOCK_RECOVERIES_REL = RUN_LOCK_REL.parent / "lock_recoveries.jsonl"
+# Upper bound on waiting for the lifecycle lock (overridable per process with
+# HYODO_FACTORY_LOCK_TIMEOUT_S).
+LIFECYCLE_LOCK_TIMEOUT_S = 30.0
+
+
+def _lifecycle_lock_timeout_s() -> float:
+    raw = os.environ.get("HYODO_FACTORY_LOCK_TIMEOUT_S", "").strip()
+    try:
+        return max(0.0, float(raw)) if raw else LIFECYCLE_LOCK_TIMEOUT_S
+    except ValueError:
+        return LIFECYCLE_LOCK_TIMEOUT_S
 
 
 @contextlib.contextmanager
 def _lifecycle_flock(workspace_root: Path) -> Iterator[None]:
-    """Acquire an OS-level exclusive advisory file lock for atomic registry mutations."""
+    """Acquire the exclusive lifecycle lock, retrying for a bounded time.
+
+    A process that holds the lock indefinitely (for example a skill that left
+    its process group) must not stall every run: after the timeout
+    (`HYODO_FACTORY_LOCK_TIMEOUT_S`, default 30 s) this fails with
+    `LIFECYCLE_LOCK_BUSY` instead of waiting forever.
+    """
     flock_path = workspace_root / LIFECYCLE_FLOCK_REL
     flock_path.parent.mkdir(parents=True, exist_ok=True)
     fd = os.open(flock_path, os.O_CREAT | os.O_RDWR, 0o600)
     try:
-        fcntl.flock(fd, fcntl.LOCK_EX)
-        yield
-    finally:
+        timeout = _lifecycle_lock_timeout_s()
+        deadline = time.monotonic() + timeout
+        while True:
+            try:
+                fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(
+                        f"LIFECYCLE_LOCK_BUSY: another process has held {LIFECYCLE_FLOCK_REL} "
+                        f"for more than {timeout:g}s. Inspect it with `lsof {flock_path}`; "
+                        "set HYODO_FACTORY_LOCK_TIMEOUT_S to wait longer."
+                    ) from None
+                time.sleep(0.05)
         try:
-            fcntl.flock(fd, fcntl.LOCK_UN)
+            yield
         finally:
-            os.close(fd)
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    finally:
+        os.close(fd)
 
 
 STALE_LOCK_RECOVERY_HINT = (
@@ -93,14 +123,27 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
-def _process_group_alive(pgid: int) -> bool:
+def _process_group_state(pgid: int) -> str:
+    """`ALIVE`, `GONE`, or `INVALID` for a recorded skill process group.
+
+    A skill's group is created by this harness for a process of the same user,
+    so pgid <= 1, the checking process's own group or session, or a group this
+    user may not signal (EPERM) cannot be one of them: such an entry is a
+    forged or corrupt record, never evidence that a skill is alive.
+    """
+    if pgid <= 1 or pgid in (os.getpgrp(), os.getsid(0)):
+        return "INVALID"
     try:
         os.killpg(pgid, 0)
     except ProcessLookupError:
-        return False
+        return "GONE"
     except PermissionError:
-        return True
-    return True
+        return "INVALID"
+    return "ALIVE"
+
+
+def _process_group_alive(pgid: int) -> bool:
+    return _process_group_state(pgid) == "ALIVE"
 
 
 def _run_key(run_id: str) -> str:
@@ -112,24 +155,20 @@ def _process_groups_path(workspace_root: Path, run_id: str) -> Path:
     return workspace_root / RUN_STATE_DIR_REL / f"{_run_key(run_id)}.process_groups.json"
 
 
-_PROCESS_GROUP_RECORD_LOCK = threading.Lock()
+def process_groups_record_rel(run_id: str) -> str:
+    """The workspace-relative path of a run's process-group record."""
+    return (RUN_STATE_DIR_REL / f"{_run_key(run_id)}.process_groups.json").as_posix()
 
 
-def record_skill_process_group(workspace_root: Path, run_id: str, pgid: int) -> None:
-    """Remember a skill's process group for the run, so recovery can prove it is gone.
+def write_skill_process_groups(workspace_root: Path, run_id: str, pgids: list[int]) -> bytes:
+    """Write the run's full list of skill process groups and return the bytes written.
 
-    Kept outside `.hyodo/factory/` because it is written while a skill runs, and
-    that directory is compared before and after every skill run.
+    The caller keeps the authoritative list in memory and always writes all of
+    it, so whatever a skill put in the file is never read back and merged.
     """
-    path = _process_groups_path(workspace_root, run_id)
-    with _PROCESS_GROUP_RECORD_LOCK:
-        groups: list[int] = []
-        if path.is_file():
-            with contextlib.suppress(OSError, json.JSONDecodeError, TypeError):
-                groups = [int(g) for g in json.loads(path.read_text(encoding="utf-8"))["pgids"]]
-        if pgid not in groups:
-            groups.append(pgid)
-        _atomic_write_text(path, json.dumps({"run_id": run_id, "pgids": groups}) + "\n")
+    data = (json.dumps({"run_id": run_id, "pgids": list(pgids)}) + "\n").encode("utf-8")
+    _atomic_write_text(_process_groups_path(workspace_root, run_id), data.decode("utf-8"))
+    return data
 
 
 def recorded_process_groups(workspace_root: Path, run_id: str) -> list[int] | None:
@@ -157,51 +196,60 @@ def run_lock_status(workspace_root: Path) -> dict[str, Any] | None:
     `state` is `STALE` only when the owner is provably gone: the lock names this
     host, its pid no longer exists, and no process group the run recorded for
     its skills still has a member. `ORPHANED_SKILLS` means the owner is gone but
-    a recorded skill process group is still running. A lock from another host,
-    without a pid, or with an unreadable process-group record is `UNKNOWN`,
-    never assumed stale. `LIVE` means the pid exists (a reused pid also reads
-    as live; that errs on the side of not touching it).
+    a recorded skill process group is still running. `UNKNOWN` (never assumed
+    stale) covers a lock from another host or without a pid
+    (`unknown_reason: owner_unverifiable`), an unreadable lock
+    (`lock_unreadable`), and an unreadable or invalid process-group record
+    (`process_group_record_invalid`, e.g. pgid 1). `LIVE` means the pid exists
+    (a reused pid also reads as live; that errs on the side of not touching it).
+
+    The process-group record can be written by any same-user process: erasing
+    it can make a lock look STALE while skills still run, and forging it can
+    block recovery. See `recover_stale_run_lock(discard_process_group_record=...)`.
     """
     lock_file = workspace_root / RUN_LOCK_REL
     if not lock_file.exists():
         return None
+    base: dict[str, Any] = {
+        "run_id": None,
+        "pid": None,
+        "host": None,
+        "owner_gone": False,
+        "alive_process_groups": [],
+        "invalid_process_groups": [],
+        "unknown_reason": None,
+        "lock_text": None,
+    }
     try:
         raw_text = lock_file.read_text(encoding="utf-8")
         held = json.loads(raw_text)
     except (OSError, json.JSONDecodeError):
         raw_text, held = None, None
+    base["lock_text"] = raw_text
     if not isinstance(held, dict):
-        return {
-            "state": "UNKNOWN",
-            "run_id": None,
-            "pid": None,
-            "host": None,
-            "alive_process_groups": [],
-            "lock_text": raw_text,
-        }
+        return {**base, "state": "UNKNOWN", "unknown_reason": "lock_unreadable"}
     pid = held.get("pid")
     host = held.get("host")
     run_id = held.get("run_id")
-    alive_groups: list[int] = []
+    base.update(run_id=run_id, pid=pid, host=host)
     if type(pid) is not int or pid <= 0 or host != socket.gethostname():
-        state = "UNKNOWN"
-    elif _pid_alive(pid):
-        state = "LIVE"
-    else:
-        groups = recorded_process_groups(workspace_root, str(run_id))
-        if groups is None:
-            state = "UNKNOWN"
-        else:
-            alive_groups = [g for g in groups if _process_group_alive(g)]
-            state = "ORPHANED_SKILLS" if alive_groups else "STALE"
-    return {
-        "state": state,
-        "run_id": run_id,
-        "pid": pid,
-        "host": host,
-        "alive_process_groups": alive_groups,
-        "lock_text": raw_text,
-    }
+        return {**base, "state": "UNKNOWN", "unknown_reason": "owner_unverifiable"}
+    if _pid_alive(pid):
+        return {**base, "state": "LIVE"}
+    base["owner_gone"] = True
+    groups = recorded_process_groups(workspace_root, str(run_id))
+    if groups is None:
+        return {**base, "state": "UNKNOWN", "unknown_reason": "process_group_record_invalid"}
+    states = {g: _process_group_state(g) for g in groups}
+    invalid = [g for g, st in states.items() if st == "INVALID"]
+    alive = [g for g, st in states.items() if st == "ALIVE"]
+    base.update(alive_process_groups=alive, invalid_process_groups=invalid)
+    if invalid:
+        return {**base, "state": "UNKNOWN", "unknown_reason": "process_group_record_invalid"}
+    return {**base, "state": "ORPHANED_SKILLS" if alive else "STALE"}
+
+
+_INSPECT_HINT = "ps -A -o pid,pgid,command"
 
 
 def _lock_held_message(workspace_root: Path, prefix: str) -> str:
@@ -216,8 +264,17 @@ def _lock_held_message(workspace_root: Path, prefix: str) -> str:
         groups = ",".join(str(g) for g in status.get("alive_process_groups", []))
         return (
             f"ORPHANED_SKILL_PROCESSES:{status.get('pid')}: the run {status.get('run_id')!r} "
-            f"that holds {RUN_LOCK_REL} is gone, but its skill process groups {groups} are "
-            f"still running. Stop them (kill -- -<pgid>), then: {STALE_LOCK_RECOVERY_HINT}"
+            f"that holds {RUN_LOCK_REL} is gone, but process groups {groups} from its record "
+            f"are still running. Inspect them with `{_INSPECT_HINT}` (PGID column), then "
+            f"stop them yourself if they are this run's skills; then: {STALE_LOCK_RECOVERY_HINT}"
+        )
+    if status.get("unknown_reason") == "process_group_record_invalid":
+        return (
+            f"RUN_STATE_RECORD_INVALID:{status.get('pid')}: the run {status.get('run_id')!r} "
+            f"that holds {RUN_LOCK_REL} is gone, but its process-group record is unreadable "
+            f"or names groups no skill can have ({status.get('invalid_process_groups')}). "
+            f"Inspect with `{_INSPECT_HINT}`; after inspection: "
+            f"{STALE_LOCK_RECOVERY_HINT} --discard-process-group-record"
         )
     return f"{prefix}: {RUN_LOCK_REL} is held by run {status.get('run_id')!r} (pid {status.get('pid')})"
 
@@ -349,7 +406,9 @@ def pending_selective_runs(workspace_root: Path) -> list[str]:
     return run_ids
 
 
-def recover_stale_run_lock(workspace_root: Path) -> dict[str, Any]:
+def recover_stale_run_lock(
+    workspace_root: Path, *, discard_process_group_record: bool = False
+) -> dict[str, Any]:
     """Remove a run lock only when its owner is provably gone, and record that it did.
 
     Everything happens under the lifecycle lock (which `acquire_run_lock` also
@@ -358,16 +417,41 @@ def recover_stale_run_lock(workspace_root: Path) -> dict[str, Any]:
     the flags that run's `--selective` activation left, clear that run's own
     pending record, write a receipt to `.hyodo/factory/lock_recoveries.jsonl`,
     and remove the lock last.
+
+    The process-group record is writable by any same-user process. When the
+    owner pid is gone on this host but the record is unreadable, invalid, or
+    names groups the operator has inspected and found not to be this run's
+    skills, `discard_process_group_record=True` (CLI:
+    `--discard-process-group-record`) ignores it. That is an operator decision:
+    the receipt records it with the discarded record's content. It is never
+    applied automatically.
     """
     with _lifecycle_flock(workspace_root):
         status = run_lock_status(workspace_root)
         if status is None:
             raise RuntimeError("NO_RUN_LOCK: nothing to recover")
-        if status["state"] != "STALE":
+        discarded_record: str | None = None
+        discardable = status["owner_gone"] and (
+            status["state"] == "ORPHANED_SKILLS"
+            or status["unknown_reason"] == "process_group_record_invalid"
+        )
+        if discard_process_group_record and discardable:
+            record = workspace_root / process_groups_record_rel(str(status["run_id"]))
+            discarded_record = "<missing>"
+            with contextlib.suppress(OSError):
+                discarded_record = record.read_text(encoding="utf-8", errors="replace")
+        elif status["state"] != "STALE":
             detail = ""
             if status["alive_process_groups"]:
                 groups = ",".join(str(g) for g in status["alive_process_groups"])
-                detail = f"; skill process groups still running: {groups}"
+                detail = (
+                    f"; process groups from its record still running: {groups} "
+                    f"(inspect with `{_INSPECT_HINT}`)"
+                )
+            if status["unknown_reason"]:
+                detail += f"; {status['unknown_reason']}"
+            if discardable:
+                detail += "; after inspecting, --discard-process-group-record ignores the record"
             raise RuntimeError(
                 f"RUN_LOCK_NOT_PROVABLY_STALE:{status['state']}: owner pid {status['pid']} on "
                 f"host {status['host']!r} is not provably gone{detail}; not removing "
@@ -396,7 +480,9 @@ def recover_stale_run_lock(workspace_root: Path) -> dict[str, Any]:
             "recovered_at": utc_now_iso(),
             "removed_lock": str(status["lock_text"] or "").strip(),
             "run_id": run_id,
-            "owner_state": "STALE",
+            "owner_state": "STALE" if discarded_record is None else status["state"],
+            "process_group_record_discarded": discarded_record is not None,
+            "discarded_process_group_record": discarded_record,
             "owner_pid": status["pid"],
             "host": status["host"],
             "selective_flags_restored": sorted(restored),
@@ -855,6 +941,10 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
     elif lock_status is not None and lock_status["state"] == "ORPHANED_SKILLS":
         groups = ",".join(str(g) for g in lock_status["alive_process_groups"])
         problems.append(f"orphaned_skill_processes:{lock_status['pid']}|{groups}")
+    elif (
+        lock_status is not None and lock_status["unknown_reason"] == "process_group_record_invalid"
+    ):
+        problems.append(f"run_state_record_invalid:{lock_status['pid']}")
     live_run = (
         lock_status["run_id"]
         if lock_status is not None and lock_status["state"] == "LIVE"

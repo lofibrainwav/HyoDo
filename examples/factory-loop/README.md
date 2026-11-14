@@ -105,7 +105,11 @@ examples/factory-loop/
   commands); `filesystem_write=false` is `PARTIAL` (workspace files only, by
   POSIX write bits plus snapshot rollback, which unlinks and recreates a
   changed file instead of writing or chmod-ing through it and records a planted
-  hard link as `hardlink_planted`; `.git/`, `.hyodo/` other than
+  hard link as `hardlink_planted`; directories are reported, not restored:
+  a file replaced by a directory, or a directory made read-only, is reported
+  as `restore_failed` and left for a person to repair, and a removed directory
+  is recreated (with default permissions) only as far as needed to put its
+  files back; `.git/`, `.hyodo/` other than
   `.hyodo/factory/`, and paths outside the workspace are not covered); `network_access=false`,
   `browser_automation=false` and declared `allowed_paths` / `allowed_tools`
   are `UNENFORCED` (proxy variables are dropped and
@@ -173,7 +177,27 @@ examples/factory-loop/
   holds (records are kept per run id, so one run never consumes another's),
   clear that record, append a receipt to `.hyodo/factory/lock_recoveries.jsonl`,
   and remove the lock last. A lock from another host, with a running pid, or
-  with a running skill group is never removed.
+  with a running skill group is never removed. Messages name an inspection
+  command (`ps -A -o pid,pgid,command`, PGID column), never a kill command.
+- The process-group record under `.hyodo/factory-run-state/` is harness state:
+  a skill run that changes it is rolled back and recorded as
+  `factory_state_write_forbidden`, like `.hyodo/factory/`. Any other process
+  running as the same user can still write it, and so can a skill that kills
+  the harness before the post-run check. Erasing the record can let recovery
+  proceed while that run's skills are still alive; forging it can block
+  recovery. A group id that no skill can have (`<= 1`, the checking process's
+  own group or session, or one this user may not signal) or an unreadable
+  record makes the lock `UNKNOWN` (`process_group_record_invalid`, doctor
+  `run_state_record_invalid:<pid>`), never `ORPHANED`. After inspecting the
+  processes yourself, clear such a record, or one naming groups that are not
+  this run's skills, with
+  `recover-stale-lock --discard-process-group-record`. It is never applied
+  automatically, it still requires the owner pid to be gone on this host, and
+  the receipt records the discarded record's content.
+- Waiting for the lifecycle lock is bounded: after
+  `HYODO_FACTORY_LOCK_TIMEOUT_S` seconds (default 30) a run or lifecycle
+  command fails with `LIFECYCLE_LOCK_BUSY` instead of waiting forever on a
+  process that holds `.hyodo/factory/lifecycle.flock`.
 - `hosts` inspects local connect/MCP configuration plans only. It never runs a
   host, so `live_contract` is `UNOBSERVED` and `verified_live_contract` is
   `false` for every host.
