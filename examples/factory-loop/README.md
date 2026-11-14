@@ -163,9 +163,12 @@ examples/factory-loop/
   exist anywhere; no such count is claimed.
 - A run that is killed leaves `.hyodo/factory/run.lock` behind. The lock
   records the owner's pid and host, and the run records each skill's process
-  group under `.hyodo/factory-run-state/`. The owner is provably gone only
-  when that pid no longer exists on this host and none of those groups has a
-  live member. Then the next run fails with `STALE_RUN_LOCK:<pid>` and
+  group under `.hyodo/factory-run-state/`. A lock counts as stale only when
+  what is checked holds: that pid no longer exists on this host and no group
+  in that record has a live member. The record itself can be erased by a skill
+  that kills the harness first (see the next item), so this is not proof that
+  every skill of the run is gone. Then the next run fails with
+  `STALE_RUN_LOCK:<pid>` and
   `doctor` reports `stale_run_lock:<pid>`; while a group is still running it is
   `ORPHANED_SKILL_PROCESSES` / `orphaned_skill_processes` instead. A killed
   `--selective` run also shows as `selective_activation_not_restored:<run_id>`.
@@ -176,8 +179,11 @@ examples/factory-loop/
   the same stale lock, restore the flags that run's own `--selective` record
   holds (records are kept per run id, so one run never consumes another's),
   clear that record, append a receipt to `.hyodo/factory/lock_recoveries.jsonl`,
-  and remove the lock last. A lock from another host, with a running pid, or
-  with a running skill group is never removed. Messages name an inspection
+  and remove the lock last. A lock from another host or with a running pid is
+  never removed, and one with a running recorded group is never removed
+  automatically: only the explicit, receipted `--discard-process-group-record`
+  flag can remove it, after the operator has inspected the processes. Messages
+  name an inspection
   command (`ps -A -o pid,pgid,command`, PGID column), never a kill command.
 - The process-group record under `.hyodo/factory-run-state/` is harness state:
   a skill run that changes it is rolled back and recorded as
