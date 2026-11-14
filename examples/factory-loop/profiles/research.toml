@@ -4,3 +4,11 @@ description = "Skill discovery (find-skills/last30days), codebase knowledge grap
 active_categories = ["research", "knowledge", "evaluation"]
 single_orchestrator = true
 require_independent_verifier = false
+personal_taste_rules = [
+    "substance_over_hype: evaluate actual implementation and at least two independent sources rather than GitHub stars",
+    "distinguish_registered_from_verified: never treat catalog presence as verified capability",
+]
+inferred_taste_hypotheses = [
+    "prefer_structural_graph_evidence_before_large_refactors",
+]
+domain_taste_focus = ["research", "architecture", "documentation", "decision_making"]

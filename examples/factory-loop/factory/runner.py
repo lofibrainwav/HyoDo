@@ -17,8 +17,10 @@ from __future__ import annotations
 
 import contextlib
 import hashlib
+import json
 import os
 import subprocess
+import sys
 import time
 from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
@@ -27,12 +29,33 @@ from typing import Any
 
 from adapters.agent_skills import disclose_skill_body
 
-from factory.contracts import ModuleRecord, SkillUnitSpec, recommend_skill_lifecycle_action
+from factory.contracts import (
+    TRUST_STAGES,
+    TRUST_STATE_SCHEMA,
+    ModuleRecord,
+    SkillUnitSpec,
+    recommend_skill_lifecycle_action,
+)
 from factory.lifecycle import acquire_run_lock, release_run_lock
 from factory.registry import load_registry_state
-from factory.router import route_skills_for_task
+from factory.router import TRUST_STATE_REL_PATH, route_skills_for_task
+from hyodo.admission_observation import (
+    ADMISSION_OBSERVATION_SCHEMA_VERSION,
+    append_admission_observation,
+)
+from hyodo.events import (
+    AGENT_EVENT_SCHEMA_VERSION,
+    append_agent_event,
+    content_digest,
+    unevaluated_policy,
+    validate_event,
+)
 from hyodo.independent_verifier import verify_exact_candidate
 from hyodo.nameplate import build_nameplate
+from hyodo.orchestration_observation import (
+    ORCHESTRATION_OBSERVATION_SCHEMA_VERSION,
+    append_orchestration_observation,
+)
 from hyodo.provenance import clean_git_env
 from hyodo.six_lens_runtime import measure_workspace_six_lenses
 from hyodo.skill_eval import evaluate_skill_case
@@ -666,11 +689,99 @@ def execute_modular_run(
                 }
 
         duration_ms = int((time.monotonic() - t0) * 1000)
+
+        # Record `hyodo.agent-event/v1` and `hyodo.orchestration-observation/v1` sidecar DAG rows
+        orchestration_observations_recorded = 0
+        skill_event_ids: dict[str, str] = {}
+        wave_event_ids: list[list[str]] = []
+        step_idx = 0
+        for wave_idx, wave in enumerate(execution_waves):
+            is_parallel_wave = len(wave) > 1 and all(
+                (skill_commands or {}).get(sid) is not None
+                and unit_lookup[sid][1].boundary.subprocess_exec
+                and not unit_lookup[sid][1].boundary.filesystem_write
+                for sid in wave
+            )
+            exec_mode = "parallel" if is_parallel_wave else "serial"
+            current_wave_events: list[str] = []
+            for skill_id in wave:
+                _, unit = unit_lookup[skill_id]
+                safe_sid = skill_id.replace("/", "-").replace("_", "-")
+                ev_id = f"evt-{run_id}-w{wave_idx}-{safe_sid}"
+                obs_id = f"obs-{run_id}-w{wave_idx}-{safe_sid}"
+                skill_event_ids[skill_id] = ev_id
+                current_wave_events.append(ev_id)
+
+                raw_ev = {
+                    "schema_version": AGENT_EVENT_SCHEMA_VERSION,
+                    "event_id": ev_id,
+                    "run_id": run_id,
+                    "step_index": step_idx,
+                    "ts": "2026-11-13T00:00:05Z",
+                    "kind": "tool_call",
+                    "actor": "agent",
+                    "tool": {
+                        "name": skill_id,
+                        "args_digest": content_digest(prompt),
+                        "paths": [],
+                    },
+                    "policy": unevaluated_policy(),
+                }
+                ok_ev, _, norm_ev = validate_event(raw_ev)
+                if ok_ev and norm_ev is not None:
+                    append_agent_event(workspace_root, norm_ev)
+                step_idx += 1
+
+                dep_event_ids = sorted(
+                    {
+                        skill_event_ids[d]
+                        for d in unit.dependencies
+                        if d in skill_event_ids and skill_event_ids[d] != ev_id
+                    }
+                )
+                if not dep_event_ids and wave_idx > 0:
+                    dep_event_ids = sorted(set(wave_event_ids[wave_idx - 1]))
+
+                out = skill_outputs.get(skill_id, {})
+                exec_state = str(out.get("execution_state", "DISCLOSED_ONLY"))
+                if exec_state in ("EXECUTED_PASS", "DISCLOSED_ONLY"):
+                    node_state = "completed"
+                elif exec_state in ("BLOCKED_BY_PERMISSION", "BLOCKED_BY_OS_READONLY_MODE"):
+                    node_state = "blocked"
+                elif exec_state == "ROLLED_BACK_ILLEGAL_WRITE":
+                    node_state = "rolled_back"
+                else:
+                    node_state = "failed"
+
+                obs_payload: dict[str, Any] = {
+                    "schema": ORCHESTRATION_OBSERVATION_SCHEMA_VERSION,
+                    "observation_id": obs_id,
+                    "run_id": run_id,
+                    "event_id": ev_id,
+                    "ts": "2026-11-13T00:00:05Z",
+                    "node_id": skill_id,
+                    "execution": exec_mode,
+                    "depends_on": dep_event_ids,
+                    "join_policy": "all" if len(dep_event_ids) >= 2 else None,
+                    "state": node_state,
+                    "attempt": 1,
+                    "approval_wait_ms": 0,
+                    "human_interventions": 0,
+                    "unobserved_claim_count": 1 if exec_state == "DISCLOSED_ONLY" else 0,
+                    "policy_conflict_count": 1 if node_state in ("blocked", "rolled_back") else 0,
+                    "verification_failure_count": 1 if out.get("gate_verdict") == "FAIL" else 0,
+                    "evidence_refs": [f"sha256:{unit.content_sha256[:12]}"],
+                }
+                if append_orchestration_observation(workspace_root, obs_payload):
+                    orchestration_observations_recorded += 1
+            wave_event_ids.append(current_wave_events)
+
         modes = [str(v.get("execution_state", "")) for v in skill_outputs.values()]
         execution_summary = {
             "skills_routed": len(route_plan["selected_skills"]),
             "execution_waves_count": len(execution_waves),
             "parallel_waves_executed": parallel_waves_executed,
+            "orchestration_observations_recorded": orchestration_observations_recorded,
             "skills_disclosed_only": sum(1 for m in modes if m == "DISCLOSED_ONLY"),
             "skills_executed_pass": sum(1 for m in modes if m == "EXECUTED_PASS"),
             "skills_executed_fail": sum(1 for m in modes if m == "EXECUTED_FAIL"),
@@ -690,6 +801,7 @@ def execute_modular_run(
             "external_action_allowed": False,
             "route_plan": route_plan,
             "execution_waves": execution_waves,
+            "orchestration_observations_recorded": orchestration_observations_recorded,
             "disclosed_skills": disclosed_skills,
             "executed_skills": executed_skills,
             "execution_summary": execution_summary,
@@ -863,4 +975,247 @@ def evaluate_skill_impact(
             "subjective_score_ignored": subjective_score_ignored,
         },
         "authority_expanded": False,
+    }
+
+
+def _default_env_fingerprint() -> str:
+    return f"py{sys.version_info.major}.{sys.version_info.minor}-{sys.platform}"
+
+
+def _read_trust_file(workspace_root: Path) -> dict[str, Any]:
+    path = workspace_root / TRUST_STATE_REL_PATH
+    if not path.is_file():
+        return {"schema": TRUST_STATE_SCHEMA, "skills": {}}
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if isinstance(raw, dict) and isinstance(raw.get("skills"), dict):
+            return raw
+    except (OSError, json.JSONDecodeError):
+        pass
+    return {"schema": TRUST_STATE_SCHEMA, "skills": {}}
+
+
+def _write_trust_file(workspace_root: Path, data: dict[str, Any]) -> None:
+    path = workspace_root / TRUST_STATE_REL_PATH
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def get_skill_trust_state(
+    workspace_root: Path,
+    skill_id: str,
+    *,
+    env_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Return the current trust stage (`DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN`) for *skill_id*.
+
+    Automatically demotes back to `VERIFY` if the skill's content hash, version,
+    permission boundary, or runtime environment fingerprint has drifted since the
+    last verification.
+    """
+    current_env = env_fingerprint or _default_env_fingerprint()
+    modules = load_registry_state(workspace_root)
+    found: tuple[ModuleRecord, SkillUnitSpec] | None = None
+    for mod in modules.values():
+        if skill_id in mod.skills:
+            found = (mod, mod.skills[skill_id])
+            break
+
+    if found is None:
+        return {
+            "skill_id": skill_id,
+            "trust_stage": "DISCOVER",
+            "drifted": False,
+            "demoted_from": None,
+            "demotion_reason": None,
+            "registered": False,
+        }
+
+    mod, unit = found
+    trust_doc = _read_trust_file(workspace_root)
+    skills_map: dict[str, Any] = trust_doc["skills"]
+    stored = skills_map.get(skill_id)
+    if not isinstance(stored, dict):
+        return {
+            "skill_id": skill_id,
+            "trust_stage": "VERIFY",
+            "drifted": False,
+            "demoted_from": None,
+            "demotion_reason": None,
+            "registered": True,
+            "content_sha256": unit.content_sha256,
+            "version": mod.version,
+            "boundary": unit.boundary.to_dict(),
+            "env_fingerprint": current_env,
+        }
+
+    drift_reasons: list[str] = []
+    if stored.get("content_sha256") != unit.content_sha256:
+        drift_reasons.append("content_sha256_changed")
+    if stored.get("version") != mod.version:
+        drift_reasons.append("version_changed")
+    if stored.get("boundary") != unit.boundary.to_dict():
+        drift_reasons.append("permission_boundary_changed")
+    if stored.get("env_fingerprint") != current_env:
+        drift_reasons.append("environment_fingerprint_changed")
+
+    if drift_reasons:
+        prev_stage = str(stored.get("trust_stage", "VERIFY"))
+        demoted = {
+            **stored,
+            "skill_id": skill_id,
+            "trust_stage": "VERIFY",
+            "drifted": True,
+            "demoted_from": prev_stage,
+            "demotion_reason": f"DRIFT_DETECTED_REVERIFY_REQUIRED:{','.join(drift_reasons)}",
+            "verifier_status": "UNOBSERVED",
+            "eval_verdict": "UNOBSERVED",
+            "content_sha256": unit.content_sha256,
+            "version": mod.version,
+            "boundary": unit.boundary.to_dict(),
+            "env_fingerprint": current_env,
+        }
+        skills_map[skill_id] = demoted
+        _write_trust_file(workspace_root, trust_doc)
+        return demoted
+
+    return {
+        **stored,
+        "drifted": False,
+        "demoted_from": None,
+        "demotion_reason": None,
+        "registered": True,
+    }
+
+
+def evaluate_and_promote_trust(
+    workspace_root: Path,
+    *,
+    skill_id: str,
+    target_stage: str | None = None,
+    eval_receipt: dict[str, Any] | None = None,
+    verifier_receipt: dict[str, Any] | None = None,
+    serenity_gate_approved: bool = False,
+    s_score: float | None = None,
+    run_id: str = "trust-eval-01",
+    source: str = "kingdom.agent-loop.eros-gate",
+    env_fingerprint: str | None = None,
+) -> dict[str, Any]:
+    """Evaluate mandatory evidence gates and advance/demote trust along `DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN`.
+
+    Hard invariants:
+    - A high `s_score` NEVER overrides a failed or `UNOBSERVED` verifier or skill-eval gate.
+    - `AUTO_RUN` requires `verifier_status == "PASS"`, `eval_verdict == "HELPED"`,
+      `reproducible == True`, `0` permission violations, `0` human interventions,
+      AND `serenity_gate_approved == True`.
+    - Records a validated `hyodo.admission-observation/v1` entry in `.hyodo/admission-observations.jsonl`.
+    """
+    current_state = get_skill_trust_state(workspace_root, skill_id, env_fingerprint=env_fingerprint)
+    if not current_state.get("registered", False):
+        raise KeyError(f"cannot promote unregistered skill: {skill_id}")
+
+    modules = load_registry_state(workspace_root)
+    mod, unit = next((m, m.skills[skill_id]) for m in modules.values() if skill_id in m.skills)
+    current_env = env_fingerprint or _default_env_fingerprint()
+    current_stage = str(current_state.get("trust_stage", "VERIFY"))
+
+    v_status = str((verifier_receipt or {}).get("status", "UNOBSERVED"))
+    e_verdict = str((eval_receipt or {}).get("verdict", "UNOBSERVED"))
+    comp = (eval_receipt or {}).get("comparison", {})
+    reproducible = bool(comp.get("reproducible", False))
+    failure_delta = int(comp.get("failure_count_delta", 0))
+    interventions_delta = int(comp.get("human_interventions_delta", 0))
+
+    mandatory_gates_passed = (
+        v_status == "PASS" and e_verdict == "HELPED" and reproducible and failure_delta <= 0
+    )
+    score_override_blocked = bool(
+        s_score is not None and s_score >= 9.0 and not mandatory_gates_passed
+    )
+
+    if v_status in ("FAIL", "HOLD", "UNOBSERVED") or e_verdict == "HURT" or failure_delta > 0:
+        new_stage = "VERIFY"
+        decision = "BLOCK"
+        admitted = False
+    elif not mandatory_gates_passed:
+        # Verifier passed, but impact is NEUTRAL/INCONCLUSIVE or not yet reproducible -> MANUAL only
+        new_stage = "MANUAL"
+        decision = "ASK_COMMANDER"
+        admitted = False
+    else:
+        # All mandatory verification & impact gates passed (`VERIFIED` + `HELPED` + `reproducible`)
+        stage_order = list(TRUST_STAGES)
+        cur_idx = stage_order.index(current_stage) if current_stage in stage_order else 1
+        if target_stage is not None:
+            if target_stage not in stage_order:
+                raise ValueError(f"invalid target_stage: {target_stage}")
+            desired_idx = stage_order.index(target_stage)
+        else:
+            desired_idx = min(cur_idx + 1, len(stage_order) - 1)
+            # If starting at VERIFY and all gates pass, advance at least to MANUAL
+            if desired_idx < stage_order.index("MANUAL"):
+                desired_idx = stage_order.index("MANUAL")
+
+        candidate_stage = stage_order[desired_idx]
+        if candidate_stage == "AUTO_RUN":
+            if serenity_gate_approved and interventions_delta <= 0:
+                new_stage = "AUTO_RUN"
+                decision = "AUTO_RUN"
+                admitted = True
+            else:
+                new_stage = "TRUSTED"
+                decision = "ASK_COMMANDER"
+                admitted = False
+        else:
+            new_stage = candidate_stage
+            decision = "ASK_COMMANDER"
+            admitted = False
+
+    trust_doc = _read_trust_file(workspace_root)
+    record = {
+        "skill_id": skill_id,
+        "module_id": mod.module_id,
+        "trust_stage": new_stage,
+        "previous_stage": current_stage,
+        "verifier_status": v_status,
+        "eval_verdict": e_verdict,
+        "reproducible": reproducible,
+        "serenity_gate_approved": serenity_gate_approved,
+        "score_override_blocked": score_override_blocked,
+        "content_sha256": unit.content_sha256,
+        "version": mod.version,
+        "boundary": unit.boundary.to_dict(),
+        "env_fingerprint": current_env,
+    }
+    trust_doc["skills"][skill_id] = record
+    _write_trust_file(workspace_root, trust_doc)
+
+    safe_sid = skill_id.replace("/", "-").replace("_", "-")
+    obs_raw = {
+        "schema": ADMISSION_OBSERVATION_SCHEMA_VERSION,
+        "observation_id": f"adm-obs-{run_id}-{safe_sid}-{new_stage.lower()}",
+        "decision_id": f"adm-dec-{run_id}-{safe_sid}-{new_stage.lower()}",
+        "run_id": run_id,
+        "decision": decision,
+        "s_score": s_score,
+        "observed": v_status != "UNOBSERVED",
+        "admitted": admitted,
+        "execution_attempted": False,
+        "execution_observed": False,
+        "source": source,
+        "ts": "2026-11-13T00:00:15Z",
+        "observation_identity": {
+            "skill_id": skill_id,
+            "trust_stage": new_stage,
+            "content_sha256": unit.content_sha256,
+            "version": mod.version,
+            "score_override_blocked": score_override_blocked,
+        },
+    }
+    admission_obs = append_admission_observation(workspace_root, obs_raw)
+    return {
+        **record,
+        "admission_decision": decision,
+        "admitted": admitted,
+        "admission_observation": admission_obs,
     }

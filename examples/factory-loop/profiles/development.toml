@@ -4,3 +4,13 @@ description = "Root-cause audit, TDD engineering, simplification, independent re
 active_categories = ["simplification", "engineering", "quality", "security", "evaluation"]
 single_orchestrator = true
 require_independent_verifier = true
+personal_taste_rules = [
+    "yagni_ladder_first: check stdlib and existing helpers before writing new code",
+    "root_cause_not_symptom: grep every caller and fix the shared function once",
+    "deletion_over_addition: prefer shortest working diff without unrequested abstractions",
+    "no_meta_work: ship working deliverables with runnable verification receipts",
+]
+inferred_taste_hypotheses = [
+    "prefer_single_file_vertical_slices_when_under_300_lines",
+]
+domain_taste_focus = ["code_quality", "architecture", "verification", "decision_making"]

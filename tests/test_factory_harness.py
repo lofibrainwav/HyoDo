@@ -990,3 +990,389 @@ def test_adversarial_all_official_external_and_workspace_repos_real_cli_run(
     for mod_id in attached:
         factory.remove_module(repo, mod_id)
     assert factory.doctor(repo)["modules_registered"] == 0
+
+
+def _write_skill(mod_dir: Path, name: str, content: str) -> Path:
+    sdir = mod_dir / "skills" / name
+    sdir.mkdir(parents=True, exist_ok=True)
+    (sdir / "SKILL.md").write_text(content, encoding="utf-8")
+    return sdir
+
+
+def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Path) -> None:
+    """Verify `analyze_capability_gaps` classifies VERIFIED, UNVERIFIED, MISSING, DEGRADED, REDUNDANT, and UNKNOWN with root causes and separates explicit Personal Taste from AI-inferred hypotheses."""
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    _init_clean_repo(repo)
+
+    # 1. Create two engineering TDD skills (to trigger REDUNDANT / DUPLICATE_SLOT on the second)
+    mod_a = tmp_path / "mod-a"
+    _write_skill(
+        mod_a,
+        "tdd-primary",
+        "---\nname: tdd-primary\ndescription: Primary TDD implementation skill\n---\n# TDD Primary\n- require file: README.md\n",
+    )
+    _write_skill(
+        mod_a,
+        "tdd-secondary",
+        "---\nname: tdd-secondary\ndescription: Competing TDD workflow skill\n---\n# TDD Secondary\n",
+    )
+    # 2. Create a simplification skill that will be disabled (WIRING_DISCONNECTED)
+    _write_skill(
+        mod_a,
+        "yagni-audit",
+        "---\nname: yagni-audit\ndescription: Root cause audit and YAGNI simplification\n---\n# YAGNI\n",
+    )
+    # 3. Create a quality verifier skill that will be mutated on disk (DEGRADED / ENVIRONMENT_OR_SYNTAX_DEGRADED)
+    _write_skill(
+        mod_a,
+        "qa-gate",
+        "---\nname: qa-gate\ndescription: Independent QA verifier\n---\n# QA Gate\n",
+    )
+    # 4. Create a security skill that will have INCONCLUSIVE evaluation (UNKNOWN)
+    _write_skill(
+        mod_a,
+        "sec-guard",
+        "---\nname: sec-guard\ndescription: Security vulnerability guard\n---\n# Sec Guard\n",
+    )
+    factory.add_module(repo, mod_a, module_id="mod-a")
+
+    # Promote `mod-a/tdd-primary` to VERIFIED (MANUAL stage with PASS verifier & HELPED impact)
+    eval_helped = factory.evaluate_skill_impact(
+        skill_id="mod-a/tdd-primary",
+        baseline_metrics={
+            "passed": False,
+            "gates_passed": 1,
+            "tests_failed": 1,
+            "tokens": 400,
+            "duration_ms": 100,
+            "human_interventions": 0,
+        },
+        treatment_metrics={
+            "passed": True,
+            "gates_passed": 3,
+            "tests_failed": 0,
+            "tokens": 350,
+            "duration_ms": 80,
+            "human_interventions": 0,
+            "output_sha256": "abc12345",
+            "repeat_output_sha256": "abc12345",
+        },
+    )
+    factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="mod-a/tdd-primary",
+        eval_receipt=eval_helped,
+        verifier_receipt={"status": "PASS"},
+    )
+
+    # Record INCONCLUSIVE / UNKNOWN for `mod-a/sec-guard`
+    factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="mod-a/sec-guard",
+        eval_receipt={"verdict": "INCONCLUSIVE", "comparison": {"reproducible": False}},
+        verifier_receipt={"status": "PASS"},
+    )
+    # Manually mark `sec-guard` verifier_status as UNKNOWN in trust_state to test UNKNOWN classification
+    trust_path = repo / ".hyodo" / "factory" / "trust_state.json"
+    t_doc = json.loads(trust_path.read_text(encoding="utf-8"))
+    t_doc["skills"]["mod-a/sec-guard"]["verifier_status"] = "UNKNOWN"
+    trust_path.write_text(json.dumps(t_doc, indent=2) + "\n", encoding="utf-8")
+
+    # Disable `mod-a/yagni-audit` -> WIRING_DISCONNECTED
+    factory.disable_target(repo, "mod-a/yagni-audit")
+
+    # Tamper with `mod-a/qa-gate` on disk -> DEGRADED (`skill_hash_drift`)
+    (mod_a / "skills" / "qa-gate" / "SKILL.md").write_text(
+        "---\nname: qa-gate\ndescription: Tampered\n---\n# Tampered\n",
+        encoding="utf-8",
+    )
+
+    # External candidate directory for MISSING `design` category
+    ext_root = tmp_path / "ext-catalog"
+    _write_skill(
+        ext_root / "taste-pack",
+        "ui-architect",
+        "---\nname: ui-architect\ndescription: Design system tokens layout and palette\n---\n# UI Architect\n",
+    )
+
+    # Analyze gaps for a complex prompt requesting engineering (tdd), simplification (yagni), quality (qa), security, and design (missing locally)
+    report = factory.analyze_capability_gaps(
+        repo,
+        "Implement TDD feature, simplify YAGNI root cause, check security vulnerability, verify QA, and design UI layout palette",
+        profile_name="development",
+        external_search_roots=[ext_root],
+        explicit_taste_feedback=["explicit_rule: prefer boring stdlib over clever wrappers"],
+        inferred_taste_hypotheses=["inferred_hypothesis: user might want dark mode palette"],
+    )
+
+    assert report["schema"] == "hyodo.capability-gap-report/v1"
+    assert report["is_simple_task"] is False
+    assert report["metacognition_mode"] == "FULL_METACOGNITIVE_LOOP"
+
+    skills = report["skill_assessments"]
+    assert skills["mod-a/tdd-primary"]["state"] == "VERIFIED"
+    assert skills["mod-a/tdd-primary"]["root_cause"] == "NONE"
+
+    assert skills["mod-a/tdd-secondary"]["state"] == "REDUNDANT"
+    assert skills["mod-a/tdd-secondary"]["root_cause"] == "DUPLICATE_SLOT"
+
+    assert skills["mod-a/yagni-audit"]["state"] == "UNVERIFIED"
+    assert skills["mod-a/yagni-audit"]["root_cause"] == "WIRING_DISCONNECTED"
+
+    assert skills["mod-a/qa-gate"]["state"] == "DEGRADED"
+    assert skills["mod-a/qa-gate"]["root_cause"] == "ENVIRONMENT_OR_SYNTAX_DEGRADED"
+
+    assert skills["mod-a/sec-guard"]["state"] == "UNKNOWN"
+    assert skills["mod-a/sec-guard"]["root_cause"] == "VERIFICATION_MISSING"
+
+    cats = report["category_assessments"]
+    assert cats["design"]["state"] == "MISSING"
+    assert cats["design"]["root_cause"] == "CAPABILITY_MISSING"
+    assert cats["design"]["external_candidates_count"] >= 1
+
+    # Verify Taste synthesis separates explicit Personal Taste from AI-inferred hypotheses
+    taste = report["taste_synthesis"]
+    assert taste["hardcoded_in_hyodo_core"] is False
+    assert any(
+        item["rule"].startswith("explicit_rule:")
+        and item["hypothesis"] is False
+        and item["authority"] == "HOST_CONFIGURED"
+        for item in taste["personal_taste"]
+    )
+    assert any(
+        item["preference"].startswith("inferred_hypothesis:")
+        and item["hypothesis"] is True
+        and item["authority"] == "UNOBSERVED"
+        and item["must_yield_to_explicit_feedback"] is True
+        for item in taste["inferred_hypotheses"]
+    )
+
+    # Verify fast-path on a short, simple prompt when category is already enabled
+    simple_rep = factory.analyze_capability_gaps(
+        repo,
+        "fix tdd bug",
+        profile_name="minimal",
+        external_search_roots=[ext_root],
+    )
+    assert simple_rep["is_simple_task"] is True
+    assert simple_rep["metacognition_mode"] == "FAST_PATH_SIMPLE_TASK"
+
+
+def test_orchestration_observations_and_graph_export_integration(tmp_path: Path) -> None:
+    """Verify `execute_modular_run` emits `hyodo.agent-event/v1` and `hyodo.orchestration-observation/v1` sidecar DAG rows that join cleanly with zero issues and export via `build_graph_export`."""
+    from hyodo.events import read_agent_events
+    from hyodo.graph_export import GRAPH_EXPORT_SCHEMA_VERSION, build_graph_export
+    from hyodo.orchestration_observation import (
+        join_adapter_events,
+        read_orchestration_observations,
+    )
+
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    _init_clean_repo(repo)
+
+    mod_dir = tmp_path / "dag-pack"
+    s1 = _write_skill(
+        mod_dir,
+        "audit-one",
+        "---\nname: audit-one\ndescription: First parallel simplify yagni audit skill\n---\n# Audit 1\n",
+    )
+    (s1 / "scripts").mkdir()
+    (s1 / "scripts" / "run.py").write_text("print('audit1')\n", encoding="utf-8")
+
+    s2 = _write_skill(
+        mod_dir,
+        "security-two",
+        "---\nname: security-two\ndescription: Second parallel security skill\n---\n# Sec 2\n",
+    )
+    (s2 / "scripts").mkdir()
+    (s2 / "scripts" / "run.py").write_text("print('sec2')\n", encoding="utf-8")
+
+    s3 = _write_skill(
+        mod_dir,
+        "qa-join",
+        "---\nname: qa-join\ndescription: Dependent QA verifier joining parallel skills\ndependencies:\n  - dag-pack/audit-one\n  - dag-pack/security-two\n---\n# QA Join\n",
+    )
+    (s3 / "scripts").mkdir()
+    (s3 / "scripts" / "run.py").write_text("print('qa_join')\n", encoding="utf-8")
+
+    factory.add_module(repo, mod_dir, module_id="dag-pack")
+
+    run_res = factory.execute_modular_run(
+        repo,
+        run_id="dag-run-01",
+        prompt="audit root cause, check security vulnerability, and run qa verify",
+        skill_commands={
+            "dag-pack/audit-one": [sys.executable, "-c", "print('a1')"],
+            "dag-pack/security-two": [sys.executable, "-c", "print('s2')"],
+            "dag-pack/qa-join": [sys.executable, "-c", "print('q3')"],
+        },
+    )
+    assert run_res["orchestration_observations_recorded"] == 3
+    assert run_res["execution_summary"]["parallel_waves_executed"] == 1
+
+    events, corrupt = read_agent_events(repo)
+    assert events is not None
+    assert corrupt == 0
+    observations = read_orchestration_observations(repo)
+    assert len(observations) == 3
+
+    by_node = {obs["node_id"]: obs for obs in observations}
+    assert by_node["dag-pack/audit-one"]["execution"] == "parallel"
+    assert by_node["dag-pack/security-two"]["execution"] == "parallel"
+    assert by_node["dag-pack/qa-join"]["execution"] == "serial"
+    assert len(by_node["dag-pack/qa-join"]["depends_on"]) == 2
+    assert by_node["dag-pack/qa-join"]["join_policy"] == "all"
+
+    from hyodo.graph_v2 import V2_SCHEMA, validate_graph_v2
+    from hyodo.report import build_report_graph
+
+    adapted, issues = join_adapter_events(events, observations)
+    assert issues == []
+    assert any(len(ev.get("parent_event_ids", [])) == 2 for ev in adapted)
+
+    v2_rows = [
+        {**ev, "schema_version": V2_SCHEMA} if "parent_event_ids" in ev else ev for ev in adapted
+    ]
+    dag_result = validate_graph_v2(v2_rows)
+    assert dag_result.acyclic is True
+    assert dag_result.references_resolved is True
+    assert dag_result.structurally_valid is True
+
+    report_graph = build_report_graph(repo)
+    graph = build_graph_export(report_graph)
+    assert graph["schema"] == GRAPH_EXPORT_SCHEMA_VERSION
+    assert len(graph["nodes"]) == 3
+
+
+def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
+    tmp_path: Path,
+) -> None:
+    """Verify `DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN` enforces mandatory gates (blocking high `s_score` overrides) and automatically demotes to `VERIFY` when hash, version, or environment changes."""
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    _init_clean_repo(repo)
+
+    # 1. Unregistered skill starts at DISCOVER
+    unreg = factory.get_skill_trust_state(repo, "ext/missing-skill")
+    assert unreg["trust_stage"] == "DISCOVER"
+    assert unreg["registered"] is False
+
+    # 2. Register skill -> starts at VERIFY
+    mod_dir = tmp_path / "trust-pack"
+    skill_dir = _write_skill(
+        mod_dir,
+        "refactor-bot",
+        "---\nname: refactor-bot\ndescription: Refactoring and TDD engineering skill\n---\n# Refactor Bot\n",
+    )
+    factory.add_module(repo, mod_dir, module_id="trust-pack")
+    initial = factory.get_skill_trust_state(repo, "trust-pack/refactor-bot")
+    assert initial["trust_stage"] == "VERIFY"
+
+    # 3. High `s_score` (9.99) + `serenity_gate_approved=True` MUST NOT override a failed or UNOBSERVED verifier gate!
+    blocked = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="trust-pack/refactor-bot",
+        target_stage="AUTO_RUN",
+        eval_receipt={
+            "verdict": "HELPED",
+            "comparison": {
+                "reproducible": True,
+                "failure_count_delta": -1,
+                "human_interventions_delta": 0,
+            },
+        },
+        verifier_receipt={"status": "FAIL"},
+        serenity_gate_approved=True,
+        s_score=9.99,
+        run_id="run-score-override-attempt",
+    )
+    assert blocked["trust_stage"] == "VERIFY"
+    assert blocked["admission_decision"] == "BLOCK"
+    assert blocked["admitted"] is False
+    assert blocked["score_override_blocked"] is True
+
+    # 4. Validated evidence promotes step-by-step: VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN
+    good_eval = {
+        "verdict": "HELPED",
+        "comparison": {
+            "reproducible": True,
+            "failure_count_delta": -2,
+            "human_interventions_delta": 0,
+        },
+    }
+    good_verifier = {"status": "PASS"}
+
+    s_manual = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="trust-pack/refactor-bot",
+        eval_receipt=good_eval,
+        verifier_receipt=good_verifier,
+        run_id="run-step-manual",
+    )
+    assert s_manual["trust_stage"] == "MANUAL"
+    assert s_manual["admission_decision"] == "ASK_COMMANDER"
+
+    s_shadow = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="trust-pack/refactor-bot",
+        eval_receipt=good_eval,
+        verifier_receipt=good_verifier,
+        run_id="run-step-shadow",
+    )
+    assert s_shadow["trust_stage"] == "SHADOW"
+
+    s_trusted = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="trust-pack/refactor-bot",
+        eval_receipt=good_eval,
+        verifier_receipt=good_verifier,
+        run_id="run-step-trusted",
+    )
+    assert s_trusted["trust_stage"] == "TRUSTED"
+
+    # Without `serenity_gate_approved=True`, attempting AUTO_RUN stays at TRUSTED (`ASK_COMMANDER`)
+    s_no_serenity = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="trust-pack/refactor-bot",
+        target_stage="AUTO_RUN",
+        eval_receipt=good_eval,
+        verifier_receipt=good_verifier,
+        serenity_gate_approved=False,
+        s_score=9.5,
+        run_id="run-step-no-serenity",
+    )
+    assert s_no_serenity["trust_stage"] == "TRUSTED"
+    assert s_no_serenity["admission_decision"] == "ASK_COMMANDER"
+    assert s_no_serenity["admitted"] is False
+
+    # With `serenity_gate_approved=True` + all mandatory gates PASS, promotes to AUTO_RUN
+    s_auto = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="trust-pack/refactor-bot",
+        target_stage="AUTO_RUN",
+        eval_receipt=good_eval,
+        verifier_receipt=good_verifier,
+        serenity_gate_approved=True,
+        s_score=9.5,
+        run_id="run-step-auto",
+    )
+    assert s_auto["trust_stage"] == "AUTO_RUN"
+    assert s_auto["admission_decision"] == "AUTO_RUN"
+    assert s_auto["admitted"] is True
+    assert s_auto["admission_observation"]["execution_attempted"] is False
+    assert s_auto["admission_observation"]["execution_observed"] is False
+
+    # 5. Mutating the skill version/content and updating module automatically demotes AUTO_RUN back to VERIFY!
+    (skill_dir / "SKILL.md").write_text(
+        "---\nname: refactor-bot\ndescription: Updated v2 instructions\n---\n# Refactor Bot v2\n",
+        encoding="utf-8",
+    )
+    factory.update_module(repo, "trust-pack", new_version="0.2.0")
+
+    after_update = factory.get_skill_trust_state(repo, "trust-pack/refactor-bot")
+    assert after_update["trust_stage"] == "VERIFY"
+    assert after_update["drifted"] is True
+    assert after_update["demoted_from"] == "AUTO_RUN"
+    assert "DRIFT_DETECTED_REVERIFY_REQUIRED" in str(after_update["demotion_reason"])

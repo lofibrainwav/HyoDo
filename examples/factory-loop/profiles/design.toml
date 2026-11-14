@@ -5,3 +5,11 @@ active_categories = ["design", "craft", "quality", "creative"]
 design_pipeline = ["architect", "craft", "gatekeep"]
 single_orchestrator = true
 require_independent_verifier = true
+personal_taste_rules = [
+    "unslop_visual_hierarchy: eliminate generic AI gradients and boilerplate cards",
+    "serene_craftsmanship: prioritize calm layout rhythm, legibility, and tactile motion",
+]
+inferred_taste_hypotheses = [
+    "prefer_editorial_typography_with_high_contrast_neutral_palettes",
+]
+domain_taste_focus = ["ui_ux", "visual_craft", "motion", "music_and_media", "documentation"]
