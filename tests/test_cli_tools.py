@@ -516,6 +516,8 @@ def test_safe_dir_with_oversize_file_shows_later_findings_and_is_not_a_pass(tmp_
     )
     result = runner.invoke(app, ["safe", str(tmp_path), "--max-files", "0"])
     assert result.exit_code == 2
-    assert "b_tok.txt" in result.output
+    # Assert on short tokens: rich wraps long tmp paths at the CI terminal width.
+    assert "secret/github_token" in result.output
+    assert "Risk (incomplete scan): high" in result.output
     assert "Scan incomplete" in result.output
     assert "This is not a validation pass." in result.output
