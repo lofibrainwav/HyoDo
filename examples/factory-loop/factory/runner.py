@@ -34,6 +34,7 @@ import os
 import re
 import shutil
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -58,6 +59,8 @@ from factory.contracts import (
 from factory.lifecycle import (
     acquire_run_lock,
     clear_pending_selective_restore,
+    clear_skill_process_groups,
+    record_skill_process_group,
     release_run_lock,
     restore_activation_state,
     save_pending_selective_restore,
@@ -225,9 +228,12 @@ def _stdout_integrity_fields(raw_stdout: str) -> dict[str, Any]:
     }
 
 
-def _snapshot_workspace_files(workspace_root: Path) -> dict[str, bytes]:
-    """Snapshot all regular files in *workspace_root* outside `.git` and `.hyodo`."""
-    snap: dict[str, bytes] = {}
+WorkspaceSnapshot = dict[str, tuple[bytes, int, int, int]]
+
+
+def _snapshot_workspace_files(workspace_root: Path) -> WorkspaceSnapshot:
+    """Snapshot regular files outside `.git` and `.hyodo`: content, mode, inode, link count."""
+    snap: WorkspaceSnapshot = {}
     for path in sorted(workspace_root.rglob("*")):
         if path.is_symlink() or not path.is_file():
             continue
@@ -235,7 +241,8 @@ def _snapshot_workspace_files(workspace_root: Path) -> dict[str, bytes]:
         if rel.parts and rel.parts[0] in _PROTECTED_TOP_DIRS:
             continue
         try:
-            snap[str(rel)] = path.read_bytes()
+            st = path.lstat()
+            snap[str(rel)] = (path.read_bytes(), st.st_mode & 0o777, st.st_ino, st.st_nlink)
         except OSError:
             continue
     return snap
@@ -243,8 +250,13 @@ def _snapshot_workspace_files(workspace_root: Path) -> dict[str, bytes]:
 
 @contextlib.contextmanager
 def _readonly_workspace_guard(workspace_root: Path) -> Iterator[None]:
-    """Pre-write OS permission enforcement: strip POSIX write bits (`mode & ~0o222`) on workspace files and dirs."""
-    saved_modes: list[tuple[Path, int]] = []
+    """Pre-write OS permission enforcement: strip POSIX write bits (`mode & ~0o222`) on workspace files and dirs.
+
+    Modes are put back only on the same inode that was protected: if a skill
+    replaced a path (for example with a hard link to a file outside the
+    workspace), the replacement is never chmod-ed.
+    """
+    saved_modes: list[tuple[Path, int, int, int]] = []
     targets: list[Path] = []
     for path in sorted(workspace_root.rglob("*")):
         if path.is_symlink():
@@ -259,56 +271,74 @@ def _readonly_workspace_guard(workspace_root: Path) -> Iterator[None]:
     try:
         for p in ordered:
             try:
-                mode = p.stat().st_mode & 0o777
-                saved_modes.append((p, mode))
+                st = p.lstat()
+                mode = st.st_mode & 0o777
+                saved_modes.append((p, mode, st.st_dev, st.st_ino))
                 p.chmod(mode & ~0o222)
             except OSError:
                 continue
         yield
     finally:
-        for p, mode in reversed(saved_modes):
+        for p, mode, dev, ino in reversed(saved_modes):
             with contextlib.suppress(OSError):
-                p.chmod(mode)
+                st = p.lstat()
+                if not stat.S_ISLNK(st.st_mode) and (st.st_dev, st.st_ino) == (dev, ino):
+                    p.chmod(mode)
 
 
 def _restore_and_detect_writes(
     workspace_root: Path,
-    before: dict[str, bytes],
+    before: WorkspaceSnapshot,
 ) -> list[str]:
-    """Post-write defense-in-depth: detect any created/modified/deleted files and restore *before* state."""
+    """Post-write defense-in-depth: detect created/modified/deleted/replaced files and restore *before* state.
+
+    Restoring never writes or chmods through an existing path: a changed file is
+    unlinked and recreated, so a hard link to a file outside the workspace is
+    only unlinked. A planted hard link is recorded as `hardlink_planted:<path>`.
+    """
     after = _snapshot_workspace_files(workspace_root)
     mutated: list[str] = []
 
-    for rel, content in after.items():
+    for rel, (content, _mode, ino, nlink) in after.items():
+        target = workspace_root / rel
         if rel not in before:
             mutated.append(f"created:{rel}")
-            with contextlib.suppress(OSError):
-                target = workspace_root / rel
-                target.chmod(0o644)
+            if nlink > 1:
+                mutated.append(f"hardlink_planted:{rel}")
+            try:
                 target.unlink()
-        elif before[rel] != content:
+            except OSError as exc:
+                mutated.append(f"restore_failed:{rel}:{type(exc).__name__}")
+            continue
+        old_content, old_mode, old_ino, old_nlink = before[rel]
+        if old_content != content or old_ino != ino:
             mutated.append(f"modified:{rel}")
-            with contextlib.suppress(OSError):
-                target = workspace_root / rel
-                target.chmod(0o644)
-                target.write_bytes(before[rel])
+            if nlink > 1 and (old_ino != ino or nlink != old_nlink):
+                mutated.append(f"hardlink_planted:{rel}")
+            failure = _restore_regular_file(workspace_root, rel, old_content, old_mode)
+            if failure is not None:
+                mutated.append(f"restore_failed:{rel}:{failure}")
 
-    for rel, content in before.items():
+    for rel, (content, mode, _ino, _nlink) in before.items():
         if rel not in after:
             mutated.append(f"deleted:{rel}")
-            failure = _restore_regular_file(workspace_root, rel, content)
+            failure = _restore_regular_file(workspace_root, rel, content, mode)
             if failure is not None:
                 mutated.append(f"restore_failed:{rel}:{failure}")
 
     return sorted(mutated)
 
 
-def _restore_regular_file(workspace_root: Path, rel: str, content: bytes) -> str | None:
-    """Recreate *rel* as a regular file without following anything a skill planted.
+def _restore_regular_file(
+    workspace_root: Path, rel: str, content: bytes, mode: int = 0o644
+) -> str | None:
+    """Recreate *rel* as a new regular file without following anything a skill planted.
 
-    A symlink or file standing where a directory (or the file) used to be is
-    removed first, so the restore never writes through a link to somewhere
-    else. Returns `None` on success or a short failure reason; it never raises.
+    Whatever stands at *rel* (file, hard link, symlink) is unlinked and a new
+    inode is created with `O_EXCL | O_NOFOLLOW`; a symlink or file standing
+    where a directory used to be is removed first. Nothing is ever written or
+    chmod-ed through an existing path. Returns `None` on success or a short
+    failure reason; it never raises.
     """
     target = workspace_root / rel
     try:
@@ -319,9 +349,14 @@ def _restore_regular_file(workspace_root: Path, rel: str, content: bytes) -> str
                 current.unlink()
             if not current.exists():
                 current.mkdir()
-        if target.is_symlink():
+        if target.is_symlink() or target.exists():
             target.unlink()
-        target.write_bytes(content)
+        fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW, mode)
+        try:
+            os.write(fd, content)
+            os.fchmod(fd, mode)
+        finally:
+            os.close(fd)
     except OSError as exc:
         return type(exc).__name__
     return None
@@ -443,8 +478,19 @@ def _kill_process_group(pgid: int) -> bool:
     return True
 
 
+class SkillTimeoutExpired(subprocess.TimeoutExpired):
+    """A skill timed out; its whole process group was then killed."""
+
+    process_group_killed: bool = False
+
+
 def _run_skill_process(
-    cmd: list[str], *, cwd: Path, env: dict[str, str], timeout: float
+    cmd: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    timeout: float,
+    on_start: Callable[[int], None] | None = None,
 ) -> tuple[subprocess.CompletedProcess[str], bool]:
     """Run a skill command in its own process group and kill that whole group afterwards.
 
@@ -464,19 +510,35 @@ def _run_skill_process(
     )
     killed = False
     try:
+        if on_start is not None:
+            on_start(proc.pid)  # the pid is the new session's process-group id
         try:
             out, err = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
             killed = _kill_process_group(proc.pid)
             proc.kill()
             out, err = proc.communicate()
-            raise subprocess.TimeoutExpired(cmd, timeout, output=out, stderr=err) from None
+            timeout_exc = SkillTimeoutExpired(cmd, timeout, output=out, stderr=err)
+            timeout_exc.process_group_killed = killed
+            raise timeout_exc from None
     finally:
         killed = _kill_process_group(proc.pid) or killed
         if proc.poll() is None:
             proc.kill()
             proc.wait()
     return subprocess.CompletedProcess(cmd, proc.returncode, out, err), killed
+
+
+def _timeout_kill_fields(exc: BaseException) -> dict[str, Any]:
+    """What happened to a timed-out skill's process group, as observed."""
+    if not isinstance(exc, SkillTimeoutExpired):
+        return {}
+    # At timeout the group is killed while the skill process itself is still in
+    # it, so a successful kill means the skill and any descendants were stopped.
+    return {
+        "process_group_killed_on_timeout": exc.process_group_killed,
+        "descendants_killed_after_exit": exc.process_group_killed,
+    }
 
 
 _HYODO_REPO_ROOT = str(Path(__file__).resolve().parents[3])
@@ -1128,7 +1190,7 @@ def execute_modular_run(
         except BaseException as run_exc:
             try:
                 restore_activation_state(workspace_root, prior_activation, owner_run_id=run_id)
-                clear_pending_selective_restore(workspace_root)
+                clear_pending_selective_restore(workspace_root, run_id)
             except Exception as restore_exc:  # keep the run's own error primary
                 add_note = getattr(run_exc, "add_note", None)  # Python 3.11+
                 if callable(add_note):
@@ -1149,11 +1211,12 @@ def execute_modular_run(
                 "reasons": [*verdict.get("reasons", []), "selective_restore_failed"],
             }
         else:
-            clear_pending_selective_restore(workspace_root)
+            clear_pending_selective_restore(workspace_root, run_id)
             selective_result["registry_state_after_run"] = "RESTORED"
             selective_result["restored_skill_flags"] = restored
         return result
     finally:
+        clear_skill_process_groups(workspace_root, run_id)
         release_run_lock(workspace_root)
 
 
@@ -1269,6 +1332,9 @@ def _execute_modular_run_locked(
     # Skills whose process group still had members when the skill exited.
     descendants_killed: dict[str, bool] = {}
 
+    def _record_group(pgid: int) -> None:
+        record_skill_process_group(workspace_root, run_id, pgid)
+
     def _auto_block(skill_id: str, reason: str, body: str) -> None:
         permission_violations.append(
             f"PERMISSION_BOUNDARY_VIOLATION:autonomous_exec_unverified:{skill_id}:{reason}"
@@ -1373,17 +1439,20 @@ def _execute_modular_run_locked(
                     "reason": violation,
                 }
             elif sid in skill_outputs:
-                # The snapshot only covers paths reached through CLAUDE_PLUGIN_ROOT /
-                # CLAUDE_SKILL_DIR. A command that names the original module directory
-                # may have read the original, which can change after the check.
+                # What is observed: the snapshot was provided (CLAUDE_PLUGIN_ROOT /
+                # CLAUDE_SKILL_DIR pointed at it) and was unchanged afterwards. Which
+                # files the process actually read is not observed, so the snapshot
+                # is never claimed as what ran. A command line that visibly names
+                # the original module directory is reported as such; one that
+                # reaches it another way (split or computed paths) is not detected.
                 original = unit_lookup[sid][0].source_path
                 spellings = {original, original.removeprefix("/private")} - {""}
                 cmd_text = " ".join((skill_commands or {}).get(sid) or [])
+                skill_outputs[sid]["module_snapshot_coverage"] = "UNOBSERVED"
                 if any(spelling in cmd_text for spelling in spellings):
                     skill_outputs[sid]["executed_from"] = "ORIGINAL_PATH_REFERENCED"
-                    skill_outputs[sid]["module_snapshot_coverage"] = "UNOBSERVED"
                 else:
-                    skill_outputs[sid]["executed_from"] = "MODULE_SNAPSHOT"
+                    skill_outputs[sid]["executed_from"] = "MODULE_SNAPSHOT_PROVIDED"
         for sid in skill_ids:
             if descendants_killed.pop(sid, False) and sid in skill_outputs:
                 skill_outputs[sid]["descendants_killed_after_exit"] = True
@@ -1494,6 +1563,7 @@ def _execute_modular_run_locked(
                                     active_taste_rules=active_taste_rules,
                                 ),
                                 timeout=timeout_s,
+                                on_start=_record_group,
                             )
                             descendants_killed[sid] = killed
                             return sid, proc
@@ -1531,6 +1601,7 @@ def _execute_modular_run_locked(
                                 "execution_state": "TIMEOUT",
                                 "gate_verdict": "FAIL",
                                 "reason": str(outcome),
+                                **_timeout_kill_fields(outcome),
                             }
                         elif isinstance(outcome, Exception):
                             isolated_faults.append(
@@ -1662,6 +1733,7 @@ def _execute_modular_run_locked(
                                     active_taste_rules=active_taste_rules,
                                 ),
                                 timeout=timeout_s,
+                                on_start=_record_group,
                             )
                             descendants_killed[skill_id] = killed
                         stderr_text = proc.stderr.strip()
@@ -1788,6 +1860,7 @@ def _execute_modular_run_locked(
                         "execution_state": "TIMEOUT",
                         "gate_verdict": "FAIL",
                         "reason": str(exc),
+                        **_timeout_kill_fields(exc),
                     }
                 except PermissionError as exc:
                     violation = f"PERMISSION_BOUNDARY_VIOLATION:filesystem_write_blocked_pre_write:{skill_id}"

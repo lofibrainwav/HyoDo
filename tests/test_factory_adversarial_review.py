@@ -215,7 +215,8 @@ def test_auto_commands_run_from_a_checked_snapshot_of_the_module(tmp_path: Path)
         "skill_outputs"
     ]["snap/tdd"]
     assert out["execution_state"] == "EXECUTED_PASS"
-    assert out["executed_from"] == "MODULE_SNAPSHOT"
+    assert out["executed_from"] == "MODULE_SNAPSHOT_PROVIDED"
+    assert out["module_snapshot_coverage"] == "UNOBSERVED"
     skill_dir = out["stdout"].splitlines()[0].removeprefix("DIR=")
     assert not skill_dir.startswith(str(mod.resolve()))
     assert not Path(skill_dir).exists()  # the snapshot is discarded after the run

@@ -90,17 +90,22 @@ examples/factory-loop/
   `CLAUDE_PLUGIN_ROOT` / `CLAUDE_SKILL_DIR` pointing at a private, read-only
   copy of the module tree whose digest matched the approval at that moment;
   the copy is re-hashed after the run and discarded, and a change to it is a
-  violation. What remains open: a command that names files of the original
-  module by absolute path instead of through those variables reads the
-  original, which can change after the check (such a run reports
-  `executed_from: ORIGINAL_PATH_REFERENCED` and `module_snapshot_coverage:
-  UNOBSERVED` instead of `MODULE_SNAPSHOT`); a process running as the same
-  user can make the copy writable again (that is detected afterwards, not
-  prevented); and files outside the module tree are not bound at all.
+  violation. What is observed is only that the copy was provided and was
+  unchanged afterwards, never which files the process read, so outputs say
+  `executed_from: MODULE_SNAPSHOT_PROVIDED` with `module_snapshot_coverage:
+  UNOBSERVED`. When the command line visibly names the original module
+  directory it says `ORIGINAL_PATH_REFERENCED` instead; a command that reaches
+  the original another way (a split or computed path) is not detected. What
+  remains open: such a command reads the original, which can change after the
+  check; a process running as the same user can make the copy writable again
+  (that is detected afterwards, not prevented); and files outside the module
+  tree are not bound at all.
 - What the runner enforces, per skill, is in `boundary_enforcement` on every
   skill output: `subprocess_exec` is `ENFORCED` (pre-exec gate for host
   commands); `filesystem_write=false` is `PARTIAL` (workspace files only, by
-  POSIX write bits plus snapshot rollback; `.git/`, `.hyodo/` other than
+  POSIX write bits plus snapshot rollback, which unlinks and recreates a
+  changed file instead of writing or chmod-ing through it and records a planted
+  hard link as `hardlink_planted`; `.git/`, `.hyodo/` other than
   `.hyodo/factory/`, and paths outside the workspace are not covered); `network_access=false`,
   `browser_automation=false` and declared `allowed_paths` / `allowed_tools`
   are `UNENFORCED` (proxy variables are dropped and
@@ -116,7 +121,9 @@ examples/factory-loop/
   `attribution=UNOBSERVED`, because which skill wrote it is not observable.
 - Every skill command runs in its own process group, and the whole group is
   killed when the skill exits (`descendants_killed_after_exit: true` when
-  something was still running). Then `.hyodo/factory/` (registry, lock, trust
+  something was still running) or times out (then also
+  `process_group_killed_on_timeout`; the killed group includes the skill
+  process itself). Then `.hyodo/factory/` (registry, lock, trust
   cache, `host_taste.json`) is compared with its state before the skill ran:
   any change, including a planted symlink, is rolled back and recorded as
   `factory_state_write_forbidden`. This holds for read-only and write-allowed
@@ -151,15 +158,22 @@ examples/factory-loop/
   UNOBSERVED. Nothing here verifies how many external repositories or skills
   exist anywhere; no such count is claimed.
 - A run that is killed leaves `.hyodo/factory/run.lock` behind. The lock
-  records the owner's pid and host; when that pid no longer exists on this
-  host, the next run fails with `STALE_RUN_LOCK:<pid>` and `doctor` reports
-  `stale_run_lock:<pid>` (plus `selective_activation_not_restored:<run_id>`
-  if a `--selective` run was killed). Recover with
-  `python examples/factory-loop/hyodo_factory.py --root <workspace> recover-stale-lock`:
-  it removes the lock only when the owner is provably gone (same host, pid not
-  running), restores the flags a killed `--selective` run left, and appends a
-  receipt to `.hyodo/factory/lock_recoveries.jsonl`. A lock from another host
-  or a running pid is never removed.
+  records the owner's pid and host, and the run records each skill's process
+  group under `.hyodo/factory-run-state/`. The owner is provably gone only
+  when that pid no longer exists on this host and none of those groups has a
+  live member. Then the next run fails with `STALE_RUN_LOCK:<pid>` and
+  `doctor` reports `stale_run_lock:<pid>`; while a group is still running it is
+  `ORPHANED_SKILL_PROCESSES` / `orphaned_skill_processes` instead. A killed
+  `--selective` run also shows as `selective_activation_not_restored:<run_id>`.
+  Recover with
+  `python examples/factory-loop/hyodo_factory.py --root <workspace> recover-stale-lock`.
+  It runs under the same lifecycle lock that taking a run lock needs, so no new
+  run can start halfway through, and in this order: confirm the lock is still
+  the same stale lock, restore the flags that run's own `--selective` record
+  holds (records are kept per run id, so one run never consumes another's),
+  clear that record, append a receipt to `.hyodo/factory/lock_recoveries.jsonl`,
+  and remove the lock last. A lock from another host, with a running pid, or
+  with a running skill group is never removed.
 - `hosts` inspects local connect/MCP configuration plans only. It never runs a
   host, so `live_contract` is `UNOBSERVED` and `verified_live_contract` is
   `false` for every host.

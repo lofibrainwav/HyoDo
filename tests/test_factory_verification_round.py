@@ -10,6 +10,7 @@ docs state the exit codes exactly.
 
 from __future__ import annotations
 
+import contextlib
 import io
 import json
 import os
@@ -283,6 +284,24 @@ def test_stale_run_lock_is_reported_and_recovered_with_a_receipt(tmp_path: Path)
     proc.wait()
     lock = json.loads((repo / ".hyodo" / "factory" / "run.lock").read_text(encoding="utf-8"))
     dead = lock["pid"]
+
+    # The owner is gone but its skill (`sleep 30`) still runs in its own process
+    # group: the owner is not provably gone yet, so nothing is recovered.
+    lifecycle = sys.modules["factory.lifecycle"]
+    groups = lifecycle.recorded_process_groups(repo, "victim-run")
+    assert groups
+    with pytest.raises(RuntimeError, match=f"ORPHANED_SKILL_PROCESSES:{dead}"):
+        factory.execute_modular_run(repo, run_id="next", prompt="implement tdd")
+    with pytest.raises(RuntimeError, match="RUN_LOCK_NOT_PROVABLY_STALE:ORPHANED_SKILLS"):
+        factory.recover_stale_run_lock(repo)
+    assert any(p.startswith("orphaned_skill_processes:") for p in factory.doctor(repo)["problems"])
+    for pgid in groups:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(pgid, signal.SIGKILL)
+    for _ in range(100):
+        if not any(lifecycle._process_group_alive(g) for g in groups):
+            break
+        time.sleep(0.05)
 
     with pytest.raises(RuntimeError, match=f"STALE_RUN_LOCK:{dead}") as excinfo:
         factory.execute_modular_run(repo, run_id="next", prompt="implement tdd")
