@@ -3176,6 +3176,9 @@ def safe(
         )
         if source.startswith(("missing:", "error:")):
             verdict_state["detail"] = "scan target UNOBSERVED"
+            if high_only and isinstance(scanned, int) and scanned > 0:
+                # Findings from the files that were read stay visible in --quiet.
+                verdict_state["detail"] += f"; {len(high_only)} high findings in observed files"
             verdict_state["decision"] = "UNOBSERVED"
         elif strict and high_only:
             verdict_state["decision"] = "FAIL"
@@ -3250,29 +3253,46 @@ def safe(
             console.print("[red]Scan target not found.[/red]")
             console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2)
+
+        def _print_rows_and_findings(*, include_rows: bool = True) -> None:
+            if include_rows:
+                for check_name, status, color in result["rows"]:
+                    console.print(f"  [{color}]{status}[/{color}] {check_name}")
+
+            high_findings = [f for f in result["findings"] if f.severity in {"high", "medium"}]
+            if high_findings:
+                console.print("\n[bold]Findings[/bold]")
+                for finding in high_findings[:12]:
+                    loc = ""
+                    if finding.path:
+                        loc = f" @ {finding.path}"
+                        if finding.line is not None:
+                            loc += f":{finding.line}"
+                    elif finding.line is not None:
+                        loc = f" @ line {finding.line}"
+                    console.print(
+                        f"  - [{finding.severity}] {finding.category}/{finding.label}: "
+                        f"{finding.detail}{loc}"
+                    )
+
         if source.startswith("error:"):
-            console.print("[red]Scan failed (read error).[/red]")
+            partial_scanned = result.get("scanned_files")
+            if isinstance(partial_scanned, int) and partial_scanned > 0:
+                # The scan continued past an unreadable file: show what it did see
+                # (a finding is never hidden), then refuse to call it a pass. The
+                # per-check rows are omitted: a clean row would read as green for
+                # content that was never scanned.
+                _print_rows_and_findings(include_rows=False)
+                console.print(
+                    f"\nRisk (incomplete scan): {result['level']} ({result['risk_score']}/100)"
+                )
+                console.print("[red]Scan incomplete: at least one file was not read.[/red]")
+            else:
+                console.print("[red]Scan failed (read error).[/red]")
             console.print("[yellow]This is not a validation pass.[/yellow]")
             raise typer.Exit(2)
 
-        for check_name, status, color in result["rows"]:
-            console.print(f"  [{color}]{status}[/{color}] {check_name}")
-
-        high_findings = [f for f in result["findings"] if f.severity in {"high", "medium"}]
-        if high_findings:
-            console.print("\n[bold]Findings[/bold]")
-            for finding in high_findings[:12]:
-                loc = ""
-                if finding.path:
-                    loc = f" @ {finding.path}"
-                    if finding.line is not None:
-                        loc += f":{finding.line}"
-                elif finding.line is not None:
-                    loc = f" @ line {finding.line}"
-                console.print(
-                    f"  - [{finding.severity}] {finding.category}/{finding.label}: "
-                    f"{finding.detail}{loc}"
-                )
+        _print_rows_and_findings()
 
         console.print(
             f"\nRisk: {result['level']} ({result['risk_score']}/100)\n-> {result['action']}"

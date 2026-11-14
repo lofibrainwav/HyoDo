@@ -839,7 +839,7 @@ def _apply_safety_exceptions(
 
 def _scan_directory(
     target: Path, root: Path, config: ScanExceptionsConfig, max_files: int = 40
-) -> tuple[list[Finding], str, str, int, int, int, int]:
+) -> tuple[list[Finding], str, str, int, int, int, int, int]:
     """Per-file scan for directories (path attached).
 
     Caps at *max_files* files; ``max_files <= 0`` means unlimited.
@@ -849,6 +849,13 @@ def _scan_directory(
     scan must say so, not just state the cap that produced it. Counting the
     full list costs a directory walk plus the binary sniff already required
     by ``is_scannable_file``; it never reads a file's full body.
+
+    A file over the bounded read size is counted as unreadable and the scan
+    continues, as the git status path does: one large file (a skill registry,
+    a lockfile) must not hide findings in every file sorted after it. The last
+    tuple element is that unreadable count; any non-zero value keeps coverage
+    ``UNOBSERVED``. Every other read error still aborts the scan, because a
+    path swapped mid-scan is not a size question.
     """
     unlisted: list[str] = []
     walked: list[Path] = []
@@ -874,16 +881,29 @@ def _scan_directory(
     if unlisted:
         # Files under an unlistable directory were never counted: report the
         # whole directory scan as unobserved rather than a clean subset.
-        return ([], "", f"error:read:{unlisted[0]}", 0, 0, total_scannable, text_scannable_files)
+        return (
+            [],
+            "",
+            f"error:read:{unlisted[0]}",
+            0,
+            0,
+            total_scannable,
+            text_scannable_files,
+            0,
+        )
 
     findings: list[Finding] = []
     chunks: list[str] = []
     count = 0
     suppressed_count = 0
+    oversize: list[Path] = []
     for file_path in scan_targets:
         try:
             text = _read_contained_text(target, file_path)
-        except OSError:
+        except OSError as exc:
+            if exc.errno == errno.EFBIG:
+                oversize.append(file_path)
+                continue
             return (
                 findings,
                 "\n".join(chunks),
@@ -892,6 +912,7 @@ def _scan_directory(
                 count,
                 total_scannable,
                 text_scannable_files,
+                len(oversize),
             )
         scanned, suppressed = _apply_safety_exceptions(
             scan_text(text, path=str(file_path)), root, config
@@ -903,6 +924,13 @@ def _scan_directory(
     corpus = "\n".join(chunks)
     findings.append(assess_rollback_signal(corpus))
     source = f"dir:{target} ({count} files)"
+    if oversize:
+        # Keep the `error:read:` prefix callers already key on; the suffix says
+        # the remaining files were still scanned.
+        source = (
+            f"error:read:{oversize[0]} ({len(oversize)} over the scan size cap; "
+            f"scan continued: {count} files in dir:{target})"
+        )
     return (
         findings,
         corpus,
@@ -911,6 +939,7 @@ def _scan_directory(
         count,
         total_scannable,
         text_scannable_files,
+        len(oversize),
     )
 
 
@@ -1114,6 +1143,7 @@ def run_safety_scan(
                 scanned_files,
                 total_scannable,
                 text_scannable_files,
+                unreadable_files,
             ) = _scan_directory(target, root, exceptions, max_files=max_files)
         else:
             scope = "none"
