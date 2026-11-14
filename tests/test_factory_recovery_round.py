@@ -315,6 +315,10 @@ def test_zombie_pid_and_process_group_count_as_gone_not_alive(tmp_path: Path) ->
         zombie.wait()
 
 
+@pytest.mark.skipif(
+    not Path("/proc/self/stat").is_file(),
+    reason="exercises the /proc scan; hosts without /proc use the ps scan tested separately",
+)
 def test_proc_read_or_parse_failure_with_zombie_fails_closed_as_alive(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -724,3 +728,73 @@ def test_pid_reuse_fails_closed_as_live(tmp_path: Path) -> None:
     finally:
         reused.kill()
         reused.wait()
+
+
+def test_killpg_permission_error_is_gone_only_for_an_all_zombie_group(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # macOS answers EPERM to killpg(pgid, 0) when every member is an unreaped
+    # zombie, and also for another user's live group. Only the first is GONE.
+    lifecycle = _lifecycle()
+
+    def eperm(_pgid: int, _sig: int) -> None:
+        raise PermissionError("simulated EPERM")
+
+    monkeypatch.setattr(lifecycle.os, "killpg", eperm)
+    pgid = 424242
+
+    def ps_listing(stdout: str, returncode: int = 0) -> Any:
+        return lambda *a, **k: subprocess.CompletedProcess(a, returncode, stdout=stdout, stderr="")
+
+    monkeypatch.setattr(lifecycle.subprocess, "run", ps_listing(f"{pgid} Z\n{pgid} Z+\n1 Ss\n"))
+    assert lifecycle._process_group_state(pgid) == "GONE"
+    monkeypatch.setattr(lifecycle.subprocess, "run", ps_listing(f"{pgid} Z\n{pgid} S\n"))
+    assert lifecycle._process_group_state(pgid) == "INVALID"
+    monkeypatch.setattr(lifecycle.subprocess, "run", ps_listing(f"{pgid} Z\ngarbage\n"))
+    assert lifecycle._process_group_state(pgid) == "INVALID"
+    monkeypatch.setattr(lifecycle.subprocess, "run", ps_listing("1 Ss\n"))
+    assert lifecycle._process_group_state(pgid) == "INVALID"
+    monkeypatch.setattr(lifecycle.subprocess, "run", ps_listing("", returncode=1))
+    assert lifecycle._process_group_state(pgid) == "INVALID"
+
+
+def test_gated_skill_gets_default_sigpipe_like_a_direct_spawn(tmp_path: Path) -> None:
+    # Python ignores SIGPIPE at startup and execvp keeps ignored signals; the
+    # gate must restore the default so `yes | head -1` ends with 141, not EPIPE.
+    _factory, repo = _scoped(tmp_path)
+    runner = sys.modules["factory.runner"]
+    cmd = ["bash", "-c", "set -o pipefail; yes | head -1 >/dev/null; echo rc=$?"]
+    gated, _ = runner._run_skill_process(
+        cmd, cwd=repo, env=dict(os.environ), timeout=10.0, on_start=lambda _pgid: None
+    )
+    direct, _ = runner._run_skill_process(cmd, cwd=repo, env=dict(os.environ), timeout=10.0)
+    assert direct.stdout.strip() == "rc=141"
+    assert gated.stdout.strip() == "rc=141"
+    assert "Broken pipe" not in gated.stderr
+
+
+def test_zombie_main_thread_with_live_threads_is_alive(monkeypatch: pytest.MonkeyPatch) -> None:
+    lifecycle = _lifecycle()
+    statuses: dict[str, str | Exception] = {}
+    orig_read_text = Path.read_text
+
+    def fake_read_text(self: Path, *args: Any, **kwargs: Any) -> str:
+        key = str(self)
+        if key in statuses:
+            value = statuses[key]
+            if isinstance(value, Exception):
+                raise value
+            return value
+        return orig_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", fake_read_text)
+    statuses["/proc/4242/status"] = "Name:\tskill\nState:\tZ (zombie)\nThreads:\t3\n"
+    assert lifecycle._proc_zombie_has_live_threads(4242) is True
+    statuses["/proc/4242/status"] = "Name:\tskill\nState:\tZ (zombie)\nThreads:\t1\n"
+    assert lifecycle._proc_zombie_has_live_threads(4242) is False
+    statuses["/proc/4242/status"] = "Name:\tskill\nState:\tZ (zombie)\n"
+    assert lifecycle._proc_zombie_has_live_threads(4242) is True
+    statuses["/proc/4242/status"] = PermissionError("simulated")
+    assert lifecycle._proc_zombie_has_live_threads(4242) is True
+    statuses["/proc/4242/status"] = FileNotFoundError("reaped")
+    assert lifecycle._proc_zombie_has_live_threads(4242) is False
