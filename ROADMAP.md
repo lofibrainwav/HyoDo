@@ -62,7 +62,7 @@ evidence is not converted into a pass.
 - Known issue, factory example only: on macOS two stale-lock tests fail and a
   zombie-only process group is refused as `INVALID` (fail closed), and gated
   skills inherit an ignored `SIGPIPE`. The `hyodo` package is unaffected; the
-  fix is #631, unreleased.
+  fix is merged on main (#631) and not yet released.
 
 ### 4.22.4 (released 2026-10-27 UTC)
 
