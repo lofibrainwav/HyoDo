@@ -8,12 +8,16 @@ skills or adapters are added.
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
+from pathlib import Path
 from typing import Any
 
 FACTORY_REGISTRY_SCHEMA = "hyodo.factory-registry/v1"
 FACTORY_LOCK_SCHEMA = "hyodo.factory-lock/v1"
 FACTORY_PROFILE_SCHEMA = "hyodo.factory-profile/v1"
 TRUST_STATE_SCHEMA = "hyodo.factory-trust-state/v1"
+HOST_TASTE_SCHEMA = "hyodo.host-taste/v1"
+SERENITY_RECEIPT_SCHEMA = "kingdom.serenity-approval/v1"
+HOST_TASTE_REL_PATH = Path(".hyodo") / "factory" / "host_taste.json"
 
 SKILL_CATEGORIES = (
     "engineering",

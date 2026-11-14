@@ -274,6 +274,49 @@ def disable_target(workspace_root: Path, target: str) -> list[str]:
         return sorted(disabled)
 
 
+def activate_selected_skills(
+    workspace_root: Path,
+    skill_ids: list[str],
+    *,
+    disable_others: bool = True,
+) -> list[str]:
+    """Atomically enable only *skill_ids* plus their transitive dependencies in one registry write."""
+    with _lifecycle_flock(workspace_root):
+        _check_not_mid_run(workspace_root)
+        modules = load_registry_state(workspace_root)
+        unit_map = {sid: u for mod in modules.values() for sid, u in mod.skills.items()}
+        to_enable: set[str] = set()
+        queue = [sid for sid in skill_ids if sid in unit_map]
+        while queue:
+            cur = queue.pop(0)
+            if cur in to_enable:
+                continue
+            unit = unit_map.get(cur)
+            if unit is None:
+                continue
+            if any(c in to_enable for c in unit.conflicts_with):
+                continue
+            if any(cur in unit_map[e].conflicts_with for e in to_enable if e in unit_map):
+                continue
+            to_enable.add(cur)
+            for dep in unit.dependencies:
+                if dep in unit_map and dep not in to_enable:
+                    queue.append(dep)
+
+        for mod_id, mod in list(modules.items()):
+            new_skills = {}
+            for sid, u in mod.skills.items():
+                should_enable = (
+                    sid in to_enable if disable_others else (u.enabled or sid in to_enable)
+                )
+                new_skills[sid] = replace(u, enabled=should_enable)
+            any_enabled = any(u.enabled for u in new_skills.values())
+            modules[mod_id] = replace(mod, enabled=any_enabled, skills=new_skills)
+
+        save_registry_state(workspace_root, modules)
+        return sorted(to_enable)
+
+
 def update_module(
     workspace_root: Path,
     module_id: str,
@@ -389,9 +432,21 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
                             f"incompatible_python_syntax:{sid}:{script_rel}:line_{exc.lineno}"
                         )
             if "hook_silent_zero_fallback" in u.capabilities:
-                warnings.append(
-                    f"unverified_hook_silent_zero:{sid}:frontmatter_hook_exits_0_when_script_missing"
-                )
+                hook_scripts = [s for s in u.executable_scripts if "gate." in s or "hook" in s]
+                existing_hook_scripts = [
+                    s
+                    for s in hook_scripts
+                    if (mod_root / s).is_file() and not (mod_root / s).is_symlink()
+                ]
+                if existing_hook_scripts:
+                    warnings.append(
+                        f"unverified_hook_silent_zero:{sid}:frontmatter_hook_exits_0_when_host_env_unbound:"
+                        f"script_present={existing_hook_scripts[0]}"
+                    )
+                else:
+                    warnings.append(
+                        f"unverified_hook_silent_zero:{sid}:frontmatter_hook_exits_0_when_script_missing"
+                    )
 
     return {
         "status": "HEALTHY" if not problems else "DEGRADED",

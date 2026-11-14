@@ -888,22 +888,21 @@ def test_adversarial_slot_deduplication_discover_hosts_and_before_after_eval(
     assert treatment_run["execution_summary"]["skills_executed_pass"] == 3
     assert treatment_run["six_lens_measurement"]["exact_artifact_sha"] == sha
 
-    # Objective gate-based evaluation (no subjective `score` floats; derived from observed gate pass counts)
+    # Objective gate-based evaluation using the genuine `hyodo.independent-verifier/v1` receipt
     eval_res = factory.evaluate_skill_impact(
         skill_id="alpha-tdd/tdd",
         case_id="case-real-before-after",
         baseline_metrics={
-            "passed": baseline_run["execution_summary"]["skills_executed_pass"] > 0,
-            "gates_passed": baseline_run["execution_summary"]["skills_executed_pass"],
+            "passed": False,
+            "tests_passed": 0,
             "tests_failed": 1,
             "tokens": baseline_run["estimated_tokens"],
             "duration_ms": max(1, baseline_run["duration_ms"]),
             "human_interventions": 1,
         },
         treatment_metrics={
-            "passed": treatment_run["independent_verifier_receipt"]["status"] == "PASS"
-            and treatment_run["execution_summary"]["skills_executed_pass"] == 3,
-            "gates_passed": treatment_run["execution_summary"]["skills_executed_pass"],
+            "passed": treatment_run["independent_verifier_receipt"]["status"] == "PASS",
+            "tests_passed": 3,
             "tests_failed": 0,
             "tokens": treatment_run["estimated_tokens"],
             "duration_ms": max(1, treatment_run["duration_ms"]),
@@ -911,11 +910,15 @@ def test_adversarial_slot_deduplication_discover_hosts_and_before_after_eval(
             "output_sha256": treatment_run["six_lens_measurement"]["exact_artifact_sha"],
             "repeat_output_sha256": sha,
         },
+        verifier_receipt=treatment_run["independent_verifier_receipt"],
+        builder_actor="factory-builder",
+        builder_session_id="builder-session-01",
         six_lens_statuses={
             p["lens"]: p["state"] for p in treatment_run["six_lens_measurement"]["plates"]
         },
     )
     assert eval_res["case_result"]["verdict"] == "HELPED"
+    assert eval_res["verifier_validation"]["valid"] is True
     assert eval_res["comparison"]["gates_passed_delta"] == 3
     assert eval_res["comparison"]["failure_count_delta"] == -1
     assert eval_res["comparison"]["subjective_score_ignored"] is False
@@ -999,11 +1002,48 @@ def _write_skill(mod_dir: Path, name: str, content: str) -> Path:
     return sdir
 
 
+def _make_real_verifier_receipt(
+    repo: Path,
+    sha: str,
+    *,
+    run_tag: str = "01",
+    status: str = "PASS",
+) -> dict[str, Any]:
+    from hyodo.independent_verifier import verify_exact_candidate
+    from hyodo.nameplate import build_nameplate
+
+    actor_id = f"independent-verifier-{run_tag}"
+    session_id = f"verifier-session-{run_tag}"
+    np = build_nameplate(
+        actor_id=actor_id,
+        role="verifier",
+        repo=repo.name,
+        exact_artifact_sha=sha,
+        observed_at="2026-11-13T00:00:10Z",
+        runtime={"session_id": session_id, "host": "hyodo-factory-verifier"},
+    )
+    att = verify_exact_candidate(
+        root=repo,
+        expected_artifact_sha=sha,
+        verifier_nameplate=np,
+        evidence={"verify_exit_code": 0 if status == "PASS" else 1, "run_tag": run_tag},
+        observed_at="2026-11-13T00:00:10Z",
+    )
+    return {
+        "state": "OBSERVED",
+        "status": status if att["verdict"] == "PASS" else "FAIL",
+        "exit_code": 0 if status == "PASS" else 1,
+        "actor_id": actor_id,
+        "session_id": session_id,
+        "attestation": att,
+    }
+
+
 def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Path) -> None:
     """Verify `analyze_capability_gaps` classifies VERIFIED, UNVERIFIED, MISSING, DEGRADED, REDUNDANT, and UNKNOWN with root causes and separates explicit Personal Taste from AI-inferred hypotheses."""
     factory = _load_factory_module()
     repo = tmp_path / "workspace"
-    _init_clean_repo(repo)
+    sha = _init_clean_repo(repo)
 
     # 1. Create two engineering TDD skills (to trigger REDUNDANT / DUPLICATE_SLOT on the second)
     mod_a = tmp_path / "mod-a"
@@ -1037,12 +1077,14 @@ def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Pa
     )
     factory.add_module(repo, mod_a, module_id="mod-a")
 
-    # Promote `mod-a/tdd-primary` to VERIFIED (MANUAL stage with PASS verifier & HELPED impact)
+    # Promote `mod-a/tdd-primary` to VERIFIED (MANUAL stage with real PASS verifier & HELPED impact)
+    real_ver_tdd = _make_real_verifier_receipt(repo, sha, run_tag="tdd-01")
     eval_helped = factory.evaluate_skill_impact(
         skill_id="mod-a/tdd-primary",
+        case_id="case-tdd-primary",
         baseline_metrics={
             "passed": False,
-            "gates_passed": 1,
+            "tests_passed": 1,
             "tests_failed": 1,
             "tokens": 400,
             "duration_ms": 100,
@@ -1050,28 +1092,34 @@ def test_capability_gap_analysis_six_states_and_taste_metacognition(tmp_path: Pa
         },
         treatment_metrics={
             "passed": True,
-            "gates_passed": 3,
+            "tests_passed": 3,
             "tests_failed": 0,
             "tokens": 350,
             "duration_ms": 80,
             "human_interventions": 0,
-            "output_sha256": "abc12345",
-            "repeat_output_sha256": "abc12345",
+            "output_sha256": sha,
+            "repeat_output_sha256": sha,
         },
+        verifier_receipt=real_ver_tdd,
+        builder_actor="factory-builder",
+        builder_session_id="builder-01",
     )
     factory.evaluate_and_promote_trust(
         repo,
         skill_id="mod-a/tdd-primary",
         eval_receipt=eval_helped,
-        verifier_receipt={"status": "PASS"},
+        verifier_receipt=real_ver_tdd,
+        run_id="run-gap-tdd-01",
     )
 
     # Record INCONCLUSIVE / UNKNOWN for `mod-a/sec-guard`
+    real_ver_sec = _make_real_verifier_receipt(repo, sha, run_tag="sec-01")
     factory.evaluate_and_promote_trust(
         repo,
         skill_id="mod-a/sec-guard",
         eval_receipt={"verdict": "INCONCLUSIVE", "comparison": {"reproducible": False}},
-        verifier_receipt={"status": "PASS"},
+        verifier_receipt=real_ver_sec,
+        run_id="run-gap-sec-01",
     )
     # Manually mark `sec-guard` verifier_status as UNKNOWN in trust_state to test UNKNOWN classification
     trust_path = repo / ".hyodo" / "factory" / "trust_state.json"
@@ -1246,13 +1294,52 @@ def test_orchestration_observations_and_graph_export_integration(tmp_path: Path)
     assert len(graph["nodes"]) == 3
 
 
+def _make_helped_eval(
+    factory: Any,
+    skill_id: str,
+    verifier_receipt: dict[str, Any],
+    sha: str,
+    *,
+    case_id: str,
+    taste_violations: int = 0,
+) -> dict[str, Any]:
+    return factory.evaluate_skill_impact(
+        skill_id=skill_id,
+        case_id=case_id,
+        baseline_metrics={
+            "passed": False,
+            "tests_passed": 0,
+            "tests_failed": 2,
+            "tokens": 400,
+            "duration_ms": 120,
+            "human_interventions": 1,
+            "taste_violations": 0,
+        },
+        treatment_metrics={
+            "passed": True,
+            "tests_passed": 3,
+            "tests_failed": 0,
+            "tokens": 350,
+            "duration_ms": 80,
+            "human_interventions": 0,
+            "taste_checks_passed": 2,
+            "taste_violations": taste_violations,
+            "output_sha256": sha,
+            "repeat_output_sha256": sha,
+        },
+        verifier_receipt=verifier_receipt,
+        builder_actor="factory-builder",
+        builder_session_id="builder-session-01",
+    )
+
+
 def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
     tmp_path: Path,
 ) -> None:
-    """Verify `DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN` enforces mandatory gates (blocking high `s_score` overrides) and automatically demotes to `VERIFY` when hash, version, or environment changes."""
+    """Verify `DISCOVER -> VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN` accumulates distinct runs (no replay, no stage-skipping, no bare boolean Serenity bypass) and demotes on drift."""
     factory = _load_factory_module()
     repo = tmp_path / "workspace"
-    _init_clean_repo(repo)
+    sha = _init_clean_repo(repo)
 
     # 1. Unregistered skill starts at DISCOVER
     unreg = factory.get_skill_trust_state(repo, "ext/missing-skill")
@@ -1270,20 +1357,15 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
     initial = factory.get_skill_trust_state(repo, "trust-pack/refactor-bot")
     assert initial["trust_stage"] == "VERIFY"
 
-    # 3. High `s_score` (9.99) + `serenity_gate_approved=True` MUST NOT override a failed or UNOBSERVED verifier gate!
+    # 3. High `s_score` (9.99) + bare `serenity_gate_approved=True` MUST NOT override a failed verifier gate!
+    v_fail = _make_real_verifier_receipt(repo, sha, run_tag="fail-01", status="FAIL")
+    e_fail = _make_helped_eval(factory, "trust-pack/refactor-bot", v_fail, sha, case_id="case-fail")
     blocked = factory.evaluate_and_promote_trust(
         repo,
         skill_id="trust-pack/refactor-bot",
         target_stage="AUTO_RUN",
-        eval_receipt={
-            "verdict": "HELPED",
-            "comparison": {
-                "reproducible": True,
-                "failure_count_delta": -1,
-                "human_interventions_delta": 0,
-            },
-        },
-        verifier_receipt={"status": "FAIL"},
+        eval_receipt=e_fail,
+        verifier_receipt=v_fail,
         serenity_gate_approved=True,
         s_score=9.99,
         run_id="run-score-override-attempt",
@@ -1293,78 +1375,73 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
     assert blocked["admitted"] is False
     assert blocked["score_override_blocked"] is True
 
-    # 4. Validated evidence promotes step-by-step: VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN
-    good_eval = {
-        "verdict": "HELPED",
-        "comparison": {
-            "reproducible": True,
-            "failure_count_delta": -2,
-            "human_interventions_delta": 0,
-        },
-    }
-    good_verifier = {"status": "PASS"}
+    # 4. Validated distinct evidence promotes strictly one step at a time:
+    #    VERIFY -> MANUAL -> SHADOW -> TRUSTED -> AUTO_RUN
+    stages_expected = ["MANUAL", "SHADOW", "TRUSTED"]
+    for idx, exp_stage in enumerate(stages_expected, start=1):
+        v_rec = _make_real_verifier_receipt(repo, sha, run_tag=f"step-{idx}", status="PASS")
+        e_rec = _make_helped_eval(
+            factory, "trust-pack/refactor-bot", v_rec, sha, case_id=f"case-step-{idx}"
+        )
+        promoted = factory.evaluate_and_promote_trust(
+            repo,
+            skill_id="trust-pack/refactor-bot",
+            eval_receipt=e_rec,
+            verifier_receipt=v_rec,
+            run_id=f"run-step-{idx}",
+        )
+        assert promoted["trust_stage"] == exp_stage
+        assert promoted["admission_decision"] == "ASK_COMMANDER"
 
-    s_manual = factory.evaluate_and_promote_trust(
-        repo,
-        skill_id="trust-pack/refactor-bot",
-        eval_receipt=good_eval,
-        verifier_receipt=good_verifier,
-        run_id="run-step-manual",
+    # Bare `serenity_gate_approved=True` without a verified `serenity_receipt` MUST stay at TRUSTED!
+    v_no_ser = _make_real_verifier_receipt(repo, sha, run_tag="no-ser", status="PASS")
+    e_no_ser = _make_helped_eval(
+        factory, "trust-pack/refactor-bot", v_no_ser, sha, case_id="case-no-ser"
     )
-    assert s_manual["trust_stage"] == "MANUAL"
-    assert s_manual["admission_decision"] == "ASK_COMMANDER"
-
-    s_shadow = factory.evaluate_and_promote_trust(
-        repo,
-        skill_id="trust-pack/refactor-bot",
-        eval_receipt=good_eval,
-        verifier_receipt=good_verifier,
-        run_id="run-step-shadow",
-    )
-    assert s_shadow["trust_stage"] == "SHADOW"
-
-    s_trusted = factory.evaluate_and_promote_trust(
-        repo,
-        skill_id="trust-pack/refactor-bot",
-        eval_receipt=good_eval,
-        verifier_receipt=good_verifier,
-        run_id="run-step-trusted",
-    )
-    assert s_trusted["trust_stage"] == "TRUSTED"
-
-    # Without `serenity_gate_approved=True`, attempting AUTO_RUN stays at TRUSTED (`ASK_COMMANDER`)
     s_no_serenity = factory.evaluate_and_promote_trust(
         repo,
         skill_id="trust-pack/refactor-bot",
         target_stage="AUTO_RUN",
-        eval_receipt=good_eval,
-        verifier_receipt=good_verifier,
-        serenity_gate_approved=False,
+        eval_receipt=e_no_ser,
+        verifier_receipt=v_no_ser,
+        serenity_gate_approved=True,
         s_score=9.5,
         run_id="run-step-no-serenity",
     )
     assert s_no_serenity["trust_stage"] == "TRUSTED"
     assert s_no_serenity["admission_decision"] == "ASK_COMMANDER"
     assert s_no_serenity["admitted"] is False
+    assert s_no_serenity["bare_boolean_rejected"] is True
 
-    # With `serenity_gate_approved=True` + all mandatory gates PASS, promotes to AUTO_RUN
+    # With a bound `serenity_receipt` + fresh PASS verifier + HELPED eval -> promotes to AUTO_RUN
+    v_auto = _make_real_verifier_receipt(repo, sha, run_tag="auto-05", status="PASS")
+    e_auto = _make_helped_eval(
+        factory, "trust-pack/refactor-bot", v_auto, sha, case_id="case-auto-05"
+    )
+    ser_receipt = factory.issue_serenity_approval_receipt(
+        repo,
+        skill_id="trust-pack/refactor-bot",
+        run_id="run-step-auto",
+        risk_level="low",
+    )
     s_auto = factory.evaluate_and_promote_trust(
         repo,
         skill_id="trust-pack/refactor-bot",
         target_stage="AUTO_RUN",
-        eval_receipt=good_eval,
-        verifier_receipt=good_verifier,
-        serenity_gate_approved=True,
+        eval_receipt=e_auto,
+        verifier_receipt=v_auto,
+        serenity_receipt=ser_receipt,
         s_score=9.5,
         run_id="run-step-auto",
     )
     assert s_auto["trust_stage"] == "AUTO_RUN"
     assert s_auto["admission_decision"] == "AUTO_RUN"
     assert s_auto["admitted"] is True
+    assert s_auto["serenity_verified"] is True
     assert s_auto["admission_observation"]["execution_attempted"] is False
     assert s_auto["admission_observation"]["execution_observed"] is False
 
-    # 5. Mutating the skill version/content and updating module automatically demotes AUTO_RUN back to VERIFY!
+    # 5. Mutating skill version/content automatically demotes AUTO_RUN back to VERIFY!
     (skill_dir / "SKILL.md").write_text(
         "---\nname: refactor-bot\ndescription: Updated v2 instructions\n---\n# Refactor Bot v2\n",
         encoding="utf-8",
@@ -1376,3 +1453,422 @@ def test_trust_progression_ladder_score_override_blocked_and_drift_demotion(
     assert after_update["drifted"] is True
     assert after_update["demoted_from"] == "AUTO_RUN"
     assert "DRIFT_DETECTED_REVERIFY_REQUIRED" in str(after_update["demotion_reason"])
+
+
+def test_personal_taste_causally_changes_routing_execution_and_evaluation(
+    tmp_path: Path,
+) -> None:
+    """Req #1: Personal Taste lives on the host and causally alters skill selection, runtime execution env, and impact evaluation."""
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    sha = _init_clean_repo(repo)
+
+    alpha = _write_skill_pkg(
+        tmp_path,
+        "alpha-design",
+        {
+            "taste": "---\ncategory: design\ndesign_stage: architect\nsubprocess_exec: true\n---\n# Alpha Design\nUI design architect.\n",
+        },
+    )
+    beta = _write_skill_pkg(
+        tmp_path,
+        "beta-design",
+        {
+            "taste": "---\ncategory: design\ndesign_stage: architect\nsubprocess_exec: true\n---\n# Beta Design\nUI design architect.\n",
+        },
+    )
+    factory.add_module(repo, alpha)
+    factory.add_module(repo, beta)
+
+    # Without explicit taste, alphabetical slot winner is alpha-design/taste
+    default_plan = factory.route_skills_for_task(repo, "design UI layout", profile_name="design")
+    assert default_plan["slot_winners"]["design:architect"] == "alpha-design/taste"
+
+    # Host writes `.hyodo/factory/host_taste.json` preferring beta-design & avoiding alpha-design;
+    # AI inferred hypothesis suggests alpha-design, which MUST yield to explicit host rules!
+    host_taste_path = repo / ".hyodo" / "factory" / "host_taste.json"
+    host_taste_path.parent.mkdir(parents=True, exist_ok=True)
+    host_taste_path.write_text(
+        json.dumps(
+            {
+                "schema": "hyodo.host-taste/v1",
+                "rules": ["unslop_typography: high contrast calm hierarchy"],
+                "prefer_skills": ["beta-design/taste"],
+                "avoid_skills": ["alpha-design/taste"],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+    gap_rep = factory.analyze_capability_gaps(
+        repo,
+        "design UI layout",
+        profile_name="design",
+        inferred_taste_hypotheses=["prefer:alpha-design/taste"],
+    )
+    assert gap_rep["taste_synthesis"]["inferred_hypotheses"][-1]["overridden_by_explicit"] is True
+
+    # Execute run: Personal Taste rules switch winner to beta-design/taste AND inject into subprocess env!
+    run_res = factory.execute_modular_run(
+        repo,
+        run_id="run-taste-causal",
+        prompt="design UI layout",
+        profile_name="design",
+        skill_commands={
+            "beta-design/taste": [
+                sys.executable,
+                "-c",
+                "import os, json; rules = json.loads(os.environ['HYODO_HOST_PERSONAL_TASTE_JSON']); assert any('prefer:beta-design/taste' in r for r in rules); print('TASTE_ENV_OK')",
+            ],
+            "alpha-design/taste": [
+                sys.executable,
+                "-c",
+                "raise RuntimeError('should_not_run')",
+            ],
+        },
+    )
+    assert run_res["route_plan"]["slot_winners"]["design:architect"] == "beta-design/taste"
+    assert any(
+        "taste_excluded:alpha-design/taste" in item
+        for item in run_res["route_plan"]["taste_applied"]["taste_excluded"]
+    )
+    assert run_res["skill_outputs"]["beta-design/taste"]["execution_state"] == "EXECUTED_PASS"
+    assert "TASTE_ENV_OK" in run_res["skill_outputs"]["beta-design/taste"]["stdout"]
+
+    # Evaluation reflects Taste conformance: code passes, yet `taste_violations=1` yields HURT!
+    real_ver = _make_real_verifier_receipt(repo, sha, run_tag="taste-01", status="PASS")
+    eval_hurt = _make_helped_eval(
+        factory,
+        "beta-design/taste",
+        real_ver,
+        sha,
+        case_id="case-taste-hurt",
+        taste_violations=1,
+    )
+    assert eval_hurt["verdict"] == "HURT"
+    assert eval_hurt["comparison"]["taste_conformance_passed"] is False
+
+
+def test_preflight_gap_analyzer_auto_invoked_and_blocks_degraded_in_execute_run(
+    tmp_path: Path,
+) -> None:
+    """Req #2: `execute_modular_run` automatically calls `analyze_capability_gaps` before routing/running and blocks DEGRADED skills."""
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    _init_clean_repo(repo)
+
+    broken_pkg = tmp_path / "broken-debug"
+    b_dir = broken_pkg / "skills" / "debug"
+    (b_dir / "scripts").mkdir(parents=True)
+    (b_dir / "SKILL.md").write_text(
+        "---\nname: debug\ncategory: engineering\ndescription: Broken debug\n---\n# Broken\n",
+        encoding="utf-8",
+    )
+    (b_dir / "scripts" / "check.py").write_text("def oops(\n  return 1\n", encoding="utf-8")
+
+    healthy_pkg = _write_skill_pkg(
+        tmp_path,
+        "healthy-debug",
+        {
+            "debug": "---\ncategory: engineering\nsubprocess_exec: true\n---\n# Healthy Debug\nDebug root cause.\n",
+        },
+    )
+    factory.add_module(repo, broken_pkg, module_id="broken-debug")
+    factory.add_module(repo, healthy_pkg, module_id="healthy-debug")
+
+    res = factory.execute_modular_run(
+        repo,
+        run_id="run-preflight-degraded",
+        prompt="debug root cause",
+        skill_commands={
+            "broken-debug/debug": [sys.executable, "-c", "print('SHOULD_NOT_RUN')"],
+            "healthy-debug/debug": [sys.executable, "-c", "print('HEALTHY_RAN')"],
+        },
+    )
+    assert res["preflight_gap_report"]["schema"] == "hyodo.capability-gap-report/v1"
+    assert (
+        res["preflight_gap_report"]["skill_assessments"]["broken-debug/debug"]["state"]
+        == "DEGRADED"
+    )
+    assert any(
+        "degraded_skipped:broken-debug/debug" in d for d in res["route_plan"]["degraded_skipped"]
+    )
+    assert (
+        res["skill_outputs"]["broken-debug/debug"]["execution_state"]
+        == "DEGRADED_PREFLIGHT_BLOCKED"
+    )
+    assert res["skill_outputs"]["healthy-debug/debug"]["execution_state"] == "EXECUTED_PASS"
+
+
+def test_adversarial_replay_stage_skip_bare_boolean_and_auto_run_gating(
+    tmp_path: Path,
+) -> None:
+    """Reqs #3, #4, #5, #6: Reject receipt replay, stage skipping, unverified skill eval, invalid Serenity receipts, and block unverified/tampered/drifted AUTO_RUN execution."""
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    sha = _init_clean_repo(repo)
+
+    pkg = _write_skill_pkg(
+        tmp_path,
+        "auto-guard",
+        {"tdd": "---\ncategory: engineering\nsubprocess_exec: true\n---\n# TDD\nTDD workflow.\n"},
+    )
+    factory.add_module(repo, pkg, module_id="auto-guard")
+
+    # 1. Fail-closed Skill Eval when verifier receipt is missing or self-reviewed
+    eval_missing = factory.evaluate_skill_impact(
+        skill_id="auto-guard/tdd",
+        case_id="case-missing-ver",
+        baseline_metrics={"passed": False, "tests_failed": 1},
+        treatment_metrics={
+            "passed": True,
+            "tests_passed": 2,
+            "output_sha256": sha,
+            "repeat_output_sha256": sha,
+        },
+    )
+    assert eval_missing["verdict"] == "INCONCLUSIVE"
+    assert eval_missing["verifier_validation"]["valid"] is False
+
+    self_rev_ver = _make_real_verifier_receipt(repo, sha, run_tag="self")
+    self_rev_ver["attestation"]["verifier_nameplate"]["actor_id"] = "same-actor"
+    eval_self = factory.evaluate_skill_impact(
+        skill_id="auto-guard/tdd",
+        case_id="case-self-ver",
+        baseline_metrics={"passed": False, "tests_failed": 1},
+        treatment_metrics={
+            "passed": True,
+            "tests_passed": 2,
+            "output_sha256": sha,
+            "repeat_output_sha256": sha,
+        },
+        verifier_receipt=self_rev_ver,
+        builder_actor="same-actor",
+    )
+    assert eval_self["verdict"] == "INCONCLUSIVE"
+    assert "SELF_REVIEW_FORBIDDEN" in str(eval_self["verifier_validation"]["reason"])
+
+    # 2. Cannot execute in `execution_mode="auto"` while at VERIFY (subprocess MUST NOT run!)
+    sentinel = repo / "should_not_exist.txt"
+    blocked_exec = factory.execute_modular_run(
+        repo,
+        run_id="run-auto-blocked-verify",
+        prompt="implement tdd",
+        execution_mode="auto",
+        skill_commands={
+            "auto-guard/tdd": [
+                sys.executable,
+                "-c",
+                f"import pathlib; pathlib.Path({str(sentinel)!r}).write_text('RAN')",
+            ]
+        },
+    )
+    assert (
+        blocked_exec["skill_outputs"]["auto-guard/tdd"]["execution_state"]
+        == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION"
+    )
+    assert not sentinel.exists()
+
+    # 3. Cannot skip stages (VERIFY -> SHADOW or AUTO_RUN forbidden!)
+    v1 = _make_real_verifier_receipt(repo, sha, run_tag="r1")
+    e1 = _make_helped_eval(factory, "auto-guard/tdd", v1, sha, case_id="c1")
+    skip_res = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="auto-guard/tdd",
+        target_stage="SHADOW",
+        eval_receipt=e1,
+        verifier_receipt=v1,
+        run_id="run-skip-1",
+    )
+    assert skip_res["stage_skip_blocked"] is True
+    assert skip_res["trust_stage"] == "VERIFY"
+    assert skip_res["admission_decision"] == "BLOCK"
+
+    # 4. Promote VERIFY -> MANUAL with first run, then verify REPLAY is blocked!
+    m_res = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="auto-guard/tdd",
+        eval_receipt=e1,
+        verifier_receipt=v1,
+        run_id="run-real-1",
+    )
+    assert m_res["trust_stage"] == "MANUAL"
+
+    replay_res = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="auto-guard/tdd",
+        eval_receipt=e1,
+        verifier_receipt=v1,
+        run_id="run-real-1-dup",
+    )
+    assert replay_res["replay_blocked"] is True
+    assert replay_res["trust_stage"] == "MANUAL"
+    assert replay_res["admission_decision"] == "BLOCK"
+
+    # 5. Accumulate SHADOW -> TRUSTED with distinct runs
+    for idx, st in enumerate(["SHADOW", "TRUSTED"], start=2):
+        vi = _make_real_verifier_receipt(repo, sha, run_tag=f"r{idx}")
+        ei = _make_helped_eval(factory, "auto-guard/tdd", vi, sha, case_id=f"c{idx}")
+        prom = factory.evaluate_and_promote_trust(
+            repo,
+            skill_id="auto-guard/tdd",
+            eval_receipt=ei,
+            verifier_receipt=vi,
+            run_id=f"run-real-{idx}",
+        )
+        assert prom["trust_stage"] == st
+
+    # 6. High-risk Serenity receipt MUST be rejected from AUTO_RUN
+    v4 = _make_real_verifier_receipt(repo, sha, run_tag="r4")
+    e4 = _make_helped_eval(factory, "auto-guard/tdd", v4, sha, case_id="c4")
+    high_risk_ser = factory.issue_serenity_approval_receipt(
+        repo, skill_id="auto-guard/tdd", run_id="run-real-4", risk_level="high"
+    )
+    bad_ser_res = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="auto-guard/tdd",
+        target_stage="AUTO_RUN",
+        eval_receipt=e4,
+        verifier_receipt=v4,
+        serenity_receipt=high_risk_ser,
+        run_id="run-real-4",
+    )
+    assert bad_ser_res["trust_stage"] == "TRUSTED"
+    assert bad_ser_res["admitted"] is False
+    assert "serenity_risk_blocked:high" in str(bad_ser_res["promotion_blocked_reason"])
+
+    # Still blocked at TRUSTED in `execution_mode="auto"`
+    blocked_trusted = factory.execute_modular_run(
+        repo,
+        run_id="run-auto-blocked-trusted",
+        prompt="implement tdd",
+        execution_mode="auto",
+        skill_commands={"auto-guard/tdd": [sys.executable, "-c", "print('SHOULD_NOT_RUN')"]},
+    )
+    assert (
+        blocked_trusted["skill_outputs"]["auto-guard/tdd"]["execution_state"]
+        == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION"
+    )
+
+    # 7. Valid low-risk Serenity receipt -> AUTO_RUN admitted & execution allowed under clean env
+    v5 = _make_real_verifier_receipt(repo, sha, run_tag="r5")
+    e5 = _make_helped_eval(factory, "auto-guard/tdd", v5, sha, case_id="c5")
+    valid_ser = factory.issue_serenity_approval_receipt(
+        repo, skill_id="auto-guard/tdd", run_id="run-real-5", risk_level="low"
+    )
+    auto_res = factory.evaluate_and_promote_trust(
+        repo,
+        skill_id="auto-guard/tdd",
+        target_stage="AUTO_RUN",
+        eval_receipt=e5,
+        verifier_receipt=v5,
+        serenity_receipt=valid_ser,
+        run_id="run-real-5",
+    )
+    assert auto_res["trust_stage"] == "AUTO_RUN"
+    assert auto_res["admitted"] is True
+
+    allowed_exec = factory.execute_modular_run(
+        repo,
+        run_id="run-auto-allowed",
+        prompt="implement tdd",
+        execution_mode="auto",
+        skill_commands={"auto-guard/tdd": [sys.executable, "-c", "print('AUTO_EXEC_OK')"]},
+    )
+    assert allowed_exec["skill_outputs"]["auto-guard/tdd"]["execution_state"] == "EXECUTED_PASS"
+
+    # 8. Changed environment fingerprint MUST block `execution_mode="auto"`
+    env_blocked = factory.execute_modular_run(
+        repo,
+        run_id="run-auto-blocked-env",
+        prompt="implement tdd",
+        execution_mode="auto",
+        env_fingerprint="py3.13-win32",
+        skill_commands={"auto-guard/tdd": [sys.executable, "-c", "print('SHOULD_NOT_RUN')"]},
+    )
+    assert (
+        env_blocked["skill_outputs"]["auto-guard/tdd"]["execution_state"]
+        == "BLOCKED_UNVERIFIED_AUTONOMOUS_EXECUTION"
+    )
+
+
+def test_selective_task_scoped_activation_170_plus_skills_and_full_stdout_hash(
+    tmp_path: Path,
+) -> None:
+    """Reqs #7 & #8: Register 175+ dormant skills without enabling all globally, selectively activate only task-needed skills, and prove full-stream stdout normalization beyond 400 chars."""
+    factory = _load_factory_module()
+    repo = tmp_path / "workspace"
+    _init_clean_repo(repo)
+
+    # Create 176 dormant skills across multiple unrelated categories (`office`, `creative`, `research`, `engineering`, `quality`)
+    mega_pkg = tmp_path / "mega-catalog"
+    skill_specs: dict[str, str] = {}
+    for i in range(60):
+        skill_specs[f"office-doc-{i:03d}"] = (
+            "---\ncategory: office\n---\n# Office Skill\nDocument drafting.\n"
+        )
+        skill_specs[f"creative-art-{i:03d}"] = (
+            "---\ncategory: creative\n---\n# Creative Skill\nVisual art.\n"
+        )
+        skill_specs[f"research-find-{i:03d}"] = (
+            "---\ncategory: research\n---\n# Research Skill\nLiterature search.\n"
+        )
+    skill_specs["tdd-winner"] = (
+        "---\ncategory: engineering\nsubprocess_exec: true\n---\n# TDD Winner\nTest-driven implementation.\n"
+    )
+    skill_specs["qa-gate"] = (
+        "---\ncategory: quality\nrole_hint: verifier\nsubprocess_exec: true\n---\n# QA Gate\nVerify quality.\n"
+    )
+
+    for sname, body in skill_specs.items():
+        _write_skill(mega_pkg, sname, body)
+
+    rec = factory.add_module(repo, mega_pkg, module_id="mega-catalog", enable_all=False)
+    assert len(rec.skills) == 182
+
+    # Initially 0 active skills; out-of-scope dormant skills are NOT misclassified as broken wiring
+    gap_before = factory.analyze_capability_gaps(
+        repo, "implement tdd feature and verify qa", profile_name="minimal"
+    )
+    assert gap_before["active_skills_count"] == 0
+    assert (
+        gap_before["dormant_out_of_scope_count"] == 180
+    )  # office/creative/research are out of scope
+    assert (
+        gap_before["skill_assessments"]["mega-catalog/office-doc-000"]["dormant_out_of_scope"]
+        is True
+    )
+    assert gap_before["skill_assessments"]["mega-catalog/office-doc-000"]["root_cause"] == "NONE"
+
+    # Selective activation runs >600-char TAP output twice with different `duration_ms` timings
+    tap_template = "import sys; lines = ['TAP version 13'] + [f'ok {i} - deterministic case {i}' for i in range(1, 22)] + [f'# duration_ms {sys.argv[1]}']; print('\\n'.join(lines))"
+    run1 = factory.execute_modular_run(
+        repo,
+        run_id="run-sel-1",
+        prompt="implement tdd feature and verify qa",
+        profile_name="minimal",
+        selective_activation=True,
+        skill_commands={
+            "mega-catalog/tdd-winner": [sys.executable, "-c", tap_template, "12.45"],
+        },
+    )
+    run2 = factory.execute_modular_run(
+        repo,
+        run_id="run-sel-2",
+        prompt="implement tdd feature and verify qa",
+        profile_name="minimal",
+        selective_activation=True,
+        skill_commands={
+            "mega-catalog/tdd-winner": [sys.executable, "-c", tap_template, "98.76"],
+        },
+    )
+
+    assert run1["selective_activation"]["active_skills_count"] <= 4
+    assert run1["selective_activation"]["dormant_skills_count"] >= 178
+    out1 = run1["skill_outputs"]["mega-catalog/tdd-winner"]
+    out2 = run2["skill_outputs"]["mega-catalog/tdd-winner"]
+    assert out1["stdout_truncated"] is True
+    assert out1["stdout_bytes"] > 500
+    assert out1["full_stdout_sha256"] != out2["full_stdout_sha256"]
+    assert out1["normalized_stdout_sha256"] == out2["normalized_stdout_sha256"]
