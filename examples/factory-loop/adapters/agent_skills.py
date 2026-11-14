@@ -364,7 +364,7 @@ def parse_skill_unit(
     role_hint = _infer_role_hint(sub_name, category, frontmatter)
     design_stage = _infer_design_stage(sub_name, category, frontmatter)
 
-    deps_raw = frontmatter.get("dependencies", [])
+    deps_raw = frontmatter.get("dependencies", frontmatter.get("depends_on", []))
     deps = tuple(deps_raw) if isinstance(deps_raw, list) else ()
     conflicts_raw = frontmatter.get("conflicts_with", [])
     conflicts = tuple(conflicts_raw) if isinstance(conflicts_raw, list) else ()
