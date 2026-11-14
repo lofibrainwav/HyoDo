@@ -35,6 +35,7 @@ from adapters.external_evaluator import (  # noqa: E402
 )
 from factory.contracts import recommend_skill_lifecycle_action  # noqa: E402
 from factory.lifecycle import (  # noqa: E402
+    activate_selected_skills,
     add_module,
     disable_target,
     discover_skills,
@@ -46,12 +47,19 @@ from factory.lifecycle import (  # noqa: E402
     verify_host_integrations,
 )
 from factory.registry import load_registry_state  # noqa: E402
-from factory.router import analyze_capability_gaps, route_skills_for_task  # noqa: E402
+from factory.router import (  # noqa: E402
+    analyze_capability_gaps,
+    route_skills_for_task,
+    select_and_activate_for_task,
+)
 from factory.runner import (  # noqa: E402
+    check_execution_permission,
     evaluate_and_promote_trust,
     evaluate_skill_impact,
     execute_modular_run,
     get_skill_trust_state,
+    issue_serenity_approval_receipt,
+    verify_serenity_approval_receipt,
 )
 
 from hyodo.events import AGENT_EVENT_SCHEMA_VERSION  # noqa: E402
@@ -313,6 +321,11 @@ def main(argv: list[str] | None = None) -> int:
     p_add.add_argument("path", type=Path)
     p_add.add_argument("--id", dest="module_id", default=None)
     p_add.add_argument("--adapter", default=None)
+    p_add.add_argument(
+        "--lazy",
+        action="store_true",
+        help="Register module dormant without enabling all skills globally",
+    )
 
     sub.add_parser("list", help="List registered modules and skills")
 
@@ -339,6 +352,11 @@ def main(argv: list[str] | None = None) -> int:
     p_rt = sub.add_parser("route", help="Route a natural-language task to active skills")
     p_rt.add_argument("prompt")
     p_rt.add_argument("--profile", default=None)
+    p_rt.add_argument(
+        "--selective",
+        action="store_true",
+        help="Include dormant registered skills in task-scoped candidate routing",
+    )
 
     p_disc = sub.add_parser("discover", help="Discover compatible external skills across roots")
     p_disc.add_argument("query", nargs="?", default=None)
@@ -376,12 +394,24 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--verify-cmd", default=None)
     p_run.add_argument("--builder-actor", default="factory-builder")
     p_run.add_argument("--verifier-actor", default="factory-independent-verifier")
+    p_run.add_argument(
+        "--selective",
+        action="store_true",
+        help="Selectively activate only task-needed skills before execution",
+    )
+    p_run.add_argument("--execution-mode", choices=("manual", "shadow", "auto"), default="manual")
 
     args = parser.parse_args(argv)
     root = args.root.resolve()
 
     if args.cmd == "add":
-        rec = add_module(root, args.path, adapter=args.adapter, module_id=args.module_id)
+        rec = add_module(
+            root,
+            args.path,
+            adapter=args.adapter,
+            module_id=args.module_id,
+            enable_all=not args.lazy,
+        )
         print(json.dumps(rec.to_dict(), indent=2))
     elif args.cmd == "list":
         mods = load_registry_state(root)
@@ -408,7 +438,12 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(rep, indent=2))
         return 0 if rep["status"] == "HEALTHY" else 1
     elif args.cmd == "route":
-        plan = route_skills_for_task(root, args.prompt, profile_name=args.profile)
+        plan = route_skills_for_task(
+            root,
+            args.prompt,
+            profile_name=args.profile,
+            include_registered_inactive=args.selective,
+        )
         print(json.dumps(plan, indent=2, ensure_ascii=False))
     elif args.cmd == "discover":
         s_roots = args.search_root or [root.parent]
@@ -447,6 +482,8 @@ def main(argv: list[str] | None = None) -> int:
             verify_cmd=v_cmd,
             builder_actor=args.builder_actor,
             verifier_actor=args.verifier_actor,
+            selective_activation=args.selective,
+            execution_mode=args.execution_mode,
         )
         print(json.dumps(run_res, indent=2, ensure_ascii=False))
         if run_res["isolated_faults"] or run_res["permission_violations"]:
@@ -461,9 +498,11 @@ if __name__ == "__main__":
 
 
 __all__ = [
+    "activate_selected_skills",
     "add_module",
     "analyze_capability_gaps",
     "build_and_verify_handoff",
+    "check_execution_permission",
     "disable_target",
     "discover_skills",
     "doctor",
@@ -473,6 +512,7 @@ __all__ = [
     "execute_modular_run",
     "get_skill_trust_state",
     "ingest_jev_skill_routing",
+    "issue_serenity_approval_receipt",
     "main",
     "recommend_skill_lifecycle_action",
     "record_jev_shadow_event",
@@ -480,7 +520,9 @@ __all__ = [
     "rollback_module",
     "route_skills_for_task",
     "run_unified_factory_pipeline",
+    "select_and_activate_for_task",
     "update_module",
     "verify_host_integrations",
+    "verify_serenity_approval_receipt",
     "write_host_promise_projection",
 ]
