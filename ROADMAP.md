@@ -53,10 +53,11 @@ evidence is not converted into a pass.
 
 ### 4.22.5 (release target)
 
-- Publish main up to #621: `hyodo safe` keeps scanning past files over the read
+- Publish main up to #630: `hyodo safe` keeps scanning past files over the read
   cap and reports `level: unobserved` when nothing was observed, `hyodo gates
   trust show` / `approve --via` for host-attested gate approval, and the factory
-  example's host-verified approvals, module-tree binding, honest enforcement and
+  example's host-verified approvals, module-tree binding, honest enforcement,
+  fail-closed zombie stale-lock checks, pre-exec PGID registration gate, and
   provenance reporting.
 - Package chain is measured in `docs/releases/4.22.5.md` after publication; host
   installation and live use need separate readback.
