@@ -313,3 +313,132 @@ def test_zombie_pid_and_process_group_count_as_gone_not_alive(tmp_path: Path) ->
         assert not lock.exists()
     finally:
         zombie.wait()
+
+
+def test_proc_read_or_parse_failure_with_zombie_fails_closed_as_alive(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lifecycle = _lifecycle()
+    zombie = subprocess.Popen(["true"], start_new_session=True)
+    try:
+        deadline = time.monotonic() + 5.0
+        while time.monotonic() < deadline and lifecycle._pid_alive(zombie.pid):
+            time.sleep(0.02)
+        assert lifecycle._pid_alive(zombie.pid) is False
+
+        orig_read_text = Path.read_text
+
+        def read_with_unreadable_peer(self: Path, *args: Any, **kwargs: Any) -> str:
+            if (
+                self.parent.parent == Path("/proc")
+                and self.name == "stat"
+                and self.parent.name != str(zombie.pid)
+                and self.parent.name.isdigit()
+            ):
+                raise PermissionError("simulated /proc read failure")
+            return orig_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", read_with_unreadable_peer)
+        assert lifecycle._process_group_state(zombie.pid) == "ALIVE"
+
+        def read_with_corrupt_peer(self: Path, *args: Any, **kwargs: Any) -> str:
+            if (
+                self.parent.parent == Path("/proc")
+                and self.name == "stat"
+                and self.parent.name != str(zombie.pid)
+                and self.parent.name.isdigit()
+            ):
+                return "123 (corrupt-line"
+            return orig_read_text(self, *args, **kwargs)
+
+        monkeypatch.setattr(Path, "read_text", read_with_corrupt_peer)
+        assert lifecycle._process_group_state(zombie.pid) == "ALIVE"
+    finally:
+        zombie.wait()
+
+
+def test_ps_fallback_timeout_expired_and_mixed_output_fail_closed(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    lifecycle = _lifecycle()
+    orig_is_file = Path.is_file
+
+    def no_proc_self_stat(self: Path) -> bool:
+        if self == Path("/proc/self/stat"):
+            return False
+        return orig_is_file(self)
+
+    monkeypatch.setattr(Path, "is_file", no_proc_self_stat)
+    monkeypatch.setattr(os, "kill", lambda pid, sig: None)
+    monkeypatch.setattr(os, "killpg", lambda pgid, sig: None)
+
+    def raise_timeout(*args: Any, **kwargs: Any) -> Any:
+        raise subprocess.TimeoutExpired(cmd=["ps"], timeout=2.0)
+
+    monkeypatch.setattr(subprocess, "run", raise_timeout)
+    assert lifecycle._pid_alive(99999) is True
+    assert lifecycle._process_group_state(99999) == "ALIVE"
+
+    def ps_mixed_and_malformed(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["ps"],
+            returncode=0,
+            stdout="99999 Z\nmalformed-line\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", ps_mixed_and_malformed)
+    assert lifecycle._process_group_state(99999) == "ALIVE"
+
+    def ps_live_plus_zombie(*args: Any, **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        return subprocess.CompletedProcess(
+            args=["ps"],
+            returncode=0,
+            stdout="99999 Z\n99999 S\n",
+            stderr="",
+        )
+
+    monkeypatch.setattr(subprocess, "run", ps_live_plus_zombie)
+    assert lifecycle._process_group_state(99999) == "ALIVE"
+
+
+def test_mixed_live_and_zombie_in_same_process_group_refuses_recovery(tmp_path: Path) -> None:
+    factory, repo = _scoped(tmp_path)
+    lifecycle = _lifecycle()
+    marker = tmp_path / "live_started"
+    # Spawn a child group holding one unwaited exited zombie (`true`) and one live `sleep`.
+    code = (
+        "import os, pathlib, subprocess, time\n"
+        f"pathlib.Path({str(marker)!r}).write_text(str(os.getpgrp()), encoding='utf-8')\n"
+        "z = subprocess.Popen(['true'])\n"
+        "try:\n"
+        "    time.sleep(30)\n"
+        "finally:\n"
+        "    z.wait()\n"
+    )
+    holder = subprocess.Popen([sys.executable, "-c", code], start_new_session=True)
+    try:
+        for _ in range(100):
+            if marker.exists():
+                break
+            time.sleep(0.05)
+        assert marker.exists()
+        time.sleep(0.2)  # let `true` become an exited zombie while `holder` stays alive
+        assert lifecycle._process_group_state(holder.pid) == "ALIVE"
+
+        dead = subprocess.Popen(["true"])
+        dead.wait()
+        lock = repo / ".hyodo" / "factory" / "run.lock"
+        lock.parent.mkdir(parents=True, exist_ok=True)
+        lock.write_text(
+            json.dumps({"run_id": "mixed-run", "pid": dead.pid, "host": socket.gethostname()}),
+            encoding="utf-8",
+        )
+        lifecycle.write_skill_process_groups(repo, "mixed-run", [holder.pid])
+        with pytest.raises(RuntimeError, match="RUN_LOCK_NOT_PROVABLY_STALE:ORPHANED_SKILLS"):
+            factory.recover_stale_run_lock(repo)
+        assert lock.exists()
+    finally:
+        with contextlib.suppress(ProcessLookupError):
+            os.killpg(holder.pid, signal.SIGKILL)
+        holder.wait()

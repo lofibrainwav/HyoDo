@@ -152,7 +152,7 @@ def _pid_alive(pid: int) -> bool:
             timeout=2.0,
             check=False,
         )
-    except OSError:
+    except (OSError, subprocess.SubprocessError):
         return True
     if res.returncode != 0:
         return True
@@ -170,8 +170,8 @@ def _process_group_state(pgid: int) -> str:
 
     Unreaped `<defunct>` zombie processes (`Z`/`X`) also pass `os.killpg(pgid, 0)`
     in containers whose PID 1 does not reap orphaned children; a group whose
-    members are all dead zombies is reported as `GONE`, while indeterminate
-    reads fail closed as `ALIVE`.
+    members are all dead zombies is reported as `GONE` only when the scan saw
+    no unreadable or unparseable entries, and fails closed as `ALIVE` otherwise.
     """
     if pgid <= 1 or pgid in (os.getpgrp(), os.getsid(0)):
         return "INVALID"
@@ -184,6 +184,7 @@ def _process_group_state(pgid: int) -> str:
 
     if Path("/proc/self/stat").is_file():
         saw_zombie = False
+        saw_uncertain = False
         try:
             proc_entries = list(Path("/proc").iterdir())
         except OSError:
@@ -192,12 +193,15 @@ def _process_group_state(pgid: int) -> str:
             if not entry.name.isdigit():
                 continue
             try:
-                parsed = _parse_proc_stat_state_and_pgrp(
-                    (entry / "stat").read_text(encoding="utf-8")
-                )
-            except OSError:
+                stat_text = (entry / "stat").read_text(encoding="utf-8")
+            except FileNotFoundError:
                 continue
+            except OSError:
+                saw_uncertain = True
+                continue
+            parsed = _parse_proc_stat_state_and_pgrp(stat_text)
             if parsed is None:
+                saw_uncertain = True
                 continue
             state, pgrp = parsed
             if pgrp != pgid:
@@ -205,7 +209,7 @@ def _process_group_state(pgid: int) -> str:
             if state not in ("Z", "X"):
                 return "ALIVE"
             saw_zombie = True
-        if saw_zombie:
+        if saw_zombie and not saw_uncertain:
             return "GONE"
         try:
             os.killpg(pgid, 0)
@@ -223,25 +227,30 @@ def _process_group_state(pgid: int) -> str:
             timeout=2.0,
             check=False,
         )
-    except OSError:
+    except (OSError, subprocess.SubprocessError):
         return "ALIVE"
     if res.returncode != 0:
         return "ALIVE"
     saw_zombie = False
+    saw_uncertain = False
     for line in res.stdout.splitlines():
+        if not line.strip():
+            continue
         parts = line.split()
         if len(parts) < 2:
+            saw_uncertain = True
             continue
         try:
             line_pgid = int(parts[0])
         except ValueError:
+            saw_uncertain = True
             continue
         if line_pgid != pgid:
             continue
         if not parts[1].startswith(("Z", "X")):
             return "ALIVE"
         saw_zombie = True
-    return "GONE" if saw_zombie else "ALIVE"
+    return "GONE" if (saw_zombie and not saw_uncertain) else "ALIVE"
 
 
 def _process_group_alive(pgid: int) -> bool:
