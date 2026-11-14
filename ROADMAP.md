@@ -13,10 +13,12 @@ reconciled. Prior release receipts remain preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.4 is the current release target and latest published release.
-It carries fail-closed safety coverage, the handoff evidence checker and the
-Python 3.13+ symlink-loop repair, with the package chain recorded in
-`docs/releases/4.22.4.md`.
+HyoDo 4.22.5 is the current release target. It is not published yet: until
+its package chain records publication in `docs/releases/4.22.5.md`, the
+public baseline above (4.22.4) stays the latest published package.
+It carries safety scans that keep scanning past oversized files, the host
+gate-trust commands and the factory-example approval, provenance and evidence
+fixes, with the package chain recorded in `docs/releases/4.22.5.md`.
 This does not establish live host integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
@@ -48,6 +50,17 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.22.5 (release target)
+
+- Publish main up to #630: `hyodo safe` keeps scanning past files over the read
+  cap and reports `level: unobserved` when nothing was observed, `hyodo gates
+  trust show` / `approve --via` for host-attested gate approval, and the factory
+  example's host-verified approvals, module-tree binding, honest enforcement,
+  fail-closed zombie stale-lock checks, pre-exec PGID registration gate, and
+  provenance reporting.
+- Package chain is measured in `docs/releases/4.22.5.md` after publication; host
+  installation and live use need separate readback.
 
 ### 4.22.4 (released 2026-10-27 UTC)
 
