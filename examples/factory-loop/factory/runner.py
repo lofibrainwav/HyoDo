@@ -505,6 +505,24 @@ class SkillTimeoutExpired(subprocess.TimeoutExpired):
     process_group_killed: bool = False
 
 
+_PRE_EXEC_GATE_SCRIPT = (
+    "import os, sys\n"
+    "fd = int(sys.argv[1])\n"
+    "try:\n"
+    "    b = os.read(fd, 1)\n"
+    "finally:\n"
+    "    os.close(fd)\n"
+    "if b != b'1':\n"
+    "    os._exit(126)\n"
+    "try:\n"
+    "    os.execvp(sys.argv[2], sys.argv[2:])\n"
+    "except OSError as exc:\n"
+    "    sys.stderr.write(f'{exc}\\n')\n"
+    "    sys.stderr.flush()\n"
+    "    os._exit(127)\n"
+)
+
+
 def _run_skill_process(
     cmd: list[str],
     *,
@@ -515,26 +533,63 @@ def _run_skill_process(
 ) -> tuple[subprocess.CompletedProcess[str], bool]:
     """Run a skill command in its own process group and kill that whole group afterwards.
 
+    When *on_start* is provided, a pre-exec pipe gate holds the child in its new
+    session before ``execvp`` until *on_start(proc.pid)* completes. If the parent
+    dies (e.g. ``SIGKILL``) or registration raises before the gate byte is sent,
+    the child observes EOF and exits without running *cmd*, and registration
+    failures reap the child before re-raising.
+
     A background descendant (`cmd &`) that outlives the skill would otherwise
     keep writing after the post-run checks. Returns `(completed, descendants_killed)`.
     A process that leaves the group (`setsid`) or any other same-user process
     is outside this guarantee.
     """
-    proc = subprocess.Popen(
-        cmd,
-        cwd=str(cwd),
-        env=env,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,
-        text=True,
-        start_new_session=True,
-    )
+    if not cmd:
+        raise ValueError("skill command must not be empty")
+    gate_r = -1
+    gate_w = -1
+    proc: subprocess.Popen[str] | None = None
     killed = False
     try:
         if on_start is not None:
-            on_start(proc.pid)  # the pid is the new session's process-group id
+            gate_r, gate_w = os.pipe()
+            spawn_cmd = [sys.executable, "-I", "-c", _PRE_EXEC_GATE_SCRIPT, str(gate_r), *cmd]
+            pass_fds: tuple[int, ...] = (gate_r,)
+        else:
+            spawn_cmd = cmd
+            pass_fds = ()
+        proc = subprocess.Popen(
+            spawn_cmd,
+            cwd=str(cwd),
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            start_new_session=True,
+            pass_fds=pass_fds,
+        )
+        if gate_r != -1:
+            os.close(gate_r)
+            gate_r = -1
+        if on_start is not None:
+            try:
+                on_start(proc.pid)  # the pid is the new session's process-group id
+            except BaseException:
+                if gate_w != -1:
+                    with contextlib.suppress(OSError):
+                        os.close(gate_w)
+                    gate_w = -1
+                _kill_process_group(proc.pid)
+                if proc.poll() is None:
+                    proc.kill()
+                proc.wait()
+                raise
+            os.write(gate_w, b"1")
+            os.close(gate_w)
+            gate_w = -1
         try:
             out, err = proc.communicate(timeout=timeout)
+            returncode = proc.returncode
         except subprocess.TimeoutExpired:
             killed = _kill_process_group(proc.pid)
             proc.kill()
@@ -543,11 +598,22 @@ def _run_skill_process(
             timeout_exc.process_group_killed = killed
             raise timeout_exc from None
     finally:
-        killed = _kill_process_group(proc.pid) or killed
-        if proc.poll() is None:
-            proc.kill()
-            proc.wait()
-    return subprocess.CompletedProcess(cmd, proc.returncode, out, err), killed
+        if gate_r != -1:
+            with contextlib.suppress(OSError):
+                os.close(gate_r)
+        if gate_w != -1:
+            with contextlib.suppress(OSError):
+                os.close(gate_w)
+        if proc is not None:
+            killed = _kill_process_group(proc.pid) or killed
+            if proc.poll() is None:
+                proc.kill()
+                proc.wait()
+            for stream in (proc.stdout, proc.stderr):
+                if stream is not None:
+                    with contextlib.suppress(OSError):
+                        stream.close()
+    return subprocess.CompletedProcess(cmd, returncode, out, err), killed
 
 
 def _timeout_kill_fields(exc: BaseException) -> dict[str, Any]:
@@ -1366,16 +1432,18 @@ def _execute_modular_run_locked(
         with record_lock:
             record_path = workspace_root / record_rel
             expected = harness_written.get(record_rel)
-            try:
-                current = record_path.read_bytes() if record_path.exists() else None
-            except OSError:
-                current = None
+            if record_path.is_symlink():
+                current: bytes | None = b"\0symlink\0"
+            else:
+                try:
+                    current = record_path.read_bytes() if record_path.exists() else None
+                except OSError:
+                    current = b"\0unreadable\0"
             if current != expected:
                 run_state_tampering.append(record_rel)
+            written = write_skill_process_groups(workspace_root, run_id, [*run_groups, pgid])
             run_groups.append(pgid)
-            harness_written[record_rel] = write_skill_process_groups(
-                workspace_root, run_id, run_groups
-            )
+            harness_written[record_rel] = written
 
     def _harness_written_now() -> dict[str, bytes]:
         with record_lock:

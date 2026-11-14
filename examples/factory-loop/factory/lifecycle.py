@@ -283,16 +283,21 @@ def write_skill_process_groups(workspace_root: Path, run_id: str, pgids: list[in
 
 
 def recorded_process_groups(workspace_root: Path, run_id: str) -> list[int] | None:
-    """The process groups a run recorded; `None` when the record is unreadable."""
+    """The process groups a run recorded; `None` when the record is unreadable or malformed."""
     path = _process_groups_path(workspace_root, run_id)
-    if not path.exists():
+    if not path.exists() and not path.is_symlink():
         return []
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-        if raw.get("run_id") != run_id:
+        if path.is_symlink() or not path.is_file():
             return None
-        return [int(g) for g in raw["pgids"]]
-    except (OSError, ValueError, KeyError, TypeError, AttributeError):
+        raw = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(raw, dict) or raw.get("run_id") != run_id:
+            return None
+        pgids = raw.get("pgids")
+        if not isinstance(pgids, list) or any(type(g) is not int for g in pgids):
+            return None
+        return list(pgids)
+    except (OSError, ValueError, TypeError):
         return None
 
 
