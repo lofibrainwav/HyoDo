@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Factory example: on macOS, `killpg(pgid, 0)` answers `EPERM` for a group whose only members are unreaped zombies, so stale-lock recovery reported such a group `INVALID` and refused with `RUN_STATE_RECORD_INVALID`. A permission error now consults the `ps` scan: the group is `GONE` only when every listed member is a zombie and the scan is clean; another user's live group, an unparseable line or a failed `ps` stays `INVALID`. The `/proc`-only test is skipped on hosts without `/proc`.
+- Factory example: the pre-exec gate restores the default `SIGPIPE` and `SIGXFSZ` before `execvp`, so a gated skill handles a closed pipe like a directly spawned one (`yes | head -1` ends with 141 instead of looping on `EPIPE`).
+- Factory example: stale-lock checks no longer call a process gone when only its main thread is a zombie (`Threads:` > 1 in `/proc/<pid>/status`, unreadable status counts as alive), require two agreeing `/proc` scans before a group is `GONE`, and re-check `os.kill` when `/proc/<pid>` is missing (another PID namespace) instead of reporting the process gone.
+
 ## [4.22.5] - 2026-11-14
 
 Safety scans that keep scanning past oversized files, gate-trust commands for hosts, and factory-example fixes so harness-built approvals, unenforced restrictions and fixed timestamps are never reported as authority or evidence, since 4.22.4.
