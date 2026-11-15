@@ -159,7 +159,10 @@ def test_execution_evidence_is_invalidated_by_new_content(tmp_path: Path) -> Non
     old_sha = rec.skills["ran/probe"].content_sha256
 
     _observe(ws, "ran/probe", old_sha)
-    assert factory.doctor(ws)["axes"]["ran"]["skills"]["ran/probe"]["execution"] == "EXECUTED_PASS"
+    ran = factory.doctor(ws)["axes"]["ran"]["skills"]["ran/probe"]
+    assert ran["execution"] == "EXECUTED_PASS"
+    # F12 stays visible in the output, not only in the docs.
+    assert ran["execution_evidence_source"] == "UNAUTHENTICATED_OBSERVATION"
 
     _skill_md(mod).write_text("---\nname: probe\ndescription: v2\n---\n# v2\n", encoding="utf-8")
     _git(mod, "commit", "-q", "-am", "v2")
@@ -453,3 +456,35 @@ def test_frontmatter_name_cannot_leave_the_host_root(tmp_path: Path) -> None:
     for skill in rep["axes"]["rooted"]["skills"].values():
         assert skill["host_observations"] == []
         assert skill["host_connection"] == "ABSENT"
+
+
+def test_crash_between_state_and_view_is_reported_and_recovers(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Gate 6: a write that dies after lock.json but before registry.toml is visible, then repaired."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    factory.add_module(ws, _module(tmp_path, "crashy"))
+    sys.path.insert(0, str(FACTORY_DIR))
+    import factory.registry as registry
+
+    real_write = registry._atomic_write_text
+
+    def dying_write(target: Path, content: str) -> None:
+        if target.name == "registry.toml":
+            raise OSError("simulated crash after lock.json was replaced")
+        real_write(target, content)
+
+    monkeypatch.setattr(registry, "_atomic_write_text", dying_write)
+    with pytest.raises(OSError, match="simulated crash"):
+        factory.disable_target(ws, "crashy")
+    monkeypatch.setattr(registry, "_atomic_write_text", real_write)
+
+    lock = json.loads((ws / ".hyodo" / "factory" / "lock.json").read_text(encoding="utf-8"))
+    assert lock["modules"]["crashy"]["enabled"] is False
+    rep = factory.doctor(ws)
+    assert "registry_view_out_of_sync:registry.toml" in rep["problems"]
+    assert rep["status"] == "DEGRADED"
+
+    factory.enable_target(ws, "crashy")
+    assert factory.doctor(ws)["status"] == "HEALTHY"

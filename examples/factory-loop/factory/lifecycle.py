@@ -1439,6 +1439,10 @@ def _collect_axes(
                 "host_observations": host_seen,
                 "execution": execution,
                 # Whether a skill helped needs host outcome evidence; the harness has none.
+                # F12: who wrote the observation rows is not authenticated, so an
+                # EXECUTED_* value is a claim from the shared sidecar, not proof
+                # that this harness ran the skill.
+                "execution_evidence_source": "UNAUTHENTICATED_OBSERVATION",
                 "helped": "UNOBSERVED",
                 **_trust_axes(mod, unit, current_tree, records, trust_error),
             }
