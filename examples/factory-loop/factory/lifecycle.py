@@ -35,12 +35,16 @@ from factory.contracts import ModuleRecord, utc_now_iso
 from factory.registry import (
     ACTIVE_HOOKS_REL,
     LIFECYCLE_FLOCK_REL,
+    REGISTRY_TOML_REL,
     RUN_LOCK_REL,
     SNAPSHOTS_DIR_REL,
     _atomic_write_text,
+    _render_registry_toml,
     compare_module_origin,
+    compute_module_tree_digest,
     load_registry_state,
     observe_module_origin,
+    recorded_upstream_state,
     save_registry_state,
     verify_lock_integrity,
 )
@@ -51,7 +55,21 @@ from hyodo.mcp_config import plan_host as plan_mcp_host
 
 # Doctor warnings about provenance that could not be observed. They make the
 # doctor status UNOBSERVED but do not degrade the module's skills for routing.
-PROVENANCE_UNOBSERVED_PREFIXES = ("module_origin_unrecorded:", "module_tree_unbindable:")
+PROVENANCE_UNOBSERVED_PREFIXES = (
+    "module_origin_unrecorded:",
+    "module_tree_unbindable:",
+    "module_upstream_unrecorded:",
+)
+
+# What `doctor`'s overall `status` covers. Every other axis is reported per
+# module/skill under `axes` and never raises the status to HEALTHY.
+DOCTOR_STATUS_SCOPE = (
+    "registry state, content integrity and recorded upstream origin only; "
+    "install, host connection, execution, independent verification, usefulness "
+    "and trust are separate axes"
+)
+TRUST_STATE_FILE_REL = RUN_LOCK_REL.parent / "trust_state.json"
+_EXECUTION_FAILED_STATES = ("failed", "blocked", "rolled_back")
 
 # Pre-activation flags of each running `--selective` run (one file per run id),
 # removed after that run's restore.
@@ -1004,11 +1022,122 @@ def remove_module(workspace_root: Path, module_id: str) -> dict[str, Any]:
         }
 
 
-def doctor(workspace_root: Path) -> dict[str, Any]:
-    """Check registry health, content hash integrity, dependencies, conflicts, and script compatibility."""
+def _read_trust_records(workspace_root: Path) -> tuple[dict[str, Any], str | None]:
+    """Read trust records without the drift demotion write that `get_skill_trust_state` does."""
+    if not (workspace_root / TRUST_STATE_FILE_REL).is_file():
+        return {}, None
+    # Imported here: factory.runner imports this module.
+    from factory.runner import _verify_trust_file_integrity
+
+    ok, error = _verify_trust_file_integrity(workspace_root)
+    if not ok:
+        return {}, error
+    raw = json.loads((workspace_root / TRUST_STATE_FILE_REL).read_text(encoding="utf-8"))
+    return raw["skills"], None
+
+
+def _executions_by_skill(workspace_root: Path) -> dict[str, list[dict[str, Any]]]:
+    from hyodo.orchestration_observation import read_orchestration_observations
+
+    by_skill: dict[str, list[dict[str, Any]]] = {}
+    for row in read_orchestration_observations(workspace_root):
+        node = row.get("node_id")
+        if isinstance(node, str):
+            by_skill.setdefault(node, []).append(row)
+    return by_skill
+
+
+def _execution_state(unit: Any, rows: list[dict[str, Any]]) -> str:
+    """Execution evidence counts only for the skill content that is registered now."""
+    ref = f"sha256:{unit.content_sha256[:12]}"
+    current = [r for r in rows if ref in (r.get("evidence_refs") or [])]
+    if any(r.get("state") == "completed" and not r.get("unobserved_claim_count") for r in current):
+        return "EXECUTED_PASS"
+    if any(r.get("state") in _EXECUTION_FAILED_STATES for r in current):
+        return "EXECUTED_FAILED"
+    if current:
+        return "DISCLOSED_ONLY"
+    return "STALE_CONTENT" if rows else "UNOBSERVED"
+
+
+def _host_connection(unit: Any, host_skill_roots: list[Path]) -> tuple[str, list[dict[str, str]]]:
+    """Read back whether each host skill root serves this exact `SKILL.md` content."""
+    if not host_skill_roots:
+        return "UNOBSERVED", []
+    names = []
+    for candidate in (Path(unit.relative_path).parent.name, unit.name):
+        if candidate and candidate not in names and candidate not in (".", ".."):
+            names.append(candidate)
+    seen: list[dict[str, str]] = []
+    for root in host_skill_roots:
+        for name in names:
+            path = root / name / "SKILL.md"
+            if not path.is_file():
+                continue
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            state = "CONNECTED" if digest == unit.content_sha256 else "DRIFTED"
+            seen.append({"host_root": str(root), "path": str(path), "state": state})
+            break
+    if any(s["state"] == "CONNECTED" for s in seen):
+        return "CONNECTED", seen
+    return ("DRIFTED" if seen else "ABSENT"), seen
+
+
+def _trust_axes(
+    mod: ModuleRecord,
+    unit: Any,
+    current_tree: str | None,
+    records: dict[str, Any],
+    trust_error: str | None,
+) -> dict[str, Any]:
+    if trust_error:
+        return {
+            "trust_stage": "UNOBSERVED",
+            "independent_verification": "UNOBSERVED",
+            "trust_unobserved_reason": trust_error,
+        }
+    stored = records.get(unit.skill_id)
+    if not isinstance(stored, dict):
+        return {"trust_stage": "VERIFY", "independent_verification": "UNOBSERVED"}
+    invalidated = []
+    if stored.get("content_sha256") != unit.content_sha256:
+        invalidated.append("content_sha256_changed")
+    if current_tree is None or stored.get("module_tree_sha256") != current_tree:
+        invalidated.append("module_tree_changed")
+    if stored.get("version") != mod.version:
+        invalidated.append("version_changed")
+    if stored.get("module_source_path") != mod.source_path:
+        invalidated.append("module_source_path_changed")
+    if invalidated:
+        return {
+            "trust_stage": "VERIFY",
+            "independent_verification": "INVALIDATED",
+            "evidence_invalidated_by": invalidated,
+            "trust_stage_before_invalidation": stored.get("trust_stage"),
+        }
+    return {
+        "trust_stage": str(stored.get("trust_stage", "VERIFY")),
+        "independent_verification": str(stored.get("verifier_status", "UNOBSERVED")),
+    }
+
+
+def doctor(
+    workspace_root: Path,
+    *,
+    host_skill_roots: list[Path] | None = None,
+) -> dict[str, Any]:
+    """Check registry health, content integrity, dependencies, conflicts, and script compatibility.
+
+    `status` covers only `DOCTOR_STATUS_SCOPE`. Install, upstream origin, host
+    connection (read back from *host_skill_roots* when given), execution
+    evidence, independent verification, usefulness and trust are reported
+    separately under `axes`; none of them is inferred from content integrity.
+    Doctor never writes: trust records are read, not demoted.
+    """
     modules = load_registry_state(workspace_root)
     problems = verify_lock_integrity(workspace_root)
     warnings: list[str] = []
+    host_roots = [Path(p) for p in (host_skill_roots or [])]
 
     enabled_ids: set[str] = set()
     for mod in modules.values():
@@ -1098,6 +1227,31 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
     provenance_unobserved = any(
         state["state"] in ("UNRECORDED", "UNBINDABLE") for state in provenance.values()
     )
+    # A matching tree digest proves only that a copy did not change after it
+    # was registered. Without a recorded clean commit its upstream is unknown,
+    # so integrity alone is never reported as HEALTHY.
+    for mod_id, mod in sorted(modules.items()):
+        if mod_id not in provenance or provenance[mod_id]["state"] != "UNCHANGED":
+            continue
+        upstream = recorded_upstream_state(mod.origin)
+        provenance[mod_id]["recorded_upstream"] = upstream
+        if upstream != "RECORDED_COMMIT":
+            warnings.append(f"{PROVENANCE_UNOBSERVED_PREFIXES[2]}{mod_id}|{upstream}")
+            provenance_unobserved = True
+
+    # lock.json is the single source of state; registry.toml is its rendered
+    # view. A write interrupted between the two leaves them out of sync.
+    toml_path = workspace_root / REGISTRY_TOML_REL
+    if modules and (
+        not toml_path.is_file()
+        or toml_path.read_text(encoding="utf-8") != _render_registry_toml(modules)
+    ):
+        problems.append("registry_view_out_of_sync:registry.toml")
+
+    axes, axis_warnings, axis_problems = _collect_axes(workspace_root, modules, host_roots)
+    warnings.extend(axis_warnings)
+    problems.extend(axis_problems)
+
     # An empty registry is nothing observed, not a healthy one.
     if not modules:
         warnings.append("no_modules_registered")
@@ -1128,15 +1282,86 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
         status = "UNOBSERVED"
     else:
         status = "HEALTHY"
+    summary: dict[str, dict[str, int]] = {}
+    for mod_axes in axes.values():
+        for skill_axes in mod_axes["skills"].values():
+            if not skill_axes["enabled"]:
+                continue
+            for key in (
+                "host_connection",
+                "execution",
+                "independent_verification",
+                "helped",
+                "trust_stage",
+            ):
+                bucket = summary.setdefault(key, {})
+                bucket[skill_axes[key]] = bucket.get(skill_axes[key], 0) + 1
     return {
         "status": status,
+        "status_scope": DOCTOR_STATUS_SCOPE,
         "modules_registered": len(modules),
         "skills_enabled": len(enabled_ids),
         "problems": sorted(set(problems)),
         "warnings": sorted(set(warnings)),
         "module_provenance": provenance,
+        "axes": axes,
+        "axes_summary": summary,
         "run_lock": lock_status,
     }
+
+
+def _collect_axes(
+    workspace_root: Path,
+    modules: dict[str, ModuleRecord],
+    host_roots: list[Path],
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    warnings: list[str] = []
+    problems: list[str] = []
+    records, trust_error = _read_trust_records(workspace_root)
+    if trust_error:
+        warnings.append(f"trust_state_unverifiable:{trust_error}")
+    executions = _executions_by_skill(workspace_root)
+    axes: dict[str, Any] = {}
+    for mod_id, mod in sorted(modules.items()):
+        src = Path(mod.source_path)
+        installed = src.is_dir()
+        current_tree = compute_module_tree_digest(src)[0] if installed else None
+        origin = mod.origin or {}
+        mod_axes: dict[str, Any] = {
+            "registration": "REGISTERED",
+            "enabled": mod.enabled,
+            "install": "PRESENT" if installed else "MISSING",
+            "content_integrity": (compare_module_origin(mod)["state"] if installed else "MISSING"),
+            "recorded_upstream": recorded_upstream_state(origin),
+            "upstream_remote_recorded": bool(origin.get("git_remote_url")),
+            "upstream_verified": "UNOBSERVED",
+            "skills": {},
+        }
+        for sid, unit in sorted(mod.skills.items()):
+            host_state, host_seen = _host_connection(unit, host_roots)
+            execution = _execution_state(unit, executions.get(sid, []))
+            skill_axes = {
+                "enabled": bool(mod.enabled and unit.enabled),
+                "host_connection": host_state,
+                "host_observations": host_seen,
+                "execution": execution,
+                # Whether a skill helped needs host outcome evidence; the harness has none.
+                "helped": "UNOBSERVED",
+                **_trust_axes(mod, unit, current_tree, records, trust_error),
+            }
+            mod_axes["skills"][sid] = skill_axes
+            if not skill_axes["enabled"]:
+                continue
+            if host_state == "DRIFTED":
+                problems.append(f"host_copy_drift:{sid}")
+            elif host_state == "ABSENT":
+                warnings.append(f"host_copy_absent:{sid}")
+            if execution == "STALE_CONTENT":
+                warnings.append(f"execution_evidence_stale:{sid}")
+            if skill_axes["independent_verification"] == "INVALIDATED":
+                warnings.append(f"verification_evidence_invalidated:{sid}")
+        axes[mod_id] = mod_axes
+    return axes, warnings, problems
 
 
 def discover_skills(

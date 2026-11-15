@@ -161,6 +161,34 @@ examples/factory-loop/
   `UNOBSERVED` with a warning; the CLI exits `0` HEALTHY, `1` DEGRADED, `2`
   UNOBSERVED. Nothing here verifies how many external repositories or skills
   exist anywhere; no such count is claimed.
+- `doctor`'s `status` covers only what `status_scope` names: registry state,
+  content integrity and the recorded upstream origin. A tree digest that still
+  matches proves only that a copy did not change after it was added, so a
+  module without a recorded clean git commit (`recorded_upstream` is
+  `NO_GIT_ORIGIN`, `DIRTY_AT_RECORD` or `UNRECORDED`) makes `doctor`
+  `UNOBSERVED` (`module_upstream_unrecorded:<id>|<state>`), never `HEALTHY`.
+  Everything else is a separate axis under `axes` and never raises the status:
+  `install` (`PRESENT`/`MISSING`); `host_connection`, `CONNECTED` only when a
+  root passed with `--host-skill-root` serves exactly the registered
+  `SKILL.md` (`DRIFTED` is a problem, `ABSENT` a warning, no root
+  `UNOBSERVED`); `execution`, from `.hyodo/orchestration-observations.jsonl`
+  and counted only for the registered content (`EXECUTED_PASS`,
+  `EXECUTED_FAILED`, `DISCLOSED_ONLY`, `STALE_CONTENT`, `UNOBSERVED`);
+  `independent_verification` and `trust_stage`, read from the trust cache
+  without the demotion write, and `INVALIDATED` / `VERIFY` once the content,
+  tree, version or source path changed; `helped`, always `UNOBSERVED`
+  because the harness has no outcome evidence; and `upstream_verified`,
+  `UNOBSERVED` because `doctor` does not contact the remote.
+  `registry_view_out_of_sync:registry.toml` means `registry.toml` no longer
+  matches `lock.json` (the state; the TOML is its rendered view), for example
+  after an interrupted write; the next lifecycle write re-renders it.
+- `verify-upstream <module>` runs `git ls-remote --heads --tags` against the
+  recorded remote and never fetches into the module. It exits `0` only for
+  `VERIFIED_AT_REF` (the recorded commit is a branch or tag tip there) and `2`
+  otherwise: `COMMIT_NOT_A_REF_TIP` (possibly an older commit, so not proof of
+  tampering) or `UNOBSERVED` (no recorded commit or remote, or the remote
+  could not be reached). It does not compare file contents; that is the
+  module tree digest, a separate check.
 - A run that is killed leaves `.hyodo/factory/run.lock` behind. The lock
   records the owner's pid and host, and the run records each skill's process
   group under `.hyodo/factory-run-state/`. A lock counts as stale only when
@@ -242,6 +270,12 @@ python examples/factory-loop/hyodo_factory.py rollback gstack --root .
 
 # Verify dependencies, content digests, script syntax, and path containment
 python examples/factory-loop/hyodo_factory.py doctor --root .
+
+# Also read back what a host serves (repeatable; read-only)
+python examples/factory-loop/hyodo_factory.py doctor --root . --host-skill-root ~/.claude/skills
+
+# Read-only supply-chain check: is the recorded commit a branch/tag tip at its remote?
+python examples/factory-loop/hyodo_factory.py verify-upstream gstack --root .
 
 # Inspect host connection and support matrix (Claude Code, Cursor, Codex, Antigravity)
 python examples/factory-loop/hyodo_factory.py hosts --root .

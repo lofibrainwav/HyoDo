@@ -194,6 +194,70 @@ def compare_module_origin(mod: ModuleRecord) -> dict[str, Any]:
     return {"state": state, "changed_fields": changed, "current": current}
 
 
+def recorded_upstream_state(origin: dict[str, Any] | None) -> str:
+    """Classify the upstream origin recorded at add/update time (no network).
+
+    `RECORDED_COMMIT` means a clean git commit was recorded; it says where the
+    module came from, not that the remote serves that commit. `NO_GIT_ORIGIN`
+    is a plain copy whose upstream is unknown; a matching tree digest still
+    proves only that the copy did not change after it was registered.
+    """
+    if not origin:
+        return "UNRECORDED"
+    if not origin.get("git_repo") or not origin.get("git_commit"):
+        return "NO_GIT_ORIGIN"
+    if origin.get("git_dirty") is None:
+        return "UNRECORDED"
+    if origin.get("git_dirty"):
+        return "DIRTY_AT_RECORD"
+    return "RECORDED_COMMIT"
+
+
+def verify_module_upstream(mod: ModuleRecord, *, timeout_s: float = 20.0) -> dict[str, Any]:
+    """Ask the recorded remote whether the recorded commit is the tip of a branch or tag.
+
+    Read-only: it runs `git ls-remote` against the recorded remote URL and never
+    fetches into the module. `VERIFIED_AT_REF` is the only positive answer.
+    A commit that is not a branch or tag tip is `COMMIT_NOT_A_REF_TIP`, which is
+    not proof of tampering (it can be an older commit), so it is not a pass.
+    """
+    origin = mod.origin or {}
+    commit = origin.get("git_commit")
+    remote = origin.get("git_remote_url")
+    result: dict[str, Any] = {
+        "module_id": mod.module_id,
+        "recorded_upstream": recorded_upstream_state(origin),
+        "remote_url": remote,
+        "recorded_commit": commit,
+        "matching_refs": [],
+    }
+    if not commit:
+        return {**result, "state": "UNOBSERVED", "reason": "no_recorded_commit"}
+    if not remote:
+        return {**result, "state": "UNOBSERVED", "reason": "no_recorded_remote"}
+    try:
+        proc = subprocess.run(
+            ["git", "ls-remote", "--heads", "--tags", remote],
+            capture_output=True,
+            text=True,
+            timeout=timeout_s,
+            check=False,
+            env=clean_git_env(),
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        return {**result, "state": "UNOBSERVED", "reason": f"ls_remote_failed:{type(exc).__name__}"}
+    if proc.returncode != 0:
+        return {**result, "state": "UNOBSERVED", "reason": f"ls_remote_exit_{proc.returncode}"}
+    refs = []
+    for line in proc.stdout.splitlines():
+        sha, _, ref = line.partition("\t")
+        if sha.strip() == commit:
+            refs.append(ref.strip().removesuffix("^{}"))
+    if refs:
+        return {**result, "state": "VERIFIED_AT_REF", "matching_refs": sorted(set(refs))}
+    return {**result, "state": "COMMIT_NOT_A_REF_TIP"}
+
+
 def _atomic_write_text(target: Path, content: str) -> None:
     """Write *content* to *target* atomically via a sibling temporary file + `os.replace`."""
     target.parent.mkdir(parents=True, exist_ok=True)
