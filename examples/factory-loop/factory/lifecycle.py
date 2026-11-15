@@ -66,6 +66,8 @@ PROVENANCE_UNOBSERVED_PREFIXES = (
 # defective; gap analysis must not read them as degraded skills.
 EVIDENCE_AXIS_WARNING_PREFIXES = (
     "execution_evidence_stale:",
+    "execution_claim_uncorroborated:",
+    "agent_ledger_unreadable",
     "verification_evidence_invalidated:",
     "host_copy_absent:",
     "host_root_unreadable:",
@@ -1055,20 +1057,38 @@ def _read_trust_records(workspace_root: Path) -> tuple[dict[str, Any], str | Non
     return (skills, None) if isinstance(skills, dict) else ({}, "TRUST_STATE_MALFORMED")
 
 
-def _executions_by_skill(workspace_root: Path) -> tuple[dict[str, list[dict[str, Any]]], bool]:
-    """Observation rows per skill id, in file order; False when the file is unreadable."""
+def _executions_by_skill(
+    workspace_root: Path,
+) -> tuple[dict[str, list[dict[str, Any]]], bool, set[tuple[str, str, str]] | None]:
+    """Observation rows per skill id in file order, and the agent-ledger join keys.
+
+    The harness runner writes each skill execution twice: an agent event
+    (`event_id`, `run_id`, `tool.name` = skill id) and an observation with the
+    same `event_id`. The keys come from the existing agent ledger; `None`
+    means that ledger could not be read.
+    """
+    from hyodo.events import read_agent_events
     from hyodo.orchestration_observation import read_orchestration_observations
 
     try:
         rows = read_orchestration_observations(workspace_root)
     except (OSError, ValueError):
-        return {}, False
+        return {}, False, None
     by_skill: dict[str, list[dict[str, Any]]] = {}
     for row in rows:
         node = row.get("node_id")
         if isinstance(node, str) and isinstance(row.get("evidence_refs", []), list):
             by_skill.setdefault(node, []).append(row)
-    return by_skill, True
+    events, _corrupt = read_agent_events(workspace_root)
+    if events is None:
+        return by_skill, True, None
+    keys: set[tuple[str, str, str]] = set()
+    for event in events:
+        tool = event.get("tool") if isinstance(event.get("tool"), dict) else {}
+        ids = (event.get("event_id"), event.get("run_id"), tool.get("name"))
+        if all(isinstance(v, str) and v for v in ids):
+            keys.add(ids)  # type: ignore[arg-type]
+    return by_skill, True, keys
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -1081,14 +1101,22 @@ def _parse_ts(value: Any) -> datetime | None:
     return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
 
 
-def _execution_state(mod: ModuleRecord, unit: Any, rows: list[dict[str, Any]]) -> str:
-    """The latest observation of the registered content decides.
+def _execution_state(
+    mod: ModuleRecord,
+    unit: Any,
+    rows: list[dict[str, Any]],
+    ledger_keys: set[tuple[str, str, str]] | None,
+) -> tuple[str, str]:
+    """Return (execution state, evidence source); the latest corroborated row decides.
 
-    A row counts only if it names this `SKILL.md` digest and is not older than
-    the module's current registration (`origin.recorded_at`), because the
-    digest alone does not cover scripts and other files in the module tree.
-    The rows' producer is not authenticated: `EXECUTED_PASS` means an
-    observation says the node completed, not that the harness ran it.
+    A row counts only if it names this `SKILL.md` digest, is not older than the
+    module's current registration (`origin.recorded_at`, because the digest
+    alone does not cover scripts) and joins an agent-ledger event with the same
+    `event_id`, `run_id` and `tool.name` = skill id, which is what the harness
+    runner writes. A row that only exists in the shared observation sidecar
+    (for example `hyodo observation record` from another host) is
+    `UNCORROBORATED_CLAIM`, never `EXECUTED_*`. A process running as the same
+    user that writes matching rows to both files is not detected.
     """
     ref = f"sha256:{unit.content_sha256[:12]}"
     registered_at = _parse_ts((mod.origin or {}).get("recorded_at"))
@@ -1101,12 +1129,23 @@ def _execution_state(mod: ModuleRecord, unit: Any, rows: list[dict[str, Any]]) -
             continue
         if row.get("state") == "completed" or row.get("state") in _EXECUTION_FAILED_STATES:
             current.append(row)
-    if current:
-        last = current[-1]
+    if ledger_keys is None:
+        return (
+            "UNOBSERVED" if current else ("STALE_CONTENT" if rows else "UNOBSERVED"),
+            "AGENT_LEDGER_UNREADABLE",
+        )
+    corroborated = [
+        r for r in current if (r.get("event_id"), r.get("run_id"), unit.skill_id) in ledger_keys
+    ]
+    if corroborated:
+        last = corroborated[-1]
         if last.get("state") in _EXECUTION_FAILED_STATES:
-            return "EXECUTED_FAILED"
-        return "DISCLOSED_ONLY" if last.get("unobserved_claim_count") else "EXECUTED_PASS"
-    return "STALE_CONTENT" if rows else "UNOBSERVED"
+            return "EXECUTED_FAILED", "AGENT_LEDGER_CORROBORATED"
+        state = "DISCLOSED_ONLY" if last.get("unobserved_claim_count") else "EXECUTED_PASS"
+        return state, "AGENT_LEDGER_CORROBORATED"
+    if current:
+        return "UNCORROBORATED_CLAIM", "UNCORROBORATED_OBSERVATION"
+    return ("STALE_CONTENT" if rows else "UNOBSERVED"), "NONE"
 
 
 def _host_connection(unit: Any, host_skill_roots: list[Path]) -> tuple[str, list[dict[str, str]]]:
@@ -1401,7 +1440,9 @@ def _collect_axes(
     records, trust_error = _read_trust_records(workspace_root)
     if trust_error:
         warnings.append(f"trust_state_unverifiable:{trust_error}")
-    executions, observations_readable = _executions_by_skill(workspace_root)
+    executions, observations_readable, ledger_keys = _executions_by_skill(workspace_root)
+    if ledger_keys is None:
+        warnings.append("agent_ledger_unreadable")
     if not observations_readable:
         warnings.append("orchestration_observations_unreadable")
     for root in host_roots:
@@ -1428,21 +1469,20 @@ def _collect_axes(
         }
         for sid, unit in sorted(mod.skills.items()):
             host_state, host_seen = _host_connection(unit, host_roots)
-            execution = (
-                _execution_state(mod, unit, executions.get(sid, []))
+            execution, evidence_source = (
+                _execution_state(mod, unit, executions.get(sid, []), ledger_keys)
                 if observations_readable
-                else "UNOBSERVED"
+                else ("UNOBSERVED", "OBSERVATIONS_UNREADABLE")
             )
             skill_axes = {
                 "enabled": bool(mod.enabled and unit.enabled),
                 "host_connection": host_state,
                 "host_observations": host_seen,
                 "execution": execution,
+                # F12: EXECUTED_* only for rows joined to the agent ledger the
+                # runner writes; a sidecar-only row is UNCORROBORATED_CLAIM.
+                "execution_evidence_source": evidence_source,
                 # Whether a skill helped needs host outcome evidence; the harness has none.
-                # F12: who wrote the observation rows is not authenticated, so an
-                # EXECUTED_* value is a claim from the shared sidecar, not proof
-                # that this harness ran the skill.
-                "execution_evidence_source": "UNAUTHENTICATED_OBSERVATION",
                 "helped": "UNOBSERVED",
                 **_trust_axes(mod, unit, current_tree, records, trust_error),
             }
@@ -1455,6 +1495,8 @@ def _collect_axes(
                 warnings.append(f"host_copy_absent:{sid}")
             if execution == "STALE_CONTENT":
                 warnings.append(f"execution_evidence_stale:{sid}")
+            elif execution == "UNCORROBORATED_CLAIM":
+                warnings.append(f"execution_claim_uncorroborated:{sid}")
             if skill_axes["independent_verification"] == "INVALIDATED":
                 warnings.append(f"verification_evidence_invalidated:{sid}")
         axes[mod_id] = mod_axes

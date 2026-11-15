@@ -121,6 +121,8 @@ def _observe(
     state: str = "completed",
     unobserved: int = 0,
     ts: str | None = None,
+    ledger: bool = True,
+    ledger_tool: str | None = None,
 ) -> None:
     sys.path.insert(0, str(FACTORY_DIR))
     from hyodo.orchestration_observation import (
@@ -148,6 +150,31 @@ def _observe(
         "evidence_refs": [f"sha256:{content_sha[:12]}"],
     }
     assert append_orchestration_observation(ws, payload)
+    if ledger:
+        # What the harness runner writes next to each observation.
+        from hyodo.events import (
+            AGENT_EVENT_SCHEMA_VERSION,
+            append_agent_event,
+            unevaluated_policy,
+            validate_event,
+        )
+
+        ok, _reasons, event = validate_event(
+            {
+                "schema_version": AGENT_EVENT_SCHEMA_VERSION,
+                "event_id": payload["event_id"],
+                "run_id": payload["run_id"],
+                "step_index": 0,
+                "ts": payload["ts"],
+                "kind": "tool_call",
+                "actor": "agent",
+                "tool": {"name": ledger_tool or skill_id, "args_digest": None, "paths": []},
+                "policy": unevaluated_policy(),
+            }
+        )
+        assert ok
+        assert event is not None
+        assert append_agent_event(ws, event)
 
 
 def test_execution_evidence_is_invalidated_by_new_content(tmp_path: Path) -> None:
@@ -161,8 +188,7 @@ def test_execution_evidence_is_invalidated_by_new_content(tmp_path: Path) -> Non
     _observe(ws, "ran/probe", old_sha)
     ran = factory.doctor(ws)["axes"]["ran"]["skills"]["ran/probe"]
     assert ran["execution"] == "EXECUTED_PASS"
-    # F12 stays visible in the output, not only in the docs.
-    assert ran["execution_evidence_source"] == "UNAUTHENTICATED_OBSERVATION"
+    assert ran["execution_evidence_source"] == "AGENT_LEDGER_CORROBORATED"
 
     _skill_md(mod).write_text("---\nname: probe\ndescription: v2\n---\n# v2\n", encoding="utf-8")
     _git(mod, "commit", "-q", "-am", "v2")
@@ -488,3 +514,39 @@ def test_crash_between_state_and_view_is_reported_and_recovers(
 
     factory.enable_target(ws, "crashy")
     assert factory.doctor(ws)["status"] == "HEALTHY"
+
+
+def test_sidecar_only_observation_is_an_uncorroborated_claim(tmp_path: Path) -> None:
+    """F12: a row no runner event backs (another host, `hyodo observation record`) is not EXECUTED."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    rec = factory.add_module(ws, _module(tmp_path, "claimed"))
+    sha = rec.skills["claimed/probe"].content_sha256
+    _observe(ws, "claimed/probe", sha, ledger=False)
+    rep = factory.doctor(ws)
+    skill = rep["axes"]["claimed"]["skills"]["claimed/probe"]
+    assert skill["execution"] == "UNCORROBORATED_CLAIM"
+    assert skill["execution_evidence_source"] == "UNCORROBORATED_OBSERVATION"
+    assert "execution_claim_uncorroborated:claimed/probe" in rep["warnings"]
+
+    # An event for another tool with the same ids does not corroborate this skill.
+    _observe(ws, "claimed/probe", sha, ledger_tool="other/tool")
+    skill = factory.doctor(ws)["axes"]["claimed"]["skills"]["claimed/probe"]
+    assert skill["execution"] == "UNCORROBORATED_CLAIM"
+
+
+def test_runner_executions_are_corroborated_end_to_end(tmp_path: Path) -> None:
+    """The real runner writes both records, so its executions read as corroborated."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    factory.add_module(ws, _module(tmp_path, "real"))
+    result = factory.execute_modular_run(
+        ws,
+        run_id="corroborate-01",
+        prompt="probe skill",
+        skill_commands={"real/probe": [sys.executable, "-c", "print('ok')"]},
+    )
+    assert result["orchestration_observations_recorded"] >= 1
+    skill = factory.doctor(ws)["axes"]["real"]["skills"]["real/probe"]
+    assert skill["execution_evidence_source"] == "AGENT_LEDGER_CORROBORATED"
+    assert skill["execution"] in ("EXECUTED_PASS", "DISCLOSED_ONLY", "EXECUTED_FAILED")

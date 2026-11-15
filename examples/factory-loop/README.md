@@ -180,9 +180,17 @@ examples/factory-loop/
   `.hyodo/orchestration-observations.jsonl`, where only rows that name the
   registered `SKILL.md` digest and are not older than the module's current
   registration count and the latest such row decides (`EXECUTED_PASS`,
-  `EXECUTED_FAILED`, `DISCLOSED_ONLY`, `STALE_CONTENT`, `UNOBSERVED`). The
-  rows' producer is not authenticated: `EXECUTED_PASS` means an observation
-  says the node completed, not that this harness ran it;
+  `EXECUTED_FAILED`, `DISCLOSED_ONLY`, `STALE_CONTENT`, `UNOBSERVED`). A row
+  also has to join an event in the existing agent ledger
+  (`.hyodo/agent-events.jsonl`) with the same `event_id`, `run_id` and
+  `tool.name` equal to the skill id, which is what the harness runner writes
+  for every skill it runs (`execution_evidence_source:
+  AGENT_LEDGER_CORROBORATED`). A row that exists only in the shared sidecar,
+  for example from `hyodo observation record` or another host, is
+  `UNCORROBORATED_CLAIM` (`execution_claim_uncorroborated:<skill>`), never
+  `EXECUTED_*`. Both files are plain local files: a process running as the
+  same user that writes matching rows to both is not detected, so this is
+  corroboration, not authentication;
   `independent_verification` and `trust_stage`, read from the trust cache
   without the demotion write, and `INVALIDATED` / `VERIFY` once the content,
   tree, version or source path changed; `helped`, always `UNOBSERVED`
