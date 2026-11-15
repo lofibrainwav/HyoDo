@@ -265,6 +265,26 @@ def test_verify_upstream_against_a_local_remote(
     assert json.loads(capsys.readouterr().out)["reason"] == "no_recorded_remote"
 
 
+@pytest.mark.parametrize("hostile", ["--upload-pack=touch /tmp/pwned", "ext::sh -c id"])
+def test_verify_upstream_refuses_option_or_command_remotes(tmp_path: Path, hostile: str) -> None:
+    """A module's git config is untrusted: its remote must not become a git option or command."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    mod = _module(tmp_path, "hostile")
+    # `git remote add` refuses such URLs; a hostile module can still write its config.
+    _git(mod, "config", "remote.origin.url", hostile)
+    factory.add_module(ws, mod)
+    sys.path.insert(0, str(FACTORY_DIR))
+    from factory.registry import load_registry_state, verify_module_upstream
+
+    rec = load_registry_state(ws)["hostile"]
+    if rec.origin.get("git_remote_url") != hostile:
+        pytest.skip("remote URL was normalized when recorded")
+    out = verify_module_upstream(rec)
+    assert out["state"] == "UNOBSERVED"
+    assert out["reason"] == "remote_url_refused"
+
+
 def test_concurrent_adds_are_serialized_without_lost_updates(tmp_path: Path) -> None:
     """Gate 7 (distinct names) and Gate 3 (same name): one writer at a time, no overwrite."""
     ws = _workspace(tmp_path)

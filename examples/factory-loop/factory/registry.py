@@ -235,9 +235,13 @@ def verify_module_upstream(mod: ModuleRecord, *, timeout_s: float = 20.0) -> dic
         return {**result, "state": "UNOBSERVED", "reason": "no_recorded_commit"}
     if not remote:
         return {**result, "state": "UNOBSERVED", "reason": "no_recorded_remote"}
+    # The remote URL comes from the module's own git config: untrusted. A
+    # leading "-" would be read as an option, and ext:: runs a command.
+    if remote.startswith("-") or remote.lower().startswith("ext::"):
+        return {**result, "state": "UNOBSERVED", "reason": "remote_url_refused"}
     try:
         proc = subprocess.run(
-            ["git", "ls-remote", "--heads", "--tags", remote],
+            ["git", "-c", "protocol.ext.allow=never", "ls-remote", "--heads", "--tags", remote],
             capture_output=True,
             text=True,
             timeout=timeout_s,
