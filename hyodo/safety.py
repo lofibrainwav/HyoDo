@@ -1007,6 +1007,14 @@ def _result_payload(
         coverage = "UNOBSERVED" if source.startswith("error:") else "FULL"
     else:
         coverage = _classify_coverage(scanned_files, total_scannable, errored=errored)
+    if coverage == "UNOBSERVED" and level == "low":
+        # A low score over content that was not (fully) observed is not a low
+        # risk verdict. Findings can still raise the level (a lower bound), but
+        # the absence of findings cannot lower it. Exit codes are unchanged.
+        level = "unobserved"
+        action = (
+            "Not observed: no risk verdict without scan coverage — final approval remains human"
+        )
     return {
         "source": source,
         "scope": scope,

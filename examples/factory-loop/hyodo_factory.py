@@ -13,6 +13,7 @@ Commands:
 - `discover`        Discover standard Agent Skills / plugins across search directories
 - `hosts`           Verify host connection & capability matrix (Claude Code, Cursor, Codex, Antigravity)
 - `run <prompt>`    Execute the modular factory loop with real subprocess isolation & verification
+- `recover-stale-lock` Remove a run lock whose owner is provably gone (records a receipt)
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ import hashlib
 import json
 import shlex
 import sys
+import time
 from pathlib import Path
 from typing import Any
 
@@ -33,7 +35,7 @@ from adapters.external_evaluator import (  # noqa: E402
     evaluator_routing_to_hyodo_retrieval,
     record_evaluator_shadow_receipt,
 )
-from factory.contracts import recommend_skill_lifecycle_action  # noqa: E402
+from factory.contracts import recommend_skill_lifecycle_action, utc_now_iso  # noqa: E402
 from factory.lifecycle import (  # noqa: E402
     activate_selected_skills,
     add_module,
@@ -41,6 +43,7 @@ from factory.lifecycle import (  # noqa: E402
     discover_skills,
     doctor,
     enable_target,
+    recover_stale_run_lock,
     remove_module,
     rollback_module,
     update_module,
@@ -58,8 +61,8 @@ from factory.runner import (  # noqa: E402
     evaluate_skill_impact,
     execute_modular_run,
     get_skill_trust_state,
-    issue_serenity_approval_receipt,
-    verify_serenity_approval_receipt,
+    issue_host_approval_request,
+    verify_host_approval_receipt,
 )
 
 from hyodo.events import AGENT_EVENT_SCHEMA_VERSION  # noqa: E402
@@ -81,7 +84,7 @@ def write_host_promise_projection(
     *,
     promise_id: str,
     host_label: str = "hyodo-factory",
-    observed_at: str = "2026-11-13T00:00:00Z",
+    observed_at: str | None = None,
     auto_count: int = 1,
     ask_count: int = 1,
     must_not_count: int = 2,
@@ -91,7 +94,7 @@ def write_host_promise_projection(
     projection = {
         "schema": HOST_PROMISE_SCHEMA,
         "producer": {"host": host_label, "schema_version": "1.0.0"},
-        "observed_at": observed_at,
+        "observed_at": observed_at or utc_now_iso(),
         "authority": "NONE",
         "source": {"state": "OBSERVED", "problem_count": 0},
         "active_promise": {"resolution": "ACTIVE", "promise_id": promise_id},
@@ -129,7 +132,7 @@ def ingest_jev_skill_routing(
     *,
     jev_observation: dict[str, Any],
     skill_rules: list[dict[str, str]],
-    ingested_at: str = "2026-11-13T00:00:00Z",
+    ingested_at: str | None = None,
 ) -> dict[str, Any]:
     """Bridge a zero-authority evaluator observation (`JEV`) into `hyodo.skill-retrieval/v1`."""
     if jev_observation.get("execution_authority") is not False:
@@ -139,7 +142,7 @@ def ingest_jev_skill_routing(
         evaluator_node="jev-skillid",
         observation=jev_observation,
         candidate_rules=skill_rules,
-        ingested_at=ingested_at,
+        ingested_at=ingested_at or utc_now_iso(),
     )
 
 
@@ -242,9 +245,11 @@ def run_unified_factory_pipeline(
     jev_completion_event: dict[str, Any],
     source_paths: list[str],
     output_paths: list[str],
-    timestamp: float = 1_760_000_000.0,
+    timestamp: float | None = None,
 ) -> dict[str, Any]:
     """Execute the host-side verification & attestation loop around a built worktree."""
+    if timestamp is None:
+        timestamp = time.time()
     promise_receipt = write_host_promise_projection(root, promise_id=promise_id)
     skill_manifest_entry = ingest_jev_skill_routing(
         root,
@@ -268,12 +273,13 @@ def run_unified_factory_pipeline(
     six_lenses = measure_workspace_six_lenses(root)
     exact_sha = six_lenses["exact_artifact_sha"]
     target_sha = exact_sha if exact_sha != "UNOBSERVED" else "0" * 40
+    verified_at = utc_now_iso()
     verifier_nameplate = build_nameplate(
         actor_id=review_producer,
         role="verifier",
         repo=root.name,
         exact_artifact_sha=target_sha,
-        observed_at="2026-11-13T00:00:10Z",
+        observed_at=verified_at,
         runtime={"session_id": verifier_session_id, "host": "hyodo-factory"},
     )
     verifier_attestation = verify_exact_candidate(
@@ -284,7 +290,7 @@ def run_unified_factory_pipeline(
             "handoff_status": handoff_verdict["status"],
             "checks": handoff_verdict["checks_observed"],
         },
-        observed_at="2026-11-13T00:00:10Z",
+        observed_at=verified_at,
     )
 
     history_path = root / ".hyodo" / "history.jsonl"
@@ -377,6 +383,19 @@ def main(argv: list[str] | None = None) -> int:
     p_trust.add_argument("skill_id")
 
     sub.add_parser("hosts", help="Verify host connection and capability support matrix")
+    p_rec = sub.add_parser(
+        "recover-stale-lock",
+        help="Remove .hyodo/factory/run.lock only if its owner process is provably gone",
+    )
+    p_rec.add_argument(
+        "--discard-process-group-record",
+        action="store_true",
+        help=(
+            "After inspecting the processes yourself: ignore the dead run's process-group "
+            "record (unreadable, invalid, or naming groups that are not its skills); "
+            "recorded in the receipt"
+        ),
+    )
 
     p_run = sub.add_parser(
         "run", help="Execute a modular factory run with real subprocess isolation"
@@ -436,7 +455,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "doctor":
         rep = doctor(root)
         print(json.dumps(rep, indent=2))
-        return 0 if rep["status"] == "HEALTHY" else 1
+        return {"HEALTHY": 0, "DEGRADED": 1}.get(rep["status"], 2)
     elif args.cmd == "route":
         plan = route_skills_for_task(
             root,
@@ -463,6 +482,15 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "hosts":
         matrix = verify_host_integrations(root)
         print(json.dumps(matrix, indent=2))
+    elif args.cmd == "recover-stale-lock":
+        try:
+            receipt = recover_stale_run_lock(
+                root, discard_process_group_record=args.discard_process_group_record
+            )
+        except RuntimeError as exc:
+            print(json.dumps({"recovered": False, "reason": str(exc)}, indent=2))
+            return 2
+        print(json.dumps({"recovered": True, **receipt}, indent=2))
     elif args.cmd == "run":
         b_cmd = shlex.split(args.build_cmd) if args.build_cmd else None
         v_cmd = shlex.split(args.verify_cmd) if args.verify_cmd else None
@@ -486,10 +514,13 @@ def main(argv: list[str] | None = None) -> int:
             execution_mode=args.execution_mode,
         )
         print(json.dumps(run_res, indent=2, ensure_ascii=False))
-        if run_res["isolated_faults"] or run_res["permission_violations"]:
+        # 0 PASS, 1 FAIL, 2 UNOBSERVED: nothing executed or no independent
+        # verifier ran is never success.
+        decision = run_res["run_verdict"]["decision"]
+        if decision == "FAIL":
             return 1
-        if v_cmd and run_res["independent_verifier_receipt"].get("status") != "PASS":
-            return 1
+        if decision != "PASS":
+            return 2
     return 0
 
 
@@ -512,17 +543,18 @@ __all__ = [
     "execute_modular_run",
     "get_skill_trust_state",
     "ingest_jev_skill_routing",
-    "issue_serenity_approval_receipt",
+    "issue_host_approval_request",
     "main",
     "recommend_skill_lifecycle_action",
     "record_jev_shadow_event",
+    "recover_stale_run_lock",
     "remove_module",
     "rollback_module",
     "route_skills_for_task",
     "run_unified_factory_pipeline",
     "select_and_activate_for_task",
     "update_module",
+    "verify_host_approval_receipt",
     "verify_host_integrations",
-    "verify_serenity_approval_receipt",
     "write_host_promise_projection",
 ]
