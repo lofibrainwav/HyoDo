@@ -162,18 +162,27 @@ examples/factory-loop/
   UNOBSERVED. Nothing here verifies how many external repositories or skills
   exist anywhere; no such count is claimed.
 - `doctor`'s `status` covers only what `status_scope` names: registry state,
-  content integrity and the recorded upstream origin. A tree digest that still
+  content integrity, the recorded upstream origin and, only when
+  `--host-skill-root` is given, host copies that differ from the registered
+  content. A tree digest that still
   matches proves only that a copy did not change after it was added, so a
   module without a recorded clean git commit (`recorded_upstream` is
   `NO_GIT_ORIGIN`, `DIRTY_AT_RECORD` or `UNRECORDED`) makes `doctor`
-  `UNOBSERVED` (`module_upstream_unrecorded:<id>|<state>`), never `HEALTHY`.
+  `UNOBSERVED` (`module_upstream_unrecorded:<id>|<state>`), never `HEALTHY`;
+  so does a registered module whose source directory is gone
+  (`module_source_missing:<id>`), enabled or not.
   Everything else is a separate axis under `axes` and never raises the status:
   `install` (`PRESENT`/`MISSING`); `host_connection`, `CONNECTED` only when a
   root passed with `--host-skill-root` serves exactly the registered
   `SKILL.md` (`DRIFTED` is a problem, `ABSENT` a warning, no root
-  `UNOBSERVED`); `execution`, from `.hyodo/orchestration-observations.jsonl`
-  and counted only for the registered content (`EXECUTED_PASS`,
-  `EXECUTED_FAILED`, `DISCLOSED_ONLY`, `STALE_CONTENT`, `UNOBSERVED`);
+  `UNOBSERVED`; a root that is not a readable directory is
+  `host_root_unreadable`, not `ABSENT`); `execution`, from
+  `.hyodo/orchestration-observations.jsonl`, where only rows that name the
+  registered `SKILL.md` digest and are not older than the module's current
+  registration count and the latest such row decides (`EXECUTED_PASS`,
+  `EXECUTED_FAILED`, `DISCLOSED_ONLY`, `STALE_CONTENT`, `UNOBSERVED`). The
+  rows' producer is not authenticated: `EXECUTED_PASS` means an observation
+  says the node completed, not that this harness ran it;
   `independent_verification` and `trust_stage`, read from the trust cache
   without the demotion write, and `INVALIDATED` / `VERIFY` once the content,
   tree, version or source path changed; `helped`, always `UNOBSERVED`
@@ -181,9 +190,15 @@ examples/factory-loop/
   `UNOBSERVED` because `doctor` does not contact the remote.
   `registry_view_out_of_sync:registry.toml` means `registry.toml` no longer
   matches `lock.json` (the state; the TOML is its rendered view), for example
-  after an interrupted write; the next lifecycle write re-renders it.
+  after an interrupted write; the next lifecycle write re-renders it. An
+  unreadable trust cache, observation file or host copy makes that axis
+  `UNOBSERVED` with a warning instead of failing the whole report. These
+  evidence warnings are not treated as skill defects by gap analysis.
 - `verify-upstream <module>` runs `git ls-remote --heads --tags` against the
-  recorded remote and never fetches into the module. It exits `0` only for
+  recorded remote and never fetches into the module. The remote URL comes from
+  the module's own git config, so a URL that starts with `-` or uses `ext::`
+  is refused (`remote_url_refused`), and git never waits for a credential
+  prompt. It exits `0` only for
   `VERIFIED_AT_REF` (the recorded commit is a branch or tag tip there) and `2`
   otherwise: `COMMIT_NOT_A_REF_TIP` (possibly an older commit, so not proof of
   tampering) or `UNOBSERVED` (no recorded commit or remote, or the remote

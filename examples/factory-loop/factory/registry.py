@@ -125,7 +125,9 @@ def _git_out(root: Path, *args: str) -> str | None:
             text=True,
             timeout=10,
             check=False,
-            env=clean_git_env(),
+            # Read-only observation: no index refresh in the module's repository.
+            env={**clean_git_env(), "GIT_OPTIONAL_LOCKS": "0"},
+            stdin=subprocess.DEVNULL,
         )
     except (OSError, subprocess.SubprocessError):
         return None
@@ -241,12 +243,29 @@ def verify_module_upstream(mod: ModuleRecord, *, timeout_s: float = 20.0) -> dic
         return {**result, "state": "UNOBSERVED", "reason": "remote_url_refused"}
     try:
         proc = subprocess.run(
-            ["git", "-c", "protocol.ext.allow=never", "ls-remote", "--heads", "--tags", remote],
+            [
+                "git",
+                "-c",
+                "protocol.ext.allow=never",
+                "-c",
+                "core.askPass=",
+                "ls-remote",
+                "--heads",
+                "--tags",
+                "--",
+                remote,
+            ],
             capture_output=True,
             text=True,
             timeout=timeout_s,
             check=False,
-            env=clean_git_env(),
+            stdin=subprocess.DEVNULL,
+            # Never wait for a password or passphrase prompt.
+            env={
+                **clean_git_env(),
+                "GIT_TERMINAL_PROMPT": "0",
+                "GIT_SSH_COMMAND": "ssh -oBatchMode=yes",
+            },
         )
     except (OSError, subprocess.SubprocessError) as exc:
         return {**result, "state": "UNOBSERVED", "reason": f"ls_remote_failed:{type(exc).__name__}"}

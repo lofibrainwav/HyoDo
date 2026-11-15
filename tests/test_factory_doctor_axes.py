@@ -11,6 +11,7 @@ import json
 import subprocess
 import sys
 import uuid
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -114,7 +115,12 @@ def test_host_readback_connected_drifted_absent(tmp_path: Path) -> None:
 
 
 def _observe(
-    ws: Path, skill_id: str, content_sha: str, state: str = "completed", unobserved: int = 0
+    ws: Path,
+    skill_id: str,
+    content_sha: str,
+    state: str = "completed",
+    unobserved: int = 0,
+    ts: str | None = None,
 ) -> None:
     sys.path.insert(0, str(FACTORY_DIR))
     from hyodo.orchestration_observation import (
@@ -127,7 +133,7 @@ def _observe(
         "observation_id": uuid.uuid4().hex,
         "run_id": "run-" + uuid.uuid4().hex[:8],
         "event_id": uuid.uuid4().hex,
-        "ts": "2026-11-15T00:00:00Z",
+        "ts": ts or datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
         "node_id": skill_id,
         "execution": "serial",
         "depends_on": [],
@@ -265,11 +271,13 @@ def test_verify_upstream_against_a_local_remote(
     assert json.loads(capsys.readouterr().out)["reason"] == "no_recorded_remote"
 
 
-@pytest.mark.parametrize("hostile", ["--upload-pack=touch /tmp/pwned", "ext::sh -c id"])
+@pytest.mark.parametrize("hostile", ["--upload-pack=touch {canary}", "ext::sh -c touch {canary}"])
 def test_verify_upstream_refuses_option_or_command_remotes(tmp_path: Path, hostile: str) -> None:
     """A module's git config is untrusted: its remote must not become a git option or command."""
     factory = _load_factory_module()
     ws = _workspace(tmp_path)
+    canary = tmp_path / "pwned"
+    hostile = hostile.format(canary=canary)
     mod = _module(tmp_path, "hostile")
     # `git remote add` refuses such URLs; a hostile module can still write its config.
     _git(mod, "config", "remote.origin.url", hostile)
@@ -283,6 +291,7 @@ def test_verify_upstream_refuses_option_or_command_remotes(tmp_path: Path, hosti
     out = verify_module_upstream(rec)
     assert out["state"] == "UNOBSERVED"
     assert out["reason"] == "remote_url_refused"
+    assert not canary.exists()
 
 
 def test_concurrent_adds_are_serialized_without_lost_updates(tmp_path: Path) -> None:
@@ -338,3 +347,109 @@ def test_new_module_needs_no_central_code_and_removal_leaves_nothing(tmp_path: P
     manifest = ws / ".hyodo" / "skills" / "manifest.json"
     if manifest.is_file():
         assert name not in manifest.read_text(encoding="utf-8")
+
+
+def test_missing_disabled_module_is_not_healthy(tmp_path: Path) -> None:
+    """Review F2: a module whose source vanished was never checked, enabled or not."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    mod = _module(tmp_path, "gone")
+    factory.add_module(ws, mod)
+    factory.disable_target(ws, "gone")
+    import shutil
+
+    shutil.rmtree(mod)
+    rep = factory.doctor(ws)
+    assert rep["axes"]["gone"]["install"] == "MISSING"
+    assert "module_source_missing:gone" in rep["warnings"]
+    assert rep["status"] == "UNOBSERVED"
+
+
+def test_latest_execution_decides_and_tree_changes_invalidate(tmp_path: Path) -> None:
+    """Review F3/F4: a later failure wins; a script change after the run makes the run stale."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    mod = _module(tmp_path, "seq")
+    rec = factory.add_module(ws, mod)
+    sha = rec.skills["seq/probe"].content_sha256
+    _observe(ws, "seq/probe", sha, ts="2999-01-01T00:00:00Z")
+    _observe(ws, "seq/probe", sha, state="failed", ts="2999-01-01T00:00:01Z")
+    skill = factory.doctor(ws)["axes"]["seq"]["skills"]["seq/probe"]
+    assert skill["execution"] == "EXECUTED_FAILED"
+
+    _observe(ws, "seq/probe", sha, ts="2999-01-01T00:00:02Z")
+    assert factory.doctor(ws)["axes"]["seq"]["skills"]["seq/probe"]["execution"] == "EXECUTED_PASS"
+
+    # The SKILL.md digest is unchanged, but a script was added after a past run.
+    ws2 = _workspace(tmp_path / "second")
+    mod2 = _module(tmp_path / "second", "tree")
+    rec2 = factory.add_module(ws2, mod2)
+    _observe(ws2, "tree/probe", rec2.skills["tree/probe"].content_sha256, ts="2000-01-01T00:00:00Z")
+    (mod2 / "run.sh").write_text("echo hi\n", encoding="utf-8")
+    _git(mod2, "add", ".")
+    _git(mod2, "commit", "-q", "-m", "script")
+    factory.update_module(ws2, "tree")
+    assert factory.doctor(ws2)["axes"]["tree"]["skills"]["tree/probe"]["execution"] == (
+        "STALE_CONTENT"
+    )
+
+
+def test_stale_evidence_does_not_degrade_gap_analysis(tmp_path: Path) -> None:
+    """Review F5: an updated skill with old evidence is not an environment or syntax defect."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    mod = _module(tmp_path, "gap")
+    rec = factory.add_module(ws, mod)
+    _observe(ws, "gap/probe", rec.skills["gap/probe"].content_sha256)
+    _skill_md(mod).write_text("---\nname: probe\ndescription: gap v2\n---\n", encoding="utf-8")
+    _git(mod, "commit", "-q", "-am", "v2")
+    factory.update_module(ws, "gap")
+    assert "execution_evidence_stale:gap/probe" in factory.doctor(ws)["warnings"]
+    sys.path.insert(0, str(FACTORY_DIR))
+    from factory.router import analyze_capability_gaps
+
+    report = json.dumps(analyze_capability_gaps(ws, "probe skill"), default=str)
+    assert "ENVIRONMENT_OR_SYNTAX_DEGRADED" not in report
+
+
+def test_unreadable_inputs_are_unobserved_not_crashes(tmp_path: Path) -> None:
+    """Review F6/F7: bad bytes or a bad host root never crash doctor."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    factory.add_module(ws, _module(tmp_path, "bad"))
+    hd = ws / ".hyodo"
+    (hd / "factory" / "trust_state.json").write_bytes(b"\xff\xfe not utf-8")
+    (hd / "orchestration-observations.jsonl").write_bytes(b"\xff\xfe\n")
+    not_a_dir = tmp_path / "file-root"
+    not_a_dir.write_text("x", encoding="utf-8")
+    rep = factory.doctor(ws, host_skill_roots=[not_a_dir, tmp_path / "missing-root"])
+    skill = rep["axes"]["bad"]["skills"]["bad/probe"]
+    assert skill["trust_stage"] == "UNOBSERVED"
+    assert skill["execution"] == "UNOBSERVED"
+    assert skill["host_connection"] == "UNOBSERVED"
+    assert any(w.startswith("host_root_unreadable:") for w in rep["warnings"])
+    assert any(w.startswith("trust_state_unverifiable:") for w in rep["warnings"])
+
+
+def test_frontmatter_name_cannot_leave_the_host_root(tmp_path: Path) -> None:
+    """Review F8: only a single path component is looked up under a host root."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    root = tmp_path / "rooted"
+    root.mkdir()
+    (root / "SKILL.md").write_text("---\nname: ../outside\ndescription: x\n---\n", encoding="utf-8")
+    _git(root, "init", "-q")
+    _git(root, "config", "user.email", "t@example.com")
+    _git(root, "config", "user.name", "T")
+    _git(root, "add", ".")
+    _git(root, "commit", "-q", "-m", "init")
+    factory.add_module(ws, root)
+    host = tmp_path / "host" / "skills"
+    host.mkdir(parents=True)
+    outside = tmp_path / "host" / "outside"
+    outside.mkdir()
+    (outside / "SKILL.md").write_bytes((root / "SKILL.md").read_bytes())
+    rep = factory.doctor(ws, host_skill_roots=[host])
+    for skill in rep["axes"]["rooted"]["skills"].values():
+        assert skill["host_observations"] == []
+        assert skill["host_connection"] == "ABSENT"

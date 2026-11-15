@@ -19,6 +19,7 @@ import subprocess
 import time
 from collections.abc import Iterator
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -61,12 +62,25 @@ PROVENANCE_UNOBSERVED_PREFIXES = (
     "module_upstream_unrecorded:",
 )
 
+# Evidence-axis warnings say a record is stale or missing, not that a skill is
+# defective; gap analysis must not read them as degraded skills.
+EVIDENCE_AXIS_WARNING_PREFIXES = (
+    "execution_evidence_stale:",
+    "verification_evidence_invalidated:",
+    "host_copy_absent:",
+    "host_root_unreadable:",
+    "orchestration_observations_unreadable",
+    "trust_state_unverifiable:",
+    "module_source_missing:",
+)
+
 # What `doctor`'s overall `status` covers. Every other axis is reported per
 # module/skill under `axes` and never raises the status to HEALTHY.
 DOCTOR_STATUS_SCOPE = (
-    "registry state, content integrity and recorded upstream origin only; "
-    "install, host connection, execution, independent verification, usefulness "
-    "and trust are separate axes"
+    "registry state, content integrity, recorded upstream origin, and (only when "
+    "--host-skill-root is given) host copies that differ from the registered content; "
+    "install, host connection, execution, independent verification, usefulness and "
+    "trust are separate axes"
 )
 TRUST_STATE_FILE_REL = RUN_LOCK_REL.parent / "trust_state.json"
 _EXECUTION_FAILED_STATES = ("failed", "blocked", "rolled_back")
@@ -1024,39 +1038,74 @@ def remove_module(workspace_root: Path, module_id: str) -> dict[str, Any]:
 
 def _read_trust_records(workspace_root: Path) -> tuple[dict[str, Any], str | None]:
     """Read trust records without the drift demotion write that `get_skill_trust_state` does."""
-    if not (workspace_root / TRUST_STATE_FILE_REL).is_file():
+    path = workspace_root / TRUST_STATE_FILE_REL
+    if not path.is_file():
         return {}, None
     # Imported here: factory.runner imports this module.
     from factory.runner import _verify_trust_file_integrity
 
-    ok, error = _verify_trust_file_integrity(workspace_root)
-    if not ok:
-        return {}, error
-    raw = json.loads((workspace_root / TRUST_STATE_FILE_REL).read_text(encoding="utf-8"))
-    return raw["skills"], None
+    try:
+        ok, error = _verify_trust_file_integrity(workspace_root)
+        if not ok:
+            return {}, error
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}, "TRUST_STATE_UNREADABLE"
+    skills = raw.get("skills") if isinstance(raw, dict) else None
+    return (skills, None) if isinstance(skills, dict) else ({}, "TRUST_STATE_MALFORMED")
 
 
-def _executions_by_skill(workspace_root: Path) -> dict[str, list[dict[str, Any]]]:
+def _executions_by_skill(workspace_root: Path) -> tuple[dict[str, list[dict[str, Any]]], bool]:
+    """Observation rows per skill id, in file order; False when the file is unreadable."""
     from hyodo.orchestration_observation import read_orchestration_observations
 
+    try:
+        rows = read_orchestration_observations(workspace_root)
+    except (OSError, ValueError):
+        return {}, False
     by_skill: dict[str, list[dict[str, Any]]] = {}
-    for row in read_orchestration_observations(workspace_root):
+    for row in rows:
         node = row.get("node_id")
-        if isinstance(node, str):
+        if isinstance(node, str) and isinstance(row.get("evidence_refs", []), list):
             by_skill.setdefault(node, []).append(row)
-    return by_skill
+    return by_skill, True
 
 
-def _execution_state(unit: Any, rows: list[dict[str, Any]]) -> str:
-    """Execution evidence counts only for the skill content that is registered now."""
+def _parse_ts(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _execution_state(mod: ModuleRecord, unit: Any, rows: list[dict[str, Any]]) -> str:
+    """The latest observation of the registered content decides.
+
+    A row counts only if it names this `SKILL.md` digest and is not older than
+    the module's current registration (`origin.recorded_at`), because the
+    digest alone does not cover scripts and other files in the module tree.
+    The rows' producer is not authenticated: `EXECUTED_PASS` means an
+    observation says the node completed, not that the harness ran it.
+    """
     ref = f"sha256:{unit.content_sha256[:12]}"
-    current = [r for r in rows if ref in (r.get("evidence_refs") or [])]
-    if any(r.get("state") == "completed" and not r.get("unobserved_claim_count") for r in current):
-        return "EXECUTED_PASS"
-    if any(r.get("state") in _EXECUTION_FAILED_STATES for r in current):
-        return "EXECUTED_FAILED"
+    registered_at = _parse_ts((mod.origin or {}).get("recorded_at"))
+    current = []
+    for row in rows:
+        if ref not in (row.get("evidence_refs") or []):
+            continue
+        row_ts = _parse_ts(row.get("ts"))
+        if registered_at is not None and (row_ts is None or row_ts < registered_at):
+            continue
+        if row.get("state") == "completed" or row.get("state") in _EXECUTION_FAILED_STATES:
+            current.append(row)
     if current:
-        return "DISCLOSED_ONLY"
+        last = current[-1]
+        if last.get("state") in _EXECUTION_FAILED_STATES:
+            return "EXECUTED_FAILED"
+        return "DISCLOSED_ONLY" if last.get("unobserved_claim_count") else "EXECUTED_PASS"
     return "STALE_CONTENT" if rows else "UNOBSERVED"
 
 
@@ -1066,21 +1115,42 @@ def _host_connection(unit: Any, host_skill_roots: list[Path]) -> tuple[str, list
         return "UNOBSERVED", []
     names = []
     for candidate in (Path(unit.relative_path).parent.name, unit.name):
-        if candidate and candidate not in names and candidate not in (".", ".."):
+        # Only a single path component: a frontmatter name must not leave the root.
+        if (
+            candidate
+            and candidate not in names
+            and candidate not in (".", "..")
+            and "/" not in candidate
+            and "\\" not in candidate
+        ):
             names.append(candidate)
     seen: list[dict[str, str]] = []
+    readable_roots = 0
     for root in host_skill_roots:
+        if not root.is_dir():
+            seen.append({"host_root": str(root), "path": str(root), "state": "ROOT_UNREADABLE"})
+            continue
+        readable_roots += 1
         for name in names:
             path = root / name / "SKILL.md"
             if not path.is_file():
                 continue
-            digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            try:
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                seen.append({"host_root": str(root), "path": str(path), "state": "UNREADABLE"})
+                break
             state = "CONNECTED" if digest == unit.content_sha256 else "DRIFTED"
             seen.append({"host_root": str(root), "path": str(path), "state": state})
             break
-    if any(s["state"] == "CONNECTED" for s in seen):
+    states = {s["state"] for s in seen}
+    if "CONNECTED" in states:
         return "CONNECTED", seen
-    return ("DRIFTED" if seen else "ABSENT"), seen
+    if "DRIFTED" in states:
+        return "DRIFTED", seen
+    if readable_roots == 0 or "UNREADABLE" in states:
+        return "UNOBSERVED", seen
+    return "ABSENT", seen
 
 
 def _trust_axes(
@@ -1242,13 +1312,23 @@ def doctor(
     # lock.json is the single source of state; registry.toml is its rendered
     # view. A write interrupted between the two leaves them out of sync.
     toml_path = workspace_root / REGISTRY_TOML_REL
-    if modules and (
-        not toml_path.is_file()
-        or toml_path.read_text(encoding="utf-8") != _render_registry_toml(modules)
-    ):
-        problems.append("registry_view_out_of_sync:registry.toml")
+    if modules:
+        try:
+            view = toml_path.read_text(encoding="utf-8") if toml_path.is_file() else None
+        except (OSError, ValueError):
+            view = None
+        if view != _render_registry_toml(modules):
+            problems.append("registry_view_out_of_sync:registry.toml")
 
-    axes, axis_warnings, axis_problems = _collect_axes(workspace_root, modules, host_roots)
+    # A registered module whose source is gone was never checked for integrity.
+    for mod_id, mod in sorted(modules.items()):
+        if not Path(mod.source_path).is_dir():
+            warnings.append(f"module_source_missing:{mod_id}")
+            provenance_unobserved = True
+
+    axes, axis_warnings, axis_problems = _collect_axes(
+        workspace_root, modules, host_roots, provenance
+    )
     warnings.extend(axis_warnings)
     problems.extend(axis_problems)
 
@@ -1314,13 +1394,19 @@ def _collect_axes(
     workspace_root: Path,
     modules: dict[str, ModuleRecord],
     host_roots: list[Path],
+    provenance: dict[str, dict[str, Any]],
 ) -> tuple[dict[str, Any], list[str], list[str]]:
     warnings: list[str] = []
     problems: list[str] = []
     records, trust_error = _read_trust_records(workspace_root)
     if trust_error:
         warnings.append(f"trust_state_unverifiable:{trust_error}")
-    executions = _executions_by_skill(workspace_root)
+    executions, observations_readable = _executions_by_skill(workspace_root)
+    if not observations_readable:
+        warnings.append("orchestration_observations_unreadable")
+    for root in host_roots:
+        if not root.is_dir():
+            warnings.append(f"host_root_unreadable:{root}")
     axes: dict[str, Any] = {}
     for mod_id, mod in sorted(modules.items()):
         src = Path(mod.source_path)
@@ -1331,7 +1417,10 @@ def _collect_axes(
             "registration": "REGISTERED",
             "enabled": mod.enabled,
             "install": "PRESENT" if installed else "MISSING",
-            "content_integrity": (compare_module_origin(mod)["state"] if installed else "MISSING"),
+            # Reuse the provenance comparison; doctor runs git once per module.
+            "content_integrity": (
+                provenance.get(mod_id, {}).get("state", "UNOBSERVED") if installed else "MISSING"
+            ),
             "recorded_upstream": recorded_upstream_state(origin),
             "upstream_remote_recorded": bool(origin.get("git_remote_url")),
             "upstream_verified": "UNOBSERVED",
@@ -1339,7 +1428,11 @@ def _collect_axes(
         }
         for sid, unit in sorted(mod.skills.items()):
             host_state, host_seen = _host_connection(unit, host_roots)
-            execution = _execution_state(unit, executions.get(sid, []))
+            execution = (
+                _execution_state(mod, unit, executions.get(sid, []))
+                if observations_readable
+                else "UNOBSERVED"
+            )
             skill_axes = {
                 "enabled": bool(mod.enabled and unit.enabled),
                 "host_connection": host_state,
