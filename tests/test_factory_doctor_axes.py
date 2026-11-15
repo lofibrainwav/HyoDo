@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,7 +29,12 @@ def _git(cwd: Path, *args: str) -> str:
 
 
 def _module(
-    base: Path, name: str, body: str = "# Probe\n\nRead-only probe skill.\n", *, git: bool = True
+    base: Path,
+    name: str,
+    body: str = "# Probe\n\nRead-only probe skill.\n",
+    *,
+    git: bool = True,
+    remote: str | None = "https://example.com/{name}.git",
 ) -> Path:
     root = base / name
     skill_dir = root / ".agents" / "skills" / "probe"
@@ -42,6 +48,8 @@ def _module(
         _git(root, "config", "user.name", "T")
         _git(root, "add", ".")
         _git(root, "commit", "-q", "-m", "init")
+        if remote:
+            _git(root, "remote", "add", "origin", remote.format(name=name))
     return root
 
 
@@ -104,7 +112,7 @@ def test_host_readback_connected_drifted_absent(tmp_path: Path) -> None:
     (host / "probe" / "SKILL.md").write_text("# tampered host copy\n", encoding="utf-8")
     rep = factory.doctor(ws, host_skill_roots=[host])
     assert rep["axes"]["hosted"]["skills"]["hosted/probe"]["host_connection"] == "DRIFTED"
-    assert "host_copy_drift:hosted/probe" in rep["problems"]
+    assert any(p.startswith("host_copy_drift:hosted/probe|") for p in rep["problems"])
     assert rep["status"] == "DEGRADED"
 
     empty = tmp_path / "empty-host"
@@ -217,7 +225,7 @@ def test_trust_record_is_invalidated_without_doctor_writing(tmp_path: Path) -> N
 
     sys.path.insert(0, str(FACTORY_DIR))
     from factory.registry import compute_module_tree_digest
-    from factory.runner import _write_trust_file
+    from factory.runner import _default_env_fingerprint, _write_trust_file
 
     tree = compute_module_tree_digest(mod)[0]
     _write_trust_file(
@@ -232,6 +240,8 @@ def test_trust_record_is_invalidated_without_doctor_writing(tmp_path: Path) -> N
                     "module_tree_sha256": tree,
                     "version": rec.version,
                     "module_source_path": rec.source_path,
+                    "boundary": unit.boundary.to_dict(),
+                    "env_fingerprint": _default_env_fingerprint(),
                 }
             }
         },
@@ -269,45 +279,83 @@ def test_interrupted_write_leaves_registry_view_out_of_sync(tmp_path: Path) -> N
     assert factory.doctor(ws)["status"] == "HEALTHY"
 
 
-def test_verify_upstream_against_a_local_remote(
-    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+def test_verify_upstream_states(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Gate 5: provenance is checked against the remote, separately from content integrity."""
+    """Gate 5: provenance is checked against a network remote, separately from integrity."""
     factory = _load_factory_module()
     ws = _workspace(tmp_path)
-    mod = _module(tmp_path, "upstreamed")
+
+    # A local bare repository is the module vouching for itself, never VERIFIED.
+    mod = _module(tmp_path, "upstreamed", remote=None)
     bare = tmp_path / "upstream.git"
     _git(tmp_path, "init", "-q", "--bare", str(bare))
     _git(mod, "remote", "add", "origin", str(bare))
     _git(mod, "push", "-q", "origin", "HEAD:refs/heads/main")
     factory.add_module(ws, mod)
+    assert factory.main(["--root", str(ws), "verify-upstream", "upstreamed"]) == 2
+    assert json.loads(capsys.readouterr().out)["state"] == "LOCAL_REMOTE"
 
-    assert factory.main(["--root", str(ws), "verify-upstream", "upstreamed"]) == 0
+    # Network remote: the ls-remote answer decides. Only the subprocess is faked.
+    net = _module(tmp_path, "net")
+    factory.add_module(ws, net)
+    commit = _git(net, "rev-parse", "HEAD")
+    sys.path.insert(0, str(FACTORY_DIR))
+    import factory.registry as registry
+
+    seen: dict[str, Any] = {}
+
+    def fake_run(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if "ls-remote" not in argv:
+            return subprocess.run(argv, **kwargs)
+        seen["argv"], seen["env"], seen["cwd"] = argv, kwargs.get("env"), kwargs.get("cwd")
+        out = (
+            f"{commit}\trefs/tags/v1^{{}}\n0000000000000000000000000000000000000000\trefs/heads/x\n"
+        )
+        return subprocess.CompletedProcess(argv, 0, out, "")
+
+    monkeypatch.setenv("GIT_ASKPASS", "/bin/echo")
+    monkeypatch.setenv("SSH_ASKPASS", "/bin/echo")
+    monkeypatch.setattr(registry.subprocess, "run", fake_run)
+    assert factory.main(["--root", str(ws), "verify-upstream", "net"]) == 0
     out = json.loads(capsys.readouterr().out)
     assert out["state"] == "VERIFIED_AT_REF"
-    assert out["matching_refs"] == ["refs/heads/main"]
+    assert out["matching_refs"] == ["refs/tags/v1"]
+    # Review M6: no credential prompt or helper, neutral working directory.
+    assert "GIT_ASKPASS" not in seen["env"]
+    assert "SSH_ASKPASS" not in seen["env"]
+    assert seen["env"]["GIT_TERMINAL_PROMPT"] == "0"
+    assert "credential.helper=" in seen["argv"]
+    assert "protocol.allow=never" in seen["argv"]
+    assert seen["argv"][-2] == "--"
+    assert seen["cwd"] == tempfile.gettempdir()
 
-    # A local commit that was never pushed is not a remote ref tip.
-    _skill_md(mod).write_text("---\nname: probe\ndescription: local\n---\n", encoding="utf-8")
-    _git(mod, "commit", "-q", "-am", "local only")
-    factory.update_module(ws, "upstreamed")
-    assert factory.main(["--root", str(ws), "verify-upstream", "upstreamed"]) == 2
+    def tip_moved(argv: list[str], **kwargs: Any) -> subprocess.CompletedProcess[str]:
+        if "ls-remote" not in argv:
+            return subprocess.run(argv, **kwargs)
+        return subprocess.CompletedProcess(argv, 0, "1" * 40 + "\trefs/heads/main\n", "")
+
+    monkeypatch.setattr(registry.subprocess, "run", tip_moved)
+    assert factory.main(["--root", str(ws), "verify-upstream", "net"]) == 2
     assert json.loads(capsys.readouterr().out)["state"] == "COMMIT_NOT_A_REF_TIP"
+    monkeypatch.undo()
 
-    copy = _module(tmp_path, "no-remote")
+    copy = _module(tmp_path, "no-remote", remote=None)
     factory.add_module(ws, copy)
     assert factory.main(["--root", str(ws), "verify-upstream", "no-remote"]) == 2
     assert json.loads(capsys.readouterr().out)["reason"] == "no_recorded_remote"
 
 
-@pytest.mark.parametrize("hostile", ["--upload-pack=touch {canary}", "ext::sh -c touch {canary}"])
+@pytest.mark.parametrize(
+    "hostile", ["--upload-pack=touch {canary}", "ext::sh -c touch {canary}", "fd::0,1"]
+)
 def test_verify_upstream_refuses_option_or_command_remotes(tmp_path: Path, hostile: str) -> None:
     """A module's git config is untrusted: its remote must not become a git option or command."""
     factory = _load_factory_module()
     ws = _workspace(tmp_path)
     canary = tmp_path / "pwned"
     hostile = hostile.format(canary=canary)
-    mod = _module(tmp_path, "hostile")
+    mod = _module(tmp_path, "hostile", remote=None)
     # `git remote add` refuses such URLs; a hostile module can still write its config.
     _git(mod, "config", "remote.origin.url", hostile)
     factory.add_module(ws, mod)
@@ -549,4 +597,171 @@ def test_runner_executions_are_corroborated_end_to_end(tmp_path: Path) -> None:
     assert result["orchestration_observations_recorded"] >= 1
     skill = factory.doctor(ws)["axes"]["real"]["skills"]["real/probe"]
     assert skill["execution_evidence_source"] == "AGENT_LEDGER_CORROBORATED"
-    assert skill["execution"] in ("EXECUTED_PASS", "DISCLOSED_ONLY", "EXECUTED_FAILED")
+    assert skill["execution"] == "EXECUTED_PASS"
+
+
+def _append_raw_observation(ws: Path, row: dict[str, Any]) -> None:
+    path = ws / ".hyodo" / "orchestration-observations.jsonl"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(row) + "\n")
+
+
+def test_one_ledger_event_cannot_vouch_for_a_replayed_row(tmp_path: Path) -> None:
+    """Review H1: reusing a real run's ids for a forged 'completed' row does not flip FAILED to PASS."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    factory.add_module(ws, _module(tmp_path, "rp"))
+    factory.execute_modular_run(
+        ws,
+        run_id="replay-01",
+        prompt="probe skill",
+        skill_commands={"rp/probe": [sys.executable, "-c", "raise SystemExit(3)"]},
+    )
+    rows = [
+        json.loads(line)
+        for line in (ws / ".hyodo" / "orchestration-observations.jsonl").read_text().splitlines()
+    ]
+    real = next(r for r in rows if r["node_id"] == "rp/probe")
+    assert factory.doctor(ws)["axes"]["rp"]["skills"]["rp/probe"]["execution"] == "EXECUTED_FAILED"
+
+    forged = {
+        **real,
+        "observation_id": uuid.uuid4().hex,
+        "state": "completed",
+        "verification_failure_count": 0,
+    }
+    _append_raw_observation(ws, forged)
+    skill = factory.doctor(ws)["axes"]["rp"]["skills"]["rp/probe"]
+    assert skill["execution"] != "EXECUTED_PASS"
+    assert skill["execution"] == "UNCORROBORATED_CLAIM"
+
+
+def test_malformed_rows_and_deep_json_do_not_crash(tmp_path: Path) -> None:
+    """Review H2: unhashable ids or deeply nested JSON make an axis UNOBSERVED, never raise."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    rec = factory.add_module(ws, _module(tmp_path, "mal"))
+    sha = rec.skills["mal/probe"].content_sha256
+    _append_raw_observation(
+        ws,
+        {
+            "node_id": "mal/probe",
+            "event_id": {"a": 1},
+            "run_id": ["x"],
+            "ts": "2999-01-01T00:00:00Z",
+            "state": "completed",
+            "evidence_refs": [f"sha256:{sha[:12]}"],
+        },
+    )
+    rep = factory.doctor(ws)
+    assert rep["axes"]["mal"]["skills"]["mal/probe"]["execution"] == "UNCORROBORATED_CLAIM"
+    sys.path.insert(0, str(FACTORY_DIR))
+    from factory.router import analyze_capability_gaps
+
+    analyze_capability_gaps(ws, "probe skill")
+
+    deep = "[" * 200000
+    hd = ws / ".hyodo"
+    (hd / "orchestration-observations.jsonl").write_text(deep + "\n", encoding="utf-8")
+    (hd / "agent-events.jsonl").write_text(deep + "\n", encoding="utf-8")
+    (hd / "factory" / "trust_state.json").write_text(deep, encoding="utf-8")
+    skill = factory.doctor(ws)["axes"]["mal"]["skills"]["mal/probe"]
+    assert skill["trust_stage"] == "UNOBSERVED"
+
+
+def test_each_host_root_is_judged_and_shared_names_are_shadowed(tmp_path: Path) -> None:
+    """Review M3/M4: a drifted second root is drift; another module's exact copy is SHADOWED."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    mod_a = _module(tmp_path, "moda")
+    factory.add_module(ws, mod_a)
+    good, bad = tmp_path / "good", tmp_path / "bad"
+    for root, content in ((good, _skill_md(mod_a).read_bytes()), (bad, b"# tampered\n")):
+        (root / "probe").mkdir(parents=True)
+        (root / "probe" / "SKILL.md").write_bytes(content)
+    rep = factory.doctor(ws, host_skill_roots=[good, bad])
+    assert rep["axes"]["moda"]["skills"]["moda/probe"]["host_connection"] == "DRIFTED"
+    assert f"host_copy_drift:moda/probe|{bad}" in rep["problems"]
+    assert rep["status"] == "DEGRADED"
+
+    factory.add_module(ws, _module(tmp_path, "modb", body="# B\n"))
+    rep = factory.doctor(ws, host_skill_roots=[good])
+    assert rep["axes"]["moda"]["skills"]["moda/probe"]["host_connection"] == "CONNECTED"
+    b_skill = rep["axes"]["modb"]["skills"]["modb/probe"]
+    assert b_skill["host_connection"] == "SHADOWED"
+    assert b_skill["host_observations"][0]["shadowed_by"] == "moda/probe"
+    assert "host_copy_shadowed:modb/probe" in rep["warnings"]
+    assert not any(p.startswith("host_copy_drift:modb/") for p in rep["problems"])
+
+
+def test_recorded_commit_needs_tracked_content_and_a_remote(tmp_path: Path) -> None:
+    """Review M5: an ignored module or a local-only commit is not a recorded upstream."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    repo = tmp_path / "host-repo"
+    repo.mkdir()
+    _git(repo, "init", "-q")
+    _git(repo, "config", "user.email", "t@example.com")
+    _git(repo, "config", "user.name", "T")
+    (repo / ".gitignore").write_text("vendored/\n", encoding="utf-8")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-q", "-m", "init")
+    _git(repo, "remote", "add", "origin", "https://example.com/host-repo.git")
+    ignored = _module(repo / "vendored", "ign", git=False)
+    factory.add_module(ws, ignored)
+    local = _module(tmp_path, "localonly", remote=None)
+    factory.add_module(ws, local)
+    rep = factory.doctor(ws)
+    assert rep["axes"]["ign"]["recorded_upstream"] == "NOT_IN_COMMIT"
+    assert rep["axes"]["localonly"]["recorded_upstream"] == "LOCAL_COMMIT_ONLY"
+    assert rep["status"] == "UNOBSERVED"
+
+
+def test_doctor_does_not_run_the_modules_fsmonitor(tmp_path: Path) -> None:
+    """Review L10: a module's own .git/config hook must not run during doctor."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    mod = _module(tmp_path, "hook")
+    canary = tmp_path / "fsmonitor-ran"
+    script = tmp_path / "fsmon.sh"
+    script.write_text(f"#!/bin/sh\ntouch {canary}\n", encoding="utf-8")
+    script.chmod(0o755)
+    factory.add_module(ws, mod)
+    _git(mod, "config", "core.fsmonitor", str(script))
+    factory.doctor(ws)
+    assert not canary.exists()
+
+
+def test_trust_axis_sees_environment_and_boundary_drift(tmp_path: Path) -> None:
+    """Review M9: doctor applies the runner's drift checks, read-only."""
+    factory = _load_factory_module()
+    ws = _workspace(tmp_path)
+    mod = _module(tmp_path, "envd")
+    rec = factory.add_module(ws, mod)
+    unit = rec.skills["envd/probe"]
+    sys.path.insert(0, str(FACTORY_DIR))
+    from factory.registry import compute_module_tree_digest
+    from factory.runner import _write_trust_file
+
+    _write_trust_file(
+        ws,
+        {
+            "skills": {
+                "envd/probe": {
+                    "skill_id": "envd/probe",
+                    "trust_stage": "AUTO_RUN",
+                    "verifier_status": "PASS",
+                    "content_sha256": unit.content_sha256,
+                    "module_tree_sha256": compute_module_tree_digest(mod)[0],
+                    "version": rec.version,
+                    "module_source_path": rec.source_path,
+                    "boundary": unit.boundary.to_dict(),
+                    "env_fingerprint": "some-other-machine",
+                }
+            }
+        },
+    )
+    skill = factory.doctor(ws)["axes"]["envd"]["skills"]["envd/probe"]
+    assert skill["trust_stage"] == "VERIFY"
+    assert "environment_fingerprint_changed" in skill["evidence_invalidated_by"]

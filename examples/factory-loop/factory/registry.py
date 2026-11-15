@@ -12,8 +12,10 @@ import contextlib
 import hashlib
 import json
 import os
+import re
 import stat
 import subprocess
+import tempfile
 import uuid
 from pathlib import Path
 from typing import Any
@@ -120,7 +122,8 @@ def compute_module_tree_digest(module_root: Path) -> tuple[str | None, int, str 
 def _git_out(root: Path, *args: str) -> str | None:
     try:
         proc = subprocess.run(
-            ["git", "-C", str(root), *args],
+            # The module's own .git/config is untrusted: no fsmonitor hook runs.
+            ["git", "-c", "core.fsmonitor=false", "-C", str(root), *args],
             capture_output=True,
             text=True,
             timeout=10,
@@ -146,6 +149,7 @@ def observe_module_origin(module_root: Path) -> dict[str, Any]:
     remote_url: str | None = None
     commit: str | None = None
     dirty: bool | None = None
+    content_in_commit: bool | None = None
     if in_git:
         raw_remote = (_git_out(module_root, "config", "--get", "remote.origin.url") or "").strip()
         remote_url = redact_remote_url(raw_remote)
@@ -154,9 +158,20 @@ def observe_module_origin(module_root: Path) -> dict[str, Any]:
             module_root, "status", "--porcelain", "--untracked-files=normal", "--", "."
         )
         dirty = None if porcelain is None else bool(porcelain.strip())
+        # A clean status says nothing about files git does not track: an
+        # ignored file, or a module inside an ignored directory, is not in HEAD.
+        tracked = _git_out(module_root, "ls-files", "--", ".")
+        ignored = _git_out(
+            module_root, "ls-files", "--others", "--ignored", "--exclude-standard", "--", "."
+        )
+        if tracked is None or ignored is None:
+            content_in_commit = None
+        else:
+            content_in_commit = bool(tracked.strip()) and not ignored.strip()
     return {
         "source_path": str(module_root),
         "git_repo": in_git,
+        "git_content_in_commit": content_in_commit if in_git else None,
         "git_remote_url": remote_url,
         "git_commit": commit,
         "git_dirty": dirty,
@@ -212,7 +227,26 @@ def recorded_upstream_state(origin: dict[str, Any] | None) -> str:
         return "UNRECORDED"
     if origin.get("git_dirty"):
         return "DIRTY_AT_RECORD"
+    if origin.get("git_content_in_commit") is not True:
+        # Module files are untracked or ignored at HEAD, or this lock predates the check.
+        return "NOT_IN_COMMIT" if origin.get("git_content_in_commit") is False else "UNRECORDED"
+    if not origin.get("git_remote_url"):
+        # A local-only commit names no upstream anyone else can check.
+        return "LOCAL_COMMIT_ONLY"
     return "RECORDED_COMMIT"
+
+
+_SCP_LIKE = re.compile(r"^[A-Za-z0-9._-]+@[A-Za-z0-9.-]+:[^/\\]")
+
+
+def _remote_kind(remote: str) -> str:
+    """`network` (https/ssh/git or scp-like), `local` (path or file://) or `refused`."""
+    lowered = remote.lower()
+    if lowered.startswith(("https://", "ssh://", "git://")) or _SCP_LIKE.match(remote):
+        return "network"
+    if lowered.startswith("file://") or remote.startswith(("/", ".", "~")):
+        return "local"
+    return "refused"
 
 
 def verify_module_upstream(mod: ModuleRecord, *, timeout_s: float = 20.0) -> dict[str, Any]:
@@ -237,16 +271,28 @@ def verify_module_upstream(mod: ModuleRecord, *, timeout_s: float = 20.0) -> dic
         return {**result, "state": "UNOBSERVED", "reason": "no_recorded_commit"}
     if not remote:
         return {**result, "state": "UNOBSERVED", "reason": "no_recorded_remote"}
-    # The remote URL comes from the module's own git config: untrusted. A
-    # leading "-" would be read as an option, and ext:: runs a command.
-    if remote.startswith("-") or remote.lower().startswith("ext::"):
+    # The remote URL comes from the module's own git config: untrusted. Only
+    # network transports are asked; a local path or file:// remote is the module
+    # vouching for itself, and option-like or helper transports are refused.
+    kind = _remote_kind(remote)
+    if kind == "refused":
         return {**result, "state": "UNOBSERVED", "reason": "remote_url_refused"}
+    if kind == "local":
+        return {**result, "state": "LOCAL_REMOTE", "reason": "local_remote_not_independent"}
     try:
         proc = subprocess.run(
             [
                 "git",
                 "-c",
-                "protocol.ext.allow=never",
+                "protocol.allow=never",
+                "-c",
+                "protocol.https.allow=always",
+                "-c",
+                "protocol.ssh.allow=always",
+                "-c",
+                "protocol.git.allow=always",
+                "-c",
+                "credential.helper=",
                 "-c",
                 "core.askPass=",
                 "ls-remote",
@@ -260,9 +306,14 @@ def verify_module_upstream(mod: ModuleRecord, *, timeout_s: float = 20.0) -> dic
             timeout=timeout_s,
             check=False,
             stdin=subprocess.DEVNULL,
-            # Never wait for a password or passphrase prompt.
+            cwd=tempfile.gettempdir(),
+            # Never wait for, or hand out, a password or passphrase.
             env={
-                **clean_git_env(),
+                **{
+                    k: v
+                    for k, v in clean_git_env().items()
+                    if k not in ("GIT_ASKPASS", "SSH_ASKPASS")
+                },
                 "GIT_TERMINAL_PROMPT": "0",
                 "GIT_SSH_COMMAND": "ssh -oBatchMode=yes",
             },

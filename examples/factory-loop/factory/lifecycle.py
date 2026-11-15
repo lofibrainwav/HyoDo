@@ -70,6 +70,7 @@ EVIDENCE_AXIS_WARNING_PREFIXES = (
     "agent_ledger_unreadable",
     "verification_evidence_invalidated:",
     "host_copy_absent:",
+    "host_copy_shadowed:",
     "host_root_unreadable:",
     "orchestration_observations_unreadable",
     "trust_state_unverifiable:",
@@ -1051,44 +1052,68 @@ def _read_trust_records(workspace_root: Path) -> tuple[dict[str, Any], str | Non
         if not ok:
             return {}, error
         raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return {}, "TRUST_STATE_UNREADABLE"
     skills = raw.get("skills") if isinstance(raw, dict) else None
     return (skills, None) if isinstance(skills, dict) else ({}, "TRUST_STATE_MALFORMED")
 
 
+LedgerJoin = tuple[dict[tuple[str, str, str], list[str]], dict[str, int]]
+
+
 def _executions_by_skill(
     workspace_root: Path,
-) -> tuple[dict[str, list[dict[str, Any]]], bool, set[tuple[str, str, str]] | None]:
-    """Observation rows per skill id in file order, and the agent-ledger join keys.
+) -> tuple[dict[str, list[dict[str, Any]]], bool, LedgerJoin | None]:
+    """Observation rows per skill id in file order, and what the agent ledger can corroborate.
 
-    The harness runner writes each skill execution twice: an agent event
-    (`event_id`, `run_id`, `tool.name` = skill id) and an observation with the
-    same `event_id`. The keys come from the existing agent ledger; `None`
-    means that ledger could not be read.
+    The harness runner writes each skill execution twice with one timestamp: an
+    agent event (`event_id`, `run_id`, `tool.name` = skill id) and an
+    observation with the same `event_id`. The join returned here maps each
+    ledger key to the timestamps recorded for it, and counts how many
+    observation rows name each `event_id`, so a key can corroborate exactly one
+    row. `None` means the agent ledger could not be read.
     """
     from hyodo.events import read_agent_events
-    from hyodo.orchestration_observation import read_orchestration_observations
+    from hyodo.orchestration_observation import (
+        ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH,
+        read_orchestration_observations,
+    )
 
+    obs_path = workspace_root / ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH
+    if obs_path.exists() and not obs_path.is_file():
+        return {}, False, None
     try:
         rows = read_orchestration_observations(workspace_root)
-    except (OSError, ValueError):
+    except (OSError, ValueError, RecursionError):
         return {}, False, None
     by_skill: dict[str, list[dict[str, Any]]] = {}
+    rows_per_event: dict[str, int] = {}
     for row in rows:
+        event_id = row.get("event_id")
+        if isinstance(event_id, str) and event_id:
+            rows_per_event[event_id] = rows_per_event.get(event_id, 0) + 1
         node = row.get("node_id")
-        if isinstance(node, str) and isinstance(row.get("evidence_refs", []), list):
+        refs = row.get("evidence_refs")
+        # A row that names no content digest says nothing about any content.
+        if (
+            isinstance(node, str)
+            and isinstance(refs, list)
+            and any(isinstance(r, str) and r.startswith("sha256:") for r in refs)
+        ):
             by_skill.setdefault(node, []).append(row)
-    events, _corrupt = read_agent_events(workspace_root)
+    try:
+        events, _corrupt = read_agent_events(workspace_root)
+    except (ValueError, RecursionError):
+        events = None
     if events is None:
         return by_skill, True, None
-    keys: set[tuple[str, str, str]] = set()
+    ledger: dict[tuple[str, str, str], list[str]] = {}
     for event in events:
         tool = event.get("tool") if isinstance(event.get("tool"), dict) else {}
-        ids = (event.get("event_id"), event.get("run_id"), tool.get("name"))
-        if all(isinstance(v, str) and v for v in ids):
-            keys.add(ids)  # type: ignore[arg-type]
-    return by_skill, True, keys
+        key = (event.get("event_id"), event.get("run_id"), tool.get("name"))
+        if all(isinstance(v, str) and v for v in key) and isinstance(event.get("ts"), str):
+            ledger.setdefault(key, []).append(event["ts"])  # type: ignore[arg-type]
+    return by_skill, True, (ledger, rows_per_event)
 
 
 def _parse_ts(value: Any) -> datetime | None:
@@ -1105,15 +1130,17 @@ def _execution_state(
     mod: ModuleRecord,
     unit: Any,
     rows: list[dict[str, Any]],
-    ledger_keys: set[tuple[str, str, str]] | None,
+    ledger_join: LedgerJoin | None,
 ) -> tuple[str, str]:
     """Return (execution state, evidence source); the latest corroborated row decides.
 
     A row counts only if it names this `SKILL.md` digest, is not older than the
     module's current registration (`origin.recorded_at`, because the digest
     alone does not cover scripts) and joins an agent-ledger event with the same
-    `event_id`, `run_id` and `tool.name` = skill id, which is what the harness
-    runner writes. A row that only exists in the shared observation sidecar
+    `event_id`, `run_id`, `tool.name` = skill id and timestamp, which is what
+    the harness runner writes. The join is one-to-one: a ledger event that two
+    observation rows name, or that appears twice in the ledger, corroborates
+    neither, so one real event cannot vouch for a replayed or re-labelled row. A row that only exists in the shared observation sidecar
     (for example `hyodo observation record` from another host) is
     `UNCORROBORATED_CLAIM`, never `EXECUTED_*`. A process running as the same
     user that writes matching rows to both files is not detected.
@@ -1129,14 +1156,20 @@ def _execution_state(
             continue
         if row.get("state") == "completed" or row.get("state") in _EXECUTION_FAILED_STATES:
             current.append(row)
-    if ledger_keys is None:
+    if ledger_join is None:
         return (
             "UNOBSERVED" if current else ("STALE_CONTENT" if rows else "UNOBSERVED"),
             "AGENT_LEDGER_UNREADABLE",
         )
-    corroborated = [
-        r for r in current if (r.get("event_id"), r.get("run_id"), unit.skill_id) in ledger_keys
-    ]
+    ledger, rows_per_event = ledger_join
+    corroborated = []
+    for r in current:
+        event_id, run_id, ts = r.get("event_id"), r.get("run_id"), r.get("ts")
+        if not (isinstance(event_id, str) and isinstance(run_id, str) and isinstance(ts, str)):
+            continue
+        stamps = ledger.get((event_id, run_id, unit.skill_id), [])
+        if stamps == [ts] and rows_per_event.get(event_id) == 1:
+            corroborated.append(r)
     if corroborated:
         last = corroborated[-1]
         if last.get("state") in _EXECUTION_FAILED_STATES:
@@ -1148,8 +1181,18 @@ def _execution_state(
     return ("STALE_CONTENT" if rows else "UNOBSERVED"), "NONE"
 
 
-def _host_connection(unit: Any, host_skill_roots: list[Path]) -> tuple[str, list[dict[str, str]]]:
-    """Read back whether each host skill root serves this exact `SKILL.md` content."""
+def _host_connection(
+    unit: Any,
+    host_skill_roots: list[Path],
+    registered: dict[str, str] | None = None,
+) -> tuple[str, list[dict[str, str]]]:
+    """Read back whether each host skill root serves this exact `SKILL.md` content.
+
+    Every root is judged on its own: one drifted root is drift even when another
+    root serves the registered copy. A host copy that is exactly another
+    registered skill's content (two modules with the same skill directory name)
+    is `SHADOWED`, not drift.
+    """
     if not host_skill_roots:
         return "UNOBSERVED", []
     names = []
@@ -1179,14 +1222,24 @@ def _host_connection(unit: Any, host_skill_roots: list[Path]) -> tuple[str, list
             except OSError:
                 seen.append({"host_root": str(root), "path": str(path), "state": "UNREADABLE"})
                 break
-            state = "CONNECTED" if digest == unit.content_sha256 else "DRIFTED"
-            seen.append({"host_root": str(root), "path": str(path), "state": state})
+            entry = {"host_root": str(root), "path": str(path)}
+            other = (registered or {}).get(digest)
+            if digest == unit.content_sha256:
+                entry["state"] = "CONNECTED"
+            elif other and other != unit.skill_id:
+                entry["state"] = "SHADOWED"
+                entry["shadowed_by"] = other
+            else:
+                entry["state"] = "DRIFTED"
+            seen.append(entry)
             break
     states = {s["state"] for s in seen}
-    if "CONNECTED" in states:
-        return "CONNECTED", seen
     if "DRIFTED" in states:
         return "DRIFTED", seen
+    if "CONNECTED" in states:
+        return "CONNECTED", seen
+    if "SHADOWED" in states:
+        return "SHADOWED", seen
     if readable_roots == 0 or "UNREADABLE" in states:
         return "UNOBSERVED", seen
     return "ABSENT", seen
@@ -1217,6 +1270,13 @@ def _trust_axes(
         invalidated.append("version_changed")
     if stored.get("module_source_path") != mod.source_path:
         invalidated.append("module_source_path_changed")
+    # The same drift checks as the runner's get_skill_trust_state, without its write.
+    if stored.get("boundary") != unit.boundary.to_dict():
+        invalidated.append("permission_boundary_changed")
+    from factory.runner import _default_env_fingerprint
+
+    if stored.get("env_fingerprint") != _default_env_fingerprint():
+        invalidated.append("environment_fingerprint_changed")
     if invalidated:
         return {
             "trust_stage": "VERIFY",
@@ -1440,14 +1500,17 @@ def _collect_axes(
     records, trust_error = _read_trust_records(workspace_root)
     if trust_error:
         warnings.append(f"trust_state_unverifiable:{trust_error}")
-    executions, observations_readable, ledger_keys = _executions_by_skill(workspace_root)
-    if ledger_keys is None:
-        warnings.append("agent_ledger_unreadable")
+    executions, observations_readable, ledger_join = _executions_by_skill(workspace_root)
     if not observations_readable:
         warnings.append("orchestration_observations_unreadable")
+    elif ledger_join is None:
+        warnings.append("agent_ledger_unreadable")
     for root in host_roots:
         if not root.is_dir():
             warnings.append(f"host_root_unreadable:{root}")
+    registered_digests = {
+        u.content_sha256: sid for m in modules.values() for sid, u in m.skills.items()
+    }
     axes: dict[str, Any] = {}
     for mod_id, mod in sorted(modules.items()):
         src = Path(mod.source_path)
@@ -1468,9 +1531,9 @@ def _collect_axes(
             "skills": {},
         }
         for sid, unit in sorted(mod.skills.items()):
-            host_state, host_seen = _host_connection(unit, host_roots)
+            host_state, host_seen = _host_connection(unit, host_roots, registered_digests)
             execution, evidence_source = (
-                _execution_state(mod, unit, executions.get(sid, []), ledger_keys)
+                _execution_state(mod, unit, executions.get(sid, []), ledger_join)
                 if observations_readable
                 else ("UNOBSERVED", "OBSERVATIONS_UNREADABLE")
             )
@@ -1490,7 +1553,11 @@ def _collect_axes(
             if not skill_axes["enabled"]:
                 continue
             if host_state == "DRIFTED":
-                problems.append(f"host_copy_drift:{sid}")
+                for seen_root in host_seen:
+                    if seen_root["state"] == "DRIFTED":
+                        problems.append(f"host_copy_drift:{sid}|{seen_root['host_root']}")
+            elif host_state == "SHADOWED":
+                warnings.append(f"host_copy_shadowed:{sid}")
             elif host_state == "ABSENT":
                 warnings.append(f"host_copy_absent:{sid}")
             if execution == "STALE_CONTENT":
