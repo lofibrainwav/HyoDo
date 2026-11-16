@@ -57,7 +57,9 @@ def test_false_green_unobserved_zero_events_without_envelope_is_never_clean(tmp_
 
     empty_file = tmp_path / "empty.jsonl"
     empty_file.write_text("", encoding="utf-8")
-    res = runner.invoke(app, ["friction", "score", str(empty_file), "--types", "re_explanation,context_loss"])
+    res = runner.invoke(
+        app, ["friction", "score", str(empty_file), "--types", "re_explanation,context_loss"]
+    )
     assert res.exit_code == 2
     assert json.loads(res.stdout)["state"] == "UNOBSERVED"
 
@@ -138,11 +140,15 @@ def test_recursive_fallback_timeout_or_nonzero_exit_never_becomes_pass(
 
 def test_work_lifecycle_abandonment_threshold_and_observer_separation() -> None:
     """Work lifecycle abandonment is only valid past threshold_seconds and when observer != actor."""
-    too_early = _abandon_event("2026-11-15T10:00:00Z", "2026-11-15T12:00:00Z", threshold_seconds=14400)
+    too_early = _abandon_event(
+        "2026-11-15T10:00:00Z", "2026-11-15T12:00:00Z", threshold_seconds=14400
+    )
     _, err = validate_event(too_early)
     assert err == "below_threshold"
 
-    past_threshold = _abandon_event("2026-11-15T07:34:42Z", "2026-11-15T15:15:00Z", threshold_seconds=14400)
+    past_threshold = _abandon_event(
+        "2026-11-15T07:34:42Z", "2026-11-15T15:15:00Z", threshold_seconds=14400
+    )
     key, ok_err = validate_event(past_threshold)
     assert ok_err is None
     assert key is not None
