@@ -1,18 +1,16 @@
 """Evidence-binding contracts for the `hyodo inspect` chunk pass.
 
-The chunk pass re-reads every chunkable file. These tests pin down what
-happens when that second read differs from the first:
-
-- a second-read failure is recorded explicitly, never silently dropped;
-- bytes that changed between passes are secret-scanned again before any
-  chunk is built from them;
-- every chunk's ``file_digest`` binds to a digest the manifest declares.
+Only bytes identical to the secret-scanned first-pass bytes are chunked. An
+entry that changes, becomes unreadable, or is swapped for a symlink to
+outside the tree between passes is not a complete observation: it moves from
+``files`` to ``unreadable``, lowers ``coverage``, and gets no chunks.
 """
 
 from __future__ import annotations
 
 import json
 
+import pytest
 from typer.testing import CliRunner
 
 from hyodo import inspect as inspect_mod
@@ -42,31 +40,33 @@ def _patch_second_read(monkeypatch, target, *, second):
     monkeypatch.setattr(inspect_mod.Path, "read_bytes", read_bytes)
 
 
-def _declared_digests(manifest):
-    declared = {entry["digest"] for entry in manifest["files"]}
-    declared |= {entry["digest_after"] for entry in manifest.get("changed_during_inspect", [])}
-    return declared
-
-
-def test_second_read_failure_is_explicitly_unobserved(tmp_path, monkeypatch):
+@pytest.mark.parametrize(
+    ("second", "reason"),
+    [
+        (PermissionError("gone"), "chunk_read_error:PermissionError"),
+        (b"draft two\n", "changed_during_inspect"),
+        (f"aws_key = {FAKE_AWS_KEY}\n".encode(), "changed_during_inspect"),
+    ],
+)
+def test_unstable_entry_is_unobserved_not_chunked(tmp_path, monkeypatch, second, reason):
     target = tmp_path / "a.txt"
-    target.write_text("stable\n", encoding="utf-8")
+    target.write_text("stable one\n", encoding="utf-8")
     (tmp_path / "b.txt").write_text("other\n", encoding="utf-8")
-    _patch_second_read(monkeypatch, target, second=PermissionError("gone"))
+    _patch_second_read(monkeypatch, target, second=second)
 
     result = run_inspect(str(tmp_path), root=tmp_path)
     manifest = result.folder_manifest
 
-    failures = manifest.get("unreadable_during_inspect")
-    assert failures == [{"path": "a.txt", "reason": "read_error:PermissionError"}]
-    assert any("a.txt" in line and "unreadable during inspect" in line for line in result.warnings)
-    # The pass-1 digest is still reported; nothing is chunked from the missing read.
-    a_digest = next(f["digest"] for f in manifest["files"] if f["path"] == "a.txt")
-    assert all(c["file_digest"] != a_digest for c in result.chunks_manifest["chunks"])
-    assert "unreadable during inspect: 1" in render_report_md(result)
+    assert manifest["coverage"] == [1, 2]
+    assert manifest["unreadable"] == [{"path": "a.txt", "reason": reason}]
+    assert [f["path"] for f in manifest["files"]] == ["b.txt"]
+    b_digest = manifest["files"][0]["digest"]
+    assert {c["file_digest"] for c in result.chunks_manifest["chunks"]} == {b_digest}
+    assert any("a.txt" in line for line in result.warnings)
+    assert "1/2 files digested" in render_report_md(result)
 
 
-def test_second_read_failure_keeps_exit_zero_contract(tmp_path, monkeypatch):
+def test_unstable_entry_keeps_exit_zero_contract(tmp_path, monkeypatch):
     target = tmp_path / "a.txt"
     target.write_text("stable\n", encoding="utf-8")
     _patch_second_read(monkeypatch, target, second=OSError("flaky"))
@@ -75,66 +75,24 @@ def test_second_read_failure_keeps_exit_zero_contract(tmp_path, monkeypatch):
 
     assert result.exit_code == 0, result.output
     folder = json.loads((tmp_path / ".hyodo" / "folder-manifest.json").read_text("utf-8"))
-    assert folder["unreadable_during_inspect"][0]["path"] == "a.txt"
+    assert folder["coverage"] == [0, 1]
+    assert folder["unreadable"][0]["path"] == "a.txt"
 
 
-def test_bytes_that_become_secret_shaped_are_not_chunked(tmp_path, monkeypatch):
-    target = tmp_path / "config.txt"
-    target.write_text("harmless = 1\n", encoding="utf-8")
-    secret_bytes = f"aws_key = {FAKE_AWS_KEY}\n".encode()
-    _patch_second_read(monkeypatch, target, second=secret_bytes)
+def test_short_digest_collision_does_not_hide_a_change(tmp_path, monkeypatch):
+    target = tmp_path / "a.txt"
+    target.write_bytes(b"original")
+    _patch_second_read(monkeypatch, target, second=b"changed")
+    monkeypatch.setattr(inspect_mod, "content_digest", lambda _data: "000000000000")
 
     result = run_inspect(str(tmp_path), root=tmp_path)
-    manifest = result.folder_manifest
 
-    changed = manifest["changed_during_inspect"]
-    assert len(changed) == 1
-    assert changed[0]["path"] == "config.txt"
-    assert changed[0]["secret_shaped_after"] is True
-    new_digest = changed[0]["digest_after"]
-    assert all(c["file_digest"] != new_digest for c in result.chunks_manifest["chunks"])
+    assert result.folder_manifest["coverage"] == [0, 1]
+    assert result.folder_manifest["changed_during_inspect"]
     assert result.chunks_manifest["chunks"] == []
-    assert any("secret-shaped" in line for line in result.warnings)
-
-
-def test_changed_clean_bytes_are_scanned_and_bound(tmp_path, monkeypatch):
-    target = tmp_path / "notes.txt"
-    target.write_text("draft one\n", encoding="utf-8")
-    _patch_second_read(monkeypatch, target, second=b"draft two\n")
-
-    result = run_inspect(str(tmp_path), root=tmp_path)
-    changed = result.folder_manifest["changed_during_inspect"]
-
-    assert changed[0]["secret_shaped_after"] is False
-    chunk_digests = {c["file_digest"] for c in result.chunks_manifest["chunks"]}
-    assert chunk_digests == {changed[0]["digest_after"]}
-
-
-def test_every_chunk_binds_to_a_declared_digest(tmp_path, monkeypatch):
-    (tmp_path / "keep.txt").write_text("k" * 5000, encoding="utf-8")
-    moving = tmp_path / "moving.txt"
-    moving.write_text("before\n", encoding="utf-8")
-    _patch_second_read(monkeypatch, moving, second=b"after, longer\n")
-
-    result = run_inspect(str(tmp_path), root=tmp_path)
-
-    declared = _declared_digests(result.folder_manifest)
-    assert result.chunks_manifest["chunks"]
-    assert all(c["file_digest"] in declared for c in result.chunks_manifest["chunks"])
-
-
-def test_unchanged_run_has_no_new_keys(tmp_path):
-    (tmp_path / "a.txt").write_text("hi\n", encoding="utf-8")
-
-    manifest = run_inspect(str(tmp_path), root=tmp_path).folder_manifest
-
-    assert "unreadable_during_inspect" not in manifest
-    assert "changed_during_inspect" not in manifest
 
 
 def test_file_swapped_for_outside_symlink_is_not_chunked(tmp_path, monkeypatch):
-    """A regular file replaced by a symlink to outside the tree between passes
-    must not have the outside bytes chunked under the tree's manifest."""
     tree = tmp_path / "tree"
     tree.mkdir()
     target = tree / "a.txt"
@@ -159,6 +117,30 @@ def test_file_swapped_for_outside_symlink_is_not_chunked(tmp_path, monkeypatch):
     result = run_inspect(str(tree), root=tree)
 
     assert result.chunks_manifest["chunks"] == []
-    assert result.folder_manifest["unreadable_during_inspect"] == [
-        {"path": "a.txt", "reason": "symlink_outside_root"}
+    assert result.folder_manifest["coverage"] == [0, 1]
+    assert result.folder_manifest["unreadable"] == [
+        {"path": "a.txt", "reason": "chunk_symlink_outside_root"}
     ]
+
+
+def test_every_chunk_binds_to_a_listed_file(tmp_path, monkeypatch):
+    (tmp_path / "keep.txt").write_text("k" * 5000, encoding="utf-8")
+    moving = tmp_path / "moving.txt"
+    moving.write_text("before\n", encoding="utf-8")
+    _patch_second_read(monkeypatch, moving, second=b"after, longer\n")
+
+    result = run_inspect(str(tmp_path), root=tmp_path)
+
+    declared = {entry["digest"] for entry in result.folder_manifest["files"]}
+    assert result.chunks_manifest["chunks"]
+    assert all(c["file_digest"] in declared for c in result.chunks_manifest["chunks"])
+
+
+def test_stable_run_is_unchanged(tmp_path):
+    (tmp_path / "a.txt").write_text("hi\n", encoding="utf-8")
+
+    result = run_inspect(str(tmp_path), root=tmp_path)
+
+    assert result.folder_manifest["coverage"] == [1, 1]
+    assert "changed_during_inspect" not in result.folder_manifest
+    assert result.warnings == []

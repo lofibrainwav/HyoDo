@@ -153,7 +153,7 @@ def test_ambiguous_runner_output_is_a_failed_run(tmp_path: Path, stdout: str) ->
 
     assert exit_code == 1
     assert summary["status"] == "FAIL"
-    assert summary["runner_failure"]["code"] == "runner_output_invalid_json"
+    assert summary["runner_failure"]["code"] == "runner_output_not_json"
 
 
 # --- B: comparators keep JSON booleans distinct from numbers ---------------
@@ -255,4 +255,4 @@ def test_unparseable_runner_output_is_a_failed_run_not_a_crash(tmp_path: Path, b
     exit_code, summary = run_evaluation(dataset, command, tmp_path, 1.0, 30)
 
     assert exit_code == 1
-    assert summary["runner_failure"]["code"] == "runner_output_invalid_json"
+    assert summary["runner_failure"]["code"] == "runner_output_not_json"

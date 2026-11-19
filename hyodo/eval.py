@@ -271,7 +271,7 @@ def _run_case(
         stdout = completed.stdout.decode("utf-8")
     except UnicodeDecodeError:
         return None, {
-            "code": "runner_output_invalid_json",
+            "code": "runner_output_not_json",
             "message": "runner stdout is not valid UTF-8",
         }
     try:
@@ -280,7 +280,7 @@ def _run_case(
         return None, {"code": "runner_output_not_json", "message": "runner stdout must be JSON"}
     except _StrictJSONError as exc:
         return None, {
-            "code": "runner_output_invalid_json",
+            "code": "runner_output_not_json",
             "message": f"runner stdout is ambiguous JSON: {exc}",
         }
     if isinstance(parsed, dict) and "output" in parsed:
