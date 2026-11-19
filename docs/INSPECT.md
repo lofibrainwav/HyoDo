@@ -72,9 +72,15 @@ sharing one digest rather than one entry hiding the other.
 
 Two optional top-level keys appear only when relevant:
 
-- `changed_during_inspect`: `[{path, digest_before, digest_after}]` — a file
-  whose bytes changed between the digest pass and the chunk pass. The run
-  still exits 0; one warning line is printed per changed file.
+- `changed_during_inspect`: `[{path, digest_before, digest_after,
+  secret_shaped_after}]` — a file whose bytes changed between the digest pass
+  and the chunk pass. `secret_shaped_after` is the secret scan of the new
+  bytes; when it is `true` the file is not chunked. The run still exits 0; one
+  warning line is printed per changed file.
+- `unreadable_during_inspect`: `[{path, reason}]` — a file that was digested in
+  the first pass but could not be re-read in the chunk pass. Its pass-1 digest
+  stays in `files` and in `coverage`, but it has no chunks. The run still
+  exits 0; one warning line is printed per file.
 - `remote`: declared connector inventories (see below).
 
 `.hyodo/chunks-manifest.json`, schema `hyodo.chunks-manifest/v1` — chunk id,
@@ -155,11 +161,19 @@ Symlinks:
 ## Digest mismatch between passes
 
 The chunk pass re-reads each file's bytes. If the whole-file digest from
-that re-read differs from the digest pass's, the pass-2 digest is what
-chunks are built from, the file is recorded under `changed_during_inspect`,
-and one warning line is printed. The run still exits 0 — a file changing
-under a live repository is reported, not silently resolved by picking one
-version.
+that re-read differs from the digest pass's, the new bytes are secret-scanned
+again before any chunk is built from them. Clean new bytes are chunked under
+the pass-2 digest; secret-shaped new bytes are not chunked at all. Either way
+the file is recorded under `changed_during_inspect` (with
+`secret_shaped_after`) and one warning line is printed. Every chunk's
+`file_digest` therefore matches either a `files[].digest` or a
+`changed_during_inspect[].digest_after`. If the re-read fails, or the entry
+has since become a symlink to a directory or to outside the tree, the file is
+recorded under `unreadable_during_inspect` with a warning instead of being
+dropped silently or chunked. The run still exits 0 — a file changing under a live
+repository is reported, not silently resolved by picking one version.
+`inspect` does not take an atomic snapshot of the whole tree; consumers that
+need one must check these keys.
 
 ## Remote inventory (Drive-shaped, no network)
 

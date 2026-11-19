@@ -321,30 +321,67 @@ def run_inspect(
     observed = expected - len(unreadable)
 
     # Pass 2: chunk. Re-read bytes; a whole-file digest mismatch vs pass 1 is
-    # reported (changed_during_inspect) but never blocks the run.
-    changed_during_inspect: list[dict[str, str]] = []
+    # reported (changed_during_inspect) but never blocks the run. Chunks are
+    # only ever built from bytes that were secret-scanned in this same pass,
+    # and a re-read that fails is recorded, never silently dropped.
+    changed_during_inspect: list[dict[str, Any]] = []
+    unreadable_during_inspect: list[dict[str, str]] = []
     warnings: list[str] = []
     chunks: list[dict[str, Any]] = []
     chunk_seq = 1
 
     for entry in sorted(chunkable, key=lambda p: p.relative_to(target).as_posix()):
+        # Re-apply pass 1's containment rule: an entry swapped for a symlink to
+        # a directory or to outside the tree since pass 1 is not chunked. This
+        # narrows, but cannot close, the window between this check and the read.
+        swapped_reason, _ = _resolve_symlink_status(entry, target)
+        if swapped_reason is not None:
+            display_path = _lexical_display_path(entry, root_abs)
+            unreadable_during_inspect.append({"path": display_path, "reason": swapped_reason})
+            warnings.append(
+                f"warning: {display_path} unreadable during inspect chunk pass "
+                f"({swapped_reason}); no chunks recorded for it"
+            )
+            continue
         try:
             data = entry.read_bytes()
-        except OSError:
-            # Became unreadable between passes; leave it out of chunks silently
-            # rather than crash — folder-manifest already recorded pass-1 state.
+        except OSError as exc:
+            # Became unreadable between passes. The pass-1 digest stays in
+            # `files`, but no chunk exists for it, so the gap is reported
+            # explicitly instead of being hidden behind pass-1 coverage.
+            display_path = _lexical_display_path(entry, root_abs)
+            reason = f"read_error:{exc.__class__.__name__}"
+            unreadable_during_inspect.append({"path": display_path, "reason": reason})
+            warnings.append(
+                f"warning: {display_path} unreadable during inspect chunk pass "
+                f"({reason}); no chunks recorded for it"
+            )
             continue
         digest_before = pass1_digest[entry]
         digest_after = content_digest(data)
         if digest_after != digest_before:
             display_path = _lexical_display_path(entry, root_abs)
+            # The pass-1 secret scan covered different bytes; scan the bytes
+            # that chunks would actually be built from.
+            text_after = data[:_SCAN_TEXT_CAP].decode("utf-8", errors="replace")
+            secret_shaped_after = any(
+                f.category == "secret" for f in scan_text(text_after, path=display_path)
+            )
             changed_during_inspect.append(
                 {
                     "path": display_path,
                     "digest_before": digest_before or "",
                     "digest_after": digest_after or "",
+                    "secret_shaped_after": secret_shaped_after,
                 }
             )
+            if secret_shaped_after:
+                warnings.append(
+                    f"warning: {display_path} changed during inspect "
+                    f"({digest_before} -> {digest_after}) and the new content is "
+                    "secret-shaped; it was not chunked"
+                )
+                continue
             warnings.append(
                 f"warning: {display_path} changed during inspect "
                 f"({digest_before} -> {digest_after}); chunks reflect the newer content"
@@ -393,6 +430,8 @@ def run_inspect(
     }
     if changed_during_inspect:
         folder_manifest["changed_during_inspect"] = changed_during_inspect
+    if unreadable_during_inspect:
+        folder_manifest["unreadable_during_inspect"] = unreadable_during_inspect
     if remote_rows:
         folder_manifest["remote"] = remote_rows
 
@@ -437,6 +476,8 @@ def render_report_md(result: InspectResult) -> str:
     out.append(f"chunks: {len(result.chunks_manifest['chunks'])}")
     if manifest.get("changed_during_inspect"):
         out.append(f"changed during inspect: {len(manifest['changed_during_inspect'])}")
+    if manifest.get("unreadable_during_inspect"):
+        out.append(f"unreadable during inspect: {len(manifest['unreadable_during_inspect'])}")
     if manifest.get("remote"):
         out.append("")
         out.append("## Remote inventory (declared, not observed)")
