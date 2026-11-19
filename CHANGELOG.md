@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `hyodo eval-compare --baseline <result.json> --candidate <result.json>` pairs two `hyodo eval` runs case by case and reports wins, losses, per-tag pass counts and an exact two-sided McNemar p-value. It refuses (`UNOBSERVED`, exit 2) when the runs observed different dataset bytes or case ids, or when either run did not complete. The verdict is evidence for review only; the exit code is 0 whenever a comparison was observed.
+
 ### Fixed
 
 - Factory example: on macOS, `killpg(pgid, 0)` answers `EPERM` for a group whose only members are unreaped zombies, so stale-lock recovery reported such a group `INVALID` and refused with `RUN_STATE_RECORD_INVALID`. A permission error now consults the `ps` scan: the group is `GONE` only when every listed member is a zombie and the scan is clean; another user's live group, an unparseable line or a failed `ps` stays `INVALID`. The `/proc`-only test is skipped on hosts without `/proc`.
