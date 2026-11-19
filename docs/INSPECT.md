@@ -73,8 +73,10 @@ sharing one digest rather than one entry hiding the other.
 Two optional top-level keys appear only when relevant:
 
 - `changed_during_inspect`: `[{path, digest_before, digest_after}]` — a file
-  whose bytes changed between the digest pass and the chunk pass. The run
-  still exits 0; one warning line is printed per changed file.
+  whose bytes changed between the digest pass and the chunk pass. The file is
+  not chunked, is listed under `unreadable` with reason `changed_during_inspect`
+  instead of under `files`, and lowers `coverage`. The run still exits 0; one
+  warning line is printed per changed file.
 - `remote`: declared connector inventories (see below).
 
 `.hyodo/chunks-manifest.json`, schema `hyodo.chunks-manifest/v1` — chunk id,
@@ -154,12 +156,18 @@ Symlinks:
 
 ## Digest mismatch between passes
 
-The chunk pass re-reads each file's bytes. If the whole-file digest from
-that re-read differs from the digest pass's, the pass-2 digest is what
-chunks are built from, the file is recorded under `changed_during_inspect`,
-and one warning line is printed. The run still exits 0 — a file changing
-under a live repository is reported, not silently resolved by picking one
-version.
+The chunk pass re-reads each file's bytes and chunks them only when their full
+SHA-256 equals that of the bytes the digest pass read and secret-scanned (the
+12-hex manifest digest is too short to prove that). Otherwise the entry is not
+a complete observation: it is removed from `files`, listed under `unreadable`,
+lowers `coverage`, gets no chunks, and prints one warning. The reasons are
+`changed_during_inspect` (also recorded under `changed_during_inspect` with
+both short digests), `chunk_read_error:<Error>` (the re-read failed), and
+`chunk_symlink_outside_root` / `chunk_symlink_dir_skipped` (the entry was
+swapped for such a symlink since the first pass). Every chunk's `file_digest`
+therefore matches a `files[].digest`. The run still exits 0 — exit 0 means the
+manifests were written, not that the tree was stable; check `coverage` and
+`unreadable`. `inspect` does not take an atomic snapshot of the whole tree.
 
 ## Remote inventory (Drive-shaped, no network)
 
