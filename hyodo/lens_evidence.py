@@ -28,6 +28,7 @@ import hashlib
 import json
 import re
 from collections.abc import Mapping
+from datetime import datetime
 from enum import Enum
 from typing import Any
 
@@ -84,11 +85,32 @@ def _provenance_residuals(provenance: Mapping[str, Any], subject_sha: str) -> li
     if not isinstance(target_commit, str) or not target_commit:
         return ["provenance_unobserved"]
     residuals: list[str] = []
+    # Matching a target commit is not enough: the code doing the measuring may
+    # itself be from an untrusted/mismatched installation. Respect the
+    # independent provenance validity supplied by the existing HyoDo collector.
+    if provenance.get("validity") != "OBSERVED":
+        residuals.append("measurer_provenance_unobserved")
     if target_commit != subject_sha:
         residuals.append("stale_provenance")
     if provenance.get("target_dirty") is not False:
         residuals.append("target_tree_not_clean")
     return residuals
+
+
+def _measurement_time(value: Any) -> tuple[str, list[str]]:
+    """Validate the recorded clock without reading the current clock.
+
+    Observed evidence cannot have an absent, naive or malformed timestamp;
+    actual freshness is still a downstream consumer's responsibility.
+    """
+    if isinstance(value, str):
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if parsed.tzinfo is not None and parsed.utcoffset() is not None:
+                return value, []
+        except (ValueError, OverflowError):
+            pass
+    return "UNOBSERVED", ["measurement_time_unobserved"]
 
 
 def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str) -> dict[str, Any]:
@@ -101,7 +123,7 @@ def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str)
     """
     if not isinstance(lens, str) or lens not in CANONICAL_VIRTUE_KEYS:
         raise ValueError(f"unknown lens: {lens!r}")
-    if not isinstance(subject_sha, str) or not _SHA.match(subject_sha):
+    if not isinstance(subject_sha, str) or not _SHA.fullmatch(subject_sha):
         raise ValueError("subject_sha must be a full 40- or 64-character hex digest")
 
     envelope = _plain(evidence) or {}
@@ -153,7 +175,8 @@ def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str)
         observed.append(name)
         refs.append({"kind": "gate", "ref": name, "digest": digest})
 
-    unbound = _provenance_residuals(provenance, subject_sha)
+    measured_at, time_residuals = _measurement_time(envelope.get("measured_at"))
+    unbound = _provenance_residuals(provenance, subject_sha) + time_residuals
     residuals = unbound + residuals
     attributed = len(declared) + uncited
     if not attributed:
@@ -171,7 +194,6 @@ def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str)
         state = "OBSERVED"
 
     tool_version = provenance.get("tool_version")
-    measured_at = envelope.get("measured_at")
     return {
         "schema_version": LENS_EVIDENCE_SCHEMA_VERSION,
         "lens": lens,
@@ -186,9 +208,7 @@ def emit_lens_evidence(evidence: Mapping[str, Any], lens: str, subject_sha: str)
         },
         "evidence_refs": refs,
         "residuals": residuals,
-        "observed_at": measured_at
-        if isinstance(measured_at, str) and measured_at
-        else "UNOBSERVED",
+        "observed_at": measured_at,
         "authority": "UNOBSERVED",
     }
 
