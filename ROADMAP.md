@@ -5,20 +5,20 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.22.5 is the latest published release (2026-11-14 UTC). Its signed
-tag, GitHub Release, SBOM, PyPI provenance, and install smoke are measured
-9/9 OBSERVED in `docs/releases/4.22.5.md`. The earlier 4.22.2 package was
-published, but its in-repository release-chain receipt has not been
-reconciled. Prior release receipts remain preserved under `docs/releases/`.
+HyoDo 4.22.6 is the latest published release (2026-11-21 UTC). Its signed
+tag, GitHub Release, SBOM, PyPI provenance and install smoke are measured
+9/9 OBSERVED in `docs/releases/4.22.6.md`. The prior 4.22.5 release is
+separately sealed in `docs/releases/4.22.5.md`. The earlier 4.22.2 package
+was published, but its in-repository release-chain receipt has not been
+reconciled. Prior release receipts remain under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.5 is the latest published release.
+HyoDo 4.22.6 is the latest published release.
 HyoDo 4.22.6 is the current release target for the version-sync contract:
-this is a prepared source candidate, NOT an already published package.
-The previous public release 4.22.5 remains sealed with its own measured
-receipt in [4.22.5 release notes](docs/releases/4.22.5.md).
-A candidate's green CI is not a tag, PyPI publication, or install readback.
+this is the already-published and closed version, not a pending candidate.
+Its nine release-chain steps are independently measured in
+`docs/releases/4.22.6.md`. Source CI alone would not have established this.
 This does not establish live host integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
@@ -51,7 +51,7 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.6 (prepared candidate; publication unobserved)
+### 4.22.6 (released 2026-11-21 UTC)
 
 - From HyoDo #651: deterministic evaluation runs bind parsed inputs to their
   recorded bytes and reject ambiguous input/runner JSON and boolean coercion.
@@ -60,8 +60,8 @@ evidence is not converted into a pass.
 - Paired evaluation comparison adds exact McNemar results for review only,
   with strict JSON input, canonical SHA-256 and tag validation.
 - No new authority, cloud service, or automatic host enforcement.
-- Release chain: UNOBSERVED until the independently authorized HyoDo
-  publication pipeline completes; see [4.22.6 release notes](docs/releases/4.22.6.md).
+- Release chain: 9/9 OBSERVED by the independent HyoDo publication
+  pipeline; see [4.22.6 release notes](docs/releases/4.22.6.md).
 
 ### 4.22.5 (released 2026-11-14 UTC)
 

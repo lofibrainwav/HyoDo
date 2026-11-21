@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [4.22.6] - 2026-11-20
+## [4.22.6] - 2026-11-21
 
-Source candidate for local evidence and evaluation integrity. Publication is
-pending the independent release-chain receipt, not implied by CI or merge.
+Released exact-byte evaluation and file-inspection integrity corrections.
+The signed GitHub tag, SBOM, PyPI OIDC provenance and independent installation
+are measured 9/9 OBSERVED in `docs/releases/4.22.6.md`.
 
 ### Added
 
