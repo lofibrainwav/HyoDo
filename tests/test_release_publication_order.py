@@ -205,7 +205,6 @@ def _authorized(**kwargs: Any) -> dict[str, Any]:
     }
 
 
-
 def test_unsafe_public_notes_stop_before_tag_or_draft(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
