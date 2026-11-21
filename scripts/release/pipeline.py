@@ -885,6 +885,14 @@ class GitHubRemote:
             )
         return done.stdout.strip()
 
+    def validate_release_notes(self, tag: str, notes: Path) -> str:
+        """Fail before pushing an immutable tag if the candidate is unsafe."""
+        try:
+            candidate = notes.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise PipelineExternalError(f"candidate release notes unreadable: {notes}") from exc
+        return _stable_public_release_notes(tag, self.repo, candidate)
+
     # -- observations -------------------------------------------------------
     def observe_main(self) -> dict[str, str]:
         self._ok("git", "fetch", "--quiet", "origin", "main")
@@ -952,11 +960,7 @@ class GitHubRemote:
     def create_draft_release(self, tag: str, notes: Path) -> None:
         import tempfile
 
-        try:
-            candidate = notes.read_text(encoding="utf-8")
-        except (OSError, UnicodeError) as exc:
-            raise PipelineExternalError(f"candidate release notes unreadable: {notes}") from exc
-        public_notes = _stable_public_release_notes(tag, self.repo, candidate)
+        public_notes = self.validate_release_notes(tag, notes)
         with tempfile.TemporaryDirectory(prefix="hyodo-release-notes-") as directory:
             public_path = Path(directory) / "public-release-notes.md"
             public_path.write_text(public_notes, encoding="utf-8")
@@ -1183,6 +1187,10 @@ def run_publication(
                 "WAITING_CI" if waiting else "BLOCKED",
                 "WAIT" if waiting else "BLOCK",
             )
+
+        # Validate before creating or pushing a tag. A bad publication
+        # summary must not strand a valid signed tag without a draft Release.
+        remote.validate_release_notes(tag, notes)
 
         # TAGGED ------------------------------------------------------------
         current_tag = observe_tag()
