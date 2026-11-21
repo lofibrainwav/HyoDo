@@ -85,16 +85,17 @@ def _last_history_entry(root: Path) -> dict[str, Any] | None:
             for line in history_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-    except OSError:
+    except (OSError, UnicodeError):
         return None
-    for raw in reversed(lines):
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-    return None
+    if not lines:
+        return None
+    # A broken newest receipt must not silently fall back to an older row.
+    # That row may have matched the same SHA but cannot certify the latest run.
+    try:
+        latest = json.loads(lines[-1])
+    except json.JSONDecodeError:
+        return None
+    return latest if isinstance(latest, dict) else None
 
 
 def _pillar_gates_observed(

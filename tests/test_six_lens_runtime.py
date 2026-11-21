@@ -177,3 +177,25 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
         plate_states = {p["lens"]: p["state"] for p in measurement["plates"]}
         assert all(plate_states[lens] == "UNOBSERVED" for lens in ("truth", "goodness", "beauty"))
         assert all(plate_states[lens] == "OBSERVED" for lens in ("benevolence", "hyo", "eternity"))
+
+    # A truncated or non-object LAST receipt must not resurrect the older
+    # OBSERVED record for the same commit. No history-owned false green.
+    for broken_tail in ('{"incomplete":', "null"):
+        (hyodo_dir / "history.jsonl").write_text(
+            json.dumps(history_entry) + "\n" + broken_tail + "\n", encoding="utf-8"
+        )
+        corrupt_tail = measure_workspace_six_lenses(repo)
+        for dimension in ("freshness", "provenance", "reproducibility", "safety", "clarity"):
+            assert corrupt_tail["experimental_dimensions"][dimension] == "UNOBSERVED"
+        assert all(
+            p["state"] == "UNOBSERVED"
+            for p in corrupt_tail["plates"]
+            if p["lens"] in {"truth", "goodness", "beauty"}
+        )
+
+    # An invalid UTF-8 final append also remains unobserved, not an exception.
+    (hyodo_dir / "history.jsonl").write_bytes(
+        json.dumps(history_entry).encode("utf-8") + b"\n\xff"
+    )
+    invalid_encoding = measure_workspace_six_lenses(repo)
+    assert invalid_encoding["experimental_dimensions"]["freshness"] == "UNOBSERVED"
