@@ -86,6 +86,65 @@ def test_incomplete_or_malformed_runs_are_unobserved(tmp_path: Path, run: dict) 
         load_run(_write(tmp_path, "r.json", run))
 
 
+@pytest.mark.parametrize(
+    "malformed",
+    [
+        "duplicate_root",
+        "duplicate_nested",
+        "nan",
+        "infinity",
+        "negative_infinity",
+        "overflow_to_infinity",
+    ],
+)
+def test_ambiguous_json_is_unobserved_instead_of_accepted(tmp_path: Path, malformed: str) -> None:
+    valid = json.dumps(_run({"case1": True}))
+    if malformed == "duplicate_root":
+        bad = valid.replace('"schema_version":', '"schema_version": "other", "schema_version":', 1)
+    elif malformed == "duplicate_nested":
+        bad = valid.replace('"passed": true', '"passed": false, "passed": true', 1)
+    else:
+        value = {
+            "nan": "NaN",
+            "infinity": "Infinity",
+            "negative_infinity": "-Infinity",
+            "overflow_to_infinity": "1e999",
+        }[malformed]
+        bad = valid[:-1] + ', "untrusted_meta": ' + value + "}"
+    file = tmp_path / "bad.json"
+    file.write_text(bad, encoding="utf-8")
+    with pytest.raises(EvalInputError, match="not JSON"):
+        load_run(file)
+    good = _write(tmp_path, "good.json", _run({"case1": True}))
+    result = runner.invoke(app, ["eval-compare", "--baseline", str(file), "--candidate", str(good)])
+    assert result.exit_code == 2
+    assert "UNOBSERVED" in result.output
+
+
+@pytest.mark.parametrize(
+    "sha",
+    ["z" * 64, "A" * 64, "a" * 63, "a" * 65],
+)
+def test_noncanonical_sha256_is_unobserved(tmp_path: Path, sha: str) -> None:
+    with pytest.raises(EvalInputError, match="dataset hash"):
+        load_run(_write(tmp_path, "bad.json", _run({"x": True}, sha=sha)))
+
+
+@pytest.mark.parametrize("tags", [["ok", 123], "ok", None])
+def test_invalid_case_tags_are_unobserved(tmp_path: Path, tags: object) -> None:
+    bad = _run({"x": True})
+    bad["cases"][0]["tags"] = tags
+    with pytest.raises(EvalInputError, match="malformed case"):
+        load_run(_write(tmp_path, "bad.json", bad))
+
+
+def test_invalid_utf8_is_unobserved(tmp_path: Path) -> None:
+    file = tmp_path / "bad.json"
+    file.write_bytes(b"\\xFF")
+    with pytest.raises(EvalInputError, match="not JSON"):
+        load_run(file)
+
+
 def test_cli_reports_and_never_gates(tmp_path: Path) -> None:
     base = _write(tmp_path, "b.json", _run({"a": False, "b": True}))
     cand = _write(tmp_path, "c.json", _run({"a": True, "b": False}))

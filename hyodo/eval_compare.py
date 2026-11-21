@@ -12,11 +12,12 @@ never a gate: it grants nothing and does not change any exit status of
 from __future__ import annotations
 
 import json
+import re
 from math import comb
 from pathlib import Path
 from typing import Any
 
-from hyodo.eval import EVAL_SCHEMA_VERSION, EvalInputError
+from hyodo.eval import EVAL_SCHEMA_VERSION, EvalInputError, _strict_json_loads, _StrictJSONError
 
 COMPARE_SCHEMA_VERSION = "hyodo.eval-compare/v1"
 
@@ -30,8 +31,8 @@ def load_run(path: Path) -> dict[str, Any]:
     except OSError as exc:
         raise EvalInputError(f"eval result unreadable: {exc}") from exc
     try:
-        run = json.loads(data.decode("utf-8"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        run = _strict_json_loads(data.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError, _StrictJSONError) as exc:
         raise EvalInputError(f"eval result is not JSON: {path.name}") from exc
     if not isinstance(run, dict) or run.get("schema_version") != EVAL_SCHEMA_VERSION:
         raise EvalInputError(f"eval result has the wrong schema: {path.name}")
@@ -39,13 +40,25 @@ def load_run(path: Path) -> dict[str, Any]:
         raise EvalInputError(f"eval run did not complete (runner failure): {path.name}")
     cases = run.get("cases")
     sha = run.get("dataset_sha256")
-    if not isinstance(cases, list) or not cases or not isinstance(sha, str) or len(sha) != 64:
+    if (
+        not isinstance(cases, list)
+        or not cases
+        or not isinstance(sha, str)
+        or re.fullmatch(r"[0-9a-f]{64}", sha) is None
+    ):
         raise EvalInputError(f"eval result has no observed cases or dataset hash: {path.name}")
     for case in cases:
         if (
             not isinstance(case, dict)
             or not isinstance(case.get("id"), str)
             or not isinstance(case.get("passed"), bool)
+            or (
+                "tags" in case
+                and (
+                    not isinstance(case["tags"], list)
+                    or not all(isinstance(tag, str) for tag in case["tags"])
+                )
+            )
         ):
             raise EvalInputError(f"eval result has a malformed case: {path.name}")
     return run
