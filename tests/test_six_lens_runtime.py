@@ -175,11 +175,5 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
         for dimension in ("freshness", "provenance", "reproducibility", "safety", "clarity"):
             assert measurement["experimental_dimensions"][dimension] == "UNOBSERVED"
         plate_states = {p["lens"]: p["state"] for p in measurement["plates"]}
-        assert all(
-            plate_states[lens] == "UNOBSERVED"
-            for lens in ("truth", "goodness", "beauty")
-        )
-        assert all(
-            plate_states[lens] == "OBSERVED"
-            for lens in ("benevolence", "hyo", "eternity")
-        )
+        assert all(plate_states[lens] == "UNOBSERVED" for lens in ("truth", "goodness", "beauty"))
+        assert all(plate_states[lens] == "OBSERVED" for lens in ("benevolence", "hyo", "eternity"))
