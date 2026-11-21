@@ -299,7 +299,33 @@ def run_unified_factory_pipeline(
         last_line = [
             line for line in history_path.read_text(encoding="utf-8").splitlines() if line.strip()
         ][-1]
-        lens_receipts = emit_all_lens_evidence(json.loads(last_line), exact_sha)
+        history = json.loads(last_line)
+        # history-receipt/v2 stores status and attribution in separate maps.
+        # Feeding it directly to the dashboard-envelope emitter silently made
+        # all six lenses UNOBSERVED despite a successful, attributed gate.
+        # Reconstruct only the gate rows already recorded; never re-measure,
+        # estimate missing axes, or treat a PASS as execution authority.
+        raw_gates = history.get("gates") if isinstance(history, dict) else None
+        raw_pillars = history.get("pillars") if isinstance(history, dict) else None
+        gates = {}
+        if isinstance(raw_gates, dict):
+            for name, status in raw_gates.items():
+                if not isinstance(name, str) or not name:
+                    continue
+                if isinstance(status, dict):
+                    gates[name] = status  # legacy fixture / dashboard envelope
+                elif isinstance(status, str) and isinstance(raw_pillars, dict):
+                    pillar = raw_pillars.get(name)
+                    if isinstance(pillar, str):
+                        gates[name] = {"status": status, "pillar": pillar}
+        lens_receipts = emit_all_lens_evidence(
+            {
+                "measured_at": history.get("measured_at") if isinstance(history, dict) else None,
+                "provenance": history.get("provenance") if isinstance(history, dict) else None,
+                "gates": gates,
+            },
+            exact_sha,
+        )
 
     return {
         "schema": "hyodo.factory-bundle/v1",
