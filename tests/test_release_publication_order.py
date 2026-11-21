@@ -52,7 +52,6 @@ SBOM_ASSETS = ["sbom.cyclonedx.json", "sbom.cyclonedx.json.sha256"]
 MUTATIONS = {"create_tag", "create_draft_release", "run_release_evidence", "publish_release"}
 
 
-
 def test_public_release_notes_exclude_candidate_receipt() -> None:
     candidate = (
         "# HyoDo 9.9.9 Release Notes\n\n## Intent\n\nUseful behavior.\n\n"
@@ -108,6 +107,7 @@ def test_real_draft_adapter_passes_only_public_summary_to_github(
     assert "Useful behavior." in captured["body"]
     assert "UNOBSERVED" not in captured["body"]
     assert "blob/main/docs/releases/9.9.9.md" in captured["body"]
+
 
 class FakeRemote:
     """In-memory GitHub + PyPI that behaves like the real gates, and logs calls."""
