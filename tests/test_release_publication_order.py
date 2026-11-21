@@ -52,6 +52,63 @@ SBOM_ASSETS = ["sbom.cyclonedx.json", "sbom.cyclonedx.json.sha256"]
 MUTATIONS = {"create_tag", "create_draft_release", "run_release_evidence", "publish_release"}
 
 
+
+def test_public_release_notes_exclude_candidate_receipt() -> None:
+    candidate = (
+        "# HyoDo 9.9.9 Release Notes\n\n## Intent\n\nUseful behavior.\n\n"
+        "## Release chain receipt\n\n- UNOBSERVED — Signed tag.\n"
+    )
+    body = pipeline._stable_public_release_notes(TAG, "lofibrainwav/HyoDo", candidate)
+    assert "Useful behavior." in body
+    assert "UNOBSERVED" not in body
+    assert "Release-chain evidence" in body
+    assert "blob/main/docs/releases/9.9.9.md" in body
+
+
+def test_public_release_notes_refuse_candidate_claim_before_receipt() -> None:
+    candidate = (
+        "# HyoDo 9.9.9 Release Notes\n\n"
+        "This is a CANDIDATE receipt. No tag, GitHub Release, SBOM or PyPI "
+        "publication is implied.\n\n"
+        "## Release chain receipt\n\n- UNOBSERVED — Signed tag.\n"
+    )
+    with pytest.raises(PipelineExternalError, match="prepublication receipt claims"):
+        pipeline._stable_public_release_notes(TAG, "lofibrainwav/HyoDo", candidate)
+
+
+def test_public_release_notes_require_receipt_boundary() -> None:
+    with pytest.raises(PipelineExternalError, match="exactly one"):
+        pipeline._stable_public_release_notes(
+            TAG, "lofibrainwav/HyoDo", "# HyoDo 9.9.9 Release Notes\n"
+        )
+
+
+def test_real_draft_adapter_passes_only_public_summary_to_github(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    note = tmp_path / "candidate.md"
+    note.write_text(
+        "# HyoDo 9.9.9 Release Notes\n\n## Intent\n\nUseful behavior.\n\n"
+        "## Release chain receipt\n\n- UNOBSERVED — PyPI publish.\n",
+        encoding="utf-8",
+    )
+    remote = object.__new__(pipeline.GitHubRemote)
+    remote.repo = "lofibrainwav/HyoDo"
+    captured: dict[str, str] = {}
+
+    def fake_ok(*argv: str, **_kwargs: object) -> str:
+        assert "--draft" in argv
+        assert "--verify-tag" in argv
+        notes_path = Path(argv[argv.index("--notes-file") + 1])
+        captured["body"] = notes_path.read_text(encoding="utf-8")
+        return ""
+
+    monkeypatch.setattr(remote, "_ok", fake_ok)
+    remote.create_draft_release(TAG, note)
+    assert "Useful behavior." in captured["body"]
+    assert "UNOBSERVED" not in captured["body"]
+    assert "blob/main/docs/releases/9.9.9.md" in captured["body"]
+
 class FakeRemote:
     """In-memory GitHub + PyPI that behaves like the real gates, and logs calls."""
 
