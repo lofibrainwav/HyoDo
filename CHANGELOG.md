@@ -7,12 +7,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.22.6] - 2026-11-20
+
+Source candidate for local evidence and evaluation integrity. Publication is
+pending the independent release-chain receipt, not implied by CI or merge.
+
 ### Added
 
 - `hyodo eval-compare --baseline <result.json> --candidate <result.json>` pairs two `hyodo eval` runs case by case and reports wins, losses, per-tag pass counts and an exact two-sided McNemar p-value. It refuses (`UNOBSERVED`, exit 2) when the runs observed different dataset bytes or case ids, or when either run did not complete. The verdict is evidence for review only; the exit code is 0 whenever a comparison was observed.
 
 ### Fixed
 
+- Paired evaluation comparison now strictly rejects duplicate JSON keys,
+  non-finite and overflowing numbers, malformed canonical SHA-256 strings,
+  invalid case tags and invalid UTF-8 inputs. The CLI reports UNOBSERVED
+  with exit code 2 rather than accepting ambiguous evidence.
 - `hyodo eval` reads the dataset once and both parses and hashes that one snapshot, so `dataset_sha256` always describes the bytes that were evaluated; before, a file replaced between the parse and the hash read produced a receipt for different bytes. A dataset that is not valid UTF-8 is now `UNOBSERVED` (exit 2) instead of an uncaught `UnicodeDecodeError`, and a non-string `scoring` or custom `operator` (for example a list) is rejected as invalid input instead of crashing.
 - `hyodo eval` rejects ambiguous JSON in the dataset (`UNOBSERVED`, exit 2) and in runner stdout (failed run, `runner_output_not_json`): duplicate object keys, `NaN` / `Infinity` literals, numbers that overflow to infinity, and integers beyond Python's digit limit. Runner stdout that is not valid UTF-8 is also `runner_output_not_json` instead of an uncaught `UnicodeDecodeError`.
 - `hyodo eval` comparators no longer treat JSON booleans as numbers: `exact`, list `contains`, `json_path` and custom `equals` / `not_equals` / list `contains` compare `true` and `1` (or `false` and `0`) as different values, including inside nested objects and arrays, and custom `gt` / `gte` / `lt` / `lte` fail when either side is or contains a boolean. Equality is checked iteratively, so deeply nested values no longer risk a `RecursionError`. Numeric `1` and `1.0` still compare equal, and string `contains` is unchanged.
@@ -20,6 +29,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Factory example: on macOS, `killpg(pgid, 0)` answers `EPERM` for a group whose only members are unreaped zombies, so stale-lock recovery reported such a group `INVALID` and refused with `RUN_STATE_RECORD_INVALID`. A permission error now consults the `ps` scan: the group is `GONE` only when every listed member is a zombie and the scan is clean; another user's live group, an unparseable line or a failed `ps` stays `INVALID`. The `/proc`-only test is skipped on hosts without `/proc`.
 - Factory example: the pre-exec gate restores the default `SIGPIPE` and `SIGXFSZ` before `execvp`, so a gated skill handles a closed pipe like a directly spawned one (`yes | head -1` ends with 141 instead of looping on `EPIPE`).
 - Factory example: stale-lock checks no longer call a process gone when only its main thread is a zombie (`Threads:` > 1 in `/proc/<pid>/status`, unreadable status counts as alive), require two agreeing `/proc` scans before a group is `GONE`, and re-check `os.kill` when `/proc/<pid>` is missing (another PID namespace) instead of reporting the process gone.
+
+### Evidence
+
+- HyoDo #651 merged to main at a131314d4fc9421ffe056e471be7770e5aeac019.
+- 56 focused eval/inspect/compare tests passed in a clean candidate worktree;
+  synthetic read-race tests confirmed accurate digest and incomplete coverage.
+- Signed tag, PyPI publication, provenance, and clean install are UNOBSERVED
+  until measured by the existing versioned release pipeline.
 
 ## [4.22.5] - 2026-11-14
 
