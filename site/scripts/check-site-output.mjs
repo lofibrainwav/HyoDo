@@ -322,3 +322,22 @@ console.log(`Sidebar label contract: PASS (${sidebarEntries.length} entries agre
 console.log(`Current-version contract: PASS (${currencyAnchors.length} anchors; source ${currentVersion} from VERSION, published ${publishedVersion} from ROADMAP.md)`);
 console.log('Public-language contract: PASS (source + generated visible text)');
 console.log('Static 404 and homepage output contracts: PASS');
+
+
+// Public product boundary source ↔ live site source parity.
+// The standalone product boundary must not silently drift between its docs
+// owner and the public site's separately tracked Markdown page.
+const canonicalBoundary = readFileSync(join(root, '..', '..', 'docs', 'PRODUCT_BOUNDARY.md'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/^# HyoDo product boundary\s*\n+/, '').trim();
+const siteBoundary = readFileSync(join(root, '..', 'src', 'content', 'docs', 'docs', 'product-boundary.md'), 'utf8')
+    .replace(/\r\n/g, '\n')
+    .replace(/^---\n[\s\S]*?\n---\s*\n/, '').trim();
+if (canonicalBoundary !== siteBoundary) {
+    throw new Error('Public product boundary drift: docs/PRODUCT_BOUNDARY.md does not match site product-boundary.md');
+}
+const renderedBoundary = readFileSync(join(root, '..', 'dist', 'docs', 'product-boundary', 'index.html'), 'utf8');
+if (!renderedBoundary.includes('Public product and consumer closure')) {
+    throw new Error('Public product boundary missing in the generated visitor page');
+}
+console.log('Public product boundary parity and visitor-visible section: PASS');
