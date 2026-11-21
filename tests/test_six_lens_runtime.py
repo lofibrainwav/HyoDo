@@ -194,8 +194,6 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
         )
 
     # An invalid UTF-8 final append also remains unobserved, not an exception.
-    (hyodo_dir / "history.jsonl").write_bytes(
-        json.dumps(history_entry).encode("utf-8") + b"\n\xff"
-    )
+    (hyodo_dir / "history.jsonl").write_bytes(json.dumps(history_entry).encode("utf-8") + b"\n\xff")
     invalid_encoding = measure_workspace_six_lenses(repo)
     assert invalid_encoding["experimental_dimensions"]["freshness"] == "UNOBSERVED"
