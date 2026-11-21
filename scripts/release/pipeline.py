@@ -823,6 +823,42 @@ def _has_exact_evidence(release: dict[str, Any] | None) -> bool:
     return release is not None and set(release.get("assets") or []) == set(SBOM_ASSETS)
 
 
+def _stable_public_release_notes(tag: str, repo: str, candidate: str) -> str:
+    """Render public notes without copying a candidate's unmeasured receipt.
+
+    A release's signed artifacts and its measured post-publication receipt have
+    different lifecycles. Link to the latter rather than freezing pre-release
+    observations into the GitHub Release description.
+    """
+    marker = "## Release chain receipt"
+    if candidate.count(marker) != 1:
+        raise PipelineExternalError(
+            "release candidate must have exactly one release-chain receipt section"
+        )
+    overview, _, _ = candidate.partition(marker)
+    if not overview.strip():
+        raise PipelineExternalError("release candidate has no public summary")
+    forbidden = (
+        "This is a CANDIDATE receipt",
+        "No tag, GitHub Release, SBOM or PyPI publication",
+        "Not measured yet. Run",
+    )
+    if any(claim in overview for claim in forbidden):
+        raise PipelineExternalError(
+            "prepublication receipt claims must not appear in public release notes"
+        )
+    version = tag.removeprefix("v")
+    return (
+        overview.rstrip()
+        + "\n\n## Release-chain evidence\n\n"
+        + f"The [release-chain receipt](https://github.com/{repo}/blob/main/"
+        + f"docs/releases/{version}.md) is maintained after publication. "
+        + "Its measured states are updated after the publication checks finish. "
+        + "This description alone does not verify provenance, installation, "
+        + "or any external host's runtime state.\n"
+    )
+
+
 class GitHubRemote:
     """Real GitHub/PyPI adapter for ``run_publication``.
 
@@ -848,6 +884,14 @@ class GitHubRemote:
                 done.stderr.strip() or done.stdout.strip() or f"{args[0]} failed"
             )
         return done.stdout.strip()
+
+    def validate_release_notes(self, tag: str, notes: Path) -> str:
+        """Fail before pushing an immutable tag if the candidate is unsafe."""
+        try:
+            candidate = notes.read_text(encoding="utf-8")
+        except (OSError, UnicodeError) as exc:
+            raise PipelineExternalError(f"candidate release notes unreadable: {notes}") from exc
+        return _stable_public_release_notes(tag, self.repo, candidate)
 
     # -- observations -------------------------------------------------------
     def observe_main(self) -> dict[str, str]:
@@ -914,20 +958,26 @@ class GitHubRemote:
         self._ok("git", "push", "origin", f"refs/tags/{tag}")
 
     def create_draft_release(self, tag: str, notes: Path) -> None:
-        self._ok(
-            "gh",
-            "release",
-            "create",
-            tag,
-            "--repo",
-            self.repo,
-            "--verify-tag",
-            "--draft",
-            "--title",
-            f"HyoDo {tag}",
-            "--notes-file",
-            str(notes),
-        )
+        import tempfile
+
+        public_notes = self.validate_release_notes(tag, notes)
+        with tempfile.TemporaryDirectory(prefix="hyodo-release-notes-") as directory:
+            public_path = Path(directory) / "public-release-notes.md"
+            public_path.write_text(public_notes, encoding="utf-8")
+            self._ok(
+                "gh",
+                "release",
+                "create",
+                tag,
+                "--repo",
+                self.repo,
+                "--verify-tag",
+                "--draft",
+                "--title",
+                f"HyoDo {tag}",
+                "--notes-file",
+                str(public_path),
+            )
 
     def publish_release(self, tag: str) -> None:
         # Only publish.yml runs created at or after this boundary are evidence for it.
@@ -1138,6 +1188,10 @@ def run_publication(
                 "WAIT" if waiting else "BLOCK",
             )
 
+        # Validate before creating or pushing a tag. A bad publication
+        # summary must not strand a valid signed tag without a draft Release.
+        remote.validate_release_notes(tag, notes)
+
         # TAGGED ------------------------------------------------------------
         current_tag = observe_tag()
         if current_tag is None:
@@ -1299,7 +1353,10 @@ def run_publication(
             f"release chain {version}: {chain.get('detail')}",
             was_simulated=False,
         )
-        receipt["next_action"] = "closed; seal the measured receipt in docs/releases"
+        receipt["next_action"] = (
+            "release chain verified; seal the measured receipt in docs/releases "
+            "and reconcile the public description using sync_release_notes.py"
+        )
     except (_PublicationBlocked, ReleaseOrderError, PipelineExternalError) as exc:
         blocked = exc if isinstance(exc, _PublicationBlocked) else _PublicationBlocked(str(exc))
         receipt.update(
