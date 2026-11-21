@@ -14,13 +14,11 @@ reconciled. Prior release receipts remain preserved under `docs/releases/`.
 ## Current release
 
 HyoDo 4.22.5 is the latest published release.
-HyoDo 4.22.5 is the current release target for the version-sync contract:
-this is an already published and closed baseline, not a pending publication.
-A later release target must be named separately by the HyoDo release process;
-a consumer's pending work does not define it.
-It carries safety scans that keep scanning past oversized files, the host
-gate-trust commands and the factory-example approval, provenance and evidence
-fixes, with the package chain recorded in `docs/releases/4.22.5.md`.
+HyoDo 4.22.6 is the current release target for the version-sync contract:
+this is a prepared source candidate, NOT an already published package.
+The previous public release 4.22.5 remains sealed with its own measured
+receipt in [4.22.5 release notes](docs/releases/4.22.5.md).
+A candidate's green CI is not a tag, PyPI publication, or install readback.
 This does not establish live host integration or documentation-site deployment.
 HyoDo 4.21.2
 remains an incomplete immutable
@@ -52,6 +50,18 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.22.6 (prepared candidate; publication unobserved)
+
+- From HyoDo #651: deterministic evaluation runs bind parsed inputs to their
+  recorded bytes and reject ambiguous input/runner JSON and boolean coercion.
+- File inspection excludes files whose bytes changed or became unreadable
+  between digest and chunking passes, with incomplete coverage visible.
+- Paired evaluation comparison adds exact McNemar results for review only,
+  with strict JSON input, canonical SHA-256 and tag validation.
+- No new authority, cloud service, or automatic host enforcement.
+- Release chain: UNOBSERVED until the independently authorized HyoDo
+  publication pipeline completes; see [4.22.6 release notes](docs/releases/4.22.6.md).
 
 ### 4.22.5 (released 2026-11-14 UTC)
 
