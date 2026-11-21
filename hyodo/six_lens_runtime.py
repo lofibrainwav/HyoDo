@@ -12,6 +12,7 @@ from hyodo.evidence_plate import (
     extract_lens_evidence,
     make_evidence_plate,
 )
+from hyodo.lens_evidence import _measurement_time
 
 DIMENSIONS = (
     "freshness",
@@ -155,10 +156,15 @@ def collect_workspace_six_lens_envelope(root: Path) -> dict[str, Any]:
         gates: dict[str, Any] = raw_gates if isinstance(raw_gates, dict) else {}
         raw_pillars = history.get("pillars")
         attributions: dict[str, Any] = raw_pillars if isinstance(raw_pillars, dict) else {}
+        # History-derived atoms must not certify a subject with an absent,
+        # malformed or timezone-naive measurement time. Use the same validator
+        # as the canonical v1 lens receipt, without reading the current clock.
+        _, time_residuals = _measurement_time(history.get("measured_at"))
         if (
             prov.get("target_commit") == exact_sha
             and prov.get("target_dirty") is False
             and prov.get("validity") == "OBSERVED"
+            and not time_residuals
         ):
             envelope["freshness"] = {"status": "FRESH", "target_commit": exact_sha}
             if prov.get("validity") == "OBSERVED":

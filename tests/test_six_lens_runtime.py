@@ -158,3 +158,28 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
         "hyo": "OBSERVED",
         "eternity": "OBSERVED",
     }
+
+    # The history reader must enforce the same timestamp binding as the
+    # canonical v1 emitter. Independent event/consent receipts remain visible.
+    for invalid_time in (None, "2026-11-13T00:00:00", "not-a-date"):
+        malformed_history = dict(history_entry)
+        if invalid_time is None:
+            malformed_history.pop("measured_at")
+        else:
+            malformed_history["measured_at"] = invalid_time
+        (hyodo_dir / "history.jsonl").write_text(
+            json.dumps(malformed_history) + "\n", encoding="utf-8"
+        )
+        measurement = measure_workspace_six_lenses(repo)
+        assert measurement["exact_artifact_sha"] == sha
+        for dimension in ("freshness", "provenance", "reproducibility", "safety", "clarity"):
+            assert measurement["experimental_dimensions"][dimension] == "UNOBSERVED"
+        plate_states = {p["lens"]: p["state"] for p in measurement["plates"]}
+        assert all(
+            plate_states[lens] == "UNOBSERVED"
+            for lens in ("truth", "goodness", "beauty")
+        )
+        assert all(
+            plate_states[lens] == "OBSERVED"
+            for lens in ("benevolence", "hyo", "eternity")
+        )
