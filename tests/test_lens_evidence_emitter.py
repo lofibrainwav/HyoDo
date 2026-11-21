@@ -176,7 +176,9 @@ def test_matching_subject_sha_cannot_override_untrusted_measuring_code(
     assert "measurer_provenance_unobserved" in receipt["residuals"]
 
 
-@pytest.mark.parametrize("invalid", [None, "", "not-a-date", "2026-11-21T05:19:38", "2026-02-30T10:00:00Z", 123])
+@pytest.mark.parametrize(
+    "invalid", [None, "", "not-a-date", "2026-11-21T05:19:38", "2026-02-30T10:00:00Z", 123]
+)
 def test_missing_naive_or_malformed_measurement_time_cannot_certify_coverage(
     tmp_path: Path, invalid
 ) -> None:
