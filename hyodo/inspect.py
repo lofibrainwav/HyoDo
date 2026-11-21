@@ -17,6 +17,7 @@ pointed HyoDo at is not itself an external variable.
 from __future__ import annotations
 
 import fnmatch
+import hashlib
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -44,7 +45,7 @@ class InspectResult:
 
     ``folder_manifest`` and ``chunks_manifest`` are the exact JSON-serializable
     documents written to disk. ``warnings`` carries human-readable lines
-    (currently only digest-mismatch-during-inspect notices) printed once by
+    (late read failures, symlink swaps and digest mismatches) printed once by
     the CLI regardless of ``--report`` format.
     """
 
@@ -237,6 +238,9 @@ def run_inspect(
     unreadable: list[dict[str, Any]] = []
     # Pass-1 digest, keyed by absolute path, for files eligible for chunking.
     pass1_digest: dict[Path, str] = {}
+    # Full SHA-256 of the scanned bytes; the 12-hex manifest digest is too short
+    # to prove that the chunked bytes are the scanned bytes.
+    pass1_full_digest: dict[Path, str] = {}
     chunkable: list[Path] = []
     expected = 0
 
@@ -316,28 +320,44 @@ def run_inspect(
 
         if not secret_shaped:
             pass1_digest[entry] = digest
+            pass1_full_digest[entry] = hashlib.sha256(data).hexdigest()
             chunkable.append(entry)
 
-    observed = expected - len(unreadable)
-
-    # Pass 2: chunk. Re-read bytes; a whole-file digest mismatch vs pass 1 is
-    # reported (changed_during_inspect) but never blocks the run.
+    # Pass 2: chunk. Only bytes identical (full SHA-256) to the secret-scanned
+    # pass-1 bytes are chunked. An entry that changed, became unreadable, or was
+    # swapped for a symlink to a directory or outside the tree is not a complete
+    # observation: it moves from `files` to `unreadable`, lowers `coverage`, gets
+    # no chunks, and prints one warning. The run still exits 0.
+    incomplete_paths: set[str] = set()
     changed_during_inspect: list[dict[str, str]] = []
     warnings: list[str] = []
     chunks: list[dict[str, Any]] = []
     chunk_seq = 1
 
     for entry in sorted(chunkable, key=lambda p: p.relative_to(target).as_posix()):
+        display_path = _lexical_display_path(entry, root_abs)
+        # Re-apply pass 1's containment rule. This narrows, but cannot close,
+        # the window between this check and the read.
+        swapped_reason, _ = _resolve_symlink_status(entry, target)
+        if swapped_reason is not None:
+            incomplete_paths.add(display_path)
+            unreadable.append({"path": display_path, "reason": f"chunk_{swapped_reason}"})
+            warnings.append(f"warning: {display_path} became {swapped_reason} during inspect")
+            continue
         try:
             data = entry.read_bytes()
-        except OSError:
-            # Became unreadable between passes; leave it out of chunks silently
-            # rather than crash — folder-manifest already recorded pass-1 state.
+        except OSError as exc:
+            incomplete_paths.add(display_path)
+            unreadable.append(
+                {"path": display_path, "reason": f"chunk_read_error:{exc.__class__.__name__}"}
+            )
+            warnings.append(f"warning: {display_path} became unreadable during inspect")
             continue
         digest_before = pass1_digest[entry]
         digest_after = content_digest(data)
-        if digest_after != digest_before:
-            display_path = _lexical_display_path(entry, root_abs)
+        if hashlib.sha256(data).hexdigest() != pass1_full_digest[entry]:
+            incomplete_paths.add(display_path)
+            unreadable.append({"path": display_path, "reason": "changed_during_inspect"})
             changed_during_inspect.append(
                 {
                     "path": display_path,
@@ -347,8 +367,9 @@ def run_inspect(
             )
             warnings.append(
                 f"warning: {display_path} changed during inspect "
-                f"({digest_before} -> {digest_after}); chunks reflect the newer content"
+                f"({digest_before} -> {digest_after}); chunks omitted"
             )
+            continue
 
         size = len(data)
         offset = 0
@@ -377,6 +398,9 @@ def run_inspect(
             )
             chunk_seq += 1
             offset = end
+
+    files = [row for row in files if row["path"] not in incomplete_paths]
+    observed = expected - len(unreadable)
 
     try:
         root_display = Path(path).resolve().relative_to(base_root.resolve()).as_posix()
