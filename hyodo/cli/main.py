@@ -102,6 +102,7 @@ from hyodo.dashboard import (
 )
 from hyodo.dx_signals import DxSignals, collect_dx_signals
 from hyodo.eval import EvalInputError, run_evaluation
+from hyodo.eval_compare import compare_runs, load_run
 from hyodo.event_graph import render_event_graph_json, validate_event_edges
 from hyodo.events import (
     AGENT_EVENTS_RELATIVE_PATH,
@@ -4500,6 +4501,41 @@ def eval_command(
             console.print(f"  runner: {failure['code']}")
     else:
         console.print(f"[red]UNOBSERVED[/red] eval: {rich_escape(str(summary['reason']))}")
+    raise typer.Exit(exit_code)
+
+
+@app.command("eval-compare")
+def eval_compare_command(
+    baseline: str = typer.Option(..., "--baseline", help="Baseline eval result JSON"),
+    candidate: str = typer.Option(..., "--candidate", help="Candidate eval result JSON"),
+    alpha: float = typer.Option(
+        0.05, "--alpha", min=0.0001, max=0.5, help="Significance level for the exact McNemar test"
+    ),
+    json_output: bool = typer.Option(False, "--json", help="Emit the full comparison as JSON"),
+):
+    """Pair two eval runs on the same dataset: wins, losses and an exact McNemar test.
+
+    Refuses (exit 2, UNOBSERVED) when the runs observed different dataset bytes or
+    case ids, or when either run did not complete. A verdict is evidence for
+    review, never a gate: the exit code is 0 whenever a comparison was observed.
+    """
+    try:
+        summary = compare_runs(load_run(Path(baseline)), load_run(Path(candidate)), alpha=alpha)
+        exit_code = 0
+    except EvalInputError as exc:
+        summary = {"status": "UNOBSERVED", "reason": str(exc)}
+        exit_code = 2
+    if json_output:
+        console.print_json(json.dumps(summary))
+    elif exit_code == 0:
+        console.print(
+            f"{summary['verdict']}: candidate {summary['candidate_pass_rate']:.1%} vs baseline "
+            f"{summary['baseline_pass_rate']:.1%} on {summary['cases']} cases; "
+            f"wins {summary['wins']}, losses {summary['losses']}, "
+            f"exact McNemar p={summary['mcnemar_exact_p']:.4f}"
+        )
+    else:
+        console.print(f"[red]UNOBSERVED[/red] eval-compare: {rich_escape(str(summary['reason']))}")
     raise typer.Exit(exit_code)
 
 

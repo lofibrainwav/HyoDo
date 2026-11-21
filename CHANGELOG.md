@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `hyodo eval-compare --baseline <result.json> --candidate <result.json>` pairs two `hyodo eval` runs case by case and reports wins, losses, per-tag pass counts and an exact two-sided McNemar p-value. It refuses (`UNOBSERVED`, exit 2) when the runs observed different dataset bytes or case ids, or when either run did not complete. The verdict is evidence for review only; the exit code is 0 whenever a comparison was observed.
+
 ### Fixed
 
 - `hyodo eval` reads the dataset once and both parses and hashes that one snapshot, so `dataset_sha256` always describes the bytes that were evaluated; before, a file replaced between the parse and the hash read produced a receipt for different bytes. A dataset that is not valid UTF-8 is now `UNOBSERVED` (exit 2) instead of an uncaught `UnicodeDecodeError`, and a non-string `scoring` or custom `operator` (for example a list) is rejected as invalid input instead of crashing.
