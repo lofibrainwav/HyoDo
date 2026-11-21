@@ -71,12 +71,12 @@ def test_public_release_notes_refuse_candidate_claim_before_receipt() -> None:
         "publication is implied.\n\n"
         "## Release chain receipt\n\n- UNOBSERVED — Signed tag.\n"
     )
-    with pytest.raises(PipelineExternalError, match="prepublication receipt claims"):
+    with pytest.raises(pipeline.PipelineExternalError, match="prepublication receipt claims"):
         pipeline._stable_public_release_notes(TAG, "lofibrainwav/HyoDo", candidate)
 
 
 def test_public_release_notes_require_receipt_boundary() -> None:
-    with pytest.raises(PipelineExternalError, match="exactly one"):
+    with pytest.raises(pipeline.PipelineExternalError, match="exactly one"):
         pipeline._stable_public_release_notes(
             TAG, "lofibrainwav/HyoDo", "# HyoDo 9.9.9 Release Notes\n"
         )
