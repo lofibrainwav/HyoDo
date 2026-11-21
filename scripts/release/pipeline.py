@@ -823,7 +823,6 @@ def _has_exact_evidence(release: dict[str, Any] | None) -> bool:
     return release is not None and set(release.get("assets") or []) == set(SBOM_ASSETS)
 
 
-
 def _stable_public_release_notes(tag: str, repo: str, candidate: str) -> str:
     """Render public notes without copying a candidate's unmeasured receipt.
 
@@ -858,6 +857,7 @@ def _stable_public_release_notes(tag: str, repo: str, candidate: str) -> str:
         + "This description alone does not verify provenance, installation, "
         + "or any external host's runtime state.\n"
     )
+
 
 class GitHubRemote:
     """Real GitHub/PyPI adapter for ``run_publication``.
@@ -955,9 +955,7 @@ class GitHubRemote:
         try:
             candidate = notes.read_text(encoding="utf-8")
         except (OSError, UnicodeError) as exc:
-            raise PipelineExternalError(
-                f"candidate release notes unreadable: {notes}"
-            ) from exc
+            raise PipelineExternalError(f"candidate release notes unreadable: {notes}") from exc
         public_notes = _stable_public_release_notes(tag, self.repo, candidate)
         with tempfile.TemporaryDirectory(prefix="hyodo-release-notes-") as directory:
             public_path = Path(directory) / "public-release-notes.md"
@@ -1347,8 +1345,10 @@ def run_publication(
             f"release chain {version}: {chain.get('detail')}",
             was_simulated=False,
         )
-        receipt["next_action"] = ("release chain verified; seal the measured receipt in docs/releases "
-                                  "and reconcile the public description using sync_release_notes.py")
+        receipt["next_action"] = (
+            "release chain verified; seal the measured receipt in docs/releases "
+            "and reconcile the public description using sync_release_notes.py"
+        )
     except (_PublicationBlocked, ReleaseOrderError, PipelineExternalError) as exc:
         blocked = exc if isinstance(exc, _PublicationBlocked) else _PublicationBlocked(str(exc))
         receipt.update(
