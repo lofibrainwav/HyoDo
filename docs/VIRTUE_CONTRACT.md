@@ -85,7 +85,13 @@ weight, aggregate, decision, or authority field. `hyodo/lens_evidence.py`
 emits it deterministically from a dashboard evidence envelope; this version
 reads gate evidence only, so a lens with no attributed gate is `UNOBSERVED`,
 and evidence measured at another commit or on a dirty tree is `UNOBSERVED`
-for the subject rather than stale-but-observed. A per-axis value, a judge,
+for the subject rather than stale-but-observed. A matching target SHA by itself
+is not enough: the measuring code must also report `validity: OBSERVED`, and
+the recorded measurement timestamp must have a valid timezone. Missing or
+mismatched measurer origin, or an absent, malformed or timezone-naive timestamp,
+leaves the lens `UNOBSERVED` with explicit residuals and no claimed evidence
+references. The emitter reads no clock: a consumer independently checks the
+receipt's age/freshness for the task at hand. A per-axis value, a judge,
 weights, floors, and any profile-specific summary belong to the integrating
 host, which should record its judgment separately and bind it to the evidence
 receipt by digest. HyoDo does not supply that host-owned judgment or turn it
