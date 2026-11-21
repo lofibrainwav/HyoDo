@@ -161,6 +161,70 @@ examples/factory-loop/
   `UNOBSERVED` with a warning; the CLI exits `0` HEALTHY, `1` DEGRADED, `2`
   UNOBSERVED. Nothing here verifies how many external repositories or skills
   exist anywhere; no such count is claimed.
+- `doctor`'s `status` covers only what `status_scope` names: registry state,
+  content integrity, the recorded upstream origin and, only when
+  `--host-skill-root` is given, host copies that differ from the registered
+  content. A tree digest that still
+  matches proves only that a copy did not change after it was added, so a
+  module without a recorded clean git commit (`recorded_upstream` is
+  `NO_GIT_ORIGIN`, `DIRTY_AT_RECORD`, `NOT_IN_COMMIT` for untracked or
+  ignored module files, `LOCAL_COMMIT_ONLY` for a commit with no recorded
+  remote, or `UNRECORDED`) makes `doctor`
+  `UNOBSERVED` (`module_upstream_unrecorded:<id>|<state>`), never `HEALTHY`;
+  so does a registered module whose source directory is gone
+  (`module_source_missing:<id>`), enabled or not.
+  Everything else is a separate axis under `axes` and never raises the status:
+  `install` (`PRESENT`/`MISSING`); `host_connection`, `CONNECTED` only when a
+  root passed with `--host-skill-root` serves exactly the registered
+  `SKILL.md`, judged per root so one drifted root is drift even when another
+  is `CONNECTED` (`DRIFTED` is a problem, `ABSENT` a warning, `SHADOWED` a
+  warning when the copy is exactly another registered skill's, no root
+  `UNOBSERVED`; a root that is not a readable directory is
+  `host_root_unreadable`, not `ABSENT`); `execution`, from
+  `.hyodo/orchestration-observations.jsonl`, where only rows that name the
+  registered `SKILL.md` digest and are not older than the module's current
+  registration count and the latest such row decides (`EXECUTED_PASS`,
+  `EXECUTED_FAILED`, `DISCLOSED_ONLY`, `STALE_CONTENT`, `UNOBSERVED`). A row
+  also has to join an event in the existing agent ledger
+  (`.hyodo/agent-events.jsonl`) with the same `event_id`, `run_id` and
+  `tool.name` equal to the skill id and the same timestamp, one-to-one (an
+  event that two rows name, or that the ledger holds twice, corroborates
+  neither), which is what the harness runner writes
+  for every skill it runs (`execution_evidence_source:
+  AGENT_LEDGER_CORROBORATED`). A row that exists only in the shared sidecar,
+  for example from `hyodo observation record` or another host, is
+  `UNCORROBORATED_CLAIM` (`execution_claim_uncorroborated:<skill>`), never
+  `EXECUTED_*`. Both files are plain local files: a process running as the
+  same user that writes matching rows to both is not detected, so this is
+  corroboration, not authentication;
+  `independent_verification` and `trust_stage`, read from the trust cache
+  without the demotion write, and `INVALIDATED` / `VERIFY` once the content,
+  tree, version or source path changed; `helped`, always `UNOBSERVED`
+  because the harness has no outcome evidence; and `upstream_verified`,
+  `UNOBSERVED` because `doctor` does not contact the remote.
+  `registry_view_out_of_sync:registry.toml` means `registry.toml` no longer
+  matches `lock.json` (the state; the TOML is its rendered view), for example
+  after an interrupted write; the next lifecycle write re-renders it. An
+  unreadable trust cache, observation file or host copy makes that axis
+  `UNOBSERVED` with a warning instead of failing the whole report. These
+  evidence warnings are not treated as skill defects by gap analysis.
+- `verify-upstream <module>` runs `git ls-remote --heads --tags` against the
+  recorded remote and never fetches into the module. The remote URL comes from
+  the module's own git config, so a URL that starts with `-` or uses `ext::`
+  is refused (`remote_url_refused`; only https, ssh, git and scp-like remotes
+  are asked), no credential helper or `GIT_ASKPASS`/`SSH_ASKPASS` is used, git
+  runs from a neutral directory without the module's fsmonitor hook, and it
+  never waits for a credential
+  prompt. It exits `0` only for
+  `VERIFIED_AT_REF` (the recorded commit is a branch or tag tip there) and `2`
+  otherwise: `COMMIT_NOT_A_REF_TIP` (possibly an older commit, so not proof of
+  tampering) or `UNOBSERVED` (no recorded commit or remote, or the remote
+  could not be reached). A local path or `file://` remote is `LOCAL_REMOTE`:
+  a module vouching for itself is not an independent check. It does not
+  compare file contents; that is the module tree digest, a separate check.
+  Known limits: a run that reuses a `run_id` keeps the first run's evidence
+  (the runner refuses the conflicting rows), and a skill whose agent event
+  could not be written reads `UNCORROBORATED_CLAIM` (fails closed).
 - A run that is killed leaves `.hyodo/factory/run.lock` behind. The lock
   records the owner's pid and host, and the run records each skill's process
   group under `.hyodo/factory-run-state/`. A lock counts as stale only when
@@ -242,6 +306,12 @@ python examples/factory-loop/hyodo_factory.py rollback gstack --root .
 
 # Verify dependencies, content digests, script syntax, and path containment
 python examples/factory-loop/hyodo_factory.py doctor --root .
+
+# Also read back what a host serves (repeatable; read-only)
+python examples/factory-loop/hyodo_factory.py doctor --root . --host-skill-root ~/.claude/skills
+
+# Read-only supply-chain check: is the recorded commit a branch/tag tip at its remote?
+python examples/factory-loop/hyodo_factory.py verify-upstream gstack --root .
 
 # Inspect host connection and support matrix (Claude Code, Cursor, Codex, Antigravity)
 python examples/factory-loop/hyodo_factory.py hosts --root .

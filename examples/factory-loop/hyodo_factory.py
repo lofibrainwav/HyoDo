@@ -8,7 +8,10 @@ Commands:
 - `update <mod>`    Atomically update a module with rollback snapshot protection
 - `rollback <mod>`  Restore a module to its previous locked snapshot
 - `remove <mod>`    Remove a module and clean up its hooks, permissions, and manifest rules
-- `doctor`          Verify lock SHA-256 integrity, dependencies, conflicts, and script syntax
+- `doctor`          Verify lock SHA-256 integrity, dependencies, conflicts, and script syntax;
+                    report install, upstream, host connection (`--host-skill-root`),
+                    execution, verification, usefulness and trust as separate axes
+- `verify-upstream <mod>` Read-only: is the recorded commit a branch/tag tip at the remote
 - `route <prompt>`  Select active skills for a natural-language task (Progressive Disclosure)
 - `discover`        Discover standard Agent Skills / plugins across search directories
 - `hosts`           Verify host connection & capability matrix (Claude Code, Cursor, Codex, Antigravity)
@@ -49,7 +52,7 @@ from factory.lifecycle import (  # noqa: E402
     update_module,
     verify_host_integrations,
 )
-from factory.registry import load_registry_state  # noqa: E402
+from factory.registry import load_registry_state, verify_module_upstream  # noqa: E402
 from factory.router import (  # noqa: E402
     analyze_capability_gaps,
     route_skills_for_task,
@@ -353,7 +356,25 @@ def main(argv: list[str] | None = None) -> int:
     p_rm = sub.add_parser("remove", help="Remove a module and clean up hooks/permissions")
     p_rm.add_argument("module_id")
 
-    sub.add_parser("doctor", help="Check registry health, hashes, dependencies, and script syntax")
+    p_doc = sub.add_parser(
+        "doctor", help="Check registry health, hashes, dependencies, and script syntax"
+    )
+    p_doc.add_argument(
+        "--host-skill-root",
+        action="append",
+        type=Path,
+        default=[],
+        help=(
+            "A host's skill directory to read back (repeatable). Each enabled skill is "
+            "CONNECTED only when <root>/<skill>/SKILL.md has the registered content"
+        ),
+    )
+
+    p_vu = sub.add_parser(
+        "verify-upstream",
+        help="Read-only: ask the recorded remote whether the recorded commit is a branch/tag tip",
+    )
+    p_vu.add_argument("module_id")
 
     p_rt = sub.add_parser("route", help="Route a natural-language task to active skills")
     p_rt.add_argument("prompt")
@@ -453,9 +474,17 @@ def main(argv: list[str] | None = None) -> int:
         res = remove_module(root, args.module_id)
         print(json.dumps(res, indent=2))
     elif args.cmd == "doctor":
-        rep = doctor(root)
+        rep = doctor(root, host_skill_roots=args.host_skill_root)
         print(json.dumps(rep, indent=2))
         return {"HEALTHY": 0, "DEGRADED": 1}.get(rep["status"], 2)
+    elif args.cmd == "verify-upstream":
+        modules = load_registry_state(root)
+        if args.module_id not in modules:
+            print(json.dumps({"error": f"unknown module: {args.module_id}"}))
+            return 2
+        rep = verify_module_upstream(modules[args.module_id])
+        print(json.dumps(rep, indent=2))
+        return 0 if rep["state"] == "VERIFIED_AT_REF" else 2
     elif args.cmd == "route":
         plan = route_skills_for_task(
             root,

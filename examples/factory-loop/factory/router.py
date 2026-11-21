@@ -33,6 +33,7 @@ from factory.contracts import (
     SkillUnitSpec,
 )
 from factory.lifecycle import (
+    EVIDENCE_AXIS_WARNING_PREFIXES,
     PROVENANCE_UNOBSERVED_PREFIXES,
     activate_selected_skills,
     discover_skills,
@@ -811,7 +812,13 @@ def analyze_capability_gaps(
     ] + [
         w
         for w in doctor_report.get("warnings", [])
-        if not str(w).startswith((*PROVENANCE_UNOBSERVED_PREFIXES, "no_modules_registered"))
+        if not str(w).startswith(
+            (
+                *PROVENANCE_UNOBSERVED_PREFIXES,
+                *EVIDENCE_AXIS_WARNING_PREFIXES,
+                "no_modules_registered",
+            )
+        )
     ]
     route_plan = route_skills_for_task(
         workspace_root,

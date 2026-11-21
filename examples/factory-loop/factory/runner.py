@@ -2139,12 +2139,15 @@ def _execute_modular_run_locked(
             skill_event_ids[skill_id] = ev_id
             current_wave_events.append(ev_id)
 
+            # One timestamp for the agent event and its observation, so a
+            # reader can join the pair one-to-one.
+            record_ts = skill_started_at.get(skill_id) or utc_now_iso()
             raw_ev = {
                 "schema_version": AGENT_EVENT_SCHEMA_VERSION,
                 "event_id": ev_id,
                 "run_id": run_id,
                 "step_index": step_idx,
-                "ts": skill_started_at.get(skill_id) or utc_now_iso(),
+                "ts": record_ts,
                 "kind": "tool_call",
                 "actor": "agent",
                 "tool": {
@@ -2193,7 +2196,7 @@ def _execute_modular_run_locked(
                 "observation_id": obs_id,
                 "run_id": run_id,
                 "event_id": ev_id,
-                "ts": skill_started_at.get(skill_id) or utc_now_iso(),
+                "ts": record_ts,
                 "node_id": skill_id,
                 "execution": exec_mode,
                 "depends_on": dep_event_ids,
