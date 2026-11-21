@@ -63,6 +63,18 @@ def test_unrelated_evidence_is_residual_not_cross_lens_atom() -> None:
     assert truth["residuals"].count("unrelated_evidence:safety") == 1
 
 
+def test_history_gate_attribution_requires_real_recorded_pillar() -> None:
+    from hyodo.six_lens_runtime import _pillar_gates_observed
+
+    raw = {"security": "FAIL", "lint": "PASS", "mystery": "PASS"}
+    pillars = {"security": "goodness", "lint": "beauty"}
+    assert _pillar_gates_observed(raw, "goodness", pillars) == {"security": "FAIL"}
+    assert _pillar_gates_observed(raw, "beauty", pillars) == {"lint": "PASS"}
+    assert _pillar_gates_observed(raw, "truth", pillars) == {}
+    assert _pillar_gates_observed(raw, "goodness", {}) == {}
+    assert _pillar_gates_observed({"security": "SKIP"}, "goodness", pillars) == {}
+
+
 def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
     tmp_path: Path,
 ) -> None:
@@ -95,7 +107,11 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
 
     hyodo_dir = repo / ".hyodo"
     hyodo_dir.mkdir()
+    # The actual append_history_receipt writer stores statuses and
+    # attributions separately; a dashboard-style gate object is not its v2 wire shape.
     history_entry = {
+        "schema_version": "hyodo.history-receipt/v2",
+        "measured_at": "2026-11-13T00:00:00Z",
         "provenance": {
             "target_commit": sha,
             "target_dirty": False,
@@ -103,11 +119,8 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
             "relation": "BYOG_PROJECT",
         },
         "input_digest": {"before": "d" * 64, "after": "d" * 64},
-        "gates": {
-            "unit": {"pillar": "truth", "status": "PASS"},
-            "security": {"pillar": "goodness", "status": "PASS"},
-            "lint": {"pillar": "beauty", "status": "PASS"},
-        },
+        "gates": {"unit": "PASS", "security": "FAIL", "lint": "PASS"},
+        "pillars": {"unit": "truth", "security": "goodness", "lint": "beauty"},
     }
     (hyodo_dir / "history.jsonl").write_text(json.dumps(history_entry) + "\n", encoding="utf-8")
     (hyodo_dir / "gates-trust.json").write_text(json.dumps({"digest": "e" * 64}), encoding="utf-8")
