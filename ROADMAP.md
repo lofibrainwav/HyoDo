@@ -13,7 +13,7 @@ reconciled. Prior release receipts remain preserved under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.5 is the current release target and latest published release.
+HyoDo 4.22.5 is the latest published release. A subsequent release target must be set separately by the HyoDo release process; a consumer's pending work does not define it.
 It carries safety scans that keep scanning past oversized files, the host
 gate-trust commands and the factory-example approval, provenance and evidence
 fixes, with the package chain recorded in `docs/releases/4.22.5.md`.

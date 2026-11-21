@@ -35,6 +35,36 @@ enforcement belongs to that host.
 4. **Recorded history is not current runtime truth.** A memory, report, or
    previous receipt can inform review without proving what is true now.
 
+## Public product and consumer closure
+
+HyoDo is an independently installable public package. A user needs HyoDo and
+their own project, not any particular agency, memory system, cloud provider,
+or access to the original developer's runtime. The portable interface is the documented CLI, versioned
+input/output schemas, and optional MCP adapter. A host may supply its own
+gates, events, policy, and evidence, but HyoDo does not assume control of that
+host's identity, approval database, or worker.
+
+**Close HyoDo as a product, not as a customer's workflow.** A published
+release is closed only by HyoDo-owned release-chain evidence (source and
+version identity, CI, signed tag/release, SBOM, publication provenance, clean
+installation and readback). An integration's successful test or broken
+approval path cannot substitute for that release evidence, and cannot
+silently reopen or invalidate a previously sealed release.
+
+**Close each consumer separately.** A consuming system owns its configured
+gate commands, evidence-source freshness, retry/approval policy, enforcement,
+execution and post-deployment readback. Report its results as
+`consumer_name + target revision + observation window + measured status`.
+A consumer's `FAIL` means HyoDo observed a failure in that scope; it is not
+a failure of HyoDo's published package without independent reproduction
+against the package's public contract. An incomplete observation is never
+treated as a complete green result.
+
+Avoid private installation assumptions, hard-coded developer paths, or
+consumer-specific requirements in HyoDo core. Validate portable behavior in
+an isolated project with only the published package; test host integrations
+separately. Existing human approval and release ownership remain in force.
+
 ## External integrations
 
 Agent runtimes, CI systems, editors, and continuity stores may provide evidence

@@ -1,8 +1,12 @@
 # HyoDo remaining work and handoff
 
-Handoff snapshot: 2026-09-20, revised after the 4.20.0 release. This is a
-bounded work register, not a live status feed or a claim that every possible
-defect has been discovered. Refresh linked evidence before starting or closing
+Historical handoff snapshot: 2026-09-20, revised after the 4.20.0 release.
+This is a bounded historical work register, not a live status feed or a claim
+that every possible defect has been discovered. For the currently published
+HyoDo release and its evidence, read [CURRENT_STATE.md](CURRENT_STATE.md) and
+the versioned receipt under [releases/](releases/). A consumer's KINGDOM/BB
+runtime, approval outage or stalled PR is not a HyoDo product release failure;
+see [PRODUCT_BOUNDARY.md](PRODUCT_BOUNDARY.md). Refresh linked evidence before starting or closing
 an item.
 
 Observations in this file are timestamped. An earlier observation is not
