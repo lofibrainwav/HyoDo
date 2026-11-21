@@ -158,6 +158,63 @@ def test_missing_provenance_is_unobserved(tmp_path: Path, provenance: dict | Non
     assert "provenance_unobserved" in receipt["residuals"]
 
 
+@pytest.mark.parametrize("validity", ["MISMATCH", "UNOBSERVED", None])
+def test_matching_subject_sha_cannot_override_untrusted_measuring_code(
+    tmp_path: Path, validity: str | None
+) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    if validity is None:
+        evidence["provenance"].pop("validity", None)
+    else:
+        evidence["provenance"]["validity"] = validity
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    assert receipt["state"] == "UNOBSERVED"
+    assert receipt["coverage"]["proxies_observed"] == []
+    assert receipt["evidence_refs"] == []
+    assert "measurer_provenance_unobserved" in receipt["residuals"]
+
+
+@pytest.mark.parametrize(
+    "invalid", [None, "", "not-a-date", "2026-11-21T05:19:38", "2026-02-30T10:00:00Z", 123]
+)
+def test_missing_naive_or_malformed_measurement_time_cannot_certify_coverage(
+    tmp_path: Path, invalid
+) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.FAIL, "failed"))
+    evidence["measured_at"] = invalid
+    first = emit_lens_evidence(evidence, "truth", sha)
+    again = emit_lens_evidence(evidence, "truth", sha)
+    assert first == again  # no wall-clock read introduced
+    _valid(first)
+    assert first["observed_at"] == "UNOBSERVED"
+    assert first["state"] == "UNOBSERVED"
+    assert first["coverage"]["proxies_observed"] == []
+    assert first["evidence_refs"] == []
+    assert "measurement_time_unobserved" in first["residuals"]
+
+
+def test_valid_timezone_offset_and_clean_external_subject_remain_observed(tmp_path: Path) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.FAIL, "failed"))
+    evidence["measured_at"] = "2026-11-21T05:19:38+09:00"
+    evidence["provenance"]["relation"] = "EXTERNAL_TARGET"
+    evidence["provenance"]["validity"] = "OBSERVED"
+    receipt = emit_lens_evidence(evidence, "truth", sha)
+    _valid(receipt)
+    assert receipt["state"] == "OBSERVED"
+    assert receipt["observed_at"] == evidence["measured_at"]
+    assert receipt["coverage"]["proxies_observed"] == ["tests", "typecheck"]
+    assert receipt["authority"] == "UNOBSERVED"
+
+
+def test_subject_sha_with_trailing_newline_is_not_accepted_as_exact_digest() -> None:
+    with pytest.raises(ValueError, match="subject_sha"):
+        emit_lens_evidence({}, "truth", "a" * 40 + "\n")
+
+
 def test_emission_is_deterministic_and_covers_the_canonical_six(tmp_path: Path) -> None:
     root, sha = _checkout(tmp_path)
     evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
