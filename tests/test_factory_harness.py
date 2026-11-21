@@ -200,11 +200,12 @@ def test_unified_factory_pipeline_connects_jev_gstack_mattpocock_and_hyodo(tmp_p
     # The emitted gate-only lenses must not be silently all UNOBSERVED.
     receipts = {row["lens"]: row for row in bundle["lens_evidence_receipts"]}
     assert {k: receipts[k]["state"] for k in ("truth", "goodness", "beauty")} == {
-        "truth": "OBSERVED", "goodness": "OBSERVED", "beauty": "OBSERVED"
+        "truth": "OBSERVED",
+        "goodness": "OBSERVED",
+        "beauty": "OBSERVED",
     }
     assert set(receipts["goodness"]["coverage"]["proxies_observed"]) == {"safety"}
-    assert all(receipts[k]["state"] == "UNOBSERVED"
-               for k in ("benevolence", "hyo", "eternity"))
+    assert all(receipts[k]["state"] == "UNOBSERVED" for k in ("benevolence", "hyo", "eternity"))
     assert all(row["authority"] == "UNOBSERVED" for row in receipts.values())
 
 
