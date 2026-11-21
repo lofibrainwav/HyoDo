@@ -121,6 +121,10 @@ class FakeRemote:
         self.drop_assets_before_publish = False
         self.main_ci: dict[str, Any] = {"result": "PASS", "sha": MAIN_SHA}
 
+    def validate_release_notes(self, tag: str, notes: Path) -> str:
+        self.calls.append("validate_release_notes")
+        return "safe fixture summary"
+
     # -- observations ---------------------------------------------------
     def observe_main(self) -> dict[str, str]:
         return {"sha": MAIN_SHA, "version": VERSION}
@@ -199,6 +203,23 @@ def _authorized(**kwargs: Any) -> dict[str, Any]:
         "authorize_sha": MAIN_SHA,
         **kwargs,
     }
+
+
+
+def test_unsafe_public_notes_stop_before_tag_or_draft(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    remote = FakeRemote()
+
+    def invalid(_tag: str, _notes: Path) -> str:
+        raise pipeline.PipelineExternalError("unsafe public release notes")
+
+    monkeypatch.setattr(remote, "validate_release_notes", invalid)
+    receipt = _run(remote, **_authorized())
+    assert receipt["result"] == "BLOCK"
+    assert receipt["state"] == "MERGED"
+    assert remote.mutations() == []
+    assert remote.tag is None
 
 
 # --- the state machine ------------------------------------------------------
