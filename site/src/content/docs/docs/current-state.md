@@ -6,14 +6,14 @@ description: Public release, current main, and measured HyoDo state separated by
 Runtime capability matrix below was measured 2026-09-13 PT, before 4.19.6; it
 is a historical snapshot.
 
-HyoDo **4.22.5** is the current release target and latest published package.
+HyoDo **4.22.5** is the latest published package, not a future release target.
 Its release chain is measured 9/9 OBSERVED in the
 [4.22.5 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.22.5.md).
 Product capability, documentation-site deployment, and live host observation
 remain separate evidence axes.
 
 - Canonical source branch: **`main`**
-- Current release target: **4.22.5**
+- Latest verified release: **4.22.5** (already published, not pending)
 - Latest published package: **4.22.5** (see the
   [4.22.5 receipt](https://github.com/lofibrainwav/HyoDo/blob/main/docs/releases/4.22.5.md))
 - The 4.22.1 release chain remains measured 9/9 OBSERVED in the
@@ -53,7 +53,7 @@ host observation is deployment-specific.
 ## Runtime capability snapshot (2026-09-13 PT)
 
 The matrix below compares the 4.19.5 public package with main as measured on
-2026-09-13. It is not a fresh runtime readback for the current 4.22.0 release.
+2026-09-13. It is a historical snapshot, not a current-release or live-host readback.
 
 | Capability | Public 4.19.5 at snapshot | Main / measured state at snapshot |
 | --- | --- | --- |

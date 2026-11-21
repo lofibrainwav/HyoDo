@@ -194,18 +194,18 @@ const currencyAnchors = [
 		authority: 'ROADMAP.md',
 	},
 	{
-		what: 'current-state release-target sentence',
+		what: 'current-state published-release sentence',
 		source: currentStateSource,
-		pattern: /HyoDo \*\*([\d.]+)\*\* is the current release target/g,
-		expected: currentVersion,
-		authority: 'VERSION',
+		pattern: /HyoDo \*\*([\d.]+)\*\* is the latest published package/g,
+		expected: publishedVersion,
+		authority: 'ROADMAP.md',
 	},
 	{
-		what: 'current-state release-target bullet',
+		what: 'current-state verified-release bullet',
 		source: currentStateSource,
-		pattern: /Current release target:\s*\*\*([\d.]+)\*\*/g,
-		expected: currentVersion,
-		authority: 'VERSION',
+		pattern: /Latest verified release:\s*\*\*([\d.]+)\*\*/g,
+		expected: publishedVersion,
+		authority: 'ROADMAP.md',
 	},
 	{
 		what: 'current-state latest-published bullet',
@@ -223,7 +223,7 @@ if (!publishedVersion) {
 // A "current public package" sentence would call the source version published
 // before its release chain is measured, so it is rejected outright.
 if (/is the current public package|Latest public package:|Public version:/.test(currentStateSource + homepage)) {
-	currencyFailures.push('a page calls the source version public; say "current release target" or "latest published" instead');
+	currencyFailures.push('a page calls the source version public; say "source version" or "latest published package" instead');
 }
 for (const { what, source, pattern, expected, authority } of currencyAnchors) {
 	const found = [...source.matchAll(pattern)];

@@ -1,6 +1,6 @@
 # HyoDo current state
 
-Public release readback: 2026-10-28 UTC (PyPI JSON `info.version`)
+Public release readback: 2026-11-21 UTC (PyPI JSON `info.version`, GitHub Release).
 Runtime capability matrix below: measured 2026-09-13 PT, before 4.19.6.
 
 This file separates shipped product capability from live/runtime observation. Exact
@@ -8,20 +8,21 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package on PyPI: HyoDo `4.22.4`.
-- Recorded closed release chain: HyoDo `4.22.4`
+- Latest public package on PyPI: HyoDo `4.22.5` (verified 2026-11-21 UTC).
+- Recorded closed release chain: HyoDo `4.22.5` (9/9 observed).
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.22.4.md`](./releases/4.22.4.md).
+  [`releases/4.22.5.md`](./releases/4.22.5.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: the recorded 4.22.4 release is closed. Research and
+- HyoDo product status: the recorded 4.22.5 release is closed. Research and
   integration have separate evidence and promotion criteria; they do not
   silently reopen the sealed public artifact. Live-host and orchestration
   experiments remain downstream integration/research work.
 
-The HyoDo/Kingdom ownership and status-separation contract is maintained in
-[`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Kingdom processes, tests,
-branches, and worktrees must not be folded into HyoDo closeout status.
+The public-product/consumer ownership and status-separation contract is in
+[`PRODUCT_BOUNDARY.md`](./PRODUCT_BOUNDARY.md). Consumer processes, tests,
+branches, approval services, and worktrees do not become HyoDo product
+status. HyoDo does not approve a consumer's merges or deployments.
 
 ## 4.22.x releases
 
@@ -29,6 +30,7 @@ Each line points to the repository release note, which owns the receipt.
 
 | Release | Summary | Release-chain receipt |
 | --- | --- | --- |
+| 4.22.5 | Oversized-file scan coverage, host gate trust commands, factory-example evidence/authority corrections | 9/9 OBSERVED, [`releases/4.22.5.md`](./releases/4.22.5.md) |
 | 4.22.4 | Fail-closed safety coverage, read-only handoff evidence checker, human-side friction scoring, MCP reader root contract, dependency refresh | 9/9 OBSERVED, [`releases/4.22.4.md`](./releases/4.22.4.md) |
 | 4.22.3 | Checkout-relative gate executables probed under the target root (#543, #544) | 9/9 OBSERVED, [`releases/4.22.3.md`](./releases/4.22.3.md) |
 | 4.22.2 | Code-linked `hyodo check` evidence; a tree changed during measurement returns `UNOBSERVED` (#539) | UNOBSERVED in the repository note, [`releases/4.22.2.md`](./releases/4.22.2.md) |
@@ -146,7 +148,7 @@ Capability existence is not run usage. Missing evidence is not green. Research i
 
 The runtime matrix above compares public 4.19.5 with the source state measured
 on 2026-09-13; it is a historical snapshot, not a fresh runtime readback for
-4.22.4 or any later release. Release-chain receipts are recorded separately above. Do not
+4.22.5 or any later release. Release-chain receipts are recorded separately above. Do not
 infer runtime identity from this page alone; use the signed release, CI receipt,
 or runtime identity receipt. Fresh
 Codex/Cursor host observations,
