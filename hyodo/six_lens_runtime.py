@@ -12,6 +12,7 @@ from hyodo.evidence_plate import (
     extract_lens_evidence,
     make_evidence_plate,
 )
+from hyodo.lens_evidence import _measurement_time
 
 DIMENSIONS = (
     "freshness",
@@ -84,25 +85,40 @@ def _last_history_entry(root: Path) -> dict[str, Any] | None:
             for line in history_path.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-    except OSError:
+    except (OSError, UnicodeError):
         return None
-    for raw in reversed(lines):
-        try:
-            parsed = json.loads(raw)
-        except json.JSONDecodeError:
-            continue
-        if isinstance(parsed, dict):
-            return parsed
-    return None
+    if not lines:
+        return None
+    # A broken newest receipt must not silently fall back to an older row.
+    # That row may have matched the same SHA but cannot certify the latest run.
+    try:
+        latest = json.loads(lines[-1])
+    except json.JSONDecodeError:
+        return None
+    return latest if isinstance(latest, dict) else None
 
 
-def _pillar_gates_observed(gates: dict[str, Any], pillar: str) -> dict[str, str]:
+def _pillar_gates_observed(
+    gates: dict[str, Any], pillar: str, attributions: dict[str, Any] | None = None
+) -> dict[str, str]:
+    """Read both legacy row gates and the real history-receipt/v2 wire shape.
+
+    In v2, gates[name] is the observed status and pillars[name] is the
+    separately recorded attribution. An unattributed string is not evidence.
+    """
     observed: dict[str, str] = {}
     for name in sorted(gates):
         row = gates.get(name)
-        if not isinstance(row, dict) or row.get("pillar") != pillar:
-            continue
-        status = row.get("status")
+        if isinstance(row, dict):
+            if row.get("pillar") != pillar:
+                continue
+            status = row.get("status")
+        else:
+            if not isinstance(row, str) or not isinstance(attributions, dict):
+                continue
+            if attributions.get(name) != pillar:
+                continue
+            status = row
         if status in {"PASS", "FAIL"}:
             observed[name] = str(status)
     return observed
@@ -139,7 +155,18 @@ def collect_workspace_six_lens_envelope(root: Path) -> dict[str, Any]:
         prov: dict[str, Any] = raw_prov if isinstance(raw_prov, dict) else {}
         raw_gates = history.get("gates")
         gates: dict[str, Any] = raw_gates if isinstance(raw_gates, dict) else {}
-        if prov.get("target_commit") == exact_sha and prov.get("target_dirty") is False:
+        raw_pillars = history.get("pillars")
+        attributions: dict[str, Any] = raw_pillars if isinstance(raw_pillars, dict) else {}
+        # History-derived atoms must not certify a subject with an absent,
+        # malformed or timezone-naive measurement time. Use the same validator
+        # as the canonical v1 lens receipt, without reading the current clock.
+        _, time_residuals = _measurement_time(history.get("measured_at"))
+        if (
+            prov.get("target_commit") == exact_sha
+            and prov.get("target_dirty") is False
+            and prov.get("validity") == "OBSERVED"
+            and not time_residuals
+        ):
             envelope["freshness"] = {"status": "FRESH", "target_commit": exact_sha}
             if prov.get("validity") == "OBSERVED":
                 envelope["provenance"] = {
@@ -153,10 +180,10 @@ def collect_workspace_six_lens_envelope(root: Path) -> dict[str, Any]:
                 after = input_digest.get("after")
                 if isinstance(before, str) and before and before == after:
                     envelope["reproducibility"] = {"input_digest": before, "stable": True}
-            safety_gates = _pillar_gates_observed(gates, "goodness")
+            safety_gates = _pillar_gates_observed(gates, "goodness", attributions)
             if safety_gates:
                 envelope["safety"] = {"gates": safety_gates}
-            clarity_gates = _pillar_gates_observed(gates, "beauty")
+            clarity_gates = _pillar_gates_observed(gates, "beauty", attributions)
             if clarity_gates:
                 envelope["clarity"] = {"gates": clarity_gates}
 

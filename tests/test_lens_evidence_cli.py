@@ -24,6 +24,7 @@ def _write_envelope(path: Path) -> None:
                 "provenance": {
                     "target_commit": SUBJECT_SHA,
                     "target_dirty": False,
+                    "validity": "OBSERVED",
                     "tool_version": "4.22.4",
                 },
                 "gates": {

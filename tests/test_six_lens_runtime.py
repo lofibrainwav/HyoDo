@@ -63,6 +63,18 @@ def test_unrelated_evidence_is_residual_not_cross_lens_atom() -> None:
     assert truth["residuals"].count("unrelated_evidence:safety") == 1
 
 
+def test_history_gate_attribution_requires_real_recorded_pillar() -> None:
+    from hyodo.six_lens_runtime import _pillar_gates_observed
+
+    raw = {"security": "FAIL", "lint": "PASS", "mystery": "PASS"}
+    pillars = {"security": "goodness", "lint": "beauty"}
+    assert _pillar_gates_observed(raw, "goodness", pillars) == {"security": "FAIL"}
+    assert _pillar_gates_observed(raw, "beauty", pillars) == {"lint": "PASS"}
+    assert _pillar_gates_observed(raw, "truth", pillars) == {}
+    assert _pillar_gates_observed(raw, "goodness", {}) == {}
+    assert _pillar_gates_observed({"security": "SKIP"}, "goodness", pillars) == {}
+
+
 def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
     tmp_path: Path,
 ) -> None:
@@ -95,7 +107,11 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
 
     hyodo_dir = repo / ".hyodo"
     hyodo_dir.mkdir()
+    # The actual append_history_receipt writer stores statuses and
+    # attributions separately; a dashboard-style gate object is not its v2 wire shape.
     history_entry = {
+        "schema_version": "hyodo.history-receipt/v2",
+        "measured_at": "2026-11-13T00:00:00Z",
         "provenance": {
             "target_commit": sha,
             "target_dirty": False,
@@ -103,11 +119,8 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
             "relation": "BYOG_PROJECT",
         },
         "input_digest": {"before": "d" * 64, "after": "d" * 64},
-        "gates": {
-            "unit": {"pillar": "truth", "status": "PASS"},
-            "security": {"pillar": "goodness", "status": "PASS"},
-            "lint": {"pillar": "beauty", "status": "PASS"},
-        },
+        "gates": {"unit": "PASS", "security": "FAIL", "lint": "PASS"},
+        "pillars": {"unit": "truth", "security": "goodness", "lint": "beauty"},
     }
     (hyodo_dir / "history.jsonl").write_text(json.dumps(history_entry) + "\n", encoding="utf-8")
     (hyodo_dir / "gates-trust.json").write_text(json.dumps({"digest": "e" * 64}), encoding="utf-8")
@@ -145,3 +158,42 @@ def test_measure_workspace_six_lenses_observes_all_six_from_local_receipts(
         "hyo": "OBSERVED",
         "eternity": "OBSERVED",
     }
+
+    # The history reader must enforce the same timestamp binding as the
+    # canonical v1 emitter. Independent event/consent receipts remain visible.
+    for invalid_time in (None, "2026-11-13T00:00:00", "not-a-date"):
+        malformed_history = dict(history_entry)
+        if invalid_time is None:
+            malformed_history.pop("measured_at")
+        else:
+            malformed_history["measured_at"] = invalid_time
+        (hyodo_dir / "history.jsonl").write_text(
+            json.dumps(malformed_history) + "\n", encoding="utf-8"
+        )
+        measurement = measure_workspace_six_lenses(repo)
+        assert measurement["exact_artifact_sha"] == sha
+        for dimension in ("freshness", "provenance", "reproducibility", "safety", "clarity"):
+            assert measurement["experimental_dimensions"][dimension] == "UNOBSERVED"
+        plate_states = {p["lens"]: p["state"] for p in measurement["plates"]}
+        assert all(plate_states[lens] == "UNOBSERVED" for lens in ("truth", "goodness", "beauty"))
+        assert all(plate_states[lens] == "OBSERVED" for lens in ("benevolence", "hyo", "eternity"))
+
+    # A truncated or non-object LAST receipt must not resurrect the older
+    # OBSERVED record for the same commit. No history-owned false green.
+    for broken_tail in ('{"incomplete":', "null"):
+        (hyodo_dir / "history.jsonl").write_text(
+            json.dumps(history_entry) + "\n" + broken_tail + "\n", encoding="utf-8"
+        )
+        corrupt_tail = measure_workspace_six_lenses(repo)
+        for dimension in ("freshness", "provenance", "reproducibility", "safety", "clarity"):
+            assert corrupt_tail["experimental_dimensions"][dimension] == "UNOBSERVED"
+        assert all(
+            p["state"] == "UNOBSERVED"
+            for p in corrupt_tail["plates"]
+            if p["lens"] in {"truth", "goodness", "beauty"}
+        )
+
+    # An invalid UTF-8 final append also remains unobserved, not an exception.
+    (hyodo_dir / "history.jsonl").write_bytes(json.dumps(history_entry).encode("utf-8") + b"\n\xff")
+    invalid_encoding = measure_workspace_six_lenses(repo)
+    assert invalid_encoding["experimental_dimensions"]["freshness"] == "UNOBSERVED"
