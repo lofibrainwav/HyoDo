@@ -50,7 +50,8 @@ evidence is not converted into a pass.
 
 ### 4.22.7
 
-Bind lens coverage to the measuring instrument, measurement time and exact target commit.
+Bind lens coverage to the measuring instrument, measurement time and exact
+target commit.
 
 ### 4.22.6 (released 2026-11-21 UTC)
 
