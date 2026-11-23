@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [4.22.7] - 2026-11-22
+
+### Fixed
+
+- Six-virtue lens receipts withhold coverage when the measuring code has
+  unverified provenance, the target commit differs from the requested SHA,
+  or the measurement time lacks a valid timezone. The history reader reports
+  an unreadable latest receipt without substituting an older measurement.
+- Public GitHub Release descriptions omit provisional release-chain receipts.
+
 ## [4.22.6] - 2026-11-21
 
 Released exact-byte evaluation and file-inspection integrity corrections.
