@@ -15,11 +15,8 @@ reconciled. Prior release receipts remain under `docs/releases/`.
 ## Current release
 
 HyoDo 4.22.6 is the latest published release.
-HyoDo 4.22.6 is the current release target for the version-sync contract:
-this is the already-published and closed version, not a pending candidate.
-Its nine release-chain steps are independently measured in
-`docs/releases/4.22.6.md`. Source CI alone would not have established this.
-This does not establish live host integration or documentation-site deployment.
+HyoDo 4.22.7 is the current release target for the six-virtue evidence fixes.
+See [the release receipt](docs/releases/4.22.7.md) for publication evidence.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -50,6 +47,11 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.22.7
+
+Bind lens coverage to the measuring instrument, measurement time and exact
+target commit.
 
 ### 4.22.6 (released 2026-11-21 UTC)
 

@@ -215,6 +215,35 @@ def test_subject_sha_with_trailing_newline_is_not_accepted_as_exact_digest() -> 
         emit_lens_evidence({}, "truth", "a" * 40 + "\n")
 
 
+@pytest.mark.parametrize(
+    ("field", "bad_value", "residual"),
+    [
+        ("validity", "MISMATCH", "measurer_provenance_unobserved"),
+        ("measured_at", "2026-11-21T05:19:38", "measurement_time_unobserved"),
+        ("target_commit", "b" * 40, "stale_provenance"),
+    ],
+)
+def test_all_six_lenses_withhold_unbound_gate_evidence(
+    tmp_path: Path, field: str, bad_value: str, residual: str
+) -> None:
+    root, sha = _checkout(tmp_path)
+    evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
+    evidence["gates"] = {lens: {"pillar": lens, "status": "PASS"} for lens in CANONICAL_VIRTUE_KEYS}
+    for receipt in emit_all_lens_evidence(evidence, sha):
+        assert receipt["coverage"]["proxies_observed"] == [receipt["lens"]]
+
+    container = evidence if field == "measured_at" else evidence["provenance"]
+    container[field] = bad_value
+    receipts = emit_all_lens_evidence(evidence, sha)
+    assert tuple(receipt["lens"] for receipt in receipts) == CANONICAL_VIRTUE_KEYS
+    for receipt in receipts:
+        _valid(receipt)
+        assert receipt["state"] == "UNOBSERVED"
+        assert receipt["coverage"]["proxies_observed"] == []
+        assert receipt["evidence_refs"] == []
+        assert residual in receipt["residuals"]
+
+
 def test_emission_is_deterministic_and_covers_the_canonical_six(tmp_path: Path) -> None:
     root, sha = _checkout(tmp_path)
     evidence = _envelope(root, tests=GateResult(GateStatus.PASS, "ok"))
