@@ -244,7 +244,11 @@ def test_run_user_gates_failure_keeps_stdout_and_stderr(tmp_path: Path) -> None:
     )
     config = GatesConfig(
         schema=SCHEMA_ID,
-        gates=(UserGate(name="mixed", pillar="truth", command=(sys.executable, "-c", probe)),),
+        gates=(
+            UserGate(
+                name="mixed", pillar="truth", command=(sys.executable, "-c", probe), timeout=5
+            ),
+        ),
     )
     result = run_user_gates(config, tmp_path)[0]
     assert result.status == "FAIL"
@@ -259,7 +263,11 @@ def test_run_user_gates_mixed_failure_tails_remain_bounded(tmp_path: Path) -> No
     )
     config = GatesConfig(
         schema=SCHEMA_ID,
-        gates=(UserGate(name="long", pillar="truth", command=(sys.executable, "-c", probe)),),
+        gates=(
+            UserGate(
+                name="long", pillar="truth", command=(sys.executable, "-c", probe), timeout=5
+            ),
+        ),
     )
     result = run_user_gates(config, tmp_path)[0]
     assert result.status == "FAIL"
@@ -278,6 +286,7 @@ def test_mixed_failure_preserves_unobserved_exit_contract(tmp_path: Path) -> Non
                 name="unobserved",
                 pillar="hyo",
                 command=(sys.executable, "-c", probe),
+                timeout=5,
                 unobserved_exit_codes=(2,),
             ),
         ),
