@@ -204,6 +204,7 @@ def install_smoke_step(
         evidence=f"run `{readback_run}`, `{version}` on PyPI, wheel sha256 `{wheel_sha256[:16]}`",
     )
 
+
 def tag_step(
     *, tag: str, commit: str | None, signed: bool, verified: bool, github_verified: bool = False
 ) -> ChainStep:
@@ -308,6 +309,7 @@ def post_publish_readback(payload: Any, *, tag: str, commit: str | None) -> bool
         and step.get("name") == "Wait for PyPI index + verify provenance / install"
     ]
     return len(checks) == 1 and checks[0].get("conclusion") == "success"
+
 
 def _github_verifies_tag(repo: str, tag: str, commit: str | None) -> bool:
     """Whether GitHub reports `tag` as a verified annotated tag on `commit`.
