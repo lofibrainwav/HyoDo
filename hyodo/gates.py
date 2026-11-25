@@ -314,14 +314,14 @@ def _failure_message(stdout: str | None, stderr: str | None) -> str:
         out_limit += err_limit - len(err)
         err_limit = len(err)
 
-    def excerpt(value: str, limit: int) -> str:
+    def _excerpt(value: str, limit: int) -> str:
         if len(value) <= limit:
             return value
         if limit <= 1:
             return "…"[:limit]
         return "…" + value[-(limit - 1) :]
 
-    return prefix + excerpt(out, out_limit) + separator + excerpt(err, err_limit)
+    return prefix + _excerpt(out, out_limit) + separator + _excerpt(err, err_limit)
 
 
 @dataclass(frozen=True)

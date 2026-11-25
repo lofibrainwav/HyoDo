@@ -264,9 +264,7 @@ def test_run_user_gates_mixed_failure_tails_remain_bounded(tmp_path: Path) -> No
     config = GatesConfig(
         schema=SCHEMA_ID,
         gates=(
-            UserGate(
-                name="long", pillar="truth", command=(sys.executable, "-c", probe), timeout=5
-            ),
+            UserGate(name="long", pillar="truth", command=(sys.executable, "-c", probe), timeout=5),
         ),
     )
     result = run_user_gates(config, tmp_path)[0]
