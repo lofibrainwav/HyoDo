@@ -290,6 +290,40 @@ def _tail(text: str | None) -> str:
     return (text or "").strip()[-GATE_MESSAGE_TAIL_CHARS:]
 
 
+def _failure_message(stdout: str | None, stderr: str | None) -> str:
+    """Keep evidence from both streams within the existing message budget.
+
+    A notice on stderr must not erase the failing test printed to stdout.
+    Preserve the single-stream contract. When both streams have content,
+    reserve space for each tail and give unused space to the other stream.
+    """
+    out = (stdout or "").strip()
+    err = (stderr or "").strip()
+    if not out or not err:
+        return _tail(err or out)
+
+    prefix = "stdout: "
+    separator = " | stderr: "
+    budget = GATE_MESSAGE_TAIL_CHARS - len(prefix) - len(separator)
+    out_limit = budget // 2
+    err_limit = budget - out_limit
+    if len(out) < out_limit:
+        err_limit += out_limit - len(out)
+        out_limit = len(out)
+    elif len(err) < err_limit:
+        out_limit += err_limit - len(err)
+        err_limit = len(err)
+
+    def excerpt(value: str, limit: int) -> str:
+        if len(value) <= limit:
+            return value
+        if limit <= 1:
+            return "…"[:limit]
+        return "…" + value[-(limit - 1) :]
+
+    return prefix + excerpt(out, out_limit) + separator + excerpt(err, err_limit)
+
+
 @dataclass(frozen=True)
 class GateTrustDecision:
     """Outcome of `resolve_gate_trust` for one `.hyodo/gates.toml` command set."""
@@ -941,7 +975,7 @@ def _run_one_gate(gate: UserGate, root: Path, *, verbose: bool) -> UserGateResul
         message = _tail(completed.stdout) if verbose else ""
         return UserGateResult(gate.name, gate.pillar, "PASS", message or "ok")
 
-    message = _tail(completed.stderr) or _tail(completed.stdout)
+    message = _failure_message(completed.stdout, completed.stderr)
     if completed.returncode in gate.unobserved_exit_codes:
         detail = f"UNOBSERVED (exit code {completed.returncode})"
         return UserGateResult(
