@@ -190,29 +190,19 @@ def _gh_json(*args: str) -> Any | None:
         return None
 
 
-_MIN_SHA_OVERLAP = 8
-
-
-def install_smoke_step(version: str, *, wheel_sha256: str | None) -> ChainStep:
-    """Whether *this* version is on PyPI -- not whether it is the newest.
-
-    The first draft compared the version against `info.version`, the latest
-    release PyPI serves. That made every receipt decay on the next release:
-    4.19.1's step read OBSERVED when measured and UNOBSERVED an hour later,
-    purely because 4.19.2 shipped. Nothing about 4.19.1 had changed.
-
-    The digest is what makes the line durable. "PyPI serves 4.19.2" is true
-    only until it is not; a wheel's sha256 is true forever and can be
-    rechecked against the file long after the version stops being current.
-    """
-    if not wheel_sha256:
+def install_smoke_step(
+    version: str, *, wheel_sha256: str | None, readback_run: str | None = None
+) -> ChainStep:
+    """Require a successful install readback and the published wheel identity."""
+    if not wheel_sha256 or not re.fullmatch(r"[0-9a-f]{64}", wheel_sha256):
+        return ChainStep(name="Install smoke", state="UNOBSERVED", evidence=None)
+    if not readback_run or not re.fullmatch(r"[1-9][0-9]*", readback_run):
         return ChainStep(name="Install smoke", state="UNOBSERVED", evidence=None)
     return ChainStep(
         name="Install smoke",
         state="OBSERVED",
-        evidence=f"`{version}` on PyPI, wheel sha256 `{wheel_sha256[:16]}`",
+        evidence=f"run `{readback_run}`, `{version}` on PyPI, wheel sha256 `{wheel_sha256[:16]}`",
     )
-
 
 def tag_step(
     *, tag: str, commit: str | None, signed: bool, verified: bool, github_verified: bool = False
@@ -256,31 +246,68 @@ def tag_step(
     return ChainStep(name="Signed verified tag", state="UNOBSERVED", evidence=None)
 
 
-def matching_run(runs: list[dict[str, Any]] | None, *, tag: str, commit: str | None) -> str | None:
-    """The id of the successful run that belongs to *this* version, or None.
+def matching_run(
+    runs: list[dict[str, Any]] | None,
+    *,
+    tag: str,
+    commit: str | None,
+    require_exact_tag: bool = False,
+) -> str | None:
+    """Cite a successful run tied to the measured commit.
 
-    An earlier draft cited each workflow's newest successful run. That is not
-    a measurement: the newest run can belong to another release, and a wrong
-    identifier in a receipt is worse than an absent one, because it looks
-    recheckable and is not.
-
-    Two ties count. `publish.yml` runs on the tag, so its `headBranch` is the
-    tag itself. `release-evidence.yml` is dispatched from `main`, so only its
-    `headSha` can place it -- compared by prefix, since the two sources
-    abbreviate differently. When neither ties, the step stays UNOBSERVED.
+    Release evidence may run from main. Publication must run on the exact
+    release tag and full commit; a tag name alone does not establish identity.
     """
+    if not commit or not re.fullmatch(r"[0-9a-f]{8,64}", commit):
+        return None
     for run in runs or []:
-        if run.get("conclusion") != "success":
+        if not isinstance(run, dict) or run.get("conclusion") != "success":
             continue
-        if run.get("headBranch") == tag:
-            return str(run.get("databaseId"))
-        sha = str(run.get("headSha") or "")
-        if not commit or len(sha) < _MIN_SHA_OVERLAP:
+        sha = run.get("headSha")
+        run_id = str(run.get("databaseId", ""))
+        if not isinstance(sha, str) or not re.fullmatch(r"[0-9a-f]{8,64}", sha):
             continue
-        if sha.startswith(commit[:12]) or commit.startswith(sha[:12]):
-            return str(run.get("databaseId"))
+        if not re.fullmatch(r"[1-9][0-9]*", run_id):
+            continue
+        if require_exact_tag:
+            if run.get("headBranch") != tag or len(commit) not in (40, 64) or sha != commit:
+                continue
+        elif not (sha.startswith(commit) or commit.startswith(sha)):
+            continue
+        return run_id
     return None
 
+
+def post_publish_readback(payload: Any, *, tag: str, commit: str | None) -> bool:
+    """Observe the exact publication run and its completed provenance/install step."""
+    if not isinstance(payload, dict) or not commit:
+        return False
+    if (
+        payload.get("headSha") != commit
+        or payload.get("headBranch") != tag
+        or payload.get("conclusion") != "success"
+    ):
+        return False
+    jobs = payload.get("jobs")
+    if not isinstance(jobs, list):
+        return False
+    matches = [
+        job
+        for job in jobs
+        if isinstance(job, dict) and job.get("name") == "Post-publish readback"
+    ]
+    if len(matches) != 1 or matches[0].get("conclusion") != "success":
+        return False
+    steps = matches[0].get("steps")
+    if not isinstance(steps, list):
+        return False
+    checks = [
+        step
+        for step in steps
+        if isinstance(step, dict)
+        and step.get("name") == "Wait for PyPI index + verify provenance / install"
+    ]
+    return len(checks) == 1 and checks[0].get("conclusion") == "success"
 
 def _github_verifies_tag(repo: str, tag: str, commit: str | None) -> bool:
     """Whether GitHub reports `tag` as a verified annotated tag on `commit`.
@@ -354,7 +381,7 @@ def measure_chain(version: str, *, repo: str, root: Path) -> list[ChainStep]:
         ):
             add(name, None)
 
-    def _run_id(workflow: str) -> str | None:
+    def _run_id(workflow: str, *, require_exact_tag: bool = False) -> str | None:
         runs = _gh_json(
             "run",
             "list",
@@ -367,19 +394,33 @@ def measure_chain(version: str, *, repo: str, root: Path) -> list[ChainStep]:
             "--json",
             "databaseId,conclusion,headBranch,headSha",
         )
-        return matching_run(runs, tag=tag, commit=commit)
+        return matching_run(runs, tag=tag, commit=commit, require_exact_tag=require_exact_tag)
 
     evidence_run = _run_id("release-evidence.yml")
     add("Release evidence workflow", f"run `{evidence_run}`" if evidence_run else None)
 
-    publish_run = _run_id("publish.yml")
+    publish_run = _run_id("publish.yml", require_exact_tag=True)
     add("PyPI publish", f"run `{publish_run}`" if publish_run else None)
-    # The publish workflow's own job verifies provenance and installs the
-    # published wheel; a green run is what observes both, so neither claims
-    # more than that one run id supports.
-    add("PyPI provenance verified", f"run `{publish_run}`" if publish_run else None)
+    readback_run = None
+    if publish_run:
+        payload = _gh_json(
+            "run",
+            "view",
+            publish_run,
+            "--repo",
+            repo,
+            "--json",
+            "headSha,headBranch,conclusion,jobs",
+        )
+        if post_publish_readback(payload, tag=tag, commit=commit):
+            readback_run = publish_run
+    add("PyPI provenance verified", f"run `{readback_run}`" if readback_run else None)
 
-    steps.append(install_smoke_step(version, wheel_sha256=_pypi_wheel_digest(version)))
+    steps.append(
+        install_smoke_step(
+            version, wheel_sha256=_pypi_wheel_digest(version), readback_run=readback_run
+        )
+    )
 
     order = {name: i for i, name in enumerate(CHAIN_STEPS)}
     return sorted(steps, key=lambda s: order.get(s.name, len(order)))
