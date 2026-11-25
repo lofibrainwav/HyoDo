@@ -293,9 +293,7 @@ def post_publish_readback(payload: Any, *, tag: str, commit: str | None) -> bool
     if not isinstance(jobs, list):
         return False
     matches = [
-        job
-        for job in jobs
-        if isinstance(job, dict) and job.get("name") == "Post-publish readback"
+        job for job in jobs if isinstance(job, dict) and job.get("name") == "Post-publish readback"
     ]
     if len(matches) != 1 or matches[0].get("conclusion") != "success":
         return False
