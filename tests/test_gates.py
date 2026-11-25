@@ -14,6 +14,7 @@ import pytest
 
 from hyodo.gates import (
     DEFAULT_TIMEOUT_SECONDS,
+    GATE_MESSAGE_TAIL_CHARS,
     GATES_TRUST_ENV_VAR,
     SCHEMA_ID,
     GatesConfig,
@@ -234,6 +235,65 @@ def test_run_user_gates_fail(tmp_path: Path) -> None:
     assert results[0].name == "bad"
     assert results[0].pillar == "goodness"
     assert results[0].status == "FAIL"
+
+
+def test_run_user_gates_failure_keeps_stdout_and_stderr(tmp_path: Path) -> None:
+    probe = (
+        "import sys; print('FAILED test_example'); "
+        "print('npm notice: update available', file=sys.stderr); sys.exit(1)"
+    )
+    config = GatesConfig(
+        schema=SCHEMA_ID,
+        gates=(
+            UserGate(
+                name="mixed", pillar="truth", command=(sys.executable, "-c", probe), timeout=5
+            ),
+        ),
+    )
+    result = run_user_gates(config, tmp_path)[0]
+    assert result.status == "FAIL"
+    assert "stdout: FAILED test_example" in result.message
+    assert "stderr: npm notice: update available" in result.message
+
+
+def test_run_user_gates_mixed_failure_tails_remain_bounded(tmp_path: Path) -> None:
+    probe = (
+        "import sys; print('A' * 500 + 'STDOUT_END'); "
+        "print('B' * 500 + 'STDERR_END', file=sys.stderr); sys.exit(1)"
+    )
+    config = GatesConfig(
+        schema=SCHEMA_ID,
+        gates=(
+            UserGate(name="long", pillar="truth", command=(sys.executable, "-c", probe), timeout=5),
+        ),
+    )
+    result = run_user_gates(config, tmp_path)[0]
+    assert result.status == "FAIL"
+    assert "STDOUT_END" in result.message
+    assert "STDERR_END" in result.message
+    assert result.message.count("…") == 2
+    assert len(result.message) <= GATE_MESSAGE_TAIL_CHARS
+
+
+def test_mixed_failure_preserves_unobserved_exit_contract(tmp_path: Path) -> None:
+    probe = "import sys; print('no sample'); print('notice', file=sys.stderr); sys.exit(2)"
+    config = GatesConfig(
+        schema=SCHEMA_ID,
+        gates=(
+            UserGate(
+                name="unobserved",
+                pillar="hyo",
+                command=(sys.executable, "-c", probe),
+                timeout=5,
+                unobserved_exit_codes=(2,),
+            ),
+        ),
+    )
+    result = run_user_gates(config, tmp_path)[0]
+    assert result.status == "SKIP"
+    assert result.message.startswith("UNOBSERVED (exit code 2)")
+    assert "stdout: no sample" in result.message
+    assert "stderr: notice" in result.message
 
 
 def _exit_gate(code: int, *, unobserved: tuple[int, ...] = ()) -> GatesConfig:

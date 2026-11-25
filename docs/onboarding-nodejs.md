@@ -147,7 +147,7 @@ So: **a present `gates.toml` always wins over the built-in preset.**
 |---------|--------|------|
 | Binary on `PATH` missing | **`SKIP`** | `shutil.which(command[0])` is `None` (or `FileNotFoundError`) — never upgraded to PASS |
 | Process finishes with exit code `0` | **`PASS`** | observed success |
-| Non-zero exit code | **`FAIL`** | message from stderr/stdout tail, or `exit code N` |
+| Non-zero exit code | **`FAIL`** | bounded tails of both non-empty streams, one tail if only one is present, or `exit code N` |
 | Wall-clock timeout | **`FAIL`** | message `"timeout"` (not SKIP) |
 
 ### Aggregate rules for user gates (and the same idea for built-in / general)
