@@ -23,6 +23,7 @@ from scripts.release.verify_release_chain import (
     ChainStep,
     install_smoke_step,
     matching_run,
+    post_publish_readback,
     receipt_drift,
     receipt_matches_measurement,
     render_receipt,
@@ -306,7 +307,9 @@ def test_install_smoke_asks_whether_this_version_is_on_pypi_not_whether_it_is_la
     # shipped: 4.19.1's step flipped to UNOBSERVED an hour after it was
     # measured OBSERVED, purely because 4.19.2 landed. That is the exact
     # decay this file exists to prevent, reintroduced one field over.
-    step = install_smoke_step("4.19.1", wheel_sha256="c4a3cb7c68246ddf" + "0" * 48)
+    step = install_smoke_step(
+        "4.19.1", wheel_sha256="c4a3cb7c68246ddf" + "0" * 48, readback_run="123"
+    )
     assert step.state == "OBSERVED"
     assert "4.19.1" in step.render()
 
@@ -314,7 +317,9 @@ def test_install_smoke_asks_whether_this_version_is_on_pypi_not_whether_it_is_la
 def test_install_smoke_names_the_artifact_rather_than_the_moment() -> None:
     # A digest is true forever. "PyPI serves 4.19.2" is true only until it
     # does not.
-    step = install_smoke_step("4.19.2", wheel_sha256="d80d1c792178c1b1" + "0" * 48)
+    step = install_smoke_step(
+        "4.19.2", wheel_sha256="d80d1c792178c1b1" + "0" * 48, readback_run="456"
+    )
     assert "d80d1c792178c1b1" in step.render()
 
 
@@ -341,3 +346,47 @@ def test_changed_evidence_is_not_zero_write_eligible() -> None:
     new = [_observed("PyPI publish", "run `2`")]
     document = render_receipt(old, measured_at="2026-09-22T15:07:26Z")
     assert receipt_matches_measurement(document, new) is False
+
+
+def test_wheel_presence_alone_is_not_install_smoke() -> None:
+    assert install_smoke_step("4.22.7", wheel_sha256="a" * 64).state == "UNOBSERVED"
+    step = install_smoke_step("4.22.7", wheel_sha256="not-a-digest", readback_run="123")
+    assert step.state == "UNOBSERVED"
+
+
+def test_publication_requires_exact_tag_and_commit() -> None:
+    run = {
+        "databaseId": 42,
+        "conclusion": "success",
+        "headBranch": "v4.22.7",
+        "headSha": _COMMIT,
+    }
+    assert matching_run([run], tag="v4.22.7", commit=_COMMIT, require_exact_tag=True) == "42"
+    assert matching_run([run], tag="v4.22.7", commit="f" * 40) is None
+    assert matching_run([run], tag="v4.22.8", commit=_COMMIT, require_exact_tag=True) is None
+    assert matching_run([run], tag="v4.22.7", commit=None) is None
+
+
+def test_post_publish_readback_requires_real_step() -> None:
+    step = {
+        "name": "Wait for PyPI index + verify provenance / install",
+        "conclusion": "success",
+    }
+    job = {"name": "Post-publish readback", "conclusion": "success", "steps": [step]}
+    run = {
+        "headSha": _COMMIT,
+        "headBranch": "v4.22.7",
+        "conclusion": "success",
+        "jobs": [job],
+    }
+    assert post_publish_readback(run, tag="v4.22.7", commit=_COMMIT)
+    for bad in (
+        {**run, "headSha": "f" * 40},
+        {**run, "headBranch": "main"},
+        {**run, "jobs": []},
+        {**run, "jobs": [{**job, "steps": []}]},
+        {**run, "jobs": [{**job, "conclusion": "skipped"}]},
+        {**run, "jobs": [{**job, "steps": [{**step, "conclusion": "skipped"}]}]},
+        {**run, "jobs": [job, job]},
+    ):
+        assert not post_publish_readback(bad, tag="v4.22.7", commit=_COMMIT)
