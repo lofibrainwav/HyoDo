@@ -5,17 +5,17 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.22.6 is the latest published release (2026-11-21 UTC). Its signed
+HyoDo 4.22.7 is the latest published release (2026-11-23 UTC). Its signed
 tag, GitHub Release, SBOM, PyPI provenance and install smoke are measured
-9/9 OBSERVED in `docs/releases/4.22.6.md`. The prior 4.22.5 release is
-separately sealed in `docs/releases/4.22.5.md`. The earlier 4.22.2 package
+9/9 OBSERVED in `docs/releases/4.22.7.md`. The prior 4.22.6 release is
+separately sealed in `docs/releases/4.22.6.md`. The earlier 4.22.2 package
 was published, but its in-repository release-chain receipt has not been
 reconciled. Prior release receipts remain under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.6 is the latest published release.
-HyoDo 4.22.7 is the current release target for the six-virtue evidence fixes.
+HyoDo 4.22.7 is the latest published release.
+HyoDo 4.22.7 is the current release target recorded by VERSION, now published.
 See [the release receipt](docs/releases/4.22.7.md) for publication evidence.
 HyoDo 4.21.2
 remains an incomplete immutable
@@ -48,7 +48,7 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.7
+### 4.22.7 (released 2026-11-23 UTC)
 
 Bind lens coverage to the measuring instrument, measurement time and exact
 target commit.
