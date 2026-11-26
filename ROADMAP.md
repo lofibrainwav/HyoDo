@@ -15,8 +15,11 @@ reconciled. Prior release receipts remain under `docs/releases/`.
 ## Current release
 
 HyoDo 4.22.7 is the latest published release.
-HyoDo 4.22.7 is the current release target recorded by VERSION, now published.
-See [the release receipt](docs/releases/4.22.7.md) for publication evidence.
+HyoDo 4.22.8 is the current release target recorded by VERSION, pending
+publication.
+See [the release receipt](docs/releases/4.22.7.md) for published 4.22.7
+evidence and [the 4.22.8 notes](docs/releases/4.22.8.md) for the pending
+release chain.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -47,6 +50,12 @@ The public package remains local-first and model-agnostic. Missing or unreadable
 evidence is not converted into a pass.
 
 ## Current focus
+
+### 4.22.8 (preparing release)
+
+Preserve ANSI-free `--json` output, retain bounded `stdout`/`stderr` failure
+evidence on gate failures and timeouts, and bind descriptor-pinned `root_fd`
+MCP `runtime_commit` with fail-closed security boundaries.
 
 ### 4.22.7 (released 2026-11-23 UTC)
 
