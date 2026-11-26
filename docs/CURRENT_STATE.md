@@ -1,6 +1,6 @@
 # HyoDo current state
 
-Public release readback: 2026-11-25 UTC (PyPI JSON `info.version`, GitHub Release).
+Public release readback: 2026-11-26 UTC (PyPI JSON `info.version`, GitHub Release).
 Runtime capability matrix below: measured 2026-09-13 PT, before 4.19.6.
 
 This file separates shipped product capability from live/runtime observation. Exact
@@ -8,13 +8,13 @@ revision identity belongs in the signed release, CI receipt, or runtime identity
 receipt rather than in this self-referential page.
 
 - Canonical source branch: `main`
-- Latest public package on PyPI: HyoDo `4.22.7` (verified 2026-11-25 UTC).
-- Recorded closed release chain: HyoDo `4.22.7` (9/9 observed).
+- Latest public package on PyPI: HyoDo `4.22.8` (verified 2026-11-26 UTC).
+- Recorded closed release chain: HyoDo `4.22.8` (9/9 observed).
 - Public release chain: CLOSED — signed tag, GitHub Release + SBOM, PyPI OIDC
   provenance, and install smoke verified in
-  [`releases/4.22.7.md`](./releases/4.22.7.md).
+  [`releases/4.22.8.md`](./releases/4.22.8.md).
 - Phase 0: CLOSED; Evidence Pack v1 remains sealed with named residuals.
-- HyoDo product status: the recorded 4.22.7 release is closed. Research and
+- HyoDo product status: the recorded 4.22.8 release is closed. Research and
   integration have separate evidence and promotion criteria; they do not
   silently reopen the sealed public artifact. Live-host and orchestration
   experiments remain downstream integration/research work.
@@ -30,6 +30,7 @@ Each line points to the repository release note, which owns the receipt.
 
 | Release | Summary | Release-chain receipt |
 | --- | --- | --- |
+| 4.22.8 | ANSI-free `--json`, bounded gate failure evidence, descriptor-pinned MCP `runtime_commit` | 9/9 OBSERVED, [`releases/4.22.8.md`](./releases/4.22.8.md) |
 | 4.22.7 | Lens evidence instrument, target and time binding | 9/9 OBSERVED, [`releases/4.22.7.md`](./releases/4.22.7.md) |
 | 4.22.6 | Exact-byte eval evidence, fail-closed changing-file inspect and paired eval comparison | 9/9 OBSERVED, [`releases/4.22.6.md`](./releases/4.22.6.md) |
 | 4.22.5 | Oversized-file scan coverage, host gate trust commands, factory-example evidence/authority corrections | 9/9 OBSERVED, [`releases/4.22.5.md`](./releases/4.22.5.md) |
