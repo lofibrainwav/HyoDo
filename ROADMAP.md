@@ -5,21 +5,18 @@ when implementation, tests, documentation, and release evidence agree.
 
 ## Current public baseline
 
-HyoDo 4.22.7 is the latest published release (2026-11-23 UTC). Its signed
+HyoDo 4.22.8 is the latest published release (2026-11-26 UTC). Its signed
 tag, GitHub Release, SBOM, PyPI provenance and install smoke are measured
-9/9 OBSERVED in `docs/releases/4.22.7.md`. The prior 4.22.6 release is
-separately sealed in `docs/releases/4.22.6.md`. The earlier 4.22.2 package
+9/9 OBSERVED in `docs/releases/4.22.8.md`. The prior 4.22.7 release is
+separately sealed in `docs/releases/4.22.7.md`. The earlier 4.22.2 package
 was published, but its in-repository release-chain receipt has not been
 reconciled. Prior release receipts remain under `docs/releases/`.
 
 ## Current release
 
-HyoDo 4.22.7 is the latest published release.
-HyoDo 4.22.8 is the current release target recorded by VERSION, pending
-publication.
-See [the release receipt](docs/releases/4.22.7.md) for published 4.22.7
-evidence and [the 4.22.8 notes](docs/releases/4.22.8.md) for the pending
-release chain.
+HyoDo 4.22.8 is the latest published release.
+HyoDo 4.22.8 is the current release target recorded by VERSION, now published.
+See [the release receipt](docs/releases/4.22.8.md) for publication evidence.
 HyoDo 4.21.2
 remains an incomplete immutable
 historical release whose GitHub Release was published without SBOM evidence
@@ -51,7 +48,7 @@ evidence is not converted into a pass.
 
 ## Current focus
 
-### 4.22.8 (preparing release)
+### 4.22.8 (released 2026-11-26 UTC)
 
 Preserve ANSI-free `--json` output, retain bounded `stdout`/`stderr` failure
 evidence on gate failures and timeouts, and bind descriptor-pinned `root_fd`
