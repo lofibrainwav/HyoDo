@@ -716,3 +716,111 @@ def test_root_fd_runtime_commit_fails_closed_on_symlink_dot_git_and_root_swap(tm
         assert mcp_readers._git_head_from_fd(fd_a, repo_a) == head_a
     finally:
         os.close(fd_a)
+
+
+def test_root_fd_runtime_commit_adversarial_boundaries(tmp_path: Path) -> None:
+    """Hostile FIFOs, NUL bytes, symlinked refs, traversal, cycles, and abs commondir fail closed."""
+    from hyodo.workspace_io import open_workspace_root
+
+    sha = "a" * 40
+
+    # 1. FIFO at .git/HEAD and .git/packed-refs must never block (O_NONBLOCK) and must fail closed
+    if hasattr(os, "mkfifo"):
+        fifo_repo = tmp_path / "fifo-head"
+        (fifo_repo / ".git").mkdir(parents=True)
+        os.mkfifo(fifo_repo / ".git" / "HEAD")
+        _, fd = open_workspace_root(fifo_repo)
+        try:
+            assert mcp_readers._git_head_from_fd(fd, fifo_repo) is None
+        finally:
+            os.close(fd)
+
+        fifo_packed = tmp_path / "fifo-packed"
+        (fifo_packed / ".git").mkdir(parents=True)
+        (fifo_packed / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        os.mkfifo(fifo_packed / ".git" / "packed-refs")
+        _, fd = open_workspace_root(fifo_packed)
+        try:
+            assert mcp_readers._git_head_from_fd(fd, fifo_packed) is None
+        finally:
+            os.close(fd)
+
+    # 2. Embedded NUL byte in HEAD ref and gitdir must fail closed (no ValueError crash)
+    nul_repo = tmp_path / "nul-head"
+    (nul_repo / ".git").mkdir(parents=True)
+    (nul_repo / ".git" / "HEAD").write_text("ref: refs/heads/main\x00evil\n", encoding="utf-8")
+    _, fd = open_workspace_root(nul_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, nul_repo) is None
+    finally:
+        os.close(fd)
+
+    nul_wt = tmp_path / "nul-wt"
+    nul_wt.mkdir()
+    (nul_wt / ".git").write_text(f"gitdir: {tmp_path}/real\x00evil\n", encoding="utf-8")
+    _, fd = open_workspace_root(nul_wt)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, nul_wt) is None
+    finally:
+        os.close(fd)
+
+    # 3. Symlinked HEAD and symlinked ref file fail closed
+    sym_repo = tmp_path / "sym-head"
+    (sym_repo / ".git" / "refs" / "heads").mkdir(parents=True)
+    outside = tmp_path / "outside-sha"
+    outside.write_text(f"{sha}\n", encoding="utf-8")
+    (sym_repo / ".git" / "HEAD").symlink_to(outside)
+    _, fd = open_workspace_root(sym_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, sym_repo) is None
+    finally:
+        os.close(fd)
+
+    (sym_repo / ".git" / "HEAD").unlink()
+    (sym_repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (sym_repo / ".git" / "refs" / "heads" / "main").symlink_to(outside)
+    _, fd = open_workspace_root(sym_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, sym_repo) is None
+    finally:
+        os.close(fd)
+
+    # 4. Path traversal in HEAD ref and cyclic symref loop fail closed
+    trav_repo = tmp_path / "trav-head"
+    (trav_repo / ".git").mkdir(parents=True)
+    (trav_repo / ".git" / "HEAD").write_text(
+        "ref: refs/heads/../../outside-sha\n", encoding="utf-8"
+    )
+    _, fd = open_workspace_root(trav_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, trav_repo) is None
+    finally:
+        os.close(fd)
+
+    cyc_repo = tmp_path / "cyc-head"
+    (cyc_repo / ".git" / "refs" / "heads").mkdir(parents=True)
+    (cyc_repo / ".git" / "HEAD").write_text("ref: refs/heads/a\n", encoding="utf-8")
+    (cyc_repo / ".git" / "refs" / "heads" / "a").write_text("ref: refs/heads/b\n", encoding="utf-8")
+    (cyc_repo / ".git" / "refs" / "heads" / "b").write_text("ref: refs/heads/a\n", encoding="utf-8")
+    _, fd = open_workspace_root(cyc_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, cyc_repo) is None
+    finally:
+        os.close(fd)
+
+    # 5. Absolute commondir escape in worktree gitdir fails closed
+    abs_common_target = tmp_path / "external-common"
+    (abs_common_target / "refs" / "heads").mkdir(parents=True)
+    (abs_common_target / "refs" / "heads" / "main").write_text(f"{sha}\n", encoding="utf-8")
+    wt_gitdir = tmp_path / "wt-meta"
+    wt_gitdir.mkdir()
+    (wt_gitdir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (wt_gitdir / "commondir").write_text(f"{abs_common_target}\n", encoding="utf-8")
+    wt_root = tmp_path / "wt-abs-common"
+    wt_root.mkdir()
+    (wt_root / ".git").write_text(f"gitdir: {wt_gitdir}\n", encoding="utf-8")
+    _, fd = open_workspace_root(wt_root)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, wt_root) is None
+    finally:
+        os.close(fd)

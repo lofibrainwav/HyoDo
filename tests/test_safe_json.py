@@ -171,3 +171,36 @@ def test_policy_check_json_survives_forced_color_terminal(tmp_path, monkeypatch)
     payload = json.loads(result.output)
     assert payload["decision"] == "UNOBSERVED"
     assert payload["exit_code"] == 2
+
+
+def test_safe_json_adversarial_narrow_width_clicolor_and_unicode_path(tmp_path):
+    """Narrow COLUMNS=20, CLICOLOR_FORCE=1, and long Unicode filenames never break --json."""
+    import os
+    import subprocess
+    import sys
+
+    nested = tmp_path / "caf\u00e9-very-long-directory-segment-for-wrapping-test"
+    nested.mkdir(parents=True)
+    sample = nested / "sample_with_very_long_name_for_narrow_terminal_wrap_check.py"
+    sample.write_text('value = "clean"\n', encoding="utf-8")
+    env = {
+        **os.environ,
+        "FORCE_COLOR": "1",
+        "CLICOLOR_FORCE": "1",
+        "COLUMNS": "20",
+        "TERM": "xterm-256color",
+    }
+    proc = subprocess.run(
+        [sys.executable, "-m", "hyodo.cli.main", "safe", str(sample), "--json"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=30,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert "\x1b[" not in proc.stdout
+    payload = json.loads(proc.stdout)
+    assert payload["source"] == f"file:{sample}"
+    assert payload["exit_code"] == 0

@@ -116,25 +116,33 @@ def _valid_commit_sha(text: str) -> str | None:
     return None
 
 
+_NONBLOCK_FLAG = getattr(os, "O_NONBLOCK", 0)
+
+
+def _has_unsafe_path_chars(text: str) -> bool:
+    return any(ord(ch) < 32 or ord(ch) == 127 or ch == "\\" for ch in text)
+
+
 def _read_regular_file_nofollow(
     dir_fd: int, parts: tuple[str, ...], *, max_bytes: int = _MAX_GIT_REF_BYTES
 ) -> str | None:
     """Read a bounded regular file beneath *dir_fd* without following any symlinks."""
-    if not parts or any(part in {"", ".", ".."} for part in parts):
+    if not parts or any(part in {"", ".", ".."} or _has_unsafe_path_chars(part) for part in parts):
         return None
     if not (
         os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW")
     ):
         return None
     directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    file_flags = os.O_RDONLY | os.O_NOFOLLOW | _NONBLOCK_FLAG
     current_fd = os.dup(dir_fd)
     try:
         for part in parts[:-1]:
             child_fd = os.open(part, directory_flags, dir_fd=current_fd)
             os.close(current_fd)
             current_fd = child_fd
-        file_fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=current_fd)
-    except OSError:
+        file_fd = os.open(parts[-1], file_flags, dir_fd=current_fd)
+    except (OSError, ValueError):
         os.close(current_fd)
         return None
     os.close(current_fd)
@@ -162,8 +170,10 @@ def _lookup_packed_ref_nofollow(common_fd: int, ref_name: str) -> str | None:
     if not (os.open in os.supports_dir_fd and hasattr(os, "O_NOFOLLOW")):
         return None
     try:
-        file_fd = os.open("packed-refs", os.O_RDONLY | os.O_NOFOLLOW, dir_fd=common_fd)
-    except OSError:
+        file_fd = os.open(
+            "packed-refs", os.O_RDONLY | os.O_NOFOLLOW | _NONBLOCK_FLAG, dir_fd=common_fd
+        )
+    except (OSError, ValueError):
         return None
     try:
         if not stat.S_ISREG(os.fstat(file_fd).st_mode):
@@ -204,6 +214,8 @@ def _resolve_head_in_git_dir(git_fd: int, common_fd: int) -> str | None:
         if not current.startswith("ref:"):
             return None
         ref_name = current[4:].strip()
+        if _has_unsafe_path_chars(ref_name):
+            return None
         ref_path = Path(ref_name)
         if (
             ref_path.is_absolute()
@@ -223,7 +235,7 @@ def _resolve_head_in_git_dir(git_fd: int, common_fd: int) -> str | None:
 
 def _open_absolute_dir_nofollow(path: Path) -> int | None:
     """Open an absolute directory path without following any symlink component."""
-    if not path.is_absolute():
+    if not path.is_absolute() or _has_unsafe_path_chars(str(path)):
         return None
     if not (
         os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW")
@@ -236,7 +248,7 @@ def _open_absolute_dir_nofollow(path: Path) -> int | None:
         return None
     try:
         for part in path.parts[1:]:
-            if part in {"", ".", ".."}:
+            if part in {"", ".", ".."} or _has_unsafe_path_chars(part):
                 os.close(current_fd)
                 return None
             child_fd = os.open(part, flags, dir_fd=current_fd)
@@ -245,7 +257,7 @@ def _open_absolute_dir_nofollow(path: Path) -> int | None:
         result = current_fd
         current_fd = -1
         return result
-    except OSError:
+    except (OSError, ValueError):
         return None
     finally:
         if current_fd >= 0:
@@ -286,7 +298,7 @@ def _git_head_from_fd(root_fd: int, resolved_root: Path | None = None) -> str | 
     if not first_line.startswith("gitdir:"):
         return None
     raw_target = first_line[len("gitdir:") :].strip()
-    if not raw_target:
+    if not raw_target or _has_unsafe_path_chars(raw_target):
         return None
     target = Path(raw_target)
     if not target.is_absolute():
@@ -302,8 +314,13 @@ def _git_head_from_fd(root_fd: int, resolved_root: Path | None = None) -> str | 
     try:
         commondir_raw = _read_regular_file_nofollow(worktree_git_fd, ("commondir",))
         if commondir_raw is not None:
-            commondir_rel = commondir_raw.strip()
+            commondir_lines = [ln.strip() for ln in commondir_raw.splitlines() if ln.strip()]
+            if len(commondir_lines) > 1:
+                return None
+            commondir_rel = commondir_lines[0] if commondir_lines else ""
             if commondir_rel:
+                if _has_unsafe_path_chars(commondir_rel) or Path(commondir_rel).is_absolute():
+                    return None
                 common_target = Path(os.path.normpath(str(target / commondir_rel)))
                 opened_common = _open_absolute_dir_nofollow(common_target)
                 if opened_common is None:
