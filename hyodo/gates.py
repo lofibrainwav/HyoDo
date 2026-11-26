@@ -324,6 +324,28 @@ def _failure_message(stdout: str | None, stderr: str | None) -> str:
     return prefix + _excerpt(out, out_limit) + separator + _excerpt(err, err_limit)
 
 
+def _coerce_stream_text(value: str | bytes | None) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bytes):
+        return value.decode("utf-8", errors="replace")
+    return value
+
+
+def _timeout_message(stdout: str | bytes | None, stderr: str | bytes | None) -> str:
+    """Keep bounded partial output on gate timeout instead of returning bare 'timeout'."""
+    detail = _failure_message(_coerce_stream_text(stdout), _coerce_stream_text(stderr))
+    if not detail:
+        return "timeout"
+    prefix = "timeout: "
+    budget = GATE_MESSAGE_TAIL_CHARS - len(prefix)
+    if len(detail) <= budget:
+        return prefix + detail
+    if budget <= 1:
+        return "timeout"
+    return prefix + "…" + detail[-(budget - 1) :]
+
+
 @dataclass(frozen=True)
 class GateTrustDecision:
     """Outcome of `resolve_gate_trust` for one `.hyodo/gates.toml` command set."""
@@ -968,8 +990,10 @@ def _run_one_gate(gate: UserGate, root: Path, *, verbose: bool) -> UserGateResul
         )
     except FileNotFoundError:
         return UserGateResult(gate.name, gate.pillar, "SKIP", f"{binary} not installed")
-    except subprocess.TimeoutExpired:
-        return UserGateResult(gate.name, gate.pillar, "FAIL", "timeout")
+    except subprocess.TimeoutExpired as exc:
+        return UserGateResult(
+            gate.name, gate.pillar, "FAIL", _timeout_message(exc.stdout, exc.stderr)
+        )
 
     if completed.returncode == 0:
         message = _tail(completed.stdout) if verbose else ""

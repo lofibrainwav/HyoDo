@@ -22,6 +22,7 @@ import ipaddress
 import json
 import math
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -315,6 +316,20 @@ app.add_typer(admission_app, name="admission")
 app.add_typer(gates_app, name="gates")
 gates_app.add_typer(gates_trust_app, name="trust")
 console = Console()
+_ANSI_CSI_RE = re.compile(r"\x1b\[[0-9;?]*[ -/]*[@-~]")
+
+
+def _emit_json(data: Any) -> None:
+    """Emit machine-readable JSON without ANSI escapes or soft line wrapping."""
+    console.out(json.dumps(data, indent=2), highlight=False)
+
+
+def _combine_gate_streams(stdout: str | None, stderr: str | None) -> str:
+    """Combine non-empty stdout and stderr without letting one stream erase the other."""
+    parts = [part.strip() for part in (stdout, stderr) if part and part.strip()]
+    return "\n".join(parts)
+
+
 _REEXPORTED_SKILLS_CLI = (
     _new_agent_event,
     _skills_ingest_from_node,
@@ -478,11 +493,16 @@ def run_pyright_check(root: Path | None, verbose: bool = False) -> GateResult:
 
         error_count = result.stdout.count("error:") + result.stderr.count("error:")
         warning_count = result.stdout.count("warning:") + result.stderr.count("warning:")
-        detail = (result.stdout or result.stderr or "").strip()
+        detail = _combine_gate_streams(result.stdout, result.stderr)
         if verbose and detail:
             return GateResult(
                 GateStatus.FAIL,
                 f"{error_count} errors, {warning_count} warnings\n{detail[:400]}",
+            )
+        if error_count == 0 and warning_count == 0 and detail:
+            return GateResult(
+                GateStatus.FAIL,
+                f"exit code {result.returncode}: {detail[-200:]}",
             )
         return GateResult(GateStatus.FAIL, f"{error_count} errors, {warning_count} warnings")
     except FileNotFoundError:
@@ -522,10 +542,10 @@ def run_ruff_check(root: Path | None, fix: bool = False, verbose: bool = False) 
 
         parts: list[str] = []
         if not lint_ok:
-            lint_msg = (lint.stdout or lint.stderr or "ruff check failed").strip()
+            lint_msg = _combine_gate_streams(lint.stdout, lint.stderr) or "ruff check failed"
             parts.append(f"lint: {lint_msg[:140]}")
         if not fmt_ok:
-            fmt_msg = (fmt.stdout or fmt.stderr or "ruff format failed").strip()
+            fmt_msg = _combine_gate_streams(fmt.stdout, fmt.stderr) or "ruff format failed"
             parts.append(f"format: {fmt_msg[:140]}")
         msg = "; ".join(parts)
         if len(msg) > 200:
@@ -551,7 +571,7 @@ def run_pytest_check(root: Path | None, verbose: bool = False) -> GateResult:
     cmd = _tool_cmd("pytest", str(root / "tests"), "-q", "--tb=short", "-ra")
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, timeout=300, cwd=str(root))
-        output = "\n".join(part for part in (result.stdout, result.stderr) if part)
+        output = _combine_gate_streams(result.stdout, result.stderr)
         skipped = [
             line.strip()
             for line in output.splitlines()
@@ -564,7 +584,7 @@ def run_pytest_check(root: Path | None, verbose: bool = False) -> GateResult:
                     return GateResult(GateStatus.PASS, f"{line.strip()}{skip_detail}")
             return GateResult(GateStatus.PASS, f"All tests passed!{skip_detail}")
 
-        detail = (result.stdout or result.stderr or "").strip()
+        detail = output
         if verbose and detail:
             return GateResult(GateStatus.FAIL, f"exit code {result.returncode}\n{detail[-500:]}")
         summary = detail.splitlines()[-1] if detail else ""
@@ -605,7 +625,7 @@ def run_sbom_check(root: Path | None, verbose: bool = False) -> GateResult:
     if result.returncode == 0:
         return GateResult(GateStatus.PASS, "SBOM generated (public surface)")
 
-    detail = (result.stderr.strip() or result.stdout.strip())[:200]
+    detail = _combine_gate_streams(result.stderr, result.stdout)[:200]
     if result.returncode == 2:
         # A scope violation means the SBOM was generated but is not the public
         # closure — a real defect, so it blocks.
@@ -1920,9 +1940,7 @@ def _resolve_audience_or_exit(
     except InvalidAudienceError as exc:
         reason = str(exc)
         if json_output:
-            console.print_json(
-                json.dumps({"decision": "UNOBSERVED", "reason": reason, "exit_code": 2})
-            )
+            _emit_json({"decision": "UNOBSERVED", "reason": reason, "exit_code": 2})
         else:
             console.print(f"[red]{reason}[/red] -- expected one of {', '.join(VALID_PROFILES)}.")
             console.print("[yellow]This is not a validation pass.[/yellow]")
@@ -2057,8 +2075,11 @@ def _verdict_output(
     )
     if json_output:
         if native_response:
-            assert captured is not None
-            console.print_json(captured.get())
+            if "json_payload" in state:
+                _emit_json(state["json_payload"])
+            else:
+                assert captured is not None
+                _emit_json(json.loads(_ANSI_CSI_RE.sub("", captured.get())))
             # Native hooks consume the JSON envelope, but the host also uses
             # the process status to enforce the decision.  Preserve the
             # command's exit code after releasing the captured stdout.
@@ -2122,12 +2143,14 @@ def _verdict_output(
                 payload["target_changed_during_run"] = True
             if provenance_post is not None:
                 payload["provenance_post"] = provenance_post.to_portable_dict()
+        elif "json_payload" in state:
+            payload = dict(state["json_payload"])
         else:
             assert captured is not None
-            payload = json.loads(captured.get())
+            payload = json.loads(_ANSI_CSI_RE.sub("", captured.get()))
         payload["verdict"] = verdict
         payload["audience"] = profile.profile
-        console.print_json(json.dumps(payload))
+        _emit_json(payload)
     else:
         verdict = render_verdict_line(*verdict_args, audience=profile.profile)
         if sampled_limitation:
@@ -3221,7 +3244,7 @@ def safe(
                 "total_scannable": result.get("total_scannable"),
                 "text_scannable_files": result.get("text_scannable_files"),
             }
-            console.print_json(json.dumps(payload))
+            verdict_state["json_payload"] = payload
             raise typer.Exit(exit_code)
 
         console.print(Panel.fit("HyoDo Safety Check (early warning)", style="bold yellow"))
@@ -5466,16 +5489,12 @@ def policy_check(
         data, err = _load_event_payload(file_path, stdin_flag)
         if err is not None:
             if json_output:
-                console.print_json(
-                    json.dumps(
-                        {
-                            "decision": "UNOBSERVED",
-                            "rule_id": None,
-                            "reason": err,
-                            "exit_code": 2,
-                        }
-                    )
-                )
+                verdict_state["json_payload"] = {
+                    "decision": "UNOBSERVED",
+                    "rule_id": None,
+                    "reason": err,
+                    "exit_code": 2,
+                }
             else:
                 console.print(f"[red]Cannot load event: {err}[/red]")
                 console.print("[yellow]This is not a validation pass.[/yellow]")
@@ -5486,16 +5505,12 @@ def policy_check(
             if hook not in _NATIVE_HOOKS:
                 message = f"unsupported --hook value: {hook}"
                 if json_output:
-                    console.print_json(
-                        json.dumps(
-                            {
-                                "decision": "UNOBSERVED",
-                                "rule_id": None,
-                                "reason": message,
-                                "exit_code": 2,
-                            }
-                        )
-                    )
+                    verdict_state["json_payload"] = {
+                        "decision": "UNOBSERVED",
+                        "rule_id": None,
+                        "reason": message,
+                        "exit_code": 2,
+                    }
                 else:
                     console.print(f"[red]{message}[/red]")
                 typer.echo(f"HYODO UNOBSERVED: {message}.", err=True)
@@ -5506,17 +5521,13 @@ def policy_check(
             if mapped is None:
                 mapping_exit = 0 if shadow else 2
                 if json_output:
-                    console.print_json(
-                        json.dumps(
-                            {
-                                "decision": "UNOBSERVED",
-                                "rule_id": None,
-                                "reason": map_err,
-                                "exit_code": mapping_exit,
-                                "shadow": shadow,
-                            }
-                        )
-                    )
+                    verdict_state["json_payload"] = {
+                        "decision": "UNOBSERVED",
+                        "rule_id": None,
+                        "reason": map_err,
+                        "exit_code": mapping_exit,
+                        "shadow": shadow,
+                    }
                 else:
                     console.print(f"[red]Cannot map {hook} hook payload: {map_err}[/red]")
                 stderr_prefix = "[SHADOW, not blocking] " if shadow else ""
@@ -5532,16 +5543,12 @@ def policy_check(
         ok, reasons, normalized = validate_event(data)
         if not ok or normalized is None:
             if json_output:
-                console.print_json(
-                    json.dumps(
-                        {
-                            "decision": "UNOBSERVED",
-                            "rule_id": None,
-                            "reason": ";".join(reasons),
-                            "exit_code": 2,
-                        }
-                    )
-                )
+                verdict_state["json_payload"] = {
+                    "decision": "UNOBSERVED",
+                    "rule_id": None,
+                    "reason": ";".join(reasons),
+                    "exit_code": 2,
+                }
             else:
                 console.print("[red]INVALID event — policy not evaluated.[/red]")
                 for reason in reasons:
@@ -5631,7 +5638,7 @@ def policy_check(
                 if decision.trust_level >= 2:
                     payload["ledger_write_required"] = True
                     payload["ledger_written"] = False
-            console.print_json(json.dumps(payload))
+            verdict_state["json_payload"] = payload
         else:
             color = "green" if decision.decision == "ALLOW" else "red"
             console.print(f"[{color}]{decision.decision}[/{color}]")

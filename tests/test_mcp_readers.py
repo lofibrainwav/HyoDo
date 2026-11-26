@@ -595,3 +595,232 @@ def test_reader_symlink_root_is_still_rejected_before_registration(tmp_path):
     with pytest.raises(ValueError, match="workspace root"):
         create_server(alias)
     assert not (actual / ".hyodo" / "mcp-access.jsonl").exists()
+
+
+def _init_git_repo(repo: Path) -> str:
+    repo.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["git", "init", "-q", str(repo)], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.email", "test@example.com"], check=True)
+    subprocess.run(["git", "-C", str(repo), "config", "user.name", "Test User"], check=True)
+    (repo / "README.md").write_text("hello\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo), "add", "README.md"], check=True)
+    subprocess.run(["git", "-C", str(repo), "commit", "-q", "-m", "init"], check=True)
+    return subprocess.check_output(["git", "-C", str(repo), "rev-parse", "HEAD"], text=True).strip()
+
+
+def test_root_fd_registration_and_server_bind_runtime_commit_for_census(tmp_path, monkeypatch):
+    """Descriptor-pinned readers bind runtime_commit so census reports CURRENT."""
+    from hyodo.workspace_io import open_workspace_root
+
+    repo = tmp_path / "repo"
+    head = _init_git_repo(repo)
+    registry = tmp_path / "registry"
+    monkeypatch.setattr(mcp_readers, "process_start", lambda _pid: _START)
+
+    server = create_server(repo)
+    ctx = _tool(server, "get_local_context")
+    assert ctx["reader"]["runtime_commit"] == head
+    (entry,) = read_access_log(repo)
+    assert entry.runtime_commit == head
+
+    root, fd = open_workspace_root(repo)
+    try:
+        with mcp_readers.registered_reader(root, "stdio", directory=registry, root_fd=fd) as path:
+            assert path is not None
+            record = json.loads(path.read_text(encoding="utf-8"))
+            assert record["runtime_commit"] == head
+            live = [ReaderProcess(os.getpid(), os.getppid(), _START, "stdio")]
+            receipt = _census(repo, registry, live)
+            assert receipt["expected_commit"] == head
+            assert receipt["readers"][0]["runtime_commit"] == head
+            assert receipt["readers"][0]["reader_status"] == "CURRENT"
+            assert receipt["readers"][0]["reasons"] == []
+            assert receipt["cutover_status"] == PROMOTION_COMPLETE
+    finally:
+        os.close(fd)
+
+
+def test_root_fd_runtime_commit_supports_packed_refs_detached_and_worktree(tmp_path):
+    """Descriptor-pinned commit resolution covers packed-refs, detached HEAD, and worktrees."""
+    from hyodo.workspace_io import open_workspace_root
+
+    repo = tmp_path / "main-repo"
+    head = _init_git_repo(repo)
+
+    # 1. packed-refs (pack all refs and prune loose branch files)
+    subprocess.run(["git", "-C", str(repo), "pack-refs", "--all", "--prune"], check=True)
+    _, fd = open_workspace_root(repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, repo) == head
+    finally:
+        os.close(fd)
+
+    # 2. git worktree (.git is a regular gitdir file)
+    wt = tmp_path / "wt"
+    subprocess.run(
+        ["git", "-C", str(repo), "worktree", "add", "-q", "--detach", str(wt)], check=True
+    )
+    _, wt_fd = open_workspace_root(wt)
+    try:
+        assert mcp_readers._git_head_from_fd(wt_fd, wt) == head
+    finally:
+        os.close(wt_fd)
+
+    # 3. worktree on a branch (uses commondir for packed-refs)
+    wt_branch = tmp_path / "wt-branch"
+    subprocess.run(
+        ["git", "-C", str(repo), "worktree", "add", "-q", "-b", "wt-test", str(wt_branch)],
+        check=True,
+    )
+    subprocess.run(["git", "-C", str(repo), "pack-refs", "--all", "--prune"], check=True)
+    _, wt_b_fd = open_workspace_root(wt_branch)
+    try:
+        assert mcp_readers._git_head_from_fd(wt_b_fd, wt_branch) == head
+    finally:
+        os.close(wt_b_fd)
+
+
+def test_root_fd_runtime_commit_fails_closed_on_symlink_dot_git_and_root_swap(tmp_path):
+    """Symlinked .git is refused, and a swapped root never leaks the replacement commit."""
+    from hyodo.workspace_io import open_workspace_root
+
+    repo_a = tmp_path / "repo-a"
+    repo_b = tmp_path / "repo-b"
+    head_a = _init_git_repo(repo_a)
+    (repo_b / "extra.txt").parent.mkdir(parents=True, exist_ok=True)
+    head_b = _init_git_repo(repo_b)
+    (repo_b / "extra.txt").write_text("second\n", encoding="utf-8")
+    subprocess.run(["git", "-C", str(repo_b), "add", "extra.txt"], check=True)
+    subprocess.run(["git", "-C", str(repo_b), "commit", "-q", "-m", "second"], check=True)
+    head_b = subprocess.check_output(
+        ["git", "-C", str(repo_b), "rev-parse", "HEAD"], text=True
+    ).strip()
+    assert head_a != head_b
+
+    # Case 1: .git symlink fails closed
+    linked = tmp_path / "linked"
+    linked.mkdir()
+    (linked / ".git").symlink_to(repo_a / ".git", target_is_directory=True)
+    _, linked_fd = open_workspace_root(linked)
+    try:
+        assert mcp_readers._git_head_from_fd(linked_fd, linked) is None
+    finally:
+        os.close(linked_fd)
+
+    # Case 2: root directory swapped after open_workspace_root stays pinned to original repo_a
+    _, fd_a = open_workspace_root(repo_a)
+    try:
+        moved = tmp_path / "moved-a"
+        repo_a.rename(moved)
+        repo_a.symlink_to(repo_b, target_is_directory=True)
+        assert mcp_readers._git_head_from_fd(fd_a, repo_a) == head_a
+    finally:
+        os.close(fd_a)
+
+
+def test_root_fd_runtime_commit_adversarial_boundaries(tmp_path: Path) -> None:
+    """Hostile FIFOs, NUL bytes, symlinked refs, traversal, cycles, and abs commondir fail closed."""
+    from hyodo.workspace_io import open_workspace_root
+
+    sha = "a" * 40
+
+    # 1. FIFO at .git/HEAD and .git/packed-refs must never block (O_NONBLOCK) and must fail closed
+    if hasattr(os, "mkfifo"):
+        fifo_repo = tmp_path / "fifo-head"
+        (fifo_repo / ".git").mkdir(parents=True)
+        os.mkfifo(fifo_repo / ".git" / "HEAD")
+        _, fd = open_workspace_root(fifo_repo)
+        try:
+            assert mcp_readers._git_head_from_fd(fd, fifo_repo) is None
+        finally:
+            os.close(fd)
+
+        fifo_packed = tmp_path / "fifo-packed"
+        (fifo_packed / ".git").mkdir(parents=True)
+        (fifo_packed / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+        os.mkfifo(fifo_packed / ".git" / "packed-refs")
+        _, fd = open_workspace_root(fifo_packed)
+        try:
+            assert mcp_readers._git_head_from_fd(fd, fifo_packed) is None
+        finally:
+            os.close(fd)
+
+    # 2. Embedded NUL byte in HEAD ref and gitdir must fail closed (no ValueError crash)
+    nul_repo = tmp_path / "nul-head"
+    (nul_repo / ".git").mkdir(parents=True)
+    (nul_repo / ".git" / "HEAD").write_text("ref: refs/heads/main\x00evil\n", encoding="utf-8")
+    _, fd = open_workspace_root(nul_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, nul_repo) is None
+    finally:
+        os.close(fd)
+
+    nul_wt = tmp_path / "nul-wt"
+    nul_wt.mkdir()
+    (nul_wt / ".git").write_text(f"gitdir: {tmp_path}/real\x00evil\n", encoding="utf-8")
+    _, fd = open_workspace_root(nul_wt)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, nul_wt) is None
+    finally:
+        os.close(fd)
+
+    # 3. Symlinked HEAD and symlinked ref file fail closed
+    sym_repo = tmp_path / "sym-head"
+    (sym_repo / ".git" / "refs" / "heads").mkdir(parents=True)
+    outside = tmp_path / "outside-sha"
+    outside.write_text(f"{sha}\n", encoding="utf-8")
+    (sym_repo / ".git" / "HEAD").symlink_to(outside)
+    _, fd = open_workspace_root(sym_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, sym_repo) is None
+    finally:
+        os.close(fd)
+
+    (sym_repo / ".git" / "HEAD").unlink()
+    (sym_repo / ".git" / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (sym_repo / ".git" / "refs" / "heads" / "main").symlink_to(outside)
+    _, fd = open_workspace_root(sym_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, sym_repo) is None
+    finally:
+        os.close(fd)
+
+    # 4. Path traversal in HEAD ref and cyclic symref loop fail closed
+    trav_repo = tmp_path / "trav-head"
+    (trav_repo / ".git").mkdir(parents=True)
+    (trav_repo / ".git" / "HEAD").write_text(
+        "ref: refs/heads/../../outside-sha\n", encoding="utf-8"
+    )
+    _, fd = open_workspace_root(trav_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, trav_repo) is None
+    finally:
+        os.close(fd)
+
+    cyc_repo = tmp_path / "cyc-head"
+    (cyc_repo / ".git" / "refs" / "heads").mkdir(parents=True)
+    (cyc_repo / ".git" / "HEAD").write_text("ref: refs/heads/a\n", encoding="utf-8")
+    (cyc_repo / ".git" / "refs" / "heads" / "a").write_text("ref: refs/heads/b\n", encoding="utf-8")
+    (cyc_repo / ".git" / "refs" / "heads" / "b").write_text("ref: refs/heads/a\n", encoding="utf-8")
+    _, fd = open_workspace_root(cyc_repo)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, cyc_repo) is None
+    finally:
+        os.close(fd)
+
+    # 5. Absolute commondir escape in worktree gitdir fails closed
+    abs_common_target = tmp_path / "external-common"
+    (abs_common_target / "refs" / "heads").mkdir(parents=True)
+    (abs_common_target / "refs" / "heads" / "main").write_text(f"{sha}\n", encoding="utf-8")
+    wt_gitdir = tmp_path / "wt-meta"
+    wt_gitdir.mkdir()
+    (wt_gitdir / "HEAD").write_text("ref: refs/heads/main\n", encoding="utf-8")
+    (wt_gitdir / "commondir").write_text(f"{abs_common_target}\n", encoding="utf-8")
+    wt_root = tmp_path / "wt-abs-common"
+    wt_root.mkdir()
+    (wt_root / ".git").write_text(f"gitdir: {wt_gitdir}\n", encoding="utf-8")
+    _, fd = open_workspace_root(wt_root)
+    try:
+        assert mcp_readers._git_head_from_fd(fd, wt_root) is None
+    finally:
+        os.close(fd)

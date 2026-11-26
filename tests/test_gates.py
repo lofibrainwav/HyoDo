@@ -296,6 +296,42 @@ def test_mixed_failure_preserves_unobserved_exit_contract(tmp_path: Path) -> Non
     assert "stderr: notice" in result.message
 
 
+def test_run_user_gates_timeout_preserves_bounded_failure_evidence(tmp_path: Path) -> None:
+    probe = (
+        "import sys, time; "
+        "print('PARTIAL_STDOUT', flush=True); "
+        "print('PARTIAL_STDERR', file=sys.stderr, flush=True); "
+        "time.sleep(5)"
+    )
+    config = GatesConfig(
+        schema=SCHEMA_ID,
+        gates=(
+            UserGate(name="slow", pillar="truth", command=(sys.executable, "-c", probe), timeout=1),
+        ),
+    )
+    result = run_user_gates(config, tmp_path)[0]
+    assert result.status == "FAIL"
+    assert result.message.startswith("timeout: ")
+    assert "PARTIAL_STDOUT" in result.message
+    assert "PARTIAL_STDERR" in result.message
+    assert len(result.message) <= GATE_MESSAGE_TAIL_CHARS
+
+
+def test_run_user_gates_silent_timeout_stays_plain_timeout(tmp_path: Path) -> None:
+    probe = "import time; time.sleep(5)"
+    config = GatesConfig(
+        schema=SCHEMA_ID,
+        gates=(
+            UserGate(
+                name="silent-slow", pillar="truth", command=(sys.executable, "-c", probe), timeout=1
+            ),
+        ),
+    )
+    result = run_user_gates(config, tmp_path)[0]
+    assert result.status == "FAIL"
+    assert result.message == "timeout"
+
+
 def _exit_gate(code: int, *, unobserved: tuple[int, ...] = ()) -> GatesConfig:
     probe = f"import sys; sys.stderr.write('no observer events'); sys.exit({code})"
     gate = UserGate(
