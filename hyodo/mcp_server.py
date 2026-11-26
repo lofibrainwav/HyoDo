@@ -17,7 +17,7 @@ from pathlib import Path
 from secrets import compare_digest
 from typing import Any
 
-from hyodo import __version__, mcp_readers
+from hyodo import __version__
 from hyodo._mcp_compat import (  # pyright: ignore[reportAttributeAccessIssue]
     constructor_accepts_transport_options,  # pyright: ignore[reportAttributeAccessIssue]
     constructor_accepts_version,  # pyright: ignore[reportAttributeAccessIssue]
@@ -178,9 +178,9 @@ def create_server(
         workspace, root_fd = open_workspace_root(root)
     except OSError as exc:
         raise ValueError("workspace root is not a directory or is not directly accessible") from exc
-    # Runtime source identity is unavailable without reopening a pathname.
-    # Keep that field explicitly unobserved rather than reading a replaced root.
-    pin = ReaderPin(root, workspace, __version__, mcp_readers.process_start(os.getpid()), None)
+    # Bind runtime_commit directly through the pinned root_fd without reopening
+    # the root pathname, keeping symlinked or swapped roots fail-closed.
+    pin = ReaderPin.at_startup(root, workspace, root_fd=root_fd)
 
     def _record(tool_name: str, exit_code: int, duration_ms: int) -> dict[str, str | None]:
         return _record_access(

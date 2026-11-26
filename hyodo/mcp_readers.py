@@ -103,6 +103,219 @@ def parent_host(ppid: int) -> str | None:
     return Path(text).name if text else None
 
 
+_COMMIT_SHA_RE = re.compile(r"^[0-9a-fA-F]{40}(?:[0-9a-fA-F]{24})?$")
+_MAX_GIT_REF_BYTES = 4096
+_MAX_PACKED_REFS_BYTES = 8 * 1024 * 1024
+_MAX_SYMREF_HOPS = 5
+
+
+def _valid_commit_sha(text: str) -> str | None:
+    candidate = text.strip()
+    if _COMMIT_SHA_RE.fullmatch(candidate):
+        return candidate.lower()
+    return None
+
+
+def _read_regular_file_nofollow(
+    dir_fd: int, parts: tuple[str, ...], *, max_bytes: int = _MAX_GIT_REF_BYTES
+) -> str | None:
+    """Read a bounded regular file beneath *dir_fd* without following any symlinks."""
+    if not parts or any(part in {"", ".", ".."} for part in parts):
+        return None
+    if not (
+        os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW")
+    ):
+        return None
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    current_fd = os.dup(dir_fd)
+    try:
+        for part in parts[:-1]:
+            child_fd = os.open(part, directory_flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = child_fd
+        file_fd = os.open(parts[-1], os.O_RDONLY | os.O_NOFOLLOW, dir_fd=current_fd)
+    except OSError:
+        os.close(current_fd)
+        return None
+    os.close(current_fd)
+    try:
+        if not stat.S_ISREG(os.fstat(file_fd).st_mode):
+            return None
+        with os.fdopen(file_fd, "rb") as handle:
+            file_fd = -1
+            raw = handle.read(max_bytes + 1)
+    except OSError:
+        return None
+    finally:
+        if file_fd >= 0:
+            os.close(file_fd)
+    if len(raw) > max_bytes:
+        return None
+    try:
+        return raw.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
+def _lookup_packed_ref_nofollow(common_fd: int, ref_name: str) -> str | None:
+    """Resolve *ref_name* from a descriptor-pinned ``packed-refs`` file."""
+    if not (os.open in os.supports_dir_fd and hasattr(os, "O_NOFOLLOW")):
+        return None
+    try:
+        file_fd = os.open("packed-refs", os.O_RDONLY | os.O_NOFOLLOW, dir_fd=common_fd)
+    except OSError:
+        return None
+    try:
+        if not stat.S_ISREG(os.fstat(file_fd).st_mode):
+            return None
+        seen_bytes = 0
+        with os.fdopen(file_fd, "rb") as handle:
+            file_fd = -1
+            for raw_line in handle:
+                seen_bytes += len(raw_line)
+                if seen_bytes > _MAX_PACKED_REFS_BYTES:
+                    return None
+                if not raw_line or raw_line.startswith((b"#", b"^")):
+                    continue
+                try:
+                    line = raw_line.decode("utf-8").strip()
+                except UnicodeDecodeError:
+                    continue
+                sha, sep, name = line.partition(" ")
+                if sep and name.strip() == ref_name:
+                    return _valid_commit_sha(sha)
+    except OSError:
+        return None
+    finally:
+        if file_fd >= 0:
+            os.close(file_fd)
+    return None
+
+
+def _resolve_head_in_git_dir(git_fd: int, common_fd: int) -> str | None:
+    """Resolve HEAD to a commit SHA using only descriptor-pinned no-follow reads."""
+    raw = _read_regular_file_nofollow(git_fd, ("HEAD",))
+    if raw is None:
+        return None
+    current = raw.strip()
+    for _ in range(_MAX_SYMREF_HOPS):
+        if (sha := _valid_commit_sha(current)) is not None:
+            return sha
+        if not current.startswith("ref:"):
+            return None
+        ref_name = current[4:].strip()
+        ref_path = Path(ref_name)
+        if (
+            ref_path.is_absolute()
+            or not ref_name.startswith("refs/")
+            or any(part in {"", ".", ".."} for part in ref_path.parts)
+        ):
+            return None
+        loose = _read_regular_file_nofollow(git_fd, ref_path.parts)
+        if loose is None and common_fd != git_fd:
+            loose = _read_regular_file_nofollow(common_fd, ref_path.parts)
+        if loose is not None:
+            current = loose.strip()
+            continue
+        return _lookup_packed_ref_nofollow(common_fd, ref_name)
+    return None
+
+
+def _open_absolute_dir_nofollow(path: Path) -> int | None:
+    """Open an absolute directory path without following any symlink component."""
+    if not path.is_absolute():
+        return None
+    if not (
+        os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW")
+    ):
+        return None
+    flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        current_fd = os.open("/", flags)
+    except OSError:
+        return None
+    try:
+        for part in path.parts[1:]:
+            if part in {"", ".", ".."}:
+                os.close(current_fd)
+                return None
+            child_fd = os.open(part, flags, dir_fd=current_fd)
+            os.close(current_fd)
+            current_fd = child_fd
+        result = current_fd
+        current_fd = -1
+        return result
+    except OSError:
+        return None
+    finally:
+        if current_fd >= 0:
+            os.close(current_fd)
+
+
+def _git_head_from_fd(root_fd: int, resolved_root: Path | None = None) -> str | None:
+    """Read HEAD commit SHA anchored to *root_fd* without reopening *resolved_root*.
+
+    Supports standard repositories (``.git`` directory inside *root_fd*) and
+    git worktrees/submodules (regular ``.git`` file with a ``gitdir:`` line
+    read through *root_fd*). Symlinks at ``.git`` or along any traversed path
+    fail closed and return ``None``.
+    """
+    if not (
+        os.open in os.supports_dir_fd and hasattr(os, "O_DIRECTORY") and hasattr(os, "O_NOFOLLOW")
+    ):
+        return None
+    directory_flags = os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW
+    try:
+        git_fd = os.open(".git", directory_flags, dir_fd=root_fd)
+    except NotADirectoryError:
+        git_fd = -1
+    except OSError:
+        return None
+
+    if git_fd >= 0:
+        try:
+            return _resolve_head_in_git_dir(git_fd, git_fd)
+        finally:
+            os.close(git_fd)
+
+    # Worktree / submodule: .git is a regular file containing `gitdir: <path>`.
+    dot_git = _read_regular_file_nofollow(root_fd, (".git",))
+    if dot_git is None:
+        return None
+    first_line = dot_git.splitlines()[0].strip() if dot_git.splitlines() else ""
+    if not first_line.startswith("gitdir:"):
+        return None
+    raw_target = first_line[len("gitdir:") :].strip()
+    if not raw_target:
+        return None
+    target = Path(raw_target)
+    if not target.is_absolute():
+        if resolved_root is None:
+            return None
+        target = Path(os.path.normpath(str(resolved_root / target)))
+    else:
+        target = Path(os.path.normpath(str(target)))
+    worktree_git_fd = _open_absolute_dir_nofollow(target)
+    if worktree_git_fd is None:
+        return None
+    common_fd = worktree_git_fd
+    try:
+        commondir_raw = _read_regular_file_nofollow(worktree_git_fd, ("commondir",))
+        if commondir_raw is not None:
+            commondir_rel = commondir_raw.strip()
+            if commondir_rel:
+                common_target = Path(os.path.normpath(str(target / commondir_rel)))
+                opened_common = _open_absolute_dir_nofollow(common_target)
+                if opened_common is None:
+                    return None
+                common_fd = opened_common
+        return _resolve_head_in_git_dir(worktree_git_fd, common_fd)
+    finally:
+        if common_fd != worktree_git_fd:
+            os.close(common_fd)
+        os.close(worktree_git_fd)
+
+
 def _git_head(root: Path) -> str | None:
     from hyodo.provenance import clean_git_env
 
@@ -218,14 +431,21 @@ class ReaderPin:
     runtime_commit: str | None
 
     @classmethod
-    def at_startup(cls, configured_root: Path, resolved_root: Path) -> ReaderPin:
+    def at_startup(
+        cls, configured_root: Path, resolved_root: Path, *, root_fd: int | None = None
+    ) -> ReaderPin:
         """Pin the current process to *resolved_root* and record who it is."""
+        runtime_commit = (
+            _git_head_from_fd(root_fd, resolved_root)
+            if root_fd is not None
+            else _git_head(resolved_root)
+        )
         return cls(
             configured_root=configured_root,
             resolved_root=resolved_root,
             server_version=__version__,
             process_start=process_start(os.getpid()),
-            runtime_commit=_git_head(resolved_root),
+            runtime_commit=runtime_commit,
         )
 
     def status(self) -> dict[str, Any]:
@@ -268,6 +488,11 @@ def build_registration(
     """Describe the current process as an MCP reader."""
     pid = os.getpid()
     ppid = os.getppid()
+    runtime_commit = (
+        _git_head_from_fd(root_fd, resolved_root)
+        if root_fd is not None
+        else _git_head(resolved_root)
+    )
     return {
         "schema_version": READER_SCHEMA_VERSION,
         "registered_at": datetime.now(timezone.utc).isoformat(),
@@ -282,7 +507,7 @@ def build_registration(
         "tool_source": str(Path(__file__).resolve().parent),
         "root_arg": str(root_arg),
         "resolved_root": str(resolved_root),
-        "runtime_commit": _git_head(resolved_root) if root_fd is None else None,
+        "runtime_commit": runtime_commit,
     }
 
 

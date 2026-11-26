@@ -108,3 +108,66 @@ def test_safe_json_level_is_not_low_when_nothing_was_observed(tmp_path):
     full = json.loads(runner.invoke(app, ["safe", "--json", str(empty)]).output)
     assert full["coverage"] == "FULL"
     assert full["level"] == "low"
+
+
+def test_safe_json_survives_forced_color_terminal(tmp_path, monkeypatch):
+    """FORCE_COLOR=1 / TTY highlighting must never crash or corrupt --json output."""
+    from rich.console import Console
+
+    from hyodo.cli import main as cli_main
+
+    sample = _secret_file(tmp_path)
+    monkeypatch.setattr(cli_main, "console", Console(force_terminal=True, color_system="truecolor"))
+
+    result = runner.invoke(app, ["safe", "--json", str(sample)])
+
+    assert result.exit_code == 0, result.output
+    assert "\x1b[" not in result.output
+    payload = json.loads(result.output)
+    assert payload["scope"] == "file"
+    assert payload["coverage"] == "FULL"
+    assert "verdict" in payload
+
+
+def test_safe_json_subprocess_force_color_env(tmp_path):
+    """Real subprocess with FORCE_COLOR=1 and TERM=xterm-256color emits parseable JSON."""
+    import os
+    import subprocess
+    import sys
+
+    sample = _secret_file(tmp_path)
+    env = {**os.environ, "FORCE_COLOR": "1", "TERM": "xterm-256color"}
+    proc = subprocess.run(
+        [sys.executable, "-m", "hyodo.cli.main", "safe", str(sample), "--json"],
+        capture_output=True,
+        text=True,
+        env=env,
+        timeout=30,
+        check=False,
+    )
+
+    assert proc.returncode == 0, proc.stderr
+    assert "\x1b[" not in proc.stdout
+    payload = json.loads(proc.stdout)
+    assert payload["source"] == f"file:{sample}"
+    assert payload["exit_code"] == 0
+
+
+def test_policy_check_json_survives_forced_color_terminal(tmp_path, monkeypatch):
+    """policy check --json under _verdict_output stays ANSI-free with forced color."""
+    from rich.console import Console
+
+    from hyodo.cli import main as cli_main
+
+    missing = tmp_path / "missing-event.json"
+    monkeypatch.setattr(cli_main, "console", Console(force_terminal=True, color_system="truecolor"))
+
+    result = runner.invoke(
+        app, ["policy", "check", "--file", str(missing), "--root", str(tmp_path), "--json"]
+    )
+
+    assert result.exit_code == 2
+    assert "\x1b[" not in result.output
+    payload = json.loads(result.output)
+    assert payload["decision"] == "UNOBSERVED"
+    assert payload["exit_code"] == 2
