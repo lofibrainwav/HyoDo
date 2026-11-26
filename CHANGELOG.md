@@ -5,6 +5,22 @@ All notable changes to HyoDo will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.22.8] - 2026-11-26
+
+### Fixed
+
+- `hyodo safe --json` and `hyodo policy check --json` emit ANSI-free, unwrapped
+  JSON under `FORCE_COLOR=1`, `CLICOLOR_FORCE=1`, narrow terminals, and TTYs.
+- Gate timeout and built-in gate failure paths retain bounded `stdout` and
+  `stderr` failure evidence without letting one stream erase the other.
+- `hyodo mcp stdio` binds `runtime_commit` from descriptor-pinned `root_fd`
+  using `O_NOFOLLOW` and `O_NONBLOCK`, supporting standard repositories,
+  detached `HEAD`, `packed-refs`, symbolic refs, and worktrees while failing
+  closed on symlinks, FIFOs, embedded NUL/control bytes, traversal, and
+  absolute `commondir` escapes.
+- Release pipeline readback requires exact publication and installation
+  readback evidence.
+
 ## [Unreleased]
 
 ## [4.22.7] - 2026-11-22
