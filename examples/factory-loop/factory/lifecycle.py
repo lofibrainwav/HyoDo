@@ -19,6 +19,7 @@ import subprocess
 import time
 from collections.abc import Iterator
 from dataclasses import replace
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
@@ -35,12 +36,16 @@ from factory.contracts import ModuleRecord, utc_now_iso
 from factory.registry import (
     ACTIVE_HOOKS_REL,
     LIFECYCLE_FLOCK_REL,
+    REGISTRY_TOML_REL,
     RUN_LOCK_REL,
     SNAPSHOTS_DIR_REL,
     _atomic_write_text,
+    _render_registry_toml,
     compare_module_origin,
+    compute_module_tree_digest,
     load_registry_state,
     observe_module_origin,
+    recorded_upstream_state,
     save_registry_state,
     verify_lock_integrity,
 )
@@ -51,7 +56,37 @@ from hyodo.mcp_config import plan_host as plan_mcp_host
 
 # Doctor warnings about provenance that could not be observed. They make the
 # doctor status UNOBSERVED but do not degrade the module's skills for routing.
-PROVENANCE_UNOBSERVED_PREFIXES = ("module_origin_unrecorded:", "module_tree_unbindable:")
+PROVENANCE_UNOBSERVED_PREFIXES = (
+    "module_origin_unrecorded:",
+    "module_tree_unbindable:",
+    "module_upstream_unrecorded:",
+)
+
+# Evidence-axis warnings say a record is stale or missing, not that a skill is
+# defective; gap analysis must not read them as degraded skills.
+EVIDENCE_AXIS_WARNING_PREFIXES = (
+    "execution_evidence_stale:",
+    "execution_claim_uncorroborated:",
+    "agent_ledger_unreadable",
+    "verification_evidence_invalidated:",
+    "host_copy_absent:",
+    "host_copy_shadowed:",
+    "host_root_unreadable:",
+    "orchestration_observations_unreadable",
+    "trust_state_unverifiable:",
+    "module_source_missing:",
+)
+
+# What `doctor`'s overall `status` covers. Every other axis is reported per
+# module/skill under `axes` and never raises the status to HEALTHY.
+DOCTOR_STATUS_SCOPE = (
+    "registry state, content integrity, recorded upstream origin, and (only when "
+    "--host-skill-root is given) host copies that differ from the registered content; "
+    "install, host connection, execution, independent verification, usefulness and "
+    "trust are separate axes"
+)
+TRUST_STATE_FILE_REL = RUN_LOCK_REL.parent / "trust_state.json"
+_EXECUTION_FAILED_STATES = ("failed", "blocked", "rolled_back")
 
 # Pre-activation flags of each running `--selective` run (one file per run id),
 # removed after that run's restore.
@@ -1004,11 +1039,274 @@ def remove_module(workspace_root: Path, module_id: str) -> dict[str, Any]:
         }
 
 
-def doctor(workspace_root: Path) -> dict[str, Any]:
-    """Check registry health, content hash integrity, dependencies, conflicts, and script compatibility."""
+def _read_trust_records(workspace_root: Path) -> tuple[dict[str, Any], str | None]:
+    """Read trust records without the drift demotion write that `get_skill_trust_state` does."""
+    path = workspace_root / TRUST_STATE_FILE_REL
+    if not path.is_file():
+        return {}, None
+    # Imported here: factory.runner imports this module.
+    from factory.runner import _verify_trust_file_integrity
+
+    try:
+        ok, error = _verify_trust_file_integrity(workspace_root)
+        if not ok:
+            return {}, error
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, RecursionError):
+        return {}, "TRUST_STATE_UNREADABLE"
+    skills = raw.get("skills") if isinstance(raw, dict) else None
+    return (skills, None) if isinstance(skills, dict) else ({}, "TRUST_STATE_MALFORMED")
+
+
+LedgerJoin = tuple[dict[tuple[str, str, str], list[str]], dict[str, int]]
+
+
+def _executions_by_skill(
+    workspace_root: Path,
+) -> tuple[dict[str, list[dict[str, Any]]], bool, LedgerJoin | None]:
+    """Observation rows per skill id in file order, and what the agent ledger can corroborate.
+
+    The harness runner writes each skill execution twice with one timestamp: an
+    agent event (`event_id`, `run_id`, `tool.name` = skill id) and an
+    observation with the same `event_id`. The join returned here maps each
+    ledger key to the timestamps recorded for it, and counts how many
+    observation rows name each `event_id`, so a key can corroborate exactly one
+    row. `None` means the agent ledger could not be read.
+    """
+    from hyodo.events import read_agent_events
+    from hyodo.orchestration_observation import (
+        ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH,
+        read_orchestration_observations,
+    )
+
+    obs_path = workspace_root / ORCHESTRATION_OBSERVATIONS_RELATIVE_PATH
+    if obs_path.exists() and not obs_path.is_file():
+        return {}, False, None
+    try:
+        rows = read_orchestration_observations(workspace_root)
+    except (OSError, ValueError, RecursionError):
+        return {}, False, None
+    by_skill: dict[str, list[dict[str, Any]]] = {}
+    rows_per_event: dict[str, int] = {}
+    for row in rows:
+        event_id = row.get("event_id")
+        if isinstance(event_id, str) and event_id:
+            rows_per_event[event_id] = rows_per_event.get(event_id, 0) + 1
+        node = row.get("node_id")
+        refs = row.get("evidence_refs")
+        # A row that names no content digest says nothing about any content.
+        if (
+            isinstance(node, str)
+            and isinstance(refs, list)
+            and any(isinstance(r, str) and r.startswith("sha256:") for r in refs)
+        ):
+            by_skill.setdefault(node, []).append(row)
+    try:
+        events, _corrupt = read_agent_events(workspace_root)
+    except (ValueError, RecursionError):
+        events = None
+    if events is None:
+        return by_skill, True, None
+    ledger: dict[tuple[str, str, str], list[str]] = {}
+    for event in events:
+        tool = event.get("tool") if isinstance(event.get("tool"), dict) else {}
+        key = (event.get("event_id"), event.get("run_id"), tool.get("name"))
+        if all(isinstance(v, str) and v for v in key) and isinstance(event.get("ts"), str):
+            ledger.setdefault(key, []).append(event["ts"])  # type: ignore[arg-type]
+    return by_skill, True, (ledger, rows_per_event)
+
+
+def _parse_ts(value: Any) -> datetime | None:
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return parsed if parsed.tzinfo else parsed.replace(tzinfo=timezone.utc)
+
+
+def _execution_state(
+    mod: ModuleRecord,
+    unit: Any,
+    rows: list[dict[str, Any]],
+    ledger_join: LedgerJoin | None,
+) -> tuple[str, str]:
+    """Return (execution state, evidence source); the latest corroborated row decides.
+
+    A row counts only if it names this `SKILL.md` digest, is not older than the
+    module's current registration (`origin.recorded_at`, because the digest
+    alone does not cover scripts) and joins an agent-ledger event with the same
+    `event_id`, `run_id`, `tool.name` = skill id and timestamp, which is what
+    the harness runner writes. The join is one-to-one: a ledger event that two
+    observation rows name, or that appears twice in the ledger, corroborates
+    neither, so one real event cannot vouch for a replayed or re-labelled row. A row that only exists in the shared observation sidecar
+    (for example `hyodo observation record` from another host) is
+    `UNCORROBORATED_CLAIM`, never `EXECUTED_*`. A process running as the same
+    user that writes matching rows to both files is not detected.
+    """
+    ref = f"sha256:{unit.content_sha256[:12]}"
+    registered_at = _parse_ts((mod.origin or {}).get("recorded_at"))
+    current = []
+    for row in rows:
+        if ref not in (row.get("evidence_refs") or []):
+            continue
+        row_ts = _parse_ts(row.get("ts"))
+        if registered_at is not None and (row_ts is None or row_ts < registered_at):
+            continue
+        if row.get("state") == "completed" or row.get("state") in _EXECUTION_FAILED_STATES:
+            current.append(row)
+    if ledger_join is None:
+        return (
+            "UNOBSERVED" if current else ("STALE_CONTENT" if rows else "UNOBSERVED"),
+            "AGENT_LEDGER_UNREADABLE",
+        )
+    ledger, rows_per_event = ledger_join
+    corroborated = []
+    for r in current:
+        event_id, run_id, ts = r.get("event_id"), r.get("run_id"), r.get("ts")
+        if not (isinstance(event_id, str) and isinstance(run_id, str) and isinstance(ts, str)):
+            continue
+        stamps = ledger.get((event_id, run_id, unit.skill_id), [])
+        if stamps == [ts] and rows_per_event.get(event_id) == 1:
+            corroborated.append(r)
+    if corroborated:
+        last = corroborated[-1]
+        if last.get("state") in _EXECUTION_FAILED_STATES:
+            return "EXECUTED_FAILED", "AGENT_LEDGER_CORROBORATED"
+        state = "DISCLOSED_ONLY" if last.get("unobserved_claim_count") else "EXECUTED_PASS"
+        return state, "AGENT_LEDGER_CORROBORATED"
+    if current:
+        return "UNCORROBORATED_CLAIM", "UNCORROBORATED_OBSERVATION"
+    return ("STALE_CONTENT" if rows else "UNOBSERVED"), "NONE"
+
+
+def _host_connection(
+    unit: Any,
+    host_skill_roots: list[Path],
+    registered: dict[str, str] | None = None,
+) -> tuple[str, list[dict[str, str]]]:
+    """Read back whether each host skill root serves this exact `SKILL.md` content.
+
+    Every root is judged on its own: one drifted root is drift even when another
+    root serves the registered copy. A host copy that is exactly another
+    registered skill's content (two modules with the same skill directory name)
+    is `SHADOWED`, not drift.
+    """
+    if not host_skill_roots:
+        return "UNOBSERVED", []
+    names = []
+    for candidate in (Path(unit.relative_path).parent.name, unit.name):
+        # Only a single path component: a frontmatter name must not leave the root.
+        if (
+            candidate
+            and candidate not in names
+            and candidate not in (".", "..")
+            and "/" not in candidate
+            and "\\" not in candidate
+        ):
+            names.append(candidate)
+    seen: list[dict[str, str]] = []
+    readable_roots = 0
+    for root in host_skill_roots:
+        if not root.is_dir():
+            seen.append({"host_root": str(root), "path": str(root), "state": "ROOT_UNREADABLE"})
+            continue
+        readable_roots += 1
+        for name in names:
+            path = root / name / "SKILL.md"
+            if not path.is_file():
+                continue
+            try:
+                digest = hashlib.sha256(path.read_bytes()).hexdigest()
+            except OSError:
+                seen.append({"host_root": str(root), "path": str(path), "state": "UNREADABLE"})
+                break
+            entry = {"host_root": str(root), "path": str(path)}
+            other = (registered or {}).get(digest)
+            if digest == unit.content_sha256:
+                entry["state"] = "CONNECTED"
+            elif other and other != unit.skill_id:
+                entry["state"] = "SHADOWED"
+                entry["shadowed_by"] = other
+            else:
+                entry["state"] = "DRIFTED"
+            seen.append(entry)
+            break
+    states = {s["state"] for s in seen}
+    if "DRIFTED" in states:
+        return "DRIFTED", seen
+    if "CONNECTED" in states:
+        return "CONNECTED", seen
+    if "SHADOWED" in states:
+        return "SHADOWED", seen
+    if readable_roots == 0 or "UNREADABLE" in states:
+        return "UNOBSERVED", seen
+    return "ABSENT", seen
+
+
+def _trust_axes(
+    mod: ModuleRecord,
+    unit: Any,
+    current_tree: str | None,
+    records: dict[str, Any],
+    trust_error: str | None,
+) -> dict[str, Any]:
+    if trust_error:
+        return {
+            "trust_stage": "UNOBSERVED",
+            "independent_verification": "UNOBSERVED",
+            "trust_unobserved_reason": trust_error,
+        }
+    stored = records.get(unit.skill_id)
+    if not isinstance(stored, dict):
+        return {"trust_stage": "VERIFY", "independent_verification": "UNOBSERVED"}
+    invalidated = []
+    if stored.get("content_sha256") != unit.content_sha256:
+        invalidated.append("content_sha256_changed")
+    if current_tree is None or stored.get("module_tree_sha256") != current_tree:
+        invalidated.append("module_tree_changed")
+    if stored.get("version") != mod.version:
+        invalidated.append("version_changed")
+    if stored.get("module_source_path") != mod.source_path:
+        invalidated.append("module_source_path_changed")
+    # The same drift checks as the runner's get_skill_trust_state, without its write.
+    if stored.get("boundary") != unit.boundary.to_dict():
+        invalidated.append("permission_boundary_changed")
+    from factory.runner import _default_env_fingerprint
+
+    if stored.get("env_fingerprint") != _default_env_fingerprint():
+        invalidated.append("environment_fingerprint_changed")
+    if invalidated:
+        return {
+            "trust_stage": "VERIFY",
+            "independent_verification": "INVALIDATED",
+            "evidence_invalidated_by": invalidated,
+            "trust_stage_before_invalidation": stored.get("trust_stage"),
+        }
+    return {
+        "trust_stage": str(stored.get("trust_stage", "VERIFY")),
+        "independent_verification": str(stored.get("verifier_status", "UNOBSERVED")),
+    }
+
+
+def doctor(
+    workspace_root: Path,
+    *,
+    host_skill_roots: list[Path] | None = None,
+) -> dict[str, Any]:
+    """Check registry health, content integrity, dependencies, conflicts, and script compatibility.
+
+    `status` covers only `DOCTOR_STATUS_SCOPE`. Install, upstream origin, host
+    connection (read back from *host_skill_roots* when given), execution
+    evidence, independent verification, usefulness and trust are reported
+    separately under `axes`; none of them is inferred from content integrity.
+    Doctor never writes: trust records are read, not demoted.
+    """
     modules = load_registry_state(workspace_root)
     problems = verify_lock_integrity(workspace_root)
     warnings: list[str] = []
+    host_roots = [Path(p) for p in (host_skill_roots or [])]
 
     enabled_ids: set[str] = set()
     for mod in modules.values():
@@ -1098,6 +1396,41 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
     provenance_unobserved = any(
         state["state"] in ("UNRECORDED", "UNBINDABLE") for state in provenance.values()
     )
+    # A matching tree digest proves only that a copy did not change after it
+    # was registered. Without a recorded clean commit its upstream is unknown,
+    # so integrity alone is never reported as HEALTHY.
+    for mod_id, mod in sorted(modules.items()):
+        if mod_id not in provenance or provenance[mod_id]["state"] != "UNCHANGED":
+            continue
+        upstream = recorded_upstream_state(mod.origin)
+        provenance[mod_id]["recorded_upstream"] = upstream
+        if upstream != "RECORDED_COMMIT":
+            warnings.append(f"{PROVENANCE_UNOBSERVED_PREFIXES[2]}{mod_id}|{upstream}")
+            provenance_unobserved = True
+
+    # lock.json is the single source of state; registry.toml is its rendered
+    # view. A write interrupted between the two leaves them out of sync.
+    toml_path = workspace_root / REGISTRY_TOML_REL
+    if modules:
+        try:
+            view = toml_path.read_text(encoding="utf-8") if toml_path.is_file() else None
+        except (OSError, ValueError):
+            view = None
+        if view != _render_registry_toml(modules):
+            problems.append("registry_view_out_of_sync:registry.toml")
+
+    # A registered module whose source is gone was never checked for integrity.
+    for mod_id, mod in sorted(modules.items()):
+        if not Path(mod.source_path).is_dir():
+            warnings.append(f"module_source_missing:{mod_id}")
+            provenance_unobserved = True
+
+    axes, axis_warnings, axis_problems = _collect_axes(
+        workspace_root, modules, host_roots, provenance
+    )
+    warnings.extend(axis_warnings)
+    problems.extend(axis_problems)
+
     # An empty registry is nothing observed, not a healthy one.
     if not modules:
         warnings.append("no_modules_registered")
@@ -1128,15 +1461,113 @@ def doctor(workspace_root: Path) -> dict[str, Any]:
         status = "UNOBSERVED"
     else:
         status = "HEALTHY"
+    summary: dict[str, dict[str, int]] = {}
+    for mod_axes in axes.values():
+        for skill_axes in mod_axes["skills"].values():
+            if not skill_axes["enabled"]:
+                continue
+            for key in (
+                "host_connection",
+                "execution",
+                "independent_verification",
+                "helped",
+                "trust_stage",
+            ):
+                bucket = summary.setdefault(key, {})
+                bucket[skill_axes[key]] = bucket.get(skill_axes[key], 0) + 1
     return {
         "status": status,
+        "status_scope": DOCTOR_STATUS_SCOPE,
         "modules_registered": len(modules),
         "skills_enabled": len(enabled_ids),
         "problems": sorted(set(problems)),
         "warnings": sorted(set(warnings)),
         "module_provenance": provenance,
+        "axes": axes,
+        "axes_summary": summary,
         "run_lock": lock_status,
     }
+
+
+def _collect_axes(
+    workspace_root: Path,
+    modules: dict[str, ModuleRecord],
+    host_roots: list[Path],
+    provenance: dict[str, dict[str, Any]],
+) -> tuple[dict[str, Any], list[str], list[str]]:
+    warnings: list[str] = []
+    problems: list[str] = []
+    records, trust_error = _read_trust_records(workspace_root)
+    if trust_error:
+        warnings.append(f"trust_state_unverifiable:{trust_error}")
+    executions, observations_readable, ledger_join = _executions_by_skill(workspace_root)
+    if not observations_readable:
+        warnings.append("orchestration_observations_unreadable")
+    elif ledger_join is None:
+        warnings.append("agent_ledger_unreadable")
+    for root in host_roots:
+        if not root.is_dir():
+            warnings.append(f"host_root_unreadable:{root}")
+    registered_digests = {
+        u.content_sha256: sid for m in modules.values() for sid, u in m.skills.items()
+    }
+    axes: dict[str, Any] = {}
+    for mod_id, mod in sorted(modules.items()):
+        src = Path(mod.source_path)
+        installed = src.is_dir()
+        current_tree = compute_module_tree_digest(src)[0] if installed else None
+        origin = mod.origin or {}
+        mod_axes: dict[str, Any] = {
+            "registration": "REGISTERED",
+            "enabled": mod.enabled,
+            "install": "PRESENT" if installed else "MISSING",
+            # Reuse the provenance comparison; doctor runs git once per module.
+            "content_integrity": (
+                provenance.get(mod_id, {}).get("state", "UNOBSERVED") if installed else "MISSING"
+            ),
+            "recorded_upstream": recorded_upstream_state(origin),
+            "upstream_remote_recorded": bool(origin.get("git_remote_url")),
+            "upstream_verified": "UNOBSERVED",
+            "skills": {},
+        }
+        for sid, unit in sorted(mod.skills.items()):
+            host_state, host_seen = _host_connection(unit, host_roots, registered_digests)
+            execution, evidence_source = (
+                _execution_state(mod, unit, executions.get(sid, []), ledger_join)
+                if observations_readable
+                else ("UNOBSERVED", "OBSERVATIONS_UNREADABLE")
+            )
+            skill_axes = {
+                "enabled": bool(mod.enabled and unit.enabled),
+                "host_connection": host_state,
+                "host_observations": host_seen,
+                "execution": execution,
+                # F12: EXECUTED_* only for rows joined to the agent ledger the
+                # runner writes; a sidecar-only row is UNCORROBORATED_CLAIM.
+                "execution_evidence_source": evidence_source,
+                # Whether a skill helped needs host outcome evidence; the harness has none.
+                "helped": "UNOBSERVED",
+                **_trust_axes(mod, unit, current_tree, records, trust_error),
+            }
+            mod_axes["skills"][sid] = skill_axes
+            if not skill_axes["enabled"]:
+                continue
+            if host_state == "DRIFTED":
+                for seen_root in host_seen:
+                    if seen_root["state"] == "DRIFTED":
+                        problems.append(f"host_copy_drift:{sid}|{seen_root['host_root']}")
+            elif host_state == "SHADOWED":
+                warnings.append(f"host_copy_shadowed:{sid}")
+            elif host_state == "ABSENT":
+                warnings.append(f"host_copy_absent:{sid}")
+            if execution == "STALE_CONTENT":
+                warnings.append(f"execution_evidence_stale:{sid}")
+            elif execution == "UNCORROBORATED_CLAIM":
+                warnings.append(f"execution_claim_uncorroborated:{sid}")
+            if skill_axes["independent_verification"] == "INVALIDATED":
+                warnings.append(f"verification_evidence_invalidated:{sid}")
+        axes[mod_id] = mod_axes
+    return axes, warnings, problems
 
 
 def discover_skills(

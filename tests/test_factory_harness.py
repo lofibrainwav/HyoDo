@@ -425,7 +425,12 @@ def test_gate_07_and_08_atomic_update_rollback_and_hash_reproducibility(tmp_path
     # Failed update to non-existent directory preserves v0.2.0
     with pytest.raises((FileNotFoundError, ValueError)):
         factory.update_module(repo, "evolvable", new_source_path=tmp_path / "does-not-exist")
-    assert factory.doctor(repo)["status"] == "HEALTHY"
+    # v0.2.0 was registered from an uncommitted tree: intact, but its upstream
+    # is not a recorded commit, so doctor says UNOBSERVED rather than HEALTHY.
+    after_failed_update = factory.doctor(repo)
+    assert after_failed_update["problems"] == []
+    assert after_failed_update["status"] == "UNOBSERVED"
+    assert after_failed_update["axes"]["evolvable"]["recorded_upstream"] == "DIRTY_AT_RECORD"
 
     # Explicit rollback restores v0.1.0 snapshot
     restored = factory.rollback_module(repo, "evolvable")
