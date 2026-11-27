@@ -134,28 +134,13 @@ that calls these gates from a host loop, see
 
 ## Factory Developer Preview
 
-Factory is an optional, source-only companion for developers who want to
-discover agent skills, see where each one came from, and route a task to the
-skills that fit. It is a **Developer Preview** that runs from a checkout of
-this repository. It is not part of the published `hyodo` package, so
-`pip install hyodo` gives you Core only, and the Core version on PyPI says
-nothing about Factory.
-
-```bash
-git clone https://github.com/lofibrainwav/HyoDo.git && cd HyoDo
-git checkout --detach 6e7b33e9b9a6654de95b9eade7f053cf51f6e4ce
-```
-
-Then follow the
-[Factory quickstart](https://github.com/lofibrainwav/HyoDo/blob/main/examples/factory-loop/README.md#developer-preview-quickstart-source-checkout).
-It needs Python 3.11 or newer and nothing else installed. In a fresh
-temporary directory it reports two same-name skills with different bytes as
-`DIVERGENT`, registers one, and routes a task to it.
-
-What works from source today: skill discovery, source and hash reporting,
-conflict reporting, task routing, and gap reports. The host owns execution:
-HyoDo starts nothing on its own, and the host-directed `run` path is
-experimental. No host is listed as verified. Boundary:
+Factory is an optional, source-only companion that discovers agent skills,
+reports where each came from, and suggests a route for a task. It is not part
+of the published `hyodo` package, so the PyPI version describes Core only.
+Pinned source: `git checkout --detach 6e7b33e9b9a6654de95b9eade7f053cf51f6e4ce`.
+Run the [Factory quickstart](https://github.com/lofibrainwav/HyoDo/blob/main/examples/factory-loop/README.md#developer-preview-quickstart-source-checkout)
+(Python 3.11 or newer, nothing installed). The host owns execution, the run
+path is experimental, and no host is listed as verified. Boundary:
 [docs/PRODUCT_BOUNDARY.md](docs/PRODUCT_BOUNDARY.md).
 
 ## Optional MCP
