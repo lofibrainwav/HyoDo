@@ -27,6 +27,18 @@ work on behalf of another system.
 An integrating host may choose to enforce a HyoDo result, but the act of
 enforcement belongs to that host.
 
+## Factory Developer Preview
+
+Factory (`examples/factory-loop/`) is an optional companion that runs from a
+source checkout of this repository. It is not part of the published `hyodo`
+package, and the lists above describe that package. Factory can discover
+skills, report where each one came from, and suggest which skills fit a task.
+A suggestion is evidence for the host, not a dispatch: the host decides what
+to load and run, and owns execution, isolation, and authorization. Its
+host-directed run path is experimental. No host is listed as verified, because
+a configured adapter or a matching source hash is a narrower fact than a
+connected session.
+
 ## Invariants
 
 1. **Execution is not evidence.** Work happening does not prove the claimed
