@@ -57,7 +57,7 @@ def _sha(path: Path) -> str:
     [
         "dispatch parallel workers across worktrees and supervise them via orchestration",
         "coordinate multi-agent worker dispatch with task DAG and settlement",
-        "여러 작업자에게 병렬 디스패치하고 오케스트레이션 조율",
+        "\uc5ec\ub7ec \uc791\uc5c5\uc790\uc5d0\uac8c \ubcd1\ub82c \ub514\uc2a4\ud328\uce58\ud558\uace0 \uc624\ucf00\uc2a4\ud2b8\ub808\uc774\uc158 \uc870\uc728",
     ],
 )
 def test_orchestration_intent_is_inferred_and_selects_orchestration_skill(
