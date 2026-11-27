@@ -161,3 +161,127 @@ def test_discover_cli_prints_conflicts_next_to_discovered(
     payload = json.loads(capsys.readouterr().out)
     assert [c["status"] for c in payload["conflicts"]] == ["DIVERGENT"]
     assert len(payload["discovered"]) >= 2
+
+
+# --- gaps: a related registered trusted skill must not hide divergent same-name input ---
+
+GAP_PROMPT = "implement the feature with tdd and a careful test plan for the module"
+
+
+def _trusted_registry(tmp_path: Path) -> tuple[Any, Path, Path]:
+    """Register one trusted `tdd` skill (synthetic fixture, not live evidence)."""
+    factory = _load_factory_module()
+    ws = tmp_path / "ws"
+    ws.mkdir()
+    pkg = tmp_path / "pkg"
+    _write_skill(pkg, "tdd", "registered canonical body", category="engineering")
+    factory.add_module(ws, pkg)
+    mod = factory.load_registry_state(ws)["pkg"]
+    unit = mod.skills["pkg/tdd"]
+    trust = {
+        "skills": {
+            "pkg/tdd": {
+                "content_sha256": unit.content_sha256,
+                "version": mod.version,
+                "boundary": unit.boundary.to_dict(),
+                "trust_stage": "TRUSTED",
+                "verifier_status": "PASS",
+                "eval_verdict": "HELPED",
+            }
+        }
+    }
+    (ws / ".hyodo" / "factory").mkdir(parents=True, exist_ok=True)
+    (ws / ".hyodo" / "factory" / "trust_state.json").write_text(json.dumps(trust))
+    return factory, ws, pkg
+
+
+def test_trusted_registered_skill_does_not_hide_divergent_external_same_name(
+    tmp_path: Path,
+) -> None:
+    factory, ws, pkg = _trusted_registry(tmp_path)
+    ext = tmp_path / "ext"
+    ext_file = _write_skill(ext, "tdd", "DIVERGENT external body", category="engineering")
+
+    report = factory.analyze_capability_gaps(ws, GAP_PROMPT, external_search_roots=[ext])
+
+    # Not a false green: the category is no longer plain VERIFIED.
+    cat = report["category_assessments"]["engineering"]
+    assert cat["state"] == "UNKNOWN"
+    assert cat["root_cause"] == "VERIFICATION_MISSING"
+    assert cat["source_conflicts"] == ["pkg/tdd"]
+
+    registered_sha = _sha(pkg / "tdd" / "SKILL.md")
+    assert len(report["source_conflicts"]) == 1
+    conflict = report["source_conflicts"][0]
+    assert conflict["skill_id"] == "pkg/tdd"
+    assert conflict["status"] == "DIVERGENT"
+    assert conflict["registered_sha256"] == registered_sha
+    assert conflict["sources"] == [{"path": str(ext_file.resolve()), "sha256": _sha(ext_file)}]
+    assert conflict["resolution"] == "HOST_DECISION_REQUIRED"
+
+    # Canonical host precedence: the registered skill is still the routed one,
+    # still verified at skill level, and its digest correlates execution receipts.
+    assert "pkg/tdd" in report["route_plan"]["selected_skills"]
+    item = report["skill_assessments"]["pkg/tdd"]
+    assert item["state"] == "VERIFIED"
+    assert item["content_sha256"] == registered_sha
+
+
+def test_same_byte_external_alias_keeps_the_category_verified(tmp_path: Path) -> None:
+    factory, ws, _pkg = _trusted_registry(tmp_path)
+    ext = tmp_path / "ext"
+    _write_skill(ext, "tdd", "registered canonical body", category="engineering")
+
+    report = factory.analyze_capability_gaps(ws, GAP_PROMPT, external_search_roots=[ext])
+    assert report["category_assessments"]["engineering"]["state"] == "VERIFIED"
+    assert report["source_conflicts"] == []
+
+
+def test_divergent_same_name_in_an_unrelated_category_is_not_reported(tmp_path: Path) -> None:
+    factory, ws, _pkg = _trusted_registry(tmp_path)
+    other = tmp_path / "other-pkg"
+    _write_skill(other, "palette", "registered design body", category="design")
+    factory.add_module(ws, other)
+    ext = tmp_path / "ext"
+    _write_skill(ext, "palette", "divergent design body", category="design")
+
+    report = factory.analyze_capability_gaps(ws, GAP_PROMPT, external_search_roots=[ext])
+    assert "design" not in report["inferred_categories"]
+    assert report["source_conflicts"] == []
+    assert report["category_assessments"]["engineering"]["state"] == "VERIFIED"
+
+
+def test_simple_task_fast_path_still_reports_the_divergence(tmp_path: Path) -> None:
+    factory, ws, _pkg = _trusted_registry(tmp_path)
+    qa_pkg = tmp_path / "qa-pkg"
+    _write_skill(qa_pkg, "qa-gate", "registered quality body", category="quality")
+    factory.add_module(ws, qa_pkg)
+    ext = tmp_path / "ext"
+    _write_skill(ext, "tdd", "DIVERGENT external body", category="engineering")
+
+    report = factory.analyze_capability_gaps(ws, "tdd the parser", external_search_roots=[ext])
+    assert report["is_simple_task"] is True
+    assert report["category_assessments"]["engineering"]["state"] == "UNKNOWN"
+    assert [c["skill_id"] for c in report["source_conflicts"]] == ["pkg/tdd"]
+
+
+def test_gaps_without_search_roots_is_unchanged_and_reports_no_conflicts(
+    tmp_path: Path,
+) -> None:
+    factory, ws, _pkg = _trusted_registry(tmp_path)
+    report = factory.analyze_capability_gaps(ws, GAP_PROMPT)
+    assert report["category_assessments"]["engineering"]["state"] == "VERIFIED"
+    assert report["source_conflicts"] == []
+
+
+def test_gaps_conflict_check_is_read_only(tmp_path: Path) -> None:
+    factory, ws, pkg = _trusted_registry(tmp_path)
+    ext = tmp_path / "ext"
+    ext_file = _write_skill(ext, "tdd", "DIVERGENT external body", category="engineering")
+    before = {p: p.read_bytes() for p in (ext_file, pkg / "tdd" / "SKILL.md")}
+    trust_before = (ws / ".hyodo" / "factory" / "trust_state.json").read_bytes()
+
+    factory.analyze_capability_gaps(ws, GAP_PROMPT, external_search_roots=[ext])
+
+    assert {p: p.read_bytes() for p in before} == before
+    assert (ws / ".hyodo" / "factory" / "trust_state.json").read_bytes() == trust_before

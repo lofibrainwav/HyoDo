@@ -35,6 +35,7 @@ from factory.contracts import (
 from factory.lifecycle import (
     PROVENANCE_UNOBSERVED_PREFIXES,
     activate_selected_skills,
+    collect_skill_source_digests,
     discover_skills,
     doctor,
 )
@@ -957,10 +958,46 @@ def analyze_capability_gaps(
                 "trust_stage": trust_stage,
                 "drift_detected": drift_detected,
                 "selected_for_task": skill_id in route_plan["selected_skills"],
+                "content_sha256": unit.content_sha256,
             }
             if skill_id in diag["silent_zero_details"]:
                 item["hook_root_cause"] = diag["silent_zero_details"][skill_id]
             skill_assessments[skill_id] = item
+
+    # A related registered skill must not hide divergent same-name external input,
+    # so this check runs whenever roots are given, for task-scoped categories only.
+    # It is read-only, never ranks sources, and leaves the registered skill routed.
+    source_conflicts: list[dict[str, Any]] = []
+    if external_search_roots:
+        external_sources = collect_skill_source_digests(
+            discover_skills(external_search_roots, max_results=1_000_000)
+        )
+        for skill_id, info in skill_assessments.items():
+            if info["category"] not in task_scope_cats or info["dormant_out_of_scope"]:
+                continue
+            reg_unit = modules[info["module_id"]].skills[skill_id]
+            if not (modules[info["module_id"]].enabled and reg_unit.enabled):
+                continue
+            diverging = {
+                path: digest
+                for path, digest in external_sources.get(reg_unit.name, {}).items()
+                if digest != reg_unit.content_sha256
+            }
+            if diverging:
+                source_conflicts.append(
+                    {
+                        "skill_id": skill_id,
+                        "name": reg_unit.name,
+                        "category": info["category"],
+                        "status": "DIVERGENT",
+                        "resolution": "HOST_DECISION_REQUIRED",
+                        "registered_sha256": reg_unit.content_sha256,
+                        "sources": [
+                            {"path": path, "sha256": diverging[path]} for path in sorted(diverging)
+                        ],
+                    }
+                )
+    conflicted_skill_ids = {c["skill_id"] for c in source_conflicts}
 
     category_assessments: dict[str, dict[str, Any]] = {}
     external_candidates: dict[str, list[dict[str, Any]]] = {}
@@ -991,8 +1028,13 @@ def analyze_capability_gaps(
             c_state = "UNVERIFIED"
             c_cause = "WIRING_DISCONNECTED"
         elif any(s["state"] == "VERIFIED" for s in cat_skills):
-            c_state = "VERIFIED"
-            c_cause = "NONE"
+            if any(s["skill_id"] in conflicted_skill_ids for s in cat_skills):
+                # Verified bytes exist, but a divergent same-name source is unreviewed.
+                c_state = "UNKNOWN"
+                c_cause = "VERIFICATION_MISSING"
+            else:
+                c_state = "VERIFIED"
+                c_cause = "NONE"
         elif any(s["state"] == "UNKNOWN" for s in cat_skills):
             c_state = "UNKNOWN"
             c_cause = "VERIFICATION_MISSING"
@@ -1006,6 +1048,9 @@ def analyze_capability_gaps(
             "root_cause": c_cause,
             "registered_skills": [s["skill_id"] for s in cat_skills],
             "external_candidates_count": len(external_candidates.get(cat, [])),
+            "source_conflicts": [
+                s["skill_id"] for s in cat_skills if s["skill_id"] in conflicted_skill_ids
+            ],
         }
 
     # System Awareness (Bridge M5-B + Cross-host continuity + PolicyTrust + HostPromise + Sidecars)
@@ -1103,6 +1148,7 @@ def analyze_capability_gaps(
         "skill_assessments": skill_assessments,
         "hook_diagnostics": diag["silent_zero_details"],
         "external_candidates": external_candidates,
+        "source_conflicts": source_conflicts,
         "taste_synthesis": taste_synthesis,
         "system_awareness": {
             "connector_overall_status": connector.get("overall_status", "UNOBSERVED"),
