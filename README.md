@@ -132,6 +132,17 @@ dual-host `allowed_tools` list (not a Cursor hook). Policy trust:
 that calls these gates from a host loop, see
 [`examples/factory-loop/`](./examples/factory-loop/).
 
+## Factory Developer Preview
+
+Factory is an optional, source-only companion that discovers agent skills,
+reports where each came from, and suggests a route for a task. It is not part
+of the published `hyodo` package, so the PyPI version describes Core only.
+Pinned source: `git checkout --detach 6e7b33e9b9a6654de95b9eade7f053cf51f6e4ce`.
+Run the [Factory quickstart](https://github.com/lofibrainwav/HyoDo/blob/main/examples/factory-loop/README.md#developer-preview-quickstart-source-checkout)
+(Python 3.11 or newer, nothing installed). The host owns execution, the run
+path is experimental, and no host is listed as verified. Boundary:
+[docs/PRODUCT_BOUNDARY.md](docs/PRODUCT_BOUNDARY.md).
+
 ## Optional MCP
 
 ```bash

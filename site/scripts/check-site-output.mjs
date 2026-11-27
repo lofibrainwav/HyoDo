@@ -264,6 +264,7 @@ const publicSourceFiles = [
 		'roadmap.md',
 		'research.md',
 		'friction-contribution.md',
+		'factory.md',
 		'acl.md',
 	].map((name) => join(repoRoot, 'site', 'src', 'content', 'docs', 'docs', name)),
 ];
@@ -279,6 +280,7 @@ const publicBuiltFiles = [
 		'roadmap',
 		'research',
 		'friction-contribution',
+		'factory',
 		'acl',
 	].map((slug) => join('docs', slug, 'index.html')),
 ].map((rel) => join(repoRoot, 'site', 'dist', rel));

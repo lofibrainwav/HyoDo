@@ -531,13 +531,26 @@ const canonicalUrl = 'https://hyodo.app/';
 							<tr><td>Codex and Cursor adapters</td><td>Included</td><td>The adapters are shipped; we have not verified a live connection.</td></tr>
 							<tr><td>Information-flow reporting</td><td>Observer only</td><td>Reports data movement; it does not control what an agent can do.</td></tr>
 							<tr><td>Hosted ChatGPT connector</td><td>Not live</td><td>Only the connector contract is documented; there is no hosted service.</td></tr>
-							<tr><td>Automatic task routing</td><td>Research</td><td>HyoDo does not route tasks to a particular agent or workflow.</td></tr>
+							<tr><td>Automatic task routing in Core</td><td>Research</td><td>HyoDo Core does not route tasks to a particular agent or workflow.</td></tr>
+							<tr><td>Factory skill discovery and routing</td><td>Developer Preview</td><td>Runs from a source checkout, not the package. The host owns execution.</td></tr>
 							<tr><td>Shared rework reports</td><td>Not built</td><td>HyoDo does not collect or upload reports about rework.</td></tr>
 						</tbody>
 					</table>
 				</section>
 			</div>
 			<div class="wrap">
+				<section class="layer" aria-labelledby="factory-preview-heading">
+					<h2 id="factory-preview-heading">Factory Developer Preview</h2>
+					<p>
+						For developers who keep several skill folders: Factory shows which copy is
+						which, flags same-name skills whose bytes differ, and suggests a route for
+						a task. It runs from a source checkout and is not part of the HyoDo
+						package. The host owns execution, the run path is experimental, and no
+						host is listed as verified.
+					</p>
+					<a class="docs-link" href="/docs/factory/">Factory Developer Preview →</a>
+				</section>
+
 				<section class="layer">
 					<h2>For people who use AI to build software</h2>
 					<p>

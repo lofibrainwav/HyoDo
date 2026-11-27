@@ -11,6 +11,96 @@ where HyoDo fits in that loop and, just as importantly, where it does not.
            -> [pull request] -> [a person merges]
 ```
 
+## Developer Preview quickstart (source checkout)
+
+Factory is a **Developer Preview**. It runs from a source checkout of this
+repository. It is not part of the published `hyodo` package: the package on
+PyPI is HyoDo Core, and Factory is the example harness in this directory.
+Nothing here needs a package install, an account, or any other project.
+
+You need `git` and Python 3.11 or newer. The commands below create files only
+in a new temporary directory, and they never run a skill.
+
+First create a temporary directory, clone the reviewed source into it, and
+enter it. Nothing is written to the folder you run this from:
+
+```sh factory-preview-clone
+preview="$(mktemp -d)"
+git clone https://github.com/lofibrainwav/HyoDo.git "$preview/HyoDo"
+cd "$preview/HyoDo"
+git checkout --detach 6e7b33e9b9a6654de95b9eade7f053cf51f6e4ce
+```
+
+Then, from the checkout root, discover two skills that share a name, register
+one, and ask Factory to route a task. Put `--root` before the subcommand, and
+set `PYTHONPATH` so Python can import the checkout's `hyodo` package:
+
+```sh factory-preview-run
+export PYTHONPATH="$PWD"
+hyodo_factory() { python3 "$PWD/examples/factory-loop/hyodo_factory.py" "$@"; }
+
+work="$(mktemp -d)"
+for side in a b; do
+  mkdir -p "$work/skills-$side/verify-demo"
+  printf -- '---\nname: verify-demo\ndescription: Verify demo output\ncategory: quality\n---\n# Verify demo (%s)\nCheck the output and report what was observed.\n' "$side" \
+    > "$work/skills-$side/verify-demo/SKILL.md"
+done
+
+echo "== doctor: a fresh workspace has nothing registered"
+hyodo_factory --root "$work/ws" doctor | grep '"status"'
+
+echo "== discover: same name, different bytes"
+hyodo_factory --root "$work/ws" discover verify \
+  --search-root "$work/skills-a" --search-root "$work/skills-b" \
+  | python3 -c 'import json,sys; [print(c["skill"], c["status"], c["resolution"]) for c in json.load(sys.stdin)["conflicts"]]'
+
+echo "== add one source, then route a task"
+hyodo_factory --root "$work/ws" add "$work/skills-a" > /dev/null
+hyodo_factory --root "$work/ws" route "verify the demo output and report the outcome" \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print("categories:", d["inferred_categories"]); print("selected:", d["selected_skills"])'
+
+echo "== gaps: the other copy is still reported"
+hyodo_factory --root "$work/ws" gaps "verify the demo output and report the outcome" \
+  --search-root "$work/skills-b" \
+  | python3 -c 'import json,sys; d=json.load(sys.stdin); print([(c["skill_id"], c["status"]) for c in d["source_conflicts"]])'
+```
+
+What you should see:
+
+- `doctor` reports `UNOBSERVED`: nothing is registered yet, so there is
+  nothing to be healthy.
+- `discover` prints `verify-demo DIVERGENT HOST_DECISION_REQUIRED`. Two files
+  with the same name but different bytes are two sources. Factory reports the
+  difference and never picks one for you. Identical bytes would print `ALIAS`.
+- `route` selects the one skill you registered, `skills-a/verify-demo`.
+- `gaps` still lists the unregistered copy as `DIVERGENT`.
+
+A skill declares its category in its frontmatter (`category: quality` above).
+Without one, Factory guesses from the skill name and description and falls
+back to `engineering`. That guess can miss, in which case `route` selects
+nothing and `gaps` shows why.
+
+What this preview does and does not establish:
+
+- It shows discovery, routing, and conflict reporting on files you can read.
+  It does not show that any skill is good, safe, or trusted.
+- The host owns execution. `run` can start a host-supplied command and a
+  separate verifier. That path is **experimental**, and it needs the host's own
+  authorization and isolation. The verifier reports contract-level isolation
+  and marks process credential isolation as unproven.
+- A configured adapter or a matching source hash each establish one narrow
+  fact. Neither shows that a host session is connected or verified. No host
+  is listed as verified here.
+- `hosts` reports what each host's configuration plan says. It never starts a
+  host.
+
+When you are done, delete the two temporary directories (`"$preview"` and
+`"$work"`).
+
+When the pinned revision changes, update it in this file, in the root
+`README.md`, and in the site page together. `tests/test_factory_preview_docs.py`
+checks that they agree and runs the block above.
+
 ## Architecture: HyoDo Core vs. Pluggable Factory Harness
 
 - **HyoDo Core (`hyodo/`)**: Immutable, host-neutral trust, evidence, policy,
@@ -219,41 +309,46 @@ examples/factory-loop/
 
 ## Modular Skill Lifecycle CLI (`hyodo_factory.py`)
 
+Run these from the checkout root with `PYTHONPATH` set as in the quickstart
+above. `--root` is a global option, so it goes before the subcommand.
+
 ```bash
+export PYTHONPATH="$PWD"
+
 # Discover compatible skill packages across external roots or catalogs
-python examples/factory-loop/hyodo_factory.py discover "security" --search-root /path/to/skills --root .
+python examples/factory-loop/hyodo_factory.py --root . discover "security" --search-root /path/to/skills
 
 # Attach external skill repositories or evaluators (auto-detects adapter)
-python examples/factory-loop/hyodo_factory.py add /path/to/gstack --root .
-python examples/factory-loop/hyodo_factory.py add /path/to/mattpocock-skills --root .
+python examples/factory-loop/hyodo_factory.py --root . add /path/to/gstack
+python examples/factory-loop/hyodo_factory.py --root . add /path/to/mattpocock-skills
 
 # List installed modules and active sub-skills
-python examples/factory-loop/hyodo_factory.py list --root .
+python examples/factory-loop/hyodo_factory.py --root . list
 
 # Enable only a specific sub-skill (plus its required intra-module dependencies)
-python examples/factory-loop/hyodo_factory.py enable gstack/qa --only --root .
+python examples/factory-loop/hyodo_factory.py --root . enable gstack/qa --only
 
 # Disable a module or sub-skill
-python examples/factory-loop/hyodo_factory.py disable gstack/qa --root .
+python examples/factory-loop/hyodo_factory.py --root . disable gstack/qa
 
 # Update or rollback a module atomically
-python examples/factory-loop/hyodo_factory.py update gstack --root .
-python examples/factory-loop/hyodo_factory.py rollback gstack --root .
+python examples/factory-loop/hyodo_factory.py --root . update gstack
+python examples/factory-loop/hyodo_factory.py --root . rollback gstack
 
 # Verify dependencies, content digests, script syntax, and path containment
-python examples/factory-loop/hyodo_factory.py doctor --root .
+python examples/factory-loop/hyodo_factory.py --root . doctor
 
 # Inspect host connection and support matrix (Claude Code, Cursor, Codex, Antigravity)
-python examples/factory-loop/hyodo_factory.py hosts --root .
+python examples/factory-loop/hyodo_factory.py --root . hosts
 
 # Route a natural-language task using Progressive Disclosure and slot deduplication
-python examples/factory-loop/hyodo_factory.py route "Audit root cause and run browser QA" --root .
+python examples/factory-loop/hyodo_factory.py --root . route "Audit root cause and run browser QA"
 
 # Execute a modular run with isolated subprocesses and independent verification
-python examples/factory-loop/hyodo_factory.py run "Implement feature with TDD" --verify-cmd "pytest -q" --root .
+python examples/factory-loop/hyodo_factory.py --root . run "Implement feature with TDD" --verify-cmd "pytest -q"
 
 # Detach a module and clean up registered hooks and manifest entries
-python examples/factory-loop/hyodo_factory.py remove gstack --root .
+python examples/factory-loop/hyodo_factory.py --root . remove gstack
 ```
 
 ## Quick try (`factory-loop.sh`)

@@ -68,6 +68,7 @@ export default defineConfig({
 						{ label: 'Graph Export', slug: 'docs/graph-export' },
 						{ label: 'Eye', slug: 'docs/eye' },
 						{ label: 'Skills', slug: 'docs/skills' },
+						{ label: 'Factory Developer Preview', slug: 'docs/factory' },
 						{ label: 'Runtime identity v1', slug: 'docs/runtime-identity' },
 					],
 				},
