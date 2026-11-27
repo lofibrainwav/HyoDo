@@ -72,6 +72,22 @@ _TASTE_STOP_WORDS = frozenset(
 )
 
 _INTENT_KEYWORDS: dict[str, tuple[str, ...]] = {
+    "orchestration": (
+        "\uc624\ucf00\uc2a4\ud2b8\ub808\uc774\uc158",
+        "\ub514\uc2a4\ud328\uce58",
+        "\uc791\uc5c5\uc790",
+        "\ubcd1\ub82c",
+        "\uc870\uc728",
+        "orchestrat",
+        "dispatch",
+        "multi-agent",
+        "worker",
+        "worktree",
+        "task dag",
+        "supervis",
+        "fan out",
+        "fan-out",
+    ),
     "simplification": (
         "\uadfc\ubcf8 \uc6d0\uc778",
         "\ubd84\uc11d",

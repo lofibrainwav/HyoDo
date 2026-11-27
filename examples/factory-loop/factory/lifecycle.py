@@ -1212,6 +1212,47 @@ def discover_skills(
     return results[:max_results]
 
 
+def find_same_name_skill_conflicts(discovered: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Group same-name skills reachable through different files and classify them.
+
+    `ALIAS` means every distinct file has identical bytes; `DIVERGENT` means at
+    least two differ. A file seen through both an aggregate root and one of its
+    child entries is one source, not a conflict. Every group stays
+    `HOST_DECISION_REQUIRED`: this only reports provenance and never picks a
+    winner, drops a source, or decides which is vendor guide or project doctrine.
+    """
+    by_name: dict[str, dict[str, str]] = {}
+    for entry in discovered:
+        module_root = Path(str(entry["path"]))
+        try:
+            skill_files = discover_skill_files(module_root)
+        except OSError:
+            continue
+        for sf in skill_files:
+            name = sf.parent.name if sf.parent != module_root else module_root.name
+            try:
+                real = sf.resolve()
+                digest = hashlib.sha256(real.read_bytes()).hexdigest()
+            except OSError:
+                continue
+            by_name.setdefault(name, {})[str(real)] = digest
+
+    conflicts: list[dict[str, Any]] = []
+    for name in sorted(by_name):
+        sources = by_name[name]
+        if len(sources) < 2:
+            continue
+        conflicts.append(
+            {
+                "skill": name,
+                "status": "ALIAS" if len(set(sources.values())) == 1 else "DIVERGENT",
+                "resolution": "HOST_DECISION_REQUIRED",
+                "sources": [{"path": path, "sha256": sources[path]} for path in sorted(sources)],
+            }
+        )
+    return conflicts
+
+
 _LIVE_CONTRACT_UNOBSERVED_REASON = (
     "no live host session was exercised; only local connect/MCP config plans were inspected"
 )
