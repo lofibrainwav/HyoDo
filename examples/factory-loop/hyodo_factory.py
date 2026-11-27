@@ -43,6 +43,7 @@ from factory.lifecycle import (  # noqa: E402
     discover_skills,
     doctor,
     enable_target,
+    find_same_name_skill_conflicts,
     recover_stale_run_lock,
     remove_module,
     rollback_module,
@@ -467,7 +468,10 @@ def main(argv: list[str] | None = None) -> int:
     elif args.cmd == "discover":
         s_roots = args.search_root or [root.parent]
         found = discover_skills(s_roots, query=args.query)
-        print(json.dumps({"discovered": found}, indent=2, ensure_ascii=False))
+        conflicts = find_same_name_skill_conflicts(found)
+        print(
+            json.dumps({"discovered": found, "conflicts": conflicts}, indent=2, ensure_ascii=False)
+        )
     elif args.cmd == "gaps":
         gap_rep = analyze_capability_gaps(
             root,
