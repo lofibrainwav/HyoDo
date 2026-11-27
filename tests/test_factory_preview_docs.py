@@ -8,6 +8,7 @@ a first-time reader gets the same first result the docs promise.
 
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import subprocess
@@ -24,6 +25,7 @@ SITE_INDEX = REPO / "site" / "src" / "pages" / "index.astro"
 SITE_CONFIG = REPO / "site" / "astro.config.mjs"
 BOUNDARY = REPO / "docs" / "PRODUCT_BOUNDARY.md"
 
+PUBLIC_URL = "https://github.com/lofibrainwav/HyoDo.git"
 REF_RE = re.compile(r"git checkout --detach ([0-9a-f]{40})")
 SUBCOMMANDS = (
     "add",
@@ -93,26 +95,89 @@ def test_quickstart_bootstraps_the_checkout_and_places_root_first() -> None:
     assert "--root" in run
 
 
-@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
-def test_quickstart_run_block_reaches_a_first_meaningful_result(tmp_path: Path) -> None:
-    run = _fenced_blocks(FACTORY_README.read_text(encoding="utf-8"))["factory-preview-run"]
+def _clean_env(tmp_path: Path) -> dict[str, str]:
     home = tmp_path / "home"
     bin_dir = home / "bin"
     bin_dir.mkdir(parents=True)
     (bin_dir / "python3").symlink_to(sys.executable)
-    env = {
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    # macOS `mktemp -d` ignores $TMPDIR; this shim keeps the test hermetic everywhere.
+    shim = bin_dir / "mktemp"
+    shim.write_text(
+        "#!/bin/sh\n"
+        '[ "$1" = "-d" ] || exit 2\n'
+        "d=\"$TMPDIR/tmp.$$.$(od -An -N4 -tx1 /dev/urandom | tr -d ' \\n')\"\n"
+        'mkdir "$d" && printf \'%s\\n\' "$d"\n',
+        encoding="utf-8",
+    )
+    shim.chmod(0o755)
+    return {
         "HOME": str(home),
         "PATH": f"{bin_dir}:/usr/bin:/bin",
-        "TMPDIR": str(tmp_path),
+        "TMPDIR": str(scratch),
         "LANG": "C.UTF-8",
     }
+
+
+def _local_public_source(tmp_path: Path) -> Path:
+    """A throwaway git repo holding the parts of the checkout the quickstart uses."""
+    source = tmp_path / "public-source"
+    for rel in ("hyodo", "examples/factory-loop", "schemas"):
+        shutil.copytree(
+            REPO / rel,
+            source / rel,
+            ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
+        )
+    for rel in ("pyproject.toml", "VERSION"):
+        shutil.copy2(REPO / rel, source / rel)
+    git_env = {
+        **os.environ,
+        "GIT_AUTHOR_NAME": "t",
+        "GIT_AUTHOR_EMAIL": "t@example.com",
+        "GIT_COMMITTER_NAME": "t",
+        "GIT_COMMITTER_EMAIL": "t@example.com",
+    }
+    for cmd in (["init", "-q"], ["add", "."], ["commit", "-q", "-m", "source"]):
+        subprocess.run(["git", *cmd], cwd=source, env=git_env, check=True, capture_output=True)
+    return source
+
+
+def _git_status(path: Path) -> str:
+    return subprocess.run(
+        ["git", "status", "--porcelain", "--untracked-files=all"],
+        cwd=path,
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout
+
+
+@pytest.mark.skipif(shutil.which("bash") is None, reason="bash is required")
+@pytest.mark.skipif(shutil.which("git") is None, reason="git is required")
+def test_quickstart_from_an_existing_folder_leaves_nothing_in_it(tmp_path: Path) -> None:
+    """Clone and example work both land in an explicitly created temporary path."""
+    blocks = _fenced_blocks(FACTORY_README.read_text(encoding="utf-8"))
+    clone = blocks["factory-preview-clone"]
+    run = blocks["factory-preview-run"]
+    source = _local_public_source(tmp_path)
+    clone = clone.replace(PUBLIC_URL, str(source))
+    clone = REF_RE.sub("git checkout --detach HEAD", clone)
+    assert str(source) in clone, "the clone block must name the public repository URL"
+
+    existing = tmp_path / "existing-folder"
+    existing.mkdir()
+    (existing / "keep.txt").write_text("mine", encoding="utf-8")
+    env = _clean_env(tmp_path)
+    repo_before = _git_status(REPO)
+
     result = subprocess.run(
-        ["bash", "-c", f"set -e\n{run}"],
-        cwd=REPO,
+        ["bash", "-c", f"set -e\n{clone}\n{run}"],
+        cwd=existing,
         env=env,
         capture_output=True,
         text=True,
-        timeout=120,
+        timeout=180,
         check=False,
     )
     assert result.returncode == 0, result.stderr
@@ -122,7 +187,31 @@ def test_quickstart_run_block_reaches_a_first_meaningful_result(tmp_path: Path) 
     assert "verify-demo" in out
     assert "selected" in out.lower()
     assert "UNOBSERVED" in out  # a fresh workspace has no registered modules
-    assert not (home / ".hyodo").exists()
+
+    # Nothing was left in the folder the reader ran the commands from.
+    assert sorted(p.name for p in existing.iterdir()) == ["keep.txt"]
+    # The clone and the example work live under the explicitly created temp paths.
+    scratch = Path(env["TMPDIR"])
+    created = sorted(p.name for p in scratch.iterdir())
+    assert len(created) >= 2, created
+    assert any((p / "HyoDo" / ".git").exists() for p in scratch.iterdir() if p.is_dir())
+    assert not (Path(env["HOME"]) / ".hyodo").exists()
+    assert _git_status(REPO) == repo_before
+
+
+def test_every_published_git_clone_names_an_explicit_destination() -> None:
+    clone_re = re.compile(r"git clone\s+(\S+)(.*)")
+    seen = 0
+    for path in (FACTORY_README, ROOT_README, SITE_DOC, SITE_INDEX):
+        for match in clone_re.finditer(path.read_text(encoding="utf-8")):
+            if "HyoDo" not in match.group(1):
+                continue
+            seen += 1
+            dest = match.group(2).strip().split("&&")[0].strip()
+            assert re.match(r'"\$[A-Za-z_]+/[^"\s]+"', dest), (
+                f"{path.name}: git clone needs an explicit temporary destination: {match.group(0)}"
+            )
+    assert seen >= 2
 
 
 def test_site_has_a_dedicated_preview_page_and_landing_section() -> None:

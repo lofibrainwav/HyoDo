@@ -17,12 +17,14 @@ need Factory.
 
 ## Try it from source
 
-You need `git` and Python 3.11 or newer. Nothing is installed, and no account or
-other project is involved.
+You need `git` and Python 3.11 or newer. Nothing is installed, no account or
+other project is involved, and the commands below write only to a new
+temporary directory, not to the folder you run them from.
 
 ```sh
-git clone https://github.com/lofibrainwav/HyoDo.git
-cd HyoDo
+preview="$(mktemp -d)"
+git clone https://github.com/lofibrainwav/HyoDo.git "$preview/HyoDo"
+cd "$preview/HyoDo"
 git checkout --detach 6e7b33e9b9a6654de95b9eade7f053cf51f6e4ce
 ```
 

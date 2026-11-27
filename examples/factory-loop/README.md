@@ -21,11 +21,13 @@ Nothing here needs a package install, an account, or any other project.
 You need `git` and Python 3.11 or newer. The commands below create files only
 in a new temporary directory, and they never run a skill.
 
-First get the reviewed source and enter it:
+First create a temporary directory, clone the reviewed source into it, and
+enter it. Nothing is written to the folder you run this from:
 
-```sh
-git clone https://github.com/lofibrainwav/HyoDo.git
-cd HyoDo
+```sh factory-preview-clone
+preview="$(mktemp -d)"
+git clone https://github.com/lofibrainwav/HyoDo.git "$preview/HyoDo"
+cd "$preview/HyoDo"
 git checkout --detach 6e7b33e9b9a6654de95b9eade7f053cf51f6e4ce
 ```
 
@@ -91,6 +93,9 @@ What this preview does and does not establish:
   is listed as verified here.
 - `hosts` reports what each host's configuration plan says. It never starts a
   host.
+
+When you are done, delete the two temporary directories (`"$preview"` and
+`"$work"`).
 
 When the pinned revision changes, update it in this file, in the root
 `README.md`, and in the site page together. `tests/test_factory_preview_docs.py`
